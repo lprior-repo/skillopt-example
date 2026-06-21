@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import pytest
 
@@ -24,9 +25,11 @@ def _make_skill_dir(root: Path, name: str) -> None:
     )
 
 
-@pytest.fixture(scope="session")
-def skills_root_large(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    root = tmp_path_factory.mktemp("skills_large")
+def _raw_skills_root_large(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = cast(Path, tmp_path_factory.mktemp("skills_large"))
     for i in range(LARGE_COUNT):
         _make_skill_dir(root, f"skill-{i:03d}")
     return root
+
+
+skills_root_large: Callable[..., Path] = pytest.fixture(scope="session")(_raw_skills_root_large)
