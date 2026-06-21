@@ -1,2 +1,0 @@
-Now I understand the task. The `copy_prefix` function uses unsafe code (`set_len` and `ptr::copy_nonoverlapping`) which needs to be removed. I'll replace it with the safe `input[..len].to_vec()`.
-Repair output written to `/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_remove_unsafe_copy/repair-output.json`. `cargo test` passed with 2 tests.

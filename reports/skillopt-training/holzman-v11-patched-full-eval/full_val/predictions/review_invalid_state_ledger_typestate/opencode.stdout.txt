@@ -1,8 +1,0 @@
-Now I have the full picture. The crate has a struct with `status: String`, lifecycle booleans, and optional lifecycle data — exactly the pattern requiring six typestate findings per SKILL.md line 44.
-Review complete. 10 findings written to `review-output.json`:
-
-- **6 BLOCKER typestate findings** (per SKILL.md line 44): enum/state machine, status/String, bool/lifecycle, Option invalid-state, newtype/domain IDs, parse boundary
-- **1 BLOCKER** mutable domain (violates Functional Core)
-- **3 MAJOR** missing benchmark, test/command evidence, and anemic domain model
-
-All findings verified to have required fields (severity, rule, file, line, problem, failure_mode, fix).

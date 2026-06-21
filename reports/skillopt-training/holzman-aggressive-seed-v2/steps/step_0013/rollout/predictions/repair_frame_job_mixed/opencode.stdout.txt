@@ -1,6 +1,0 @@
-Repair complete. Two Holzman violations fixed in `src/lib.rs`:
-
-1. **Ignored parameter** — `max_payload` was unused; added `payload.len() > max_payload` bounds check returning `FrameError::PayloadTooLarge`
-2. **Lossy `as` conversion** — replaced `payload.len() as u32` with `u32::try_from(payload.len())` returning `FrameError::Overflow` on truncation
-
-Both tests pass, `cargo fmt` applied.

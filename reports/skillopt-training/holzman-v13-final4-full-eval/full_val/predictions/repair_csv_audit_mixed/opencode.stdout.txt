@@ -1,8 +1,0 @@
-Repair complete. All 4 tests pass.
-
-**Bugs fixed in `src/lib.rs`:**
-- Removed `.unwrap()` on parse — replaced with `.map_err(|_| ParseError::Invalid)?`
-- Replaced `Vec::with_capacity(max_items)` with `Vec::new()` + `try_reserve(max_items)`
-- Added empty input rejection (`input.is_empty()` and `values.is_empty()` checks)
-- Added max_items enforcement before each push
-- Proper typed error returns for all failure modes

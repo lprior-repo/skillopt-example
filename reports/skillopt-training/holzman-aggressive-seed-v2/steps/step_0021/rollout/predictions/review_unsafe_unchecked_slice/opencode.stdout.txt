@@ -1,6 +1,0 @@
-Review complete. Wrote `review-output.json` with 8 findings:
-
-- **5 BLOCKERs** in `src/lib.rs:1-2`: `unsafe` with `get_unchecked`, unchecked indexing, no error propagation for a fallible operation, unchecked `start + len` arithmetic, and primitive-obsession API design.
-- **3 MAJORs**: missing benchmark, profiler, and allocation evidence.
-
-All code findings stem from the single function `field` which bypasses all bounds checking via `unsafe` with no way to signal errors, no measured performance justification, and no safe fallback path.

@@ -1,8 +1,0 @@
-Current code has multiple Holzman violations: lossy `as u32` conversion, unused `max_payload`, missing `checked_add`, missing `try_reserve`, and no payload size check. Let me fix it.
-Repair complete. Three Holzman violations fixed in `src/lib.rs`:
-
-1. **Lossy `as u32`** → `u32::try_from(payload.len()).map_err(...)` — prevents truncation on large payloads
-2. **Missing `max_payload` check** → returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`
-3. **No bounded allocation** → `checked_add` for capacity arithmetic + `try_reserve` for fallible allocation
-
-All 2 behavior tests pass, clippy clean under strict flags, JSON output written.

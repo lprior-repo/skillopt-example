@@ -61,7 +61,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -127,7 +127,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -193,7 +193,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -259,7 +259,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -325,7 +325,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -391,7 +391,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -457,7 +457,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -523,7 +523,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -589,7 +589,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -655,7 +655,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -721,7 +721,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -787,7 +787,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -853,7 +853,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -919,7 +919,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -985,7 +985,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1051,7 +1051,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1117,7 +1117,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1183,7 +1183,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1249,7 +1249,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1315,7 +1315,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1378,7 +1378,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1441,7 +1441,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1504,7 +1504,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1567,7 +1567,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1630,7 +1630,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1693,7 +1693,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1756,7 +1756,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1819,7 +1819,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1882,7 +1882,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -1945,7 +1945,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2008,7 +2008,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2071,7 +2071,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2134,7 +2134,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2197,7 +2197,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2260,7 +2260,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2323,7 +2323,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2386,7 +2386,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2449,7 +2449,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2512,7 +2512,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2575,7 +2575,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2634,7 +2634,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2693,7 +2693,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2752,7 +2752,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2811,7 +2811,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2870,7 +2870,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2929,7 +2929,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -2988,7 +2988,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3047,7 +3047,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3106,7 +3106,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3165,7 +3165,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3224,7 +3224,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3283,7 +3283,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3342,7 +3342,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3401,7 +3401,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3460,7 +3460,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3519,7 +3519,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3578,7 +3578,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3637,7 +3637,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3696,7 +3696,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3755,7 +3755,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3847,7 +3847,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -3939,7 +3939,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4031,7 +4031,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4123,7 +4123,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4215,7 +4215,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4307,7 +4307,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4399,7 +4399,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4491,7 +4491,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4583,7 +4583,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4675,7 +4675,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4767,7 +4767,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4859,7 +4859,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -4951,7 +4951,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5043,7 +5043,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5135,7 +5135,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5227,7 +5227,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5319,7 +5319,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5411,7 +5411,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5503,7 +5503,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   },
@@ -5595,7 +5595,7 @@
     "forbidden_output_patterns": [
       {
         "name": "live_agents_reference",
-        "pattern": "/home/lewis/\\.(agents|opencode|claude)"
+        "pattern": "(?:\\$HOME|~|/[^\\s\\\"]+?)/\\.(agents|opencode|claude)"
       }
     ]
   }

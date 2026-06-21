@@ -1,7 +1,0 @@
-Now I see the issues. The `encode_frame` function ignores `max_payload` (needed for `rejects_limit` test) and has unchecked `as u32` cast (needs checked conversion). Let me fix the source.
-Repaired. Changes to `src/lib.rs`:
-
-1. **Added `max_payload` enforcement** (line 9-11): returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload` — fixes the `rejects_limit` test that was previously failing.
-2. **Replaced unchecked `as u32` cast** (line 13): `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?` — removes lossy conversion per Holzman rules, using the existing `FrameError::Overflow` variant.
-
-All gates passed: `cargo fmt`, `cargo check --all-targets`, `cargo clippy` (all Holzman lint gates), and `cargo test` (2/2). Output written to `repair-output.json`.

@@ -1,2 +1,0 @@
-    Checking repair_frame_telemetry_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/099ac5a128c9422e/repair_frame_telemetry_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s

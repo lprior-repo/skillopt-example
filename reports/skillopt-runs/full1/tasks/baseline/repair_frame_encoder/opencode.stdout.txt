@@ -1,5 +1,0 @@
-Now I understand the issue. The `encode_frame` function never checks if `payload.len() > max_payload`. It ignores the `max_payload` parameter entirely. Let me run the tests first to confirm:
-The test confirms the bug: `max_payload` is never checked. The fix is to add the bound check:
-Tests pass. Let me also verify clippy passes:
-Now let me write the required output JSON:
-Repaired `/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_frame_encoder/repair-output.json` — cargo test passed.

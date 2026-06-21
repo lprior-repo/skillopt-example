@@ -1,8 +1,0 @@
-{
-  "provider_spec": "mock:dryrun",
-  "eval_model": "",
-  "max_steps": 4,
-  "regression_tolerance": 0.01,
-  "opencode_timeout": 300,
-  "cargo_timeout": 120
-}

@@ -1,2 +1,0 @@
-    Checking repair_checked_average v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v5/tasks/candidate-v5/repair_checked_average)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s

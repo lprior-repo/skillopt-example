@@ -1,7 +1,0 @@
-Repair complete. Three violations fixed in `src/lib.rs:8-21`:
-
-1. **Lossy cast** (`payload.len() as u32`) → `u32::try_from(payload.len()).map_err(...)`
-2. **Missing payload check** → early return `PayloadTooLarge` when `payload.len() > max_payload`
-3. **Unbounded allocation** → `4usize.checked_add(payload.len()).ok_or(Overflow)?` + `out.try_reserve(capacity).map_err(Allocation)?`
-
-`cargo fmt` and `cargo test` (2/2 pass). Output written to `repair-output.json`.

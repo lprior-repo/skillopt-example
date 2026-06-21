@@ -1,3 +1,0 @@
-The tests import `render_summary`, `summarize_metrics`, `Summary`, and `SummaryError` — none of which match the current `summarize_file` function. The tests expect a string-parsing API, not a file-reading one. I also see forbidden constructs: `unwrap()`, unchecked `+=`, unchecked division, and `parts[1]` indexing.
-All 6 tests pass. Now let me run clippy to verify no warnings:
-`cargo test` passed (all 6 tests). Written `repair-output.json` to `/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/candidate-v6/repair_metric_summary_layers/repair-output.json`.

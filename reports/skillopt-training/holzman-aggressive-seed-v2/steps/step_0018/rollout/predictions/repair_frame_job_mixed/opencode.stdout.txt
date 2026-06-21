@@ -1,4 +1,0 @@
-Repaired. Two changes to `src/lib.rs`:
-
-1. **Added `max_payload` enforcement** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`, satisfying the `rejects_limit` test
-2. **Replaced lossy `as` cast** — `payload.len() as u32` → `u32::try_from(payload.len())` with `Overflow` error, satisfying Holzman Rust constraint on unchecked width conversions

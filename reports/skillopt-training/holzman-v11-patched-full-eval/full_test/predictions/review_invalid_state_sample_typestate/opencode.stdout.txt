@@ -1,9 +1,0 @@
-Now I have the full picture. The code has a `SampleWorkflow` struct with `status: String`, lifecycle booleans, optional lifecycle field, and raw `String` id — triggering the SKILL.md typestate review clause requiring exactly six findings.
-Done. Review written to `review-output.json` with 6 findings:
-
-1. **typestate-state-machine** (line 1) — flat booleans + string encode lifecycle instead of enum typestate
-2. **status-string** (line 3) — `status: String` instead of typed enum
-3. **bool-lifecycle** (line 4) — independent booleans permit invalid state combinations
-4. **option-invalid-state** (line 6) — bare `Option<u64>` for lifecycle data
-5. **newtype-domain-id** (line 2) — raw `String` id without smart constructor
-6. **parse-boundary** (line 1) — no boundary between untrusted input and trusted domain values

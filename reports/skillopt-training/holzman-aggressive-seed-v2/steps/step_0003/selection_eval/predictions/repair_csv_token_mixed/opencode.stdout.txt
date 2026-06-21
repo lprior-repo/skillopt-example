@@ -1,8 +1,0 @@
-Now I see the issues clearly. Let me fix the production source.
-All 4 tests pass. Let me verify the final source and write the output.
-Repaired. Summary of changes to `src/lib.rs`:
-
-- **Removed** `unwrap()` on `.parse::<u16>()` — replaced with `.map_err(|_| ParseError::Invalid)`
-- **Added** empty-input rejection — returns `Err(ParseError::Empty)` for empty trimmed parts
-- **Added** `max_items` enforcement — returns `Err(ParseError::TooMany)` when part count exceeds limit
-- **Added** `try_reserve` — handles `Allocation` errors via `map_err` to `ParseError::Allocation`

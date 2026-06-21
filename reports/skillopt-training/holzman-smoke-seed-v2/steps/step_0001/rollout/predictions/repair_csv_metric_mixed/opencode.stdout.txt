@@ -1,8 +1,0 @@
-Now I see all the violations. Let me write the fixed `src/lib.rs`:
-All 4 tests pass. Writing the output:
-Repaired. Changes made to `src/lib.rs`:
-
-1. **Removed `.unwrap()`** — replaced with `map_err(|_| ParseError::Invalid)` for parse failures
-2. **Added empty-input check** — `trimmed.is_empty()` returns `Err(ParseError::Empty)`
-3. **Added max_items enforcement** — checks `values.len() >= max_items` before each push, returns `Err(ParseError::TooMany)`
-4. **Added `try_reserve`** — allocates with bounded capacity and maps allocation failure to `Err(ParseError::Allocation)`

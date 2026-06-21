@@ -29,7 +29,7 @@ class HolzmanRustAdapter(EnvAdapter):
         opencode_variant: str = "",
         opencode_show_thinking: bool = False,
         references_dir: str = "",
-        sandbox_root: str = "/tmp/opencode/holzman-skillopt-train",
+        sandbox_root: str = "/tmp/opencode/holzman-skillopt",
         max_completion_tokens: int = 8192,
     ) -> None:
         self.workers = int(workers)

@@ -1,9 +1,0 @@
-Now I understand the issues. The function needs: payload size check, checked arithmetic, `try_reserve`, and no lossy `as` casts.
-Repaired. Summary of changes to `src/lib.rs`:
-
-- **Added payload size check** — returns `PayloadTooLarge` when `payload.len() > max_payload`
-- **Removed lossy cast** — replaced `payload.len() as u32` with `u32::try_from(payload.len())`
-- **Added checked arithmetic** — `4usize.checked_add(payload.len())` for capacity
-- **Added fallible allocation** — `out.try_reserve(capacity)` instead of unbounded extend
-
-All gates passed: `cargo fmt`, `cargo test` (2/2), strict `cargo clippy`. Output written to `repair-output.json`.

@@ -1,1 +1,0 @@
-Review complete. Written `review-output.json` to the required output path with 8 findings and 6 missing-evidence items. All required fields present: severity, rule, file, line, problem, failure_mode, fix.

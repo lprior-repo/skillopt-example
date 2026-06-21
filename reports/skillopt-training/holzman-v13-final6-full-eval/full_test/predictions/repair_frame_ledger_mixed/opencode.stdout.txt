@@ -1,9 +1,0 @@
-Issues identified in `src/lib.rs`:
-1. No `max_payload` check (test expects `PayloadTooLarge` error)
-2. `payload.len() as u32` is lossy conversion
-3. Missing `checked_add` and `try_reserve` per frame/packet encoder pattern
-Repair complete. Three fixes applied to `src/lib.rs`:
-
-1. **Added `max_payload` check** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` (satisfies `rejects_limit` test)
-2. **Replaced lossy cast** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
-3. **Frame encoder pattern** — added `checked_add` for capacity arithmetic and `try_reserve` for allocation

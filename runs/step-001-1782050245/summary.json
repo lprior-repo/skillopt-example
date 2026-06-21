@@ -1,1 +1,0 @@
-{"aggregates": [{"bundle": "step-001", "hard": 0.8, "soft": 0.5, "mixed": 0.65, "passed_tasks": 1, "task_count": 1}], "gate": {"action": "kept"}}

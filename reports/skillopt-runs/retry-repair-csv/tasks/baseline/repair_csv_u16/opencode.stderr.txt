@@ -1,3 +1,0 @@
-[0m
-> build · MiniMax-M2.7-highspeed
-[0m

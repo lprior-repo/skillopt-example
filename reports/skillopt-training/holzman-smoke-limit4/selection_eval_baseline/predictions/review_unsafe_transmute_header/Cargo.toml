@@ -1,4 +1,0 @@
-[package]
-name = "review_unsafe_transmute_header"
-version = "0.1.0"
-edition = "2021"

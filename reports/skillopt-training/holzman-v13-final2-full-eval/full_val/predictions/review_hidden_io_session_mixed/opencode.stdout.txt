@@ -1,7 +1,0 @@
-Now I have all references and the task crate. Let me write the review output.
-Review complete. Written to `review-output.json` with:
-
-- **14 findings**: 9 BLOCKER, 5 MAJOR
-- **Key violations**: hidden I/O fused with parsing (lines 9, 16), 3 `unwrap()` panic surfaces (lines 9, 19), unchecked indexing (line 16), lossy `as u16` cast (line 19), no typed error taxonomy, no bounded allocation (`try_reserve`), `split` instead of mandatory `split_once`, no performance/command evidence
-- **6 missing evidence items**: benchmarks, profiler data, allocation audit, command evidence, second-ring evidence, stress tests
-- **Residual risk**: static review only, no commands executed, code is not deliverable in current form

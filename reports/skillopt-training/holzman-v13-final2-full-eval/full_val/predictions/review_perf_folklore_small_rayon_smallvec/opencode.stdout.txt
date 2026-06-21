@@ -1,9 +1,0 @@
-Now I have all context. Let me write the review findings.
-Review complete. Written 6 BLOCKER findings to `review-output.json` covering:
-
-1. **folklore_rayon_tiny_input** — Rayon suggestion for 4-element input
-2. **folklore_smallvec_fixed_array** — SmallVec for fixed-size [u8; 4] output
-3. **unnecessary_allocation_fixed_size** — Heap Vec for 4 known slots; should return `[&'static str; 4]`
-4. **unmeasured_performance_claim** — "because it will be faster" with no baseline, hardware, or workload
-5. **missing_benchmark_profiler_allocation_evidence** — No criterion benchmark, flamegraph, or dhat profiling
-6. **unreachable_performance_advice** — TODO guidance that would mislead future developers into anti-patterns

@@ -1,2 +1,0 @@
-Now let me explore the task crate structure.
-Review output written to `/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/review_arithmetic_indexing/review-output.json`.

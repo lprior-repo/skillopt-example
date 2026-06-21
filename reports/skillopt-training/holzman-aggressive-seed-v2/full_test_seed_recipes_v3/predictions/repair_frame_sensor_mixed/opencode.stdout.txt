@@ -1,9 +1,0 @@
-Now I understand the issues. The current code has: lossy `as u32` cast, no `max_payload` enforcement, and no `try_reserve`. Let me fix them.
-All tests pass. Now writing the output.
-Repair complete. Three Holzman Rust violations fixed in `src/lib.rs`:
-
-1. **Lossy `as` cast** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
-2. **Missing `max_payload` enforcement** — added guard returning `Err(FrameError::PayloadTooLarge)`
-3. **Missing `try_reserve`** — added `out.try_reserve(capacity).map_err(|_| FrameError::Allocation)?` with `checked_add` for capacity computation
-
-All 2 behavior tests pass.

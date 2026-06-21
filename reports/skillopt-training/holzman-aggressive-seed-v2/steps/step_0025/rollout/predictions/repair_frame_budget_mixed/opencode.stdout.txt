@@ -1,7 +1,0 @@
-The tests expect `max_payload` validation that's missing from the production code, plus the `as u32` lossy conversion violates Holzman constraints.
-Repair complete. Two issues fixed in `src/lib.rs`:
-
-1. **Missing `max_payload` enforcement** — added bounds check returning `FrameError::PayloadTooLarge` when `payload.len() > max_payload`.
-2. **Lossy `as u32` conversion** (`payload.len() as u32`) — replaced with `u32::try_from()` wired to `FrameError::Overflow`.
-
-Both behavior tests pass. Output written to `repair-output.json`.

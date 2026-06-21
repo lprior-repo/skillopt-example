@@ -1,6 +1,0 @@
-Repair complete. All 4 tests pass. Changes made to `src/lib.rs`:
-
-- **Removed** `.unwrap()` on `parse::<u16>()` -- replaced with `match` returning `ParseError::Invalid`
-- **Added** `Empty` check for empty input string
-- **Added** `TooMany` check when item count reaches `max_items` limit
-- **Removed** `collect()` + implicit unwrap pattern; now iterates with per-item error handling

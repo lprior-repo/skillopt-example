@@ -1,2 +1,0 @@
-Now let me explore the task crate files.
-Review output written to `/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/review_dense_ir_hot_path/review-output.json`.

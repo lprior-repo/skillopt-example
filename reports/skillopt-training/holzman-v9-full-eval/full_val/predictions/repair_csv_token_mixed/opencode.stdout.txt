@@ -1,8 +1,0 @@
-Now I have full picture. The source has multiple Holzman law violations: `unwrap()`, no empty check, no max_items enforcement, no bounded allocation. Let me repair.
-Repair complete. All 4 tests pass, clippy strict gates clean.
-
-**Violations fixed in `src/lib.rs`:**
-- Removed `.unwrap()` → replaced with `.map_err(|_| ParseError::Invalid)`
-- Added empty-input guard → returns `ParseError::Empty`
-- Added `max_items` enforcement → returns `ParseError::TooMany`
-- Added `try_reserve` with `ParseError::Allocation` fallback

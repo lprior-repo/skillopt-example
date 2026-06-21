@@ -55,7 +55,7 @@ _ROOT: Final[Path] = Path(__file__).resolve().parents[1]
 _SKILLOPT_ROOT: Final[Path] = _ROOT / "vendor" / "SkillOpt"
 _DEFAULT_CONFIG: Final[Path] = _SKILLOPT_ROOT / "configs" / "holzman_rust" / "aggressive.yaml"
 _DEFAULT_CANDIDATE_DIR: Final[Path] = _ROOT / "candidates" / "holzman-rust-candidate-v13"
-_DEFAULT_REPORT_ROOT: Final[Path] = _ROOT / "reports" / "skillopt-training"
+_DEFAULT_REPORT_ROOT: Final[Path] = _ROOT / "reports" / "holzman-rust"
 _VALID_SPLITS: Final[tuple[str, ...]] = ("train", "val", "test")
 _HARD_PASS_THRESHOLD: Final[float] = 1.0
 _BUNDLE_HASHES_NAME: Final[str] = "bundle_hashes.json"
@@ -234,10 +234,23 @@ def _resolve_out_root(args_out: str) -> Path:
     return out
 
 
+def _display_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(_ROOT.resolve()).as_posix()
+    except ValueError:
+        home = Path.home().resolve()
+        try:
+            return f"$HOME/{resolved.relative_to(home).as_posix()}"
+        except ValueError:
+            tail = "/".join(resolved.parts[-2:]) if len(resolved.parts) >= 2 else resolved.name
+            return f"<absolute>/{tail}"
+
+
 def _validate_candidate(candidate_dir: Path) -> None:
     skill_path = candidate_dir / _SKILL_FILENAME
     if not skill_path.is_file():
-        raise RunError(f"missing skill file: {skill_path}", code="missing_skill_md")
+        raise RunError(f"missing skill file: {_display_path(skill_path)}", code="missing_skill_md")
 
 
 def _config_errors(cfg: Mapping[str, object]) -> list[str]:
@@ -252,7 +265,7 @@ def _config_errors(cfg: Mapping[str, object]) -> list[str]:
     except OSError:
         resolved_split_dir = split_dir
     if resolved_split_dir != _SUPPORTED_SPLIT_DIR.resolve():
-        errors.append(f"split_dir={resolved_split_dir}")
+        errors.append(f"split_dir={_display_path(resolved_split_dir)}")
 
     if _as_str(cfg.get("data_path"), "").strip():
         errors.append("data_path_must_be_empty")
@@ -261,7 +274,7 @@ def _config_errors(cfg: Mapping[str, object]) -> list[str]:
     if _as_int(cfg.get("limit"), 0) != 0:
         errors.append(f"limit={_as_int(cfg.get('limit'), 0)}")
     if not (_SUPPORTED_SPLIT_DIR / _MANIFEST_NAME).is_file():
-        errors.append(f"missing_dataset_manifest={_SUPPORTED_SPLIT_DIR / _MANIFEST_NAME}")
+        errors.append(f"missing_dataset_manifest={_display_path(_SUPPORTED_SPLIT_DIR / _MANIFEST_NAME)}")
     return errors
 
 
@@ -306,11 +319,11 @@ def _run_metadata(
     manifest_path = _SUPPORTED_SPLIT_DIR / _MANIFEST_NAME
     return {
         "candidate": candidate,
-        "candidate_dir": str(candidate_dir),
+        "candidate_dir": _display_path(candidate_dir),
         "candidate_hashes": hashes,
-        "config_path": str(config_path),
+        "config_path": _display_path(config_path),
         "config_sha256": sha256_file(config_path),
-        "dataset_split_dir": str(_SUPPORTED_SPLIT_DIR),
+        "dataset_split_dir": _display_path(_SUPPORTED_SPLIT_DIR),
         "dataset_manifest_sha256": sha256_file(manifest_path),
         "promotion_eligible": promotion_eligible,
         "promotion_reason": promotion_reason,
@@ -383,7 +396,7 @@ def main() -> int:
     parser.add_argument(
         "--out",
         required=True,
-        help="Output directory under reports/skillopt-training unless absolute",
+        help="Output directory under reports/holzman-rust unless absolute",
     )
     parser.add_argument("--splits", default="val,test", help="Comma-separated train,val,test")
     parser.add_argument("--ids", default="", help="Comma-separated task ids for targeted reruns")
@@ -426,7 +439,7 @@ def main() -> int:
     (out_root / _RUN_METADATA_NAME).write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(
         json.dumps(
-            {"out": str(out_root), "run_metadata": metadata},
+            {"out": _display_path(out_root), "run_metadata": metadata},
             indent=2,
         ),
         flush=True,

@@ -1,9 +1,0 @@
-Repair complete. All 4 behavior tests pass.
-
-Changes to `src/lib.rs`:
-- Removed `.unwrap()` — replaced with `match` returning `ParseError::Invalid`
-- Added empty-input check returning `ParseError::Empty`
-- Added `max_items` cap enforcement returning `ParseError::TooMany`
-- Pre-allocated `Vec` with bounded capacity from `max_items`
-
-`repair-output.json` written and validated.

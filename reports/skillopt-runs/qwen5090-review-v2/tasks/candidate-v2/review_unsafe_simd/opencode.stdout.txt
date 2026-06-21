@@ -1,2 +1,0 @@
-Now I have all the source and references. Let me write the review.
-Review output written to `/tmp/opencode/holzman-skillopt/qwen5090-review-v2/tasks/candidate-v2/review_unsafe_simd/review-output.json`.

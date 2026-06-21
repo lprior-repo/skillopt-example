@@ -1,9 +1,0 @@
-The source has critical violations: `.unwrap()` on parse, ignores `max_items`, no empty check, no allocation bounds. Let me fix it.
-All 4 tests pass. Now writing the required output.
-Repaired. The original `parse_packets` had three violations of Holzman Rust laws:
-
-1. **`.unwrap()` on parse** — hostile input `"nope"` would panic. Replaced with `.map_err(|_| ParseError::Invalid)`.
-2. **`max_items` ignored** — no cap was enforced. Added `parts.len() > max_items` check returning `Err(ParseError::TooMany)`.
-3. **No empty-input guard** — `""` would produce `Ok(vec![])` instead of `Err(ParseError::Empty)`. Added `input.is_empty()` check.
-
-All 4 behavior tests pass. JSON output written to required path.

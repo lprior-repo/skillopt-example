@@ -1,9 +1,0 @@
-Now I have full context. The current `parse_samples` uses `.unwrap()` (no error handling), doesn't check empty input, doesn't enforce `max_items`, and doesn't use `try_reserve`. Let me repair it per the CSV-to-Vec parser recipe.
-All 4 tests pass. Writing the required output JSON.
-Repair complete. All 4 behavior tests pass.
-
-**Changes in `src/lib.rs`** — replaced the bare `.unwrap()`-based parser with the recipe-compliant version:
-- `input.is_empty()` → `Err(ParseError::Empty)`
-- `Vec::new()` + `try_reserve(max_items)` → `Err(ParseError::Allocation)` on OOM
-- `values.len() >= max_items` before each push → `Err(ParseError::TooMany)`
-- `trimmed.parse().map_err(|_| ParseError::Invalid)` → `Err(ParseError::Invalid)` on bad values

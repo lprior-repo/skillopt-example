@@ -1,9 +1,0 @@
-Repair complete. All 6 tests pass. Key changes to `src/lib.rs`:
-
-- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
-- **Added `render_summary`**: Pure function that formats a `Summary` into the expected string
-- **`split_once`**: Replaces `split + collect + [1]` unchecked indexing
-- **`checked_add`**: Replaces `+=` for safe total accumulation (detects overflow)
-- **`checked_div`**: Replaces `/` for safe average calculation
-- **Empty/invalid handling**: Empty lines skipped, missing commas or parse failures return typed errors
-- **Zero forbidden constructs**: No `unwrap`, `unsafe`, `expect`, `panic!`, unchecked indexing, or lossy `as`

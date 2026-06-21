@@ -1,9 +1,0 @@
-Repaired `parse_tokens` in `src/lib.rs`. Changes:
-
-- **Removed** `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)` 
-- **Added** empty input rejection → `ParseError::Empty`
-- **Added** `try_reserve(max_items)` with `ParseError::Allocation` fallback
-- **Added** `max_items` enforcement before each push → `ParseError::TooMany`
-- Used `for` loop with checked length instead of `collect()` + `unwrap`
-
-All 4 tests pass, `cargo fmt --check` clean, `cargo clippy --lib -- -D warnings` clean. Output written to `repair-output.json`.

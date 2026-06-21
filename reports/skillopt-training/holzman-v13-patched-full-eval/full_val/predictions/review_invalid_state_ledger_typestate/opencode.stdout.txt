@@ -1,9 +1,0 @@
-Now I have all the context needed. Let me write the review output.
-Review complete. Wrote `/review-output.json` with 10 findings and 5 missing evidence items.
-
-Key violations found:
-- **Typestate absent** — `LedgerWorkflow` uses `status: String`, `is_validated: bool`, `is_sent: bool`, `sent_at_epoch_ms: Option<u64>` as independent fields, enabling any invalid combination (line 1-6)
-- **Six typestate findings** per SKILL.md requirement: enum/state machine, String status, bool lifecycle, Option invalid combos, raw primitive IDs, parse boundary
-- **Shell leakage** — `mark_sent` does imperative `.to_string()` allocation mutation instead of pure enum transition (line 9-10)
-- **All fields public** — external mutation defeats all invariants (line 1-6)
-- **Missing evidence** — no benchmarks, profiler, allocation data, or command evidence (cargo check/clippy/test)

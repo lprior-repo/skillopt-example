@@ -1,6 +1,0 @@
-Repair complete. Two issues fixed in `src/lib.rs`:
-
-1. **Missing boundary check** — Added `payload.len() > max_payload` guard returning `FrameError::PayloadTooLarge` (required by `rejects_limit` test)
-2. **Lossy `as u32` cast** — Replaced with `u32::try_from(payload.len())` mapped to `FrameError::Overflow` (Holzman constraint)
-
-Both tests pass. Output written to `repair-output.json`.

@@ -1,9 +1,0 @@
-[
-  {
-    "op": "replace",
-    "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the f",
-    "content_preview": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing",
-    "status": "applied_replace",
-    "index": 1
-  }
-]

@@ -1,6 +1,0 @@
-Now I have all the information. Let me write the review output.
-Review complete. Written to `review-output.json`.
-
-**5 BLOCKER findings, 1 MINOR finding.** The core issue: `BudgetWorkflow` is a textbook case of illegal states being representable — three independent fields (`status: String`, `is_validated: bool`, `is_sent: bool`) encode a single lifecycle concept, allowing impossible combinations like `status="draft"` + `is_sent=true`. The `mark_sent` function has no state-transition guard and can be called from any state.
-
-**Required fix:** Collapse into a typed enum `BudgetStatus { Draft, Validated, Sent }`, replace `id: String` with a domain newtype, and change `mark_sent` to accept a validated predecessor type returning `Result<SentBudget, TransitionError>`.

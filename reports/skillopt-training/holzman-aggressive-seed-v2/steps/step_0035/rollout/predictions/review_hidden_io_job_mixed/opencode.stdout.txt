@@ -1,2 +1,0 @@
-Now I have a thorough understanding of the code and the Holzman constraints. Let me write the review output.
-Review complete. Written to `review-output.json` — valid JSON with 9 findings (7 blockers, 1 warning, 1 info), 5 missing evidence items, and residual risk assessment.

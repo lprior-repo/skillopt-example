@@ -1,8 +1,0 @@
-Review complete. Wrote `review-output.json` with:
-
-- **5 BLOCKERs**: `unwrap()` on I/O (line 9), `unwrap()` on parse (line 19), lossy `as u16` cast (line 19), unchecked indexing `parts[0]` (line 16), hidden `println!` I/O side effect (line 16)
-- **2 HIGHs**: raw `pub` fields on `Record` without validation (line 3), intermediate `Vec<String>` allocation per line (line 12), missing typed error taxonomy
-- **1 MEDIUM**: raw primitives enter domain without parse-boundary smart constructor (line 8)
-- **6 missing evidence**: no benchmark, profiler, allocation analysis, CI command evidence, Kani/Miri tests, or integration harness
-
-Residual risk is high — multiple panic-prone constructs and data-corruption paths exist in the single-file crate.

@@ -1,9 +1,0 @@
-Now I have a clear picture. The source has multiple Holzman violations: `.unwrap()`, no empty check, no max_items enforcement, no `try_reserve`, and uses `.collect()` from split. Let me fix it per the Mandatory Repair Patterns.
-Repair complete. All 4 behavior tests pass, all strict clippy lints pass, formatting is clean.
-
-**Changes made to `src/lib.rs`:**
-- Removed `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)?`
-- Added empty-input rejection → `ParseError::Empty`
-- Added `max_items` enforcement per-item → `ParseError::TooMany`
-- Replaced `Vec::with_capacity` + `.collect()` pattern with `Vec::new()` + `try_reserve` + iterative push
-- Added zero-capacity guard → `ParseError::TooMany`

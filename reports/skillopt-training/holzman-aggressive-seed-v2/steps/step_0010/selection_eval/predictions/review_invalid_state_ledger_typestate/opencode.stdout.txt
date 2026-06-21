@@ -1,9 +1,0 @@
-Review complete. Written to `review-output.json`.
-
-**Summary of findings:**
-
-- **7 findings** (6 BLOCKER, 3 MAJOR -- some overlap in severity)
-- Core violation: `LedgerWorkflow` is a public-data POD with `status: String`, `is_validated: bool`, `is_sent: bool` -- every illegal state is constructible at compile time
-- No typestate enum, no newtypes, no fallible constructor, no field encapsulation
-- `mark_sent` is imperative mutation instead of a typed typestate transition
-- No benchmarks, tests, profiler, or allocation evidence exist

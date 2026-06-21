@@ -1,4 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
-     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/ec3c355c9b28fbe4/debug/deps/repair_csv_sensor_mixed-b1f108bacca8cc3c)
-     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/ec3c355c9b28fbe4/debug/deps/behavior-e77d35609c0e43d6)
-   Doc-tests repair_csv_sensor_mixed

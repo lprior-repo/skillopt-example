@@ -1,9 +1,0 @@
-Review complete. Wrote `review-output.json` with 9 findings across the crate.
-
-**Summary of violations found:**
-
-- **6 BLOCKERs** — The core issue is that `LeaseWorkflow` uses `pub String`, `pub bool`, and `pub Option<u64>` fields instead of typed domain types and typestates. This makes illegal states (e.g. `status="sent"` + `is_sent=false` + `is_validated=false`) fully representable and constructable. `id` uses raw `String`, `status` uses raw `String`, both `is_validated` and `is_sent` are bool lifecycle flags, and `sent_at_epoch_ms` is a naked `Option<u64>` with no coupling to the sent state.
-
-- **3 MAJORs** — `mark_sent` has no precondition validation (no check that the lease was validated), no typed error return, and all struct fields are `pub` allowing unvalidated mutation by any caller.
-
-The structural fix is to replace the entire field set with a typed state enum/typestate pattern (e.g. `LeaseState { Draft, Validated, Sent { sent_at: Timestamp } }`), private fields, fallible constructors, and `Result`-returning state transitions.

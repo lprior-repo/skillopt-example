@@ -78,7 +78,7 @@ _CARGO_DEPS_HEADER: Final[str] = '[package]\nname = "{name}"\nversion = "0.1.0"\
 _LIVE_REF_FORBIDDEN: Final[tuple[ForbiddenPattern, ...]] = (
     ForbiddenPattern(
         name="live_agents_reference",
-        pattern=r"/home/lewis/\.(agents|opencode|claude)",
+        pattern=r"(?:\$HOME|~|/[^\s\"]+?)/\.(agents|opencode|claude)",
     ),
 )
 _CSV_FORBIDDEN: Final[tuple[ForbiddenPattern, ...]] = (

@@ -1,6 +1,0 @@
-Repaired. Two fixes in `src/lib.rs`:
-
-1. **Added `max_payload` boundary check** — was unused, causing `rejects_limit` to pass oversized payloads
-2. **Replaced lossy `as u32` with checked `try_into()`** — per Holzman rule forbidding lossy conversions
-
-All 2 behavior tests pass, `cargo fmt --check`, `cargo check`, and `cargo test` all green. Output written to `repair-output.json`.

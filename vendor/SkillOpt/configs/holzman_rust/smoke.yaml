@@ -48,12 +48,12 @@ evaluation:
 
 env:
   name: holzman_rust
-  skill_init: /home/lewis/src/skill-moo/vendor/SkillOpt/skillopt/envs/holzman_rust/skills/initial.md
+  skill_init: vendor/SkillOpt/skillopt/envs/holzman_rust/skills/initial.md
   split_mode: split_dir
-  split_dir: /home/lewis/src/skill-moo/data/holzman_rust_aggressive
+  split_dir: data/holzman_rust_aggressive
   data_path: ""
   split_output_dir: ""
-  out_root: /home/lewis/src/skill-moo/reports/skillopt-training/holzman-smoke-seed-v2
+  out_root: reports/holzman-rust/smoke
   workers: 1
   limit: 4
   opencode_timeout: 900
@@ -62,5 +62,5 @@ env:
   repair_model: qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
   opencode_variant: ""
   opencode_show_thinking: false
-  references_dir: /home/lewis/src/skill-moo/candidates/holzman-rust-candidate-v6/references
-  sandbox_root: /tmp/opencode/holzman-skillopt-train
+  references_dir: candidates/holzman-rust-candidate-v13/references
+  sandbox_root: /tmp/opencode/holzman-skillopt

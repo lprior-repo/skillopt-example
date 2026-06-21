@@ -1,7 +1,0 @@
-Repaired. All 4 behavior tests pass. Changes made to `src/lib.rs`:
-
-- Removed `.unwrap()` — replaced with `map_err(|_| ParseError::Invalid)`
-- Added empty-input check returning `ParseError::Empty`
-- Added `max_items` enforcement via `try_reserve` + per-push cap check returning `ParseError::TooMany`
-- Added empty-part rejection as `ParseError::Invalid`
-- Replaced `collect()` into `Vec` with `Vec::new` + explicit push loop for bounded allocation

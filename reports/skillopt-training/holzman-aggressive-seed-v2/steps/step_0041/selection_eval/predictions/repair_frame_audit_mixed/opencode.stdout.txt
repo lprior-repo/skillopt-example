@@ -1,8 +1,0 @@
-Issues found:
-1. `max_payload` is accepted but never checked — `rejects_limit` test fails
-2. `as u32` on payload.len() — lossy conversion, Holzman violation
-3. `Allocation` and `Overflow` error variants exist but are never returned
-Repair complete. Changes made to `src/lib.rs`:
-
-1. **Added `max_payload` enforcement** — returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload` (was previously ignored)
-2. **Replaced lossy `as u32`** with `u32::try_from(payload.len()).map_err(...)` to satisfy Holzman constraint against lossy conversions and exercise the `Overflow` error variant

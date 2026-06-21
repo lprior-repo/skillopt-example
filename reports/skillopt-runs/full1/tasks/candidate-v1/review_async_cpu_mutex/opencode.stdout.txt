@@ -1,5 +1,0 @@
-Now let me explore the task crate structure and read all source files.
-Now I have a complete picture. Let me analyze and write the review output.
-
-The crate has a single `src/lib.rs` with multiple severe Holzman violations:
-Review complete. Output written to `/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/review_async_cpu_mutex/review-output.json` with 4 BLOCKER findings (await_holding_lock, CPU-on-async-worker, unwrap-in-production, missing try_reserve), 5 MAJOR findings, and 1 MINOR finding.

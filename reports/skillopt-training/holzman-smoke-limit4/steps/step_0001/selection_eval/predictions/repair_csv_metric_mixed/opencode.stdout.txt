@@ -1,7 +1,0 @@
-Repair complete. All 4 behavior tests pass, no forbidden constructs in production code.
-
-**Changes made to `src/lib.rs`:**
-- Replaced `.unwrap()` on `parse::<u16>()` with a `match` returning `Err(ParseError::Invalid)`
-- Added `Empty` check for empty input
-- Added `TooMany` check: `item_count > max_items`
-- Kept `ParseError::Allocation` variant (dead code, not exercised by current inputs)

@@ -1,3 +1,0 @@
-    Blocking waiting for file lock on package cache
-    Checking repair_csv_audit_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/ea9d49b809663a08/repair_csv_audit_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s

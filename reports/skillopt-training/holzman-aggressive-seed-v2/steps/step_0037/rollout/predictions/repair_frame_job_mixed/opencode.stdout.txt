@@ -1,7 +1,0 @@
-Now I understand the issue. The current `encode_frame` doesn't check `max_payload` and uses a lossy `as` cast. Let me fix both issues.
-Repair complete. Two issues fixed in `src/lib.rs`:
-
-1. **Missing `max_payload` enforcement** — Added bounds check returning `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` (required by `rejects_limit` test)
-2. **Lossy `as` conversion** — Replaced `payload.len() as u32` with `TryFrom::try_from(payload.len())` to avoid unsafe narrowing, mapping failure to `FrameError::Overflow`
-
-All 2 behavior tests pass. Output written to `repair-output.json`.

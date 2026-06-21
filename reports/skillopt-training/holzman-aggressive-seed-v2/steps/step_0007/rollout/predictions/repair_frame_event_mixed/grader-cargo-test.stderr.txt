@@ -1,4 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
-     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/95bc9616fdd39288/debug/deps/repair_frame_event_mixed-e40f0ce792f36d0b)
-     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/95bc9616fdd39288/debug/deps/behavior-4d38d19c6f73bf13)
-   Doc-tests repair_frame_event_mixed

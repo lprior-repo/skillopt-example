@@ -1,9 +1,0 @@
-[
-  {
-    "op": "insert_after",
-    "target": "## Repair Mode",
-    "content_preview": "### Repair Mode Checklist\n\nBefore finalizing any repair, verify these specific patterns are fixed:\n1. **Allocation:** Any `Vec::with_capacity` must be replaced with `try_reserve` (or `try_from`/`try_i",
-    "status": "applied_insert_after",
-    "index": 1
-  }
-]

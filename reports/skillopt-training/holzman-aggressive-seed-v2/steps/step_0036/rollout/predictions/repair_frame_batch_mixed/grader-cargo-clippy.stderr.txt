@@ -1,2 +1,0 @@
-    Checking repair_frame_batch_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/bedf73981f69fdc7/repair_frame_batch_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s

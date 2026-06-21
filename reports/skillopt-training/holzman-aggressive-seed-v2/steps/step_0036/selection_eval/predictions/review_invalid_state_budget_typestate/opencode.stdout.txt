@@ -1,8 +1,0 @@
-Now I have all the information needed. Let me write the review output.
-Review complete. Written 9 findings to `review-output.json`:
-
-**3 BLOCKERs** — the struct uses `String` for status and `bool` for lifecycle flags (`is_validated`, `is_sent`), making illegal states fully representable. No typestate enum, no constructor, no guards.
-
-**4 Major** — `mark_sent` has no precondition (any budget can be marked sent), `sent_at_epoch_ms` is an untyped `u64`, fields are all `pub` with no constructor, and string-based status comparison.
-
-**2 Minor** — missing benchmark and command evidence.

@@ -10,3 +10,8 @@ __pycache__/
 outputs/
 tmp/
 target/
+reports/
+runs/
+.benchmarks/
+.hypothesis/
+dist/

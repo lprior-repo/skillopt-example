@@ -1,9 +1,0 @@
-Now I understand the issues. Let me fix the production source.
-All 4 tests pass. Writing the repair output.
-Repair complete. All 4 tests pass.
-
-**Changes made to `src/lib.rs`:**
-- Removed `unwrap()` on `.parse::<u16>()` — replaced with `match` returning `ParseError::Invalid` on failure
-- Added empty-input check returning `ParseError::Empty`
-- Added `max_items` enforcement returning `ParseError::TooMany` when item count exceeds the limit
-- Added empty-trimmed-segment check returning `ParseError::Empty`

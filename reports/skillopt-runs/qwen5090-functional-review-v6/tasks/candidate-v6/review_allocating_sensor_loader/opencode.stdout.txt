@@ -1,2 +1,0 @@
-Now I have all the information needed. Let me write the review.
-Review written to `/tmp/opencode/holzman-skillopt/qwen5090-functional-review-v6/tasks/candidate-v6/review_allocating_sensor_loader/review-output.json`.

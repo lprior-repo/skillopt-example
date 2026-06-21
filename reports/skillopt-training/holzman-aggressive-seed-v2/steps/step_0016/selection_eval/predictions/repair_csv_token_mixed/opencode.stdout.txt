@@ -1,6 +1,0 @@
-Repaired. All 4 tests pass. Changes to `src/lib.rs`:
-
-- Removed `unwrap()` — replaced with `?` propagation and explicit error mapping
-- Added empty-input check → `ParseError::Empty`
-- Added invalid-token check → `ParseError::Invalid` (via `map_err`)
-- Added `max_items` enforcement → `ParseError::TooMany` (checked during iteration)

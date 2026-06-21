@@ -1,5 +1,0 @@
-   Compiling repair_bounded_retries v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-repair-v5/tasks/candidate-v5/repair_bounded_retries)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
-     Running unittests src/lib.rs (target/debug/deps/repair_bounded_retries-d404c47f057f8843)
-     Running tests/behavior.rs (target/debug/deps/behavior-70b9d0217e706462)
-   Doc-tests repair_bounded_retries

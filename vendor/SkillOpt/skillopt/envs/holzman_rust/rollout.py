@@ -328,10 +328,8 @@ def execution_clean(opencode: dict[str, Any]) -> tuple[bool, list[str]]:
     if "Invalid Tool" in combined:
         problems.append("invalid_tool_call")
     for term in [
-        "/home/lewis/src/skill-moo/evals",
         "evals/holzman-rust/tasks.json",
-        "/home/lewis/src/skill-moo/candidates",
-        "/home/lewis/src/skill-moo/reports",
+        "file://",
     ]:
         if term in combined:
             problems.append(f"leaked_path={term}")

@@ -1,3 +1,0 @@
-The bug is clear: `max_payload` is ignored. The `rejects_limit` test expects payload rejection when it exceeds the limit. Fix: add the bound check.
-Both tests pass. Writing the required output.
-Repaired. The bug was that `max_payload` was ignored — `encode_frame` accepted any payload regardless of the limit. Added a single bound check at the top of the function. Both tests pass (`encodes`, `rejects_limit`). Output written to `repair-output.json`.

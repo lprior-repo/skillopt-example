@@ -1,8 +1,0 @@
-Now let me run the tests to see current failures:
-Two failures: division by zero on empty slice, and unchecked arithmetic overflow. Fixing both:
-The sum needs to stay in `u32` space with checked arithmetic to detect overflow:
-All 3 tests pass. Let me verify with clippy:
-Now writing the output:
-Repaired `src/lib.rs` with two changes: added empty-slice guard returning `Err(AverageError::Empty)` to prevent division-by-zero, and replaced unchecked `sum += *value` with `sum.checked_add(value)` returning `Err(AverageError::Overflow)` to prevent arithmetic overflow — `cargo test` passes (3/3) and `cargo clippy` is clean.
-
-Output written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/baseline/repair_checked_average/repair-output.json`.

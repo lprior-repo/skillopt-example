@@ -1,2 +1,0 @@
-    Checking repair_frame_shard_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/910863b97ec283db/repair_frame_shard_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s

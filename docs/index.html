@@ -21,7 +21,7 @@
           <a href="#workflow">Workflow</a>
           <a href="#minimax">MiniMax M3</a>
           <a href="#promotion">Promotion gate</a>
-          <a href="#skill-bundles">Skill bundles</a>
+          <a href="#candidate">Candidate</a>
           <a href="#troubleshooting">Troubleshooting</a>
         </nav>
       </aside>
@@ -155,23 +155,19 @@
           </div>
         </section>
 
-        <section id="skill-bundles" class="doc-section split-section">
+        <section id="candidate" class="doc-section split-section">
           <div class="section-heading">
             <span class="section-kicker">05</span>
-            <h2>Skill bundles</h2>
-            <p>Each skill bundle is self-contained and discoverable by the training harness.</p>
+            <h2>Candidate</h2>
+            <p>The active candidate lives under `candidates/` and is evaluated only through the generated corpus path.</p>
           </div>
           <div class="file-tree-card">
-            <pre><code>skills/holzman-rust/
+            <pre><code>candidates/holzman-rust-candidate-v13/
   SKILL.md
-  rubric.json
-  prompt.md
-  tasks.jsonl
-  eval.py
-  config.json</code></pre>
+  references/</code></pre>
             <p>
-              Use `uv run skillopt-train list --skills-root skills` to discover bundles and
-              `uv run skillopt-train run holzman-rust --steps 4` to evolve one locally.
+              Run `scripts/run_holzman_candidate_eval.py` against this candidate. Generated reports belong
+              under ignored output directories and must be recreated for promotion evidence.
             </p>
           </div>
         </section>
@@ -204,7 +200,7 @@
         <a href="#workflow">Workflow</a>
         <a href="#minimax">MiniMax M3</a>
         <a href="#promotion">Promotion gate</a>
-        <a href="#skill-bundles">Skill bundles</a>
+        <a href="#candidate">Candidate</a>
       </aside>
     </div>
   </body>

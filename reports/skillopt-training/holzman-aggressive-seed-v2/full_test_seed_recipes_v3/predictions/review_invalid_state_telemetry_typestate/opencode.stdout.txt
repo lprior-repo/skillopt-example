@@ -1,7 +1,0 @@
-Review complete. Written to `review-output.json` with 9 findings:
-
-- **6 BLOCKERs**: string status instead of enum typestate, independent bool lifecycle flags allowing invalid combinations, orphan `sent_at_epoch_ms` field decoupled from `is_sent`, all fields pub enabling direct mutation bypassing invariants, `mark_sent` lacks state guards and error taxonomy, no domain error type at all.
-- **2 MAJORs**: missing benchmark/profiler evidence for allocations, no functional-core/imperative-shell separation.
-- **1 MINOR**: raw `String` id without newtype validation.
-
-4 missing-evidence entries and residual risk documented.

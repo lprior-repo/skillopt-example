@@ -1,2 +1,0 @@
-The bug: `max_payload` is never checked. Test `rejects_payload_over_limit` expects `PayloadTooLarge` error when payload exceeds the limit.
-Repaired `/tmp/opencode/holzman-skillopt/qwen3090-repair-v5/tasks/baseline/repair_frame_encoder/repair-output.json` with `cargo test` passed (2/2 tests).

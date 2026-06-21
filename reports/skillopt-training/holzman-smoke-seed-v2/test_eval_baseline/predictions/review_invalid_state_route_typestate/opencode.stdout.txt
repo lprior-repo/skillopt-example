@@ -1,7 +1,0 @@
-Review complete. Written 10 findings and 5 missing-evidence items to `review-output.json`.
-
-Key issues:
-- **4 BLOCKERs**: Illegal states representable (pub fields), primitive obsession (`String`/`bool` instead of typed enums), no pre-condition validation in `mark_sent`, unvalidated state transitions
-- **3 Majors**: Bare primitives (`u64`, `String`) without newtypes, no encapsulation (data bag struct with no methods)
-- **2 Minors**: No benchmarks, no allocation profiling
-- **5 Missing evidence**: No benchmarks, profiler, integration/behavioral tests, or CI command evidence

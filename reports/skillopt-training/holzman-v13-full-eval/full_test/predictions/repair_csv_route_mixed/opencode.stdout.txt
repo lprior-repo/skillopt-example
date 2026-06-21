@@ -1,9 +1,0 @@
-Now I have a clear picture. The current `parse_routes` has multiple Holzman violations: `.unwrap()`, no empty check, no `max_items` enforcement, no `try_reserve`. Let me fix it.
-Now let me write the required output JSON:
-Repair complete. All 4 tests pass. Changes made to `src/lib.rs`:
-
-- **`.unwrap()` removed** → replaced with `.map_err(|_| ParseError::Invalid)?` on `parse()`
-- **Empty input check** → returns `ParseError::Empty` before any iteration
-- **Bounded allocation** → `Vec::new()` + `try_reserve(max_items)` with `ParseError::Allocation` on failure
-- **max_items enforcement** → explicit loop checks `values.len() >= max_items` before each push, returns `ParseError::TooMany`
-- **No `collect()` on fallible iterator** → replaced with explicit `for` loop

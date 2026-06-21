@@ -1,5 +1,0 @@
-Review complete. Valid JSON written to `review-output.json` with:
-
-- **5 BLOCKER findings** covering: illegal states representable (bools/String instead of typestate enum), primitive obsession, untyped returns, functional-core/shell violation, and public field exposure.
-- **5 missing evidence** items: no benchmarks, profiler, allocation evidence, behavior tests, or command-layer specs.
-- **Residual risk**: fundamental DDD contract violation — no typestate model exists, making proof obligations impossible until the type model is repaired.

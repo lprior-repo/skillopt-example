@@ -1,8 +1,0 @@
-Repair complete. All 4 tests pass. Changes made to `src/lib.rs:9-23`:
-
-- **Removed `.unwrap()`** - replaced with `.map_err(|_| ParseError::Invalid)` returning typed error
-- **Added empty input check** - returns `ParseError::Empty` when input is blank
-- **Added max_items cap** - returns `ParseError::TooMany` when item count exceeds limit
-- **No other banned constructs** remain (no unsafe, panic, unchecked access, or lossy casts)
-
-`repair-output.json` written and validated at the required path.

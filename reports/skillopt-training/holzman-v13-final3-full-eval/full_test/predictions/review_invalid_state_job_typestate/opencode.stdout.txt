@@ -1,5 +1,0 @@
-Review complete. Written to `review-output.json` with 7 findings:
-
-- **6 typestate findings** (all BLOCKER): missing enum/state machine, `status: String`, lifecycle `bool` fields, `Option` invalid-state combinations, raw `String` ID without newtype, and missing parse boundary
-- **1 architectural finding** (BLOCKER): `mark_sent` conflates pure data transform with action semantics
-- **6 missing evidence items**: no benchmarks, profiler, allocation analysis, command evidence, error taxonomy, or resource caps

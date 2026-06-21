@@ -23,7 +23,7 @@ Candidate-only. Do not promote without clean stress evidence against the current
 - Before reporting done, inspect final source for missing `try_reserve`, unchecked `+`, unchecked `/`, lossy `as`, unchecked indexing/slicing, `unwrap`/`expect`/panic surfaces, `Vec::with_capacity`, `split(',').collect()`, `let _ = expr` on must-use values, hidden I/O, and changed tests/manifests.
 - Run `cargo fmt`, `cargo test`, `cargo fmt --check`, and strict source `cargo clippy` when feasible. Never claim a command passed unless it actually passed.
 - If JSON output is required, write the exact requested path and validate parseability when tools allow.
-- In eval/sandbox mode, `reference_files_read` must list only the active `.skill/holzman-rust/...` bundle and task files you actually read. Never list `/home/lewis/.agents/...`, `/home/lewis/.opencode/...`, or other live skill paths.
+- In eval/sandbox mode, `reference_files_read` must list only the active `.skill/holzman-rust/...` bundle and task files you actually read. Never list `$HOME/.agents/...`, `$HOME/.opencode/...`, `$HOME/.claude/...`, or $HOME/.claude/..., or other live skill paths.
 
 ## Mandatory Repair Patterns
 

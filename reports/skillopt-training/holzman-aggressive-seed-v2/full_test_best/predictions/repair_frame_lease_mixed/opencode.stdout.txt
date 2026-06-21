@@ -1,6 +1,0 @@
-Repair complete. Two changes to `src/lib.rs`:
-
-1. **Added `max_payload` check** (line 9-11) — rejects `PayloadTooLarge` when `payload.len() > max_payload`
-2. **Removed lossy `as u32`** (line 13) — replaced with `u32::try_from(...).map_err(|_| FrameError::Overflow)?`
-
-All 2 behavior tests pass, `cargo fmt` clean. Output written to `repair-output.json`.

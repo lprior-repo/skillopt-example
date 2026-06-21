@@ -1,6 +1,0 @@
-Now I see the issues. The `encode_frame` function ignores `max_payload` entirely, and uses lossy `as` conversion. Let me fix both.
-Repair complete. Two fixes in `src/lib.rs`:
-
-1. **Added `max_payload` bound check** - returns `PayloadTooLarge` when `payload.len() > max_payload` (test `rejects_limit` was failing)
-2. **Replaced lossy `as u32` with checked `u32::try_from`** - Holzman constraint compliance, maps overflow to `FrameError::Overflow`
-3. **Added `Vec::with_capacity(4 + payload.len())`** - allocation-aware pre-sizing

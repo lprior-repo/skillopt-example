@@ -1,2 +1,0 @@
-    Checking repair_csv_shard_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_shard_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s

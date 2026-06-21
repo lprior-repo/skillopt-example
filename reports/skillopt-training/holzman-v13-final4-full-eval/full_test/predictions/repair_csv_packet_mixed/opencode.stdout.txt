@@ -1,8 +1,0 @@
-I can see the issues. The source has `unwrap()`, no empty/overflow checks, no `try_reserve`, and uses `.collect()`. Let me apply the repair patterns.
-Done. Repaired `src/lib.rs` with these changes:
-
-- **Removed `.unwrap()`** → `.map_err(|_| ParseError::Invalid)?` for fallible parsing
-- **Added empty-input rejection** → `input.is_empty()` returns `Err(ParseError::Empty)`
-- **Replaced `.collect()`** → `Vec::new()` + `try_reserve(max_items)` + explicit loop (per CSV parser repair pattern)
-- **Added max_items enforcement** → returns `Err(ParseError::TooMany)` before each push
-- **Zero strict lint warnings**, all 4 behavior tests pass

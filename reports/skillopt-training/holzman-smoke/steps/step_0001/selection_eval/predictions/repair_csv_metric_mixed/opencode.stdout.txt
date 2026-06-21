@@ -1,8 +1,0 @@
-Now I understand the issues. The current code uses `.unwrap()` on parsing, doesn't check `max_items`, doesn't check for empty input, and doesn't handle invalid parse results. Let me fix `src/lib.rs`.
-All 4 tests pass. Now let me write the output JSON.
-Repair complete. All 4 tests pass. Changes:
-
-- Removed `.unwrap()` on `parse::<u16>()` — replaced with `.map_err(|_| ParseError::Invalid)`
-- Added `Empty` check for blank/whitespace-only input
-- Added `TooMany` check comparing parsed item count against `max_items`
-- Added skip for empty split segments to handle edge cases like `","`

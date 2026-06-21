@@ -1,6 +1,0 @@
-Repaired. All 4 tests pass, all forbidden constructs removed:
-
-- Replaced `.unwrap()` with `.map_err(|_| ParseError::Invalid)` 
-- Added empty input check → `ParseError::Empty`
-- Added `max_items` enforcement → `ParseError::TooMany`
-- Removed `.collect()` iterator; replaced with explicit loop for bounded control

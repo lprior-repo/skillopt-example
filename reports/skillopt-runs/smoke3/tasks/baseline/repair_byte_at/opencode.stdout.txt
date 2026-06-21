@@ -1,2 +1,0 @@
-The issue is `input[index]` panics on out-of-bounds. Fix it to use `input.get(index).copied()`:
-Repaired `/tmp/opencode/holzman-skillopt/smoke3/tasks/baseline/repair_byte_at/repair-output.json` — `cargo test` passed.

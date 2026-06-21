@@ -1,5 +1,0 @@
-Review complete. Written to `review-output.json`.
-
-**Summary:** 9 findings (7 BLOCKER, 2 MINOR), 4 missing evidence items.
-
-The core issue: `LedgerWorkflow` uses `String` for status and `bool` flags for lifecycle (`is_validated`, `is_sent`), making illegal states directly constructible. Holzman Rust requires these to be replaced with a typestate enum so the compiler enforces invariants (sent implies validated, timestamp present iff sent, only valid status strings). The `mark_sent` function also allocates unnecessarily via `String::to_string` and lacks a typed error return for invalid transitions.

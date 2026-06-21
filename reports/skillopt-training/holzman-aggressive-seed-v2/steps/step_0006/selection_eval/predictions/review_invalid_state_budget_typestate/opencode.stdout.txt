@@ -1,9 +1,0 @@
-Now I have all the information needed. Let me write the review output.
-Review complete. Written to `review-output.json` with 6 BLOCKER findings and 5 missing evidence items. The core issues:
-
-1. **`is_validated: bool`** (line 4) — primitive bool flag allowing invalid state combinations
-2. **`is_sent: bool`** (line 5) — redundant bool flag, contradictory with string status
-3. **`status: String`** (line 3) — unbounded string instead of enumerated domain states
-4. **All fields `pub`** (line 1) — zero invariant enforcement at the type level
-5. **`mark_sent` omits `sent_at_epoch_ms`** (line 9) — sent state without required timestamp
-6. **No validated-before-sent check** (line 9) — unvalidated budgets can be marked sent

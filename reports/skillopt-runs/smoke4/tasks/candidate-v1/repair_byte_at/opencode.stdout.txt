@@ -1,2 +1,0 @@
-The issue is clear: `input[index]` uses unchecked indexing that panics on out-of-bounds, but the function signature returns `Option<u8>` meaning it should return `None` when out of bounds. The fix is to use `.get(index)` which returns `Option<&u8>`.
-Repaired `/tmp/opencode/holzman-skillopt/smoke4/tasks/candidate-v1/repair_byte_at/repair-output.json` - cargo test passed.

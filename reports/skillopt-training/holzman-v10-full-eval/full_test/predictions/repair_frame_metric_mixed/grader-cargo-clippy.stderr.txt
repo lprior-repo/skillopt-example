@@ -1,2 +1,0 @@
-    Checking repair_frame_metric_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/b8bbfffc3a0ac0e2/repair_frame_metric_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s

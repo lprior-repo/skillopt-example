@@ -1,9 +1,0 @@
-Now I understand the issues. The function uses `.unwrap()`, ignores `max_items`, and doesn't handle empty input or invalid parses. Let me fix it.
-All 4 tests pass. Let me write the required output.
-Repair complete. All 4 behavior tests pass. Summary of changes to `src/lib.rs:9-21`:
-
-- **Removed** `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)` for typed error propagation
-- **Added** empty input check → `ParseError::Empty`
-- **Added** `max_items` enforcement → `ParseError::TooMany`
-- **Added** allocation-aware capacity via `Vec::with_capacity`
-- Zero forbidden constructs (`unsafe`, `unwrap`, `expect`, `panic`, etc.) remain in production source

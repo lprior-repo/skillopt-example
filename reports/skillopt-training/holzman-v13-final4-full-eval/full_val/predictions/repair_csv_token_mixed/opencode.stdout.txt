@@ -1,9 +1,0 @@
-Now I have full context. The production code has three violations: `unwrap()`, no `max_items` enforcement, and no `try_reserve`. Let me fix it.
-Repair complete. Summary of changes to `src/lib.rs`:
-
-1. **Removed `unwrap()`** — replaced with `.map_err(|_| ParseError::Invalid)?` on parse
-2. **Added empty input check** — returns `Err(ParseError::Empty)` for blank input
-3. **Added `max_items` enforcement** — checks `values.len() >= max_items` before each push, returns `Err(ParseError::TooMany)`
-4. **Replaced `Vec::with_capacity` pattern** — uses `Vec::new()` + `try_reserve(max_items).map_err(|_| ParseError::Allocation)?`
-
-All 4 tests pass. Formatting, compile, and strict clippy gates all clean. JSON written to `repair-output.json`.

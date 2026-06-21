@@ -1,5 +1,0 @@
-Review complete. Written to `review-output.json` with:
-
-- **3 findings**: 1 BLOCKER (cargo-culted Rayon/SmallVec claim on 4-byte input without evidence), 2 MINOR (allocation via unbounded `collect`, Vec return type leaking implementation detail)
-- **5 missing evidence items**: no benchmark, profiler, allocation tracing, second-ring comparison, or command evidence
-- **Residual risk**: static review only; the code is functionally correct but the TODO comment invites a counterproductive optimization on a fixed 4-element input

@@ -1,2 +1,0 @@
-Now I have all the context. Let me write the review.
-The required output path is `/tmp/opencode/holzman-skillopt/qwen5090-review-v2/tasks/candidate-v2/review_arithmetic_indexing/review-output.json`.

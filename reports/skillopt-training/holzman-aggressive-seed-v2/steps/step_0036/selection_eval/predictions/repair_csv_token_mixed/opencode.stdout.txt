@@ -1,9 +1,0 @@
-Now I have the full picture. The `parse_tokens` function has multiple Holzman violations: `unwrap()` on parse, ignores `max_items`, no empty check, no allocation handling. Let me fix it.
-All 4 tests pass. Writing the repair output.
-Repair complete. All 4 behavior tests pass. Changes in `src/lib.rs`:
-
-- **Removed `unwrap()`** on `parse::<u16>()` — now uses `map_err` to return `ParseError::Invalid`
-- **Added empty-input check** — returns `ParseError::Empty`
-- **Added `max_items` enforcement** — returns `ParseError::TooMany` when tokens exceed limit
-- **Replaced `Vec` construction** — uses `Vec::new()` + `try_reserve()` instead of collecting directly, with `Allocation` error on allocation failure
-- **Added empty-token guard** — blank tokens between commas return `ParseError::Invalid`

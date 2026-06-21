@@ -1,2 +1,0 @@
-Now I have the full picture. The crate has a single 6-line source file with a critical `unwrap()` on `parse::<u32>()`, which is a panic path in production code.
-review-output.json written to the required output path.

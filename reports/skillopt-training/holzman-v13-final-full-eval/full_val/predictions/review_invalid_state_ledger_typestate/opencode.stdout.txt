@@ -1,9 +1,0 @@
-Now I have the full picture. The source is a textbook violation of every typestate and Holzman rule. Writing the review output.
-Review complete. Written to `/review-output.json`.
-
-**Summary**: 14 BLOCKER findings across the entire 13-line crate. The source is a textbook violation of every typestate and Holzman rule:
-
-- **Typestate violations** (6 required findings): `LedgerWorkflow` uses `pub String` for status, `pub bool` for lifecycle flags, and `pub Option<u64>` for optional data — all independent and combinable into any invalid state. No typestate enum, no smart constructor, no parse boundary.
-- **Hidden I/O**: `"sent".to_string()` allocates in a pure domain function.
-- **Invariant violations**: `mark_sent` transitions to sent without requiring validated-first; all fields are `pub` so callers bypass invariants entirely.
-- **Missing evidence**: No benchmark, profiler, allocation audit, command-truth, or second-ring evidence for any operation.

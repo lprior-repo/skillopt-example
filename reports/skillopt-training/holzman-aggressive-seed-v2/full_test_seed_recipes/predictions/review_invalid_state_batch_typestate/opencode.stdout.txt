@@ -1,9 +1,0 @@
-Now I have all the context. Let me write the review.
-Review complete. Written to `review-output.json`. Key findings:
-
-- **4 BLOCKERs**: `status: String` (no domain discipline), `is_validated/is_sent: bool` (orphan lifecycle flags), `mark_sent` blind mutation (no preconditions), and illegal states representable (any field combination is legal including contradictions like `status="sent"` + `is_sent=false`)
-- **2 MAJORs**: No typestate state machine, no `BatchId` newtype
-- **1 MINOR**: All fields are `pub`, enabling external invalid-state construction
-- **6 INFO**: Missing benchmark, profiler, allocation, second-ring, and command evidence
-
-The core issue: `BatchWorkflow` is a textbook example of make-illegal-states-representable — a String status + two independent booleans can express every logically impossible combination of a batch workflow lifecycle.

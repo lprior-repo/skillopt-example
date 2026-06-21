@@ -1,2 +1,0 @@
-    Checking repair_csv_audit_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/e55f7a1060a637af/repair_csv_audit_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s

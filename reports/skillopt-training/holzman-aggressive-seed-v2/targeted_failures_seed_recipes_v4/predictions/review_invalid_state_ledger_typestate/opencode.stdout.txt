@@ -1,9 +1,0 @@
-Review complete. Written to `review-output.json`.
-
-**13 findings** across the task crate (`src/lib.rs`):
-
-- **8 BLOCKERs** — Core Holzman violations: `LedgerWorkflow` uses `status: String` + `is_validated: bool` + `is_sent: bool` which permits illegal state combinations, all fields are public (no encapsulation), `mark_sent` bypasses typestate enforcement, no smart constructor for `id`, and no error taxonomy for invalid transitions.
-- **2 MajoRs** — No functional core / imperative shell split on the transition logic; no domain error enum.
-- **3 MINORs** — Missing benchmark, profiler, and allocation evidence; no second-ring command evidence.
-
-**Residual risk**: Without enum-based typestate, the domain model cannot enforce lifecycle correctness at compile time — silent state corruption leading to double-sends and missed validations is the primary risk.

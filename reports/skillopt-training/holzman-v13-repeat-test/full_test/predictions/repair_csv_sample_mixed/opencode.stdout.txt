@@ -1,8 +1,0 @@
-Repaired. All 4 behavior tests pass, no panic surfaces remain.
-
-Changes to `src/lib.rs`:
-- Removed `.unwrap()` on parse -- replaced with `.map_err(|_| ParseError::Invalid)?`
-- Added empty-input check returning `ParseError::Empty`
-- Added `max_items` cap enforcement returning `ParseError::TooMany`
-- Replaced `Vec::with_capacity`/`collect` with `Vec::new` + `try_reserve(max_items)` + fallible reserve error
-- Iterative parse loop instead of unbounded `collect()`

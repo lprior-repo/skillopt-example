@@ -1,8 +1,0 @@
-Now I have all context. Writing the review output.
-Review complete. Written 15 BLOCKER findings + 8 missing evidence items to `review-output.json`. Key violations:
-
-- **Typestate absent** — `RouteWorkflow` uses `String` + `bool` + `Option<u64>` instead of an exhaustive typestate enum
-- **6 typestate-specific findings** — status/String, bool/lifecycle, Option invalid-state combos, newtype IDs, parse boundary, struct fields public
-- **mark_sent accepts any state** — no type-level or value-level transition guards
-- **Hidden I/O** — `"sent".to_string()` allocates on the heap in pure core logic
-- **Zero evidence** — no tests, benchmarks, profiler data, allocation budgets, or command evidence

@@ -1,2 +1,0 @@
-    Checking repair_summary_event_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/9523b2262c6622c9/repair_summary_event_mixed)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s

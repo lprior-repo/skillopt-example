@@ -1,9 +1,0 @@
-I can see the issues: `max_payload` is never checked, `as u32` is a lossy conversion, and no allocation safety. Let me run the tests first to confirm the failure modes.
-Confirmed: `rejects_limit` fails because `max_payload` is ignored. Now I'll apply the minimal fix.
-All 2 tests pass. Let me verify the final source and write the output.
-Repair complete. Two changes in `src/lib.rs`:
-
-1. **Added `max_payload` enforcement** (line 9-11) — returns `Err(FrameError::PayloadTooLarge)` when payload exceeds limit
-2. **Replaced lossy `as u32`** with `u32::try_from` (line 18) and added `checked_add` for capacity math (line 13-15) + `try_reserve` for allocation safety
-
-All 2 behavior tests pass.

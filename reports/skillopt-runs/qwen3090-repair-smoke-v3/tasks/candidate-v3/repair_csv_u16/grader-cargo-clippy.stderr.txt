@@ -1,2 +1,0 @@
-    Checking repair_csv_u16 v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v3/tasks/candidate-v3/repair_csv_u16)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s

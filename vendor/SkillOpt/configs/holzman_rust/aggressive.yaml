@@ -28,7 +28,7 @@ evaluation:
   eval_test: true
 
 env:
-  out_root: /home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2
+  out_root: reports/holzman-rust/aggressive
   workers: 2
   limit: 0
   opencode_timeout: 1200

@@ -1,7 +1,0 @@
-[package]
-name = "review_async_cpu_mutex"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-tokio = { version = "1", features = ["sync", "time"] }

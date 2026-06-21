@@ -1,2 +1,0 @@
-Now I have the full picture. Writing the review output.
-Review complete. Found 8 findings (7 BLOCKER, 1 MAJOR) and 5 missing evidence items. The core violation is `LeaseWorkflow` uses `String` status + `bool` lifecycle flags instead of enums/typestates, allowing invalid state combinations. All fields are `pub`, enabling external mutation bypassing invariants. Wrote `review-output.json` at the required path.

@@ -1,8 +1,0 @@
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
-     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/2963c8d9fbc11986/debug/deps/repair_csv_audit_mixed-03dc3be90d06d870)
-     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/2963c8d9fbc11986/debug/deps/behavior-a1eab2853311edc5)
-   Doc-tests repair_csv_audit_mixed

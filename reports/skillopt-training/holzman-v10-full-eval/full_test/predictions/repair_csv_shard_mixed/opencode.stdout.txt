@@ -1,8 +1,0 @@
-Repaired. The `parse_shards` function had 4 Holzman law violations:
-
-1. **`unwrap()` on parse** → replaced with `map_err(|_| ParseError::Invalid)`
-2. **Ignored `max_items`** → enforced cap before each push, returning `ParseError::TooMany`
-3. **No empty check** → returns `ParseError::Empty` for empty input
-4. **No bounded allocation** → uses `try_reserve(max_items)` before collecting
-
-All 4 behavior tests pass. Output written to `repair-output.json`.

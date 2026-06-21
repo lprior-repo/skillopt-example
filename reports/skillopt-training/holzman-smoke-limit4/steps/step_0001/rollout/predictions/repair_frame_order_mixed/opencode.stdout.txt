@@ -1,7 +1,0 @@
-Repaired. Two fixes in `src/lib.rs`:
-
-1. **Added `max_payload` check** — returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload`
-2. **Replaced `payload.len() as u32`** with `u32::try_from(payload.len())` to eliminate lossy conversion, mapping overflow to `FrameError::Overflow`
-3. **Pre-allocated buffer** with `Vec::with_capacity(4 + payload.len())` for deterministic allocation
-
-Both tests pass. Output written to `repair-output.json`.

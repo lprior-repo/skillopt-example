@@ -1,5 +1,0 @@
-Now I see the issues. Let me run the tests first to confirm they fail, then repair.
-Wait, I need to reconsider. The test `detects_overflow` expects `Err(AverageError::Overflow)` for `[u32::MAX, 1]`. With a u64 sum this won't overflow. The test expects u32-sum overflow detection.
-All 3 tests pass. Now let me verify Holzman Rust constraints with clippy.
-All tests pass and clippy is clean. Now let me write the output JSON.
-Repaired `src/lib.rs`: added empty-slice check, `checked_add` for overflow-safe summation, `u32::try_from` for bounds-safe length conversion, and `checked_div` for division safety. All 3 tests pass and strict clippy is clean.

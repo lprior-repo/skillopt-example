@@ -1,1 +1,0 @@
-Repaired `src/lib.rs` by replacing `unsafe` `ptr::copy_nonoverlapping` + `set_len` with safe `input.get(..len).map(|s| s.to_vec())`; cargo test passed (2/2) and clippy reports zero warnings. Output written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-v5/tasks/candidate-v5/repair_remove_unsafe_copy/repair-output.json`.

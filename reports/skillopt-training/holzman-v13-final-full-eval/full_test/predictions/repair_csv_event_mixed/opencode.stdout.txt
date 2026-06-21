@@ -1,8 +1,0 @@
-Repaired. The original `parse_events` had 4 violations:
-
-1. `.unwrap()` on parse -- replaced with `map_err(|_| ParseError::Invalid)`
-2. No empty input check -- added `input.is_empty()` → `ParseError::Empty`
-3. No `max_items` enforcement -- added length check before each push → `ParseError::TooMany`
-4. `split(',').map(...).collect()` pattern -- replaced with bounded `for` loop + `try_reserve` + `ParseError::Allocation`
-
-All 4 tests pass, clippy clean, JSON output written.

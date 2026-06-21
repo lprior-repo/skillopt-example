@@ -1,2 +1,0 @@
-Now I have all context. Let me write the review.
-Review written to `/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/candidate-v5/review_dense_ir_hot_path/review-output.json`.

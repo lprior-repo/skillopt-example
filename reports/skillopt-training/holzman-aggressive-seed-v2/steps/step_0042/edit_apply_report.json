@@ -1,9 +1,0 @@
-[
-  {
-    "op": "replace",
-    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded, unchecked `+`/`-`/`*` in capacity/len",
-    "content_preview": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded or known, unchecked `+`/`-`/`*` in cap",
-    "status": "skipped_replace_target_not_found",
-    "index": 1
-  }
-]

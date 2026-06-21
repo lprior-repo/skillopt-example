@@ -1,7 +1,0 @@
-The current code ignores `max_payload` entirely. Tests need payload size validation. Let me fix it.
-Both tests pass. Writing the output.
-Repaired. Two Holzman violations fixed in `src/lib.rs:8-17`:
-
-1. **Unused `max_payload`** — added payload size check, returns `PayloadTooLarge` when exceeded
-2. **Lossy `as` conversion** (`payload.len() as u32`) — replaced with `u32::try_from(payload.len())` mapping to `Overflow`
-3. **Unallocated Vec** — added `try_reserve(4 + payload.len())` with `Allocation` error handling

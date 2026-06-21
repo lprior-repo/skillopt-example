@@ -1,9 +1,0 @@
-Now I have all the context needed. Let me write the review output.
-Review complete. Wrote `review-output.json` with 6 findings (5 BLOCKER, 1 WARNING) and 6 missing evidence items.
-
-Key violations in `src/lib.rs`:
-- **Tiny fixed-input + Vec**: Returns `Vec` for a known `[u8; 4]` input — every call heap-allocates
-- **Rayon folklore**: TODO proposes Rayon for 4 elements — thread-pool overhead will be 10-100x slower
-- **SmallVec folklore**: TODO proposes SmallVec for always-4 output — unnecessary type parameter + heap fallback
-- **Missing benchmark/profiler/allocation evidence**: No benchmarks, profiler data, allocation tracing, or baseline measurements exist
-- **Unmeasured optimization encoded as TODO**: Future developer will follow the TODO and regress performance

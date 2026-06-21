@@ -1,8 +1,0 @@
-Repair complete. All 4 behavior tests pass.
-
-**Changes in `src/lib.rs`:**
-- Added empty-input check returning `Err(ParseError::Empty)`
-- Replaced `.collect()` with explicit `for` loop using `Vec::new()` + `try_reserve(max_items)` for allocation safety
-- Enforced `max_items` before each push, returning `Err(ParseError::TooMany)`
-- Replaced `.unwrap()` with `.map_err(|_| ParseError::Invalid)?` for parse failures
-- No production `unsafe`, `unwrap`, `expect`, `panic!`, or lossy casts remain

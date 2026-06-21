@@ -1,3 +1,0 @@
-Now I understand the issues. The current `parse_headers` function has multiple problems: unchecked indexing, no `max_headers` enforcement, no empty-name check, no separator validation, and it always uses `Cow::Owned` instead of `Cow::Borrowed`. Let me fix it.
-All 5 tests pass. Now let me verify no forbidden constructs remain and write the output.
-Repaired `/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_headers_zero_copy/repair-output.json`; all 5 cargo tests passed and clippy is clean.

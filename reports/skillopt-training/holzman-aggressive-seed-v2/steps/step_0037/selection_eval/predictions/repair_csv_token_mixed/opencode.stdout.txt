@@ -1,8 +1,0 @@
-Repaired. All 4 tests pass, all Holzman constraints satisfied.
-
-**Changes to `src/lib.rs`:**
-- Removed `.unwrap()` on `.parse()` — replaced with `.map_err(|_| ParseError::Invalid)?`
-- Added empty-input check returning `ParseError::Empty`
-- Added `max_items` cap check returning `ParseError::TooMany`
-- Added `try_reserve` with `ParseError::Allocation` error propagation
-- Removed `.split(',')` + `.map().unwrap()` chain; replaced with bounded iteration and `?` error propagation

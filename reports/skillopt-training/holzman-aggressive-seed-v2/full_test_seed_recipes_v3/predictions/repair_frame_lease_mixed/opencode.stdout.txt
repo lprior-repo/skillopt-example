@@ -1,9 +1,0 @@
-Repair complete. All tests pass.
-
-**Changes to `src/lib.rs`:**
-- Added `payload.len() > max_payload` check → `Err(FrameError::PayloadTooLarge)`
-- Replaced lossy `payload.len() as u32` with `u32::try_from(payload.len()).map_err(...)` → `Err(FrameError::Overflow)`
-- Added `checked_add` for capacity computation
-- Added `try_reserve(capacity)` → `Err(FrameError::Allocation)`
-
-**Holzman violations repaired:** lossy `as` cast, missing payload bound check, missing checked arithmetic, missing bounded allocation.

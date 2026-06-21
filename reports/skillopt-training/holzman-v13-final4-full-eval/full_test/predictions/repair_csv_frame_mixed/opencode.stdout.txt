@@ -1,9 +1,0 @@
-Now I have the full picture. The source has `.unwrap()`, `.collect()` on splits, no `try_reserve`, no empty/too-many checks. Let me fix it.
-All 4 tests pass. Let me verify the final source is clean:
-Repaired. All 4 tests pass. Changes:
-
-- **`.unwrap()` removed** → replaced with `map_err(|_| ParseError::Invalid)?`
-- **`.collect()` removed** → replaced with `Vec::new()` + `for`-loop iteration
-- **`try_reserve` added** → `values.try_reserve(max_items).map_err(|_| ParseError::Allocation)?`
-- **Empty rejection added** → `if input.is_empty() { return Err(ParseError::Empty); }`
-- **TooMany enforcement added** → checks `values.len() >= max_items` before each push
