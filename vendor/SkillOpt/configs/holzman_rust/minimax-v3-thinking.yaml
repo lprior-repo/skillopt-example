@@ -1,0 +1,14 @@
+_base_: aggressive.yaml
+
+model:
+  backend: minimax
+  target: MiniMax-M3
+  target_backend: minimax_chat
+  minimax_model: MiniMax-M3
+  minimax_enable_thinking: true
+
+env:
+  review_model: minimax-coding-plan/MiniMax-M3
+  repair_model: minimax-coding-plan/MiniMax-M3
+  opencode_variant: thinking
+  opencode_show_thinking: true

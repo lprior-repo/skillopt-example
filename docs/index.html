@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkillOpt Example Docs</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar" aria-label="Documentation navigation">
+        <a class="brand" href="#top" aria-label="SkillOpt Example home">
+          <span class="brand-mark">S</span>
+          <span>
+            <strong>SkillOpt Example</strong>
+            <small>Holzman Rust evals</small>
+          </span>
+        </a>
+        <nav class="nav-list">
+          <a href="#quickstart">Quickstart</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#minimax">MiniMax M3</a>
+          <a href="#promotion">Promotion gate</a>
+          <a href="#skill-bundles">Skill bundles</a>
+          <a href="#troubleshooting">Troubleshooting</a>
+        </nav>
+      </aside>
+
+      <main id="top" class="content">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Generated corpus. Proof-friendly evals. Candidate-only skill work.</p>
+            <h1>Run high-assurance SkillOpt evaluations without guessing what passed.</h1>
+            <p class="hero-lede">
+              This workspace packages a generated Holzman Rust corpus, a SkillOpt adapter, and a
+              fail-closed candidate evaluator with exact hashes and non-promotable targeted reruns.
+            </p>
+            <div class="hero-actions">
+              <a class="button primary" href="#quickstart">Start evaluating</a>
+              <a class="button secondary" href="#promotion">Read promotion rules</a>
+            </div>
+          </div>
+          <div class="terminal-card" aria-label="Quick command example">
+            <div class="terminal-topbar">
+              <span></span><span></span><span></span>
+              <strong>candidate eval</strong>
+            </div>
+            <pre><code>uv run python scripts/run_holzman_candidate_eval.py \
+  --config vendor/SkillOpt/configs/holzman_rust/minimax-v3-thinking.yaml \
+  --out holzman-minimax-m3 \
+  --splits val,test \
+  --candidate-name holzman-minimax-m3</code></pre>
+          </div>
+        </section>
+
+        <section class="metrics-grid" aria-label="Workspace status metrics">
+          <article>
+            <span>Corpus</span>
+            <strong>387 tasks</strong>
+            <p>Train 227, validation 80, test 80.</p>
+          </article>
+          <article>
+            <span>Model path</span>
+            <strong>MiniMax M3</strong>
+            <p>OpenCode `thinking` variant wired through config.</p>
+          </article>
+          <article>
+            <span>Gate</span>
+            <strong>Fail closed</strong>
+            <p>Subset runs are explicit non-promotion evidence.</p>
+          </article>
+        </section>
+
+        <section id="quickstart" class="doc-section">
+          <div class="section-heading">
+            <span class="section-kicker">01</span>
+            <h2>Quickstart</h2>
+            <p>Install dependencies, regenerate the corpus, then run a candidate eval.</p>
+          </div>
+          <div class="code-stack">
+            <article class="code-card">
+              <header><span>Install</span><code>dependencies</code></header>
+              <pre><code>uv sync --dev</code></pre>
+            </article>
+            <article class="code-card">
+              <header><span>Validate corpus</span><code>387 tasks</code></header>
+              <pre><code>uv run python scripts/generate_holzman_rust_dataset.py \
+  --out /tmp/holzman_rust_aggressive_check \
+  --seed 42</code></pre>
+            </article>
+            <article class="code-card">
+              <header><span>Run full eval</span><code>promotion eligible</code></header>
+              <pre><code>uv run python scripts/run_holzman_candidate_eval.py \
+  --out holzman-current \
+  --splits val,test \
+  --candidate-name holzman-current</code></pre>
+            </article>
+          </div>
+        </section>
+
+        <section id="workflow" class="doc-section split-section">
+          <div class="section-heading">
+            <span class="section-kicker">02</span>
+            <h2>Workflow</h2>
+            <p>One supported path keeps dataset generation, rollout execution, and evidence aligned.</p>
+          </div>
+          <div class="steps-card">
+            <ol>
+              <li><strong>Generate</strong><span>Create deterministic split data under `data/holzman_rust_aggressive`.</span></li>
+              <li><strong>Evaluate</strong><span>Run candidate skill bundles through `scripts/run_holzman_candidate_eval.py`.</span></li>
+              <li><strong>Record</strong><span>Persist `run_metadata.json`, bundle hashes, summaries, and raw artifacts.</span></li>
+              <li><strong>Promote</strong><span>Accept only full `val,test` hard `1.0` runs with `non_promotable: false`.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section id="minimax" class="doc-section">
+          <div class="section-heading">
+            <span class="section-kicker">03</span>
+            <h2>MiniMax M3 with thinking</h2>
+            <p>The OpenCode rollout passes the configured model and variant to every task.</p>
+          </div>
+          <div class="config-panel">
+            <pre><code>env:
+  review_model: minimax-coding-plan/MiniMax-M3
+  repair_model: minimax-coding-plan/MiniMax-M3
+  opencode_variant: thinking
+  opencode_show_thinking: true</code></pre>
+            <p>
+              The evaluator writes these effective settings into `run_metadata.json`, along with
+              candidate, config, and dataset manifest hashes.
+            </p>
+          </div>
+        </section>
+
+        <section id="promotion" class="doc-section policy-section">
+          <div class="section-heading">
+            <span class="section-kicker">04</span>
+            <h2>Promotion gate</h2>
+            <p>Promotion is designed to fail closed. A convenient rerun is never promoted by accident.</p>
+          </div>
+          <div class="policy-grid">
+            <article>
+              <h3>Eligible</h3>
+              <p>Full `val,test`, `--kind all`, no `--ids`, `limit: 0`, checked-in split dir, hard `1.0` on both splits.</p>
+            </article>
+            <article>
+              <h3>Non-promotable</h3>
+              <p>Targeted IDs, partial split sets, review-only/repair-only runs, alternate raw data paths, or any hard failure.</p>
+            </article>
+            <article>
+              <h3>Evidence</h3>
+              <p>Keep `run_metadata.json`, `bundle_hashes.json`, per-split summaries, and raw prediction artifacts together.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="skill-bundles" class="doc-section split-section">
+          <div class="section-heading">
+            <span class="section-kicker">05</span>
+            <h2>Skill bundles</h2>
+            <p>Each skill bundle is self-contained and discoverable by the training harness.</p>
+          </div>
+          <div class="file-tree-card">
+            <pre><code>skills/holzman-rust/
+  SKILL.md
+  rubric.json
+  prompt.md
+  tasks.jsonl
+  eval.py
+  config.json</code></pre>
+            <p>
+              Use `uv run skillopt-train list --skills-root skills` to discover bundles and
+              `uv run skillopt-train run holzman-rust --steps 4` to evolve one locally.
+            </p>
+          </div>
+        </section>
+
+        <section id="troubleshooting" class="doc-section">
+          <div class="section-heading">
+            <span class="section-kicker">06</span>
+            <h2>Troubleshooting</h2>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>Why did my run exit `2`?</summary>
+              <p>The run wrote artifacts, but it was not promotion eligible. Check `promotion_reason` in `run_metadata.json`.</p>
+            </details>
+            <details>
+              <summary>Why did my run fail before OpenCode launched?</summary>
+              <p>The evaluator rejects unsupported configs before rollout. Check `split_mode`, `split_dir`, `data_path`, and `limit`.</p>
+            </details>
+            <details>
+              <summary>Where do model settings show up?</summary>
+              <p>`run_metadata.json` records `review_model`, `repair_model`, `opencode_variant`, and `opencode_show_thinking`.</p>
+            </details>
+          </div>
+        </section>
+      </main>
+
+      <aside class="toc" aria-label="On this page">
+        <p>On this page</p>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#minimax">MiniMax M3</a>
+        <a href="#promotion">Promotion gate</a>
+        <a href="#skill-bundles">Skill bundles</a>
+      </aside>
+    </div>
+  </body>
+</html>

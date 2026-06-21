@@ -1,0 +1,1 @@
+tightened cargo fmt enforcement

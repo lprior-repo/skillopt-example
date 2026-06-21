@@ -1,0 +1,35 @@
+_base_: smoke.yaml
+
+train:
+  num_epochs: 3
+  train_size: 64
+  batch_size: 4
+  accumulation: 1
+  seed: 42
+
+gradient:
+  minibatch_size: 4
+  merge_batch_size: 4
+  analyst_workers: 2
+  failure_only: true
+  max_analyst_rounds: 2
+
+optimizer:
+  learning_rate: 4
+  min_learning_rate: 2
+  lr_scheduler: cosine
+  use_slow_update: false
+
+evaluation:
+  use_gate: true
+  gate_metric: hard
+  sel_env_num: 10
+  test_env_num: 10
+  eval_test: true
+
+env:
+  out_root: /home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2
+  workers: 2
+  limit: 0
+  opencode_timeout: 1200
+  cargo_timeout: 300

@@ -1,0 +1,66 @@
+_base_: ../_base_/default.yaml
+
+model:
+  backend: qwen
+  optimizer: Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+  target: Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+  optimizer_backend: qwen_chat
+  target_backend: qwen_chat
+  optimizer_qwen_chat_base_url: http://127.0.0.1:11000/v1
+  target_qwen_chat_base_url: http://127.0.0.1:11000/v1
+  qwen_chat_api_key: local
+  qwen_chat_timeout_seconds: 600
+  qwen_chat_max_tokens: 12000
+  qwen_chat_temperature: 0.2
+  qwen_chat_enable_thinking: false
+  reasoning_effort: medium
+
+train:
+  num_epochs: 1
+  train_size: 4
+  batch_size: 2
+  accumulation: 1
+  seed: 42
+
+gradient:
+  minibatch_size: 2
+  merge_batch_size: 2
+  analyst_workers: 1
+  failure_only: true
+  max_analyst_rounds: 1
+
+optimizer:
+  learning_rate: 2
+  min_learning_rate: 1
+  lr_scheduler: constant
+  lr_control_mode: fixed
+  skill_update_mode: patch
+  use_slow_update: false
+  use_meta_skill: false
+  use_skill_aware_reflection: false
+
+evaluation:
+  use_gate: true
+  gate_metric: hard
+  sel_env_num: 4
+  test_env_num: 4
+  eval_test: true
+
+env:
+  name: holzman_rust
+  skill_init: /home/lewis/src/skill-moo/vendor/SkillOpt/skillopt/envs/holzman_rust/skills/initial.md
+  split_mode: split_dir
+  split_dir: /home/lewis/src/skill-moo/data/holzman_rust_aggressive
+  data_path: ""
+  split_output_dir: ""
+  out_root: /home/lewis/src/skill-moo/reports/skillopt-training/holzman-smoke-seed-v2
+  workers: 1
+  limit: 4
+  opencode_timeout: 900
+  cargo_timeout: 240
+  review_model: qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+  repair_model: qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+  opencode_variant: ""
+  opencode_show_thinking: false
+  references_dir: /home/lewis/src/skill-moo/candidates/holzman-rust-candidate-v6/references
+  sandbox_root: /tmp/opencode/holzman-skillopt-train

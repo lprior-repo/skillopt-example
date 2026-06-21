@@ -40,7 +40,7 @@ class MockProvider:
             default_response
             if default_response is not None
             else ModelResponse(
-                text='{"edits":[],"reasoning":"mock no-op"}',
+                text='{"addendum":"mock no-op addendum\\n","reasoning":"mock no-op"}',
                 usage=Usage.zero(),
                 model=model,
                 latency_ms=0,

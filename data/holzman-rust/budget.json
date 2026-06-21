@@ -1,0 +1,14 @@
+{
+  "best_mixed": 0.4,
+  "best_step": 1,
+  "elapsed_seconds": 0.08623957633972168,
+  "history": [
+    0.4,
+    0.4,
+    0.4,
+    0.4
+  ],
+  "started_at": 1782050042.0880342,
+  "steps_completed": 4,
+  "usd_spent": 0.0
+}

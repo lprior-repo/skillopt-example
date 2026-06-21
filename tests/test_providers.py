@@ -15,7 +15,7 @@ def test_mock_provider_default_response() -> None:
     response = provider.complete(
         pytest.importorskip("skillopt_train.providers").ModelRequest.new(prompt="hi"),
     )
-    assert "edits" in response.text
+    assert "addendum" in response.text
 
 
 def test_mock_provider_scripted_match() -> None:
