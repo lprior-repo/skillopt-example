@@ -123,9 +123,8 @@ files = [
 exclude = "^(vendor|data|docs|reports|candidates|dist|\\.venv)/"
 
 [[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_decorators = false
-warn_return_any = false
+module = ["conftest", "tests.*", "bench.*"]
+disable_error_code = ["untyped-decorator", "no-any-return"]
 
 [tool.ruff]
 line-length = 110
