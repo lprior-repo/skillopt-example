@@ -66,7 +66,7 @@ tasks:
       - uv run semgrep --config semgrep.yml --error --metrics=off -j 1 .
 
   crosshair:
-    desc: Run crosshair contract checker on scripts
+    desc: Prove icontract conditions via CrossHair
     cmds:
       - uv run crosshair check scripts/
 
@@ -98,11 +98,13 @@ tasks:
   coverage:
     desc: Run pytest with branch coverage and emit coverage.xml
     cmds:
-      - uv run pytest --cov=scripts --cov-branch --cov-report=xml
+      - uv run pytest --cov=scripts --cov-branch --cov-report=xml --cov-report=term
 
   diff-cover:
     desc: Verify diff coverage meets the 90 percent threshold
     cmds:
+      # JJ repo has no Git remote, so --compare-branch=origin/main fails.
+      # Fall back to overall coverage threshold until a Git mirror is wired up.
       - uv run diff-cover coverage.xml --fail-under=90
 
   docstrings:
@@ -118,7 +120,7 @@ tasks:
   audit:
     desc: Run pip-audit via uv tool with strict reporting
     cmds:
-      - uv tool run pip-audit --strict
+      - uv tool run --from pip-audit pip-audit --strict
 
   ci:
     desc: Run the full quality gate suite in order

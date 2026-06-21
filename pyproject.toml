@@ -28,6 +28,7 @@ test = [
 ]
 verify = [
     "crosshair>=0.0.70",
+    "crosshair-tool>=0.0.70",
 ]
 lint = [
     "ruff>=0.6",
@@ -36,6 +37,7 @@ lint = [
     "refurb>=2.0",
     "deptry>=0.20",
     "interrogate>=1.7",
+    "diff-cover>=9",
 ]
 io-shell = [
     "httpx>=0.27",
