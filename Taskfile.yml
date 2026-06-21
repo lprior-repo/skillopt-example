@@ -21,10 +21,11 @@ tasks:
       - uv sync --dev
 
   test:
-    desc: Validate generated dataset and evaluator imports
+    desc: Validate generated dataset, evaluator imports, and property tests
     cmds:
       - uv run python -m py_compile scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
       - uv run python scripts/generate_holzman_rust_dataset.py --out /tmp/holzman_rust_aggressive_check --seed 42
+      - uv run pytest tests/ -v
 
   smoke:
     desc: Show current candidate evaluator help

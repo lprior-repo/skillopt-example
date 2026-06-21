@@ -29,11 +29,11 @@
       <main id="top" class="content">
         <section class="hero">
           <div class="hero-copy">
-            <p class="eyebrow">Generated corpus. Proof-friendly evals. Candidate-only skill work.</p>
-            <h1>Run high-assurance SkillOpt evaluations without guessing what passed.</h1>
+            <p class="eyebrow">Generated corpus · Proof-friendly evals · Candidate-only skill work</p>
+            <h1>Run high-assurance SkillOpt evaluations without guessing what passed</h1>
             <p class="hero-lede">
               This workspace packages a generated Holzman Rust corpus, a SkillOpt adapter, and a
-              fail-closed candidate evaluator with exact hashes and non-promotable targeted reruns.
+              fail-closed candidate evaluator with exact hashes and non-promotable targeted reruns
             </p>
             <div class="hero-actions">
               <a class="button primary" href="#quickstart">Start evaluating</a>
@@ -57,17 +57,17 @@
           <article>
             <span>Corpus</span>
             <strong>387 tasks</strong>
-            <p>Train 227, validation 80, test 80.</p>
+            <p>Train 227, validation 80, test 80</p>
           </article>
           <article>
             <span>Model path</span>
             <strong>MiniMax M3</strong>
-            <p>OpenCode `thinking` variant wired through config.</p>
+            <p>OpenCode `thinking` variant wired through config</p>
           </article>
           <article>
             <span>Gate</span>
             <strong>Fail closed</strong>
-            <p>Subset runs are explicit non-promotion evidence.</p>
+            <p>Subset runs are explicit non-promotion evidence</p>
           </article>
         </section>
 
@@ -75,7 +75,7 @@
           <div class="section-heading">
             <span class="section-kicker">01</span>
             <h2>Quickstart</h2>
-            <p>Install dependencies, regenerate the corpus, then run a candidate eval.</p>
+            <p>Install dependencies, regenerate the corpus, then run a candidate eval</p>
           </div>
           <div class="code-stack">
             <article class="code-card">
@@ -102,14 +102,14 @@
           <div class="section-heading">
             <span class="section-kicker">02</span>
             <h2>Workflow</h2>
-            <p>One supported path keeps dataset generation, rollout execution, and evidence aligned.</p>
+            <p>One supported path keeps dataset generation, rollout execution, and evidence aligned</p>
           </div>
           <div class="steps-card">
             <ol>
-              <li><strong>Generate</strong><span>Create deterministic split data under `data/holzman_rust_aggressive`.</span></li>
-              <li><strong>Evaluate</strong><span>Run candidate skill bundles through `scripts/run_holzman_candidate_eval.py`.</span></li>
-              <li><strong>Record</strong><span>Persist `run_metadata.json`, bundle hashes, summaries, and raw artifacts.</span></li>
-              <li><strong>Promote</strong><span>Accept only full `val,test` hard `1.0` runs with `non_promotable: false`.</span></li>
+              <li><strong>Generate</strong><span>Create deterministic split data under `data/holzman_rust_aggressive`</span></li>
+              <li><strong>Evaluate</strong><span>Run candidate skill bundles through `scripts/run_holzman_candidate_eval.py`</span></li>
+              <li><strong>Record</strong><span>Persist `run_metadata.json`, bundle hashes, summaries, and raw artifacts</span></li>
+              <li><strong>Promote</strong><span>Accept only full `val,test` hard `1.0` runs with `non_promotable: false`</span></li>
             </ol>
           </div>
         </section>
@@ -118,7 +118,7 @@
           <div class="section-heading">
             <span class="section-kicker">03</span>
             <h2>MiniMax M3 with thinking</h2>
-            <p>The OpenCode rollout passes the configured model and variant to every task.</p>
+            <p>The OpenCode rollout passes the configured model and variant to every task</p>
           </div>
           <div class="config-panel">
             <pre><code>env:
@@ -128,7 +128,7 @@
   opencode_show_thinking: true</code></pre>
             <p>
               The evaluator writes these effective settings into `run_metadata.json`, along with
-              candidate, config, and dataset manifest hashes.
+              candidate, config, and dataset manifest hashes
             </p>
           </div>
         </section>
@@ -137,20 +137,20 @@
           <div class="section-heading">
             <span class="section-kicker">04</span>
             <h2>Promotion gate</h2>
-            <p>Promotion is designed to fail closed. A convenient rerun is never promoted by accident.</p>
+            <p>Promotion is designed to fail closed · A convenient rerun is never promoted by accident</p>
           </div>
           <div class="policy-grid">
             <article>
               <h3>Eligible</h3>
-              <p>Full `val,test`, `--kind all`, no `--ids`, `limit: 0`, checked-in split dir, hard `1.0` on both splits.</p>
+              <p>Full `val,test`, `--kind all`, no `--ids`, `limit: 0`, checked-in split dir, hard `1.0` on both splits</p>
             </article>
             <article>
               <h3>Non-promotable</h3>
-              <p>Targeted IDs, partial split sets, review-only/repair-only runs, alternate raw data paths, or any hard failure.</p>
+              <p>Targeted IDs, partial split sets, review-only/repair-only runs, alternate raw data paths, or any hard failure</p>
             </article>
             <article>
               <h3>Evidence</h3>
-              <p>Keep `run_metadata.json`, `bundle_hashes.json`, per-split summaries, and raw prediction artifacts together.</p>
+              <p>Keep `run_metadata.json`, `bundle_hashes.json`, per-split summaries, and raw prediction artifacts together</p>
             </article>
           </div>
         </section>
@@ -159,15 +159,15 @@
           <div class="section-heading">
             <span class="section-kicker">05</span>
             <h2>Candidate</h2>
-            <p>The active candidate lives under `candidates/` and is evaluated only through the generated corpus path.</p>
+            <p>The active candidate lives under `candidates/` and is evaluated only through the generated corpus path</p>
           </div>
           <div class="file-tree-card">
             <pre><code>candidates/holzman-rust-candidate-v13/
   SKILL.md
   references/</code></pre>
             <p>
-              Run `scripts/run_holzman_candidate_eval.py` against this candidate. Generated reports belong
-              under ignored output directories and must be recreated for promotion evidence.
+              Run `scripts/run_holzman_candidate_eval.py` against this candidate · Generated reports belong
+              under ignored output directories and must be recreated for promotion evidence
             </p>
           </div>
         </section>
@@ -180,15 +180,15 @@
           <div class="faq-list">
             <details open>
               <summary>Why did my run exit `2`?</summary>
-              <p>The run wrote artifacts, but it was not promotion eligible. Check `promotion_reason` in `run_metadata.json`.</p>
+              <p>The run wrote artifacts, but it was not promotion eligible · Check `promotion_reason` in `run_metadata.json`</p>
             </details>
             <details>
               <summary>Why did my run fail before OpenCode launched?</summary>
-              <p>The evaluator rejects unsupported configs before rollout. Check `split_mode`, `split_dir`, `data_path`, and `limit`.</p>
+              <p>The evaluator rejects unsupported configs before rollout · Check `split_mode`, `split_dir`, `data_path`, and `limit`</p>
             </details>
             <details>
               <summary>Where do model settings show up?</summary>
-              <p>`run_metadata.json` records `review_model`, `repair_model`, `opencode_variant`, and `opencode_show_thinking`.</p>
+              <p>`run_metadata.json` records `review_model`, `repair_model`, `opencode_variant`, and `opencode_show_thinking`</p>
             </details>
           </div>
         </section>
