@@ -1,0 +1,24 @@
+Let me start by reading the skill bundle, references, and task crate structure.
+Now I have the full picture. The code has multiple Holzman violations and doesn't match the test contract. Let me fix it.
+
+Issues:
+1. `summarize_metrics` returns `Result<String, ...>` but tests expect `Result<Summary, ...>`
+2. Missing `render_summary` function
+3. `unwrap()` on parse (line 24)
+4. Unchecked `+=` for total/count
+5. Lossy `count as u32` / `count as u64`
+6. Unchecked `total / count` division
+7. Collects all split parts into `Vec<String>` instead of using `split_once`
+8. No empty-input check
+All 6 tests pass. Let me verify the final source and write the output.
+Repair complete. All 6 tests pass. Summary of changes to `src/lib.rs`:
+
+**Contract fix:** `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` to match the test contract. Added `render_summary(Summary) -> String`.
+
+**Holzman violations removed:**
+- `unwrap()` on parse → `map_err(|_| SummaryError::Invalid)`
+- Unchecked `+=` → `checked_add(...).ok_or(Overflow)`
+- Lossy `count as u32` / `count as u64` → `u32::try_from` / `u64::try_from`
+- Unchecked `total / count` → `checked_div`
+- `Vec::collect` from `split(',')` → `split_once(',')`
+- Missing empty-input check → early `Err(SummaryError::Empty)`

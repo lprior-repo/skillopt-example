@@ -1,0 +1,13 @@
+Crate reviewed. Writing output.
+Review complete. Output written to `review-output.json` with 10 findings (9 BLOCKER, 1 MISSING). Key violations:
+
+| Rule | File:Line | Issue |
+|---|---|---|
+| `zero_forbidden_constructs` | `lib.rs:9` | `fs::read_to_string().unwrap()` panics on I/O error |
+| `functional_core_imperative_shell` | `lib.rs:8` | I/O mixed into data function, no Result return |
+| `functional_core_imperative_shell` | `lib.rs:16` | `println!` hidden I/O in parser closure |
+| `parsing_access` | `lib.rs:12` | `split().collect()` instead of `split_once` |
+| `zero_forbidden_constructs` | `lib.rs:16,18` | Unchecked `parts[0]` / `parts[1]` indexing |
+| `zero_forbidden_constructs` | `lib.rs:19` | `parse::<u32>().unwrap()` panics on non-numeric |
+| `zero_forbidden_constructs` | `lib.rs:19` | `as u16` lossy cast silently truncates values >65535 |
+| `benchmark_evidence` | `lib.rs:8` | No benchmarks/profiler/allocation evidence |

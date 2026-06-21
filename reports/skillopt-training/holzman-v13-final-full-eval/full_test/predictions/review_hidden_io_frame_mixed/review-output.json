@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Shell leakage: file I/O (fs::read_to_string), parsing, logging (println), and domain construction are fused in a single function. Data/Calculations/Actions boundary is violated.",
+      "failure_mode": "Core logic depends on filesystem availability and stdout; cannot be tested deterministically or composed in pure pipelines. Side effects are invisible to the caller.",
+      "fix": "Split into three layers: (1) Actions: fn load_raw(path: &str) -> Result<String, IoError>, (2) Calculations: fn parse_records(text: &str) -> Result<Vec<Record>, ParseError>, (3) Data: Record struct with smart constructor. Caller composes them."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_expect_panic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() - panic surface on I/O failure (file not found, permission denied, encoding error).",
+      "failure_mode": "Entire program aborts with panic when the file is missing or unreadable instead of returning a typed error the caller can handle gracefully.",
+      "fix": "Return Result<Vec<Record>, FrameLoadError> with an IoError variant. Replace .unwrap() with ? operator: `let text = fs::read_to_string(path).map_err(|e| FrameLoadError::Io(e))?;`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_expect_panic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() - panic surface on non-numeric or out-of-range value in any line's second field.",
+      "failure_mode": "Malformed CSV input (e.g., empty file, line with missing field, non-numeric value like 'abc') causes a panic instead of a typed parse error. Partial data is silently lost.",
+      "fix": "Replace with fallible parse: `let val = parts[1].trim().parse::<u32>().map_err(|_| FrameLoadError::InvalidValue(parts[0].clone()))?;` and return Result<Vec<Record>, FrameLoadError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] - unchecked indexing into split result. If a line has fewer than 2 comma-separated fields, this panics at runtime.",
+      "failure_mode": "Malformed CSV line (e.g., single-field line, empty line) causes panic via index-out-of-bounds instead of returning a typed error.",
+      "fix": "Use .get(0).ok_or(FrameLoadError::MissingField(...)) and .get(1).ok_or(FrameLoadError::MissingField(...)) with typed error, or restructure with split_once."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(...) as u16 - lossy cast from u32 parse result to u16. Values in range 65536..=4294967295 silently truncate to u16 range.",
+      "failure_mode": "A valid u32 value like 70000 silently becomes 4464 (70000 - 65536), producing incorrect domain data with no error signal. Data corruption is silent and undetectable at parse time.",
+      "fix": "Parse directly to u16: `parts[1].trim().parse::<u16>().map_err(|_| FrameLoadError::InvalidValue(...))?`, or use `u16::try_from(parsed_u32).map_err(|_| FrameLoadError::ValueOutOfRange(...))?`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_split_collect_intermediate_vec",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates a Vec<String> for every line. Uses split instead of split_once. Also parts[0] and parts[1] access via indexing rather than destructuring.",
+      "failure_mode": "Every input line allocates a temporary Vec plus trimmed String allocations. No upper bound on lines loaded. split produces more elements than needed, and the Vec is only used for 2 field accesses.",
+      "fix": "Use `let (name, value_str) = line.split_once(',').ok_or(FrameLoadError::MissingField(...))?;` with `value_str.trim().parse::<u16>()` for zero-allocation per-line parsing. Add a domain cap on total records with try_reserve."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) - I/O side effect (stdout) embedded in data-parsing logic. Also uses unchecked parts[0] indexing.",
+      "failure_mode": "Parsing function has observable side effects that cannot be suppressed in testing or production. Output ordering depends on input order, making deterministic testing impossible. stdout buffering can cause performance issues.",
+      "fix": "Remove println entirely from the parsing path. If logging is needed, use a callback/result enum variant that the shell layer decides how to handle (log, discard, or collect into a progress struct)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Raw primitives (String, u16) used directly in the Record struct with no smart constructor. No parse boundary enforcement means callers can construct invalid domain states directly.",
+      "failure_mode": "Any code can create Record { name: \"\".to_string(), value: 0 } or Record with a name exceeding reasonable bounds. The name field accepts arbitrary strings including empty or whitespace-only values. The value field accepts any u16 including sentinel values that may be invalid in context.",
+      "fix": "Add a private constructor: impl Record { pub fn new(name: &str, value: u16) -> Result<Self, RecordError> { ... } } with validation (non-empty name, value range). Make fields private or use a newtype for name."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence for load_frames. No bounded capacity limit on total records loaded. No try_reserve or domain cap.",
+      "failure_mode": "Loading a file with millions of lines will allocate unbounded memory, potentially causing OOM. No allocation budget exists for production use with untrusted input sizes.",
+      "fix": "Add a max_records parameter, validate input size, call Vec::new().try_reserve(max_records).map_err(|_| FrameLoadError::Allocation)?, and enforce the cap during iteration. Add benchmark evidence showing allocation behavior at scale."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No typed error type. Function returns Vec<Record> with panics as the only error signal. No error taxonomy for I/O, parse, validation, or allocation failures.",
+      "failure_mode": "Callers cannot distinguish between file-not-found, malformed data, out-of-range values, or resource exhaustion. Error handling is binary: success or panic.",
+      "fix": "Define: pub enum FrameLoadError { Io(std::io::Error), MissingField(usize), InvalidValue(String), ValueOutOfRange { field: String, value: String }, Allocation }, pub fn load_frames(path: &str, max_records: usize) -> Result<Vec<Record>, FrameLoadError>."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_frames allocation/throughput behavior",
+    "no profiler evidence for hot-path analysis",
+    "no allocation tracking (no try_reserve, no Vec::with_capacity, no domain cap)",
+    "no second-ring evidence (no clippy, no test suite, no command output)",
+    "no command-truth evidence - no verification commands were run"
+  ],
+  "residual_risk": "Static review only. Every function in the crate violates absolute laws: hidden I/O (fs::read, println), panic surfaces (2x unwrap), unchecked indexing, lossy cast, intermediate allocations, no error taxonomy, no parse boundary, no bounds, no benchmarks. Delivery is blocked until all violations are remediated."
+}

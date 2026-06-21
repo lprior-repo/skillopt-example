@@ -1,0 +1,16 @@
+Now I have all the context. This is a small crate with a `BatchWorkflow` struct and `mark_sent` function. Let me write the review.
+Review complete. Wrote valid JSON to `/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/review_invalid_state_batch_typestate/review-output.json`.
+
+**8 BLOCKER findings** in `src/lib.rs` (13 lines):
+
+1. **make_illegal_states_unrepresentable** (line 1) — `BatchWorkflow` uses `String status` + `bool is_validated` + `bool is_sent` + `Option<u64> sent_at_epoch_ms`, allowing impossible state combinations like `is_sent=true` with `status="pending"` and `sent_at_epoch_ms=None`.
+
+2. **parse_boundary** (line 2) — Raw primitives enter the domain with no smart constructor; callers can construct invalid states directly.
+
+3. **functional_core_imperative_shell** (line 9) — `mark_sent` mutates in-place with zero validation: no prior-state check, no idempotency guard, no timestamp enforcement.
+
+4. **no_pub_fields** (line 2) — All 4 fields are `pub`, making invariants bypassable from any crate.
+
+5. **zero_forbidden_constructs** (line 10) — `"sent".to_string()` allocates a new String on every call instead of using an enum variant.
+
+6-8. **Missing evidence** — No benchmarks, no tests, no `[[bench]]` section, no dev-dependencies, no command evidence.

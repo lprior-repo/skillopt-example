@@ -1,0 +1,4 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/20afdacd9ab6448e/debug/deps/repair_csv_route_mixed-4475a0feb2631340)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/20afdacd9ab6448e/debug/deps/behavior-6b1a35737a3c7320)
+   Doc-tests repair_csv_route_mixed

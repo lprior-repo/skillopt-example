@@ -1,0 +1,14 @@
+Now I have the full crate. Let me write the review output.
+Review complete. Written to `review-output.json` with 6 findings (4 BLOCKER, 2 WARNING):
+
+**BLOCKERs:**
+1. **`tiny-fixed-performance-folklore`** (line 2) - TODO proposes Rayon/SmallVec for 4-byte input without benchmark evidence. Rayon overhead will make this slower.
+2. **`allocation-overhead-tiny-input`** (line 6) - `Vec` return for fixed 4 elements forces heap allocation every call.
+3. **`missing-benchmark-evidence`** (line 1) - Performance claim in TODO has no workload, baseline, hardware spec, or measurements.
+4. **`missing-command-evidence`** (line 1) - No verification commands run; no test targets or benchmarks exist.
+
+**WARNINGs:**
+5. **`unused-iter-indirection`** (line 3) - Iterator adapters add vtable dispatch for 4 known elements.
+6. **`functional-core-allocation`** (line 6) - Pure computation shouldn't force heap allocation.
+
+**Recommendation:** Replace `Vec<&'static str>` return with `[&'static str; 4]`, remove the Rayon/SmallVec TODO, add tests and benchmarks.

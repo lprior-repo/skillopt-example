@@ -1,0 +1,19 @@
+Now I have all the context needed. Let me write the review.
+Review complete. Written 10 findings to `review-output.json`.
+
+**Summary of violations found in `src/lib.rs`:**
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | no_hidden_io (shell leakage) | 8 |
+| 2 | BLOCKER | no_unwrap (I/O unwrap) | 9 |
+| 3 | BLOCKER | no_unwrap (parse unwrap) | 19 |
+| 4 | BLOCKER | no_unchecked_indexing | 16 |
+| 5 | BLOCKER | no_lossy_cast (u32→u16) | 19 |
+| 6 | BLOCKER | no_split_collect_intermediate_vec | 12 |
+| 7 | BLOCKER | no_hidden_io (println in parsing) | 16 |
+| 8 | BLOCKER | parse_boundary (no smart constructor) | 3 |
+| 9 | WARNING | missing_benchmark_evidence | 8 |
+| 10 | WARNING | missing_error_taxonomy | 8 |
+
+Every function in the crate violates absolute Holzman laws: hidden I/O, panic surfaces, unchecked indexing, lossy casts, intermediate allocations, no error taxonomy, no parse boundary, and no bounds. Delivery is blocked.

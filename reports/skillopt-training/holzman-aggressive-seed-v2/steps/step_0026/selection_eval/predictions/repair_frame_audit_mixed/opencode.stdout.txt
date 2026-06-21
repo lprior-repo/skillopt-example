@@ -1,0 +1,12 @@
+Issues found in `src/lib.rs`:
+1. `as u32` cast (lossy width conversion, Holzman Rule 3)
+2. No `max_payload` check (behavior bug — `rejects_limit` test fails)
+3. No `try_reserve` (Holzman Rule 1)
+Both tests pass. Now writing the output.
+Repair complete. Changes to `src/lib.rs:8-14`:
+
+1. **Added `max_payload` check** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`, fixing the `rejects_limit` behavior.
+2. **Replaced `as u32` with `u32::try_from(...)`** — eliminates lossy width-reducing cast (Holzman Rule 3).
+3. **Added `try_reserve(4 + payload.len())`** with error mapping — satisfies Holzman Rule 1 for bounded allocation.
+
+Both behavior tests pass.

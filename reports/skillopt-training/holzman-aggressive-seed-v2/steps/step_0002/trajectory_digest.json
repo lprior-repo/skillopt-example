@@ -1,0 +1,41 @@
+{
+  "step": 2,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 2,
+  "failure_patterns": [
+    {
+      "pattern": "missing_checked_arithmetic: Agents failed to use checked_add/checked_div/try_from in summary/frame logic despite explicit skill instructions.",
+      "count": 1,
+      "task_ids": [
+        "repair_frame_order_mixed"
+      ]
+    },
+    {
+      "pattern": "missing_split_once: Agents used manual find/slicing instead of split_once for string parsing where applicable.",
+      "count": 1,
+      "task_ids": [
+        "repair_summary_audit_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.7,
+  "score_after": 0.3,
+  "rejected_edits": [
+    {
+      "op": "replace",
+      "content": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the failure mode requires them. **Always** use `split_once` for first-delimiter parsing, `checked_add`/`checked_mul` for accumulators, `checked_div` before division, and `try_from` for width conversions.",
+      "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the failure mode requires them."
+    },
+    {
+      "op": "replace",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+`/`*` in capacity/length/summary math (use `checked_add`/`checked_mul`), integer `/` where `checked_div` is required, `as` width casts instead of `try_from`, unchecked indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. **Verify** that `cargo fmt`, `cargo test`, and `cargo clippy` actually passed before claiming success; do not guess command outcomes.",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+    },
+    {
+      "op": "append",
+      "content": "## Command Verification\n\nNever claim `cargo fmt`, `cargo test`, or `cargo clippy` passed unless the grader/verification output explicitly confirms it. If a command fails, report the failure, do not claim success, and do not fabricate output. JSON command claims must match actual command outcomes.",
+      "target": ""
+    }
+  ]
+}

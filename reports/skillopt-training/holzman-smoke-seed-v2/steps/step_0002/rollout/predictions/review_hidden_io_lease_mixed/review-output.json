@@ -1,0 +1,122 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permission denied, truncated content)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed IoError",
+      "fix": "return Result<Vec<Record>, LeaseError> and use map_err to convert io::Error into a typed error; never unwrap file I/O"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or empty second field",
+      "failure_mode": "malformed CSV input aborts the entire load instead of returning a typed ParseError for the specific record",
+      "fix": "return Result and use .map_err(|e| ParseError{ record: parts[0].clone(), source: e }) on the parse call"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(...) as u16 is a lossy cast from u32; values > 65535 silently truncate",
+      "failure_mode": "a valid u32 in [65536, 2^32-1] wraps to a wrong u16 value, corrupting data silently without any error signal",
+      "fix": "use u16::try_from(parsed_u32) and propagate the error via ? or Result; reject out-of-range values as a typed LeaseValue error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is accessed with unchecked indexing; if the line has no commas the Vec has length 1 and parts[1] will panic on line 19",
+      "failure_mode": "malformed line (missing comma or missing second field) panics at parts[1] or silently reads a garbage first field at parts[0]",
+      "fix": "use parts.get(0) and parts.get(1) and return a typed ParseError on None, or use split_once(',') and handle the missing-separator case"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is hidden I/O inside a function that also does file I/O; this mixes side effects with parsing logic and makes the function untestable without capturing stdout",
+      "failure_mode": "the caller cannot suppress logging, the function is not a pure parser, and unit tests must stub stdout or accept console pollution",
+      "fix": "move all println! into the imperative shell caller; the parsing step should be a pure function that takes &str and yields Record or error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_leases returns Vec<Record> with no error type; all failure modes are hidden behind panic",
+      "failure_mode": "consumers have no way to distinguish IoError, ParseError, LeaseValueOutOfRange, or MalformedLine; error handling is impossible",
+      "fix": "define a LeaseError enum with Io, Parse, ValueOutOfRange, and MalformedLine variants; signature: pub fn load_leases(path: &str) -> Result<Vec<Record>, LeaseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_leaves mixes file I/O (fs::read_to_string on line 9) with CSV parsing and domain construction (lines 10-22)",
+      "failure_mode": "the parsing logic cannot be unit-tested in isolation; any change to I/O behavior requires re-testing the parser and vice versa",
+      "fix": "split into: pub fn load_leases(path: &str) -> Result<Vec<Record>, LeaseError> that reads the file, and a separate pub fn parse_records(lines: impl Iterator<Item=&str>) -> Result<Vec<Record>, LeaseError> that is pure and testable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! is a side effect hidden inside an iterator map closure; callers cannot control or suppress it",
+      "failure_mode": "log injection makes the function non-deterministic with respect to output, breaks test isolation, and prevents use in library contexts",
+      "fix": "remove println! entirely from the library function; expose a callback or structured log event if the caller wants diagnostics"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_capacity_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::with_capacity is not used and no try_reserve is called before collecting split parts",
+      "failure_mode": "unbounded allocation on adversarial input; a single line with millions of comma-separated fields could OOM",
+      "fix": "if collecting parts, use try_reserve with a known maximum, or better, use split_once to avoid collecting all parts into a Vec at all"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark module exists; no profiler or allocation evidence for load_leases performance",
+      "failure_mode": "performance characteristics of CSV parsing at scale are unknown; any optimization claims would be ungrounded",
+      "fix": "add a criterion or custom benchmark for load_leases with realistic lease-file sizes and report allocation counts"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation tracing evidence; the function allocates a String per line (read_to_string), a Vec per line (split parts), and a String per field (trim + to_string)",
+      "failure_mode": "per-record allocation overhead is unmeasured; for high-throughput lease loading this could be a bottleneck",
+      "fix": "profile with criterion or heaptrack; consider a zero-copy parser using &str slices and split_once"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0].clone() clones a String unnecessarily; the value is not shared",
+      "failure_mode": "wasted allocation per record; while not a correctness bug, it violates the zero-waste principle",
+      "fix": "use parts[0].clone() only if ownership transfer is needed; consider returning Cow<'_, str> or restructure to avoid the intermediate Vec entirely"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_leases throughput or allocation",
+    "no profiler evidence for hot path analysis",
+    "no allocation tracking (criterion/heaptrack) for the parsing pipeline",
+    "no command evidence for cargo fmt, cargo check, or cargo clippy",
+    "no second-ring evidence for any performance or correctness claims"
+  ],
+  "residual_risk": "Static review only; no build or test commands were run. The code has 8 BLOCKER violations (unwrap on I/O, unwrap on parse, lossy as cast, unchecked indexing, hidden I/O println!, no typed errors, mixed I/O and parsing in one function, no checked allocation). All must be repaired before the crate can pass Holzman gates. Without building, the findings on syntax and clippy lints are unknown."
+}

@@ -1,0 +1,19 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Written to `/.../review-output.json`.
+
+**8 findings across the crate:**
+
+| Severity | Rule | Line | Core Issue |
+|---|---|---|---|
+| BLOCKER | `make_illegal_states_unrepresentable` | 1 | `status: String` + booleans allow impossible states |
+| BLOCKER | `parse_boundary` | 2 | Raw primitives enter domain, no smart constructor |
+| BLOCKER | `no_unsafe_constructors` | 1 | All fields `pub`, no access control |
+| BLOCKER | `functional_core_determinism` | 9 | `mark_sent` has zero precondition checks |
+| MAJOR | `typed_domain_errors` | 9 | No `Result` return, no error taxonomy |
+| MAJOR | `functional_core_purity` | 1 | `Option<u64>` timestamp not coupled to sent state |
+| MAJOR | `no_primitive_obsession` | 2 | `id: String` with no domain constraints |
+| MINOR | `missing_benchmark_evidence` | 1 | No benchmarks, unnecessary allocation per call |
+
+**Missing evidence:** benchmarks, profiler/allocation data, second-ring verification (Miri/Kani/Flux), command evidence.
+
+**Residual risk:** Critical — illegal states are fully representable. The compiler cannot prevent invalid transitions without enum typestates.

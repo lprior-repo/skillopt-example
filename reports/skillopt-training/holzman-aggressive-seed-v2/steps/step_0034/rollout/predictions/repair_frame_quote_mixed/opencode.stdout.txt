@@ -1,0 +1,7 @@
+Repair complete. Two issues fixed in `src/lib.rs`:
+
+1. **`max_payload` ignored** — Added bounds check: returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload`
+2. **Lossy `as` cast** — Replaced `payload.len() as u32` with `u32::try_from(payload.len())` mapping overflow to `FrameError::Overflow`
+3. **No allocation safety** — Added `try_reserve` with `FrameError::Allocation` on failure
+
+All 2 behavior tests pass, no forbidden constructs remain.

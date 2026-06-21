@@ -1,0 +1,80 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses String for status and bools for is_validated/is_sent, allowing illegal states such as status=\"draft\" with is_sent=true, or any combination of flags that contradicts domain invariants.",
+      "failure_mode": "Invalid state combinations are constructible at compile time; no caller can rely on status meaning anything, and is_sent does not reflect actual state.",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single BudgetStatus enum (e.g., Draft, Validated, Sent) using a typestate pattern. Remove redundant flags entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "push_logic_into_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates raw String and bool fields directly with no type-level guarantee that the transition is valid. It can be called on any BudgetWorkflow regardless of prior state.",
+      "failure_mode": "A budget can be marked sent without ever being validated, bypassing the validation invariant. The function name promises a state transition but has zero enforcement.",
+      "fix": "Define BudgetStatus as an enum with explicit transitions. mark_sent should accept BudgetStatus::Validated (or a typestate-guaranteed reference) and return BudgetStatus::Sent. Remove the struct entirely or make it a thin wrapper with a private status field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints. Any string including empty, whitespace-only, or malformed IDs are accepted without validation.",
+      "failure_mode": "Downstream code cannot assume id is a valid budget identifier; callers must re-validate on every use.",
+      "fix": "Introduce a BudgetId newtype with a fallible constructor (e.g., BudgetId::try_from(&str)) that rejects empty/invalid values. Use BudgetId in the struct instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enums",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a boolean lifecycle flag that does not express the domain state machine. It can be true while status is anything other than a validated value.",
+      "failure_mode": "Two independent booleans/strings describe the same concept, creating inconsistency. Code checking is_validated may diverge from code checking status.",
+      "fix": "Merge status, is_validated, and is_sent into a single BudgetStatus enum: enum BudgetStatus { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }. The enum variants encode all lifecycle information."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The struct has all public fields with no encapsulation. No validation constructor exists; any code can construct or mutate BudgetWorkflow freely.",
+      "failure_mode": "No boundary between pure domain logic and imperative shell. The struct is its own API surface with zero invariants enforced.",
+      "fix": "Make all fields private. Provide a fallible constructor BudgetWorkflow::try_new(id, initial_status). Expose state via immutable accessors or pattern-match on the status enum."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_repeated_validation_of_primitives",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses string comparison by constructing \"sent\".to_string() rather than matching against a typed enum variant. The string literal is duplicated at each call site.",
+      "failure_mode": "Typos in the string literal silently create a new status value; callers cannot exhaustively match on status variants.",
+      "fix": "Replace String status with BudgetStatus enum. mark_sent operates on enum variants directly with compile-time exhaustive matching."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a new String on every call to mark_sent, even though the value is constant.",
+      "failure_mode": "Unnecessary heap allocation in what should be a pure state transition. Wasteful for hot paths.",
+      "fix": "After converting to BudgetStatus enum, assignment becomes a constant variant (e.g., item.status = BudgetStatus::Sent { sent_at_epoch_ms: now }) with no heap allocation."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition",
+    "no profiler data for allocation patterns in BudgetWorkflow lifetime",
+    "no allocation audit for String fields vs enum variants",
+    "no command-level evidence (cargo test, cargo fmt, cargo clippy not run)"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental type-level design flaws that allow all illegal state combinations at compile time. The code compiles and passes basic tests trivially because there are no tests or assertions, but the domain model provides zero compile-time guarantees."
+}

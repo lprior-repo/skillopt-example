@@ -1,0 +1,10 @@
+Now I have full context. The source has multiple Holzman violations: `unwrap()`, unbounded `collect()`, no empty/invalid/too-many checks. Let me apply the mandatory CSV/parser repair pattern.
+All 4 tests pass and formatting is clean. Now writing the required output.
+Repair complete. All 4 behavior tests pass, zero Holzman violations remain.
+
+**Changes made to `src/lib.rs`:**
+- Replaced `.map(...).unwrap().collect()` with a bounded `for` loop
+- Added `input.is_empty()` guard → `ParseError::Empty`
+- Added `try_reserve(max_items)` for bounded allocation
+- Added `max_items` cap check before each push → `ParseError::TooMany`
+- Parse failures use `.map_err(|_| ParseError::Invalid)` instead of `.unwrap()`

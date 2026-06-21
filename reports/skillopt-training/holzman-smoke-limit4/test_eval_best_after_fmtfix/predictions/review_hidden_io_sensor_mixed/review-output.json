@@ -1,0 +1,85 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing/unreadable file",
+      "failure_mode": "any absent or permission-denied file aborts the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, io::Error> and use fs::read_to_string(path)? or .map_err with a domain error type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[0].parse::<u32>().unwrap() as u16 - unwrap on parse and lossy as cast",
+      "failure_mode": "non-numeric content panics; a u32 value exceeding u16::MAX silently truncates via lossy cast",
+      "fix": "use u16::from_str or u32::try_from followed by .try_into() to u16 with proper error propagation; return Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are accessed via unchecked indexing with no bounds verification",
+      "failure_mode": "a line with fewer than 2 comma-separated fields causes a panic on out-of-bounds access",
+      "fix": "use split_once(',') or .get(0) and .get(1) with Option handling, or iterator .next()/.nth(1) with explicit None fallback"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) - I/O side effect embedded in data-parsing pipeline",
+      "failure_mode": "pure data transformation leaks console logging; breaks determinism and makes the core function untestable in isolation",
+      "fix": "move all println! to the imperative shell layer; the pure core function should return data only with no side effects"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sensors mixes I/O (fs::read_to_string, println), parsing, and domain construction in a single public function",
+      "failure_mode": "no pure testable core exists; the entire pipeline is coupled to filesystem access and console I/O",
+      "fix": "extract a pure fn parse_records(lines: impl Iterator<Item=&str>) -> Result<Vec<Record>, ParseError> and keep the shell function for fs reads and logging"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record has no invariants - any String and any u16 are valid, including empty names and zero values that may be semantically invalid",
+      "failure_mode": "downstream code cannot assume Record is semantically meaningful; invalid records propagate silently",
+      "fix": "use a private-constructor Record with a fallible fn try_new(name: &str, value: u16) -> Result<Record, RecordError> that rejects empty names and enforces domain invariants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": ".map(|part| part.trim().to_string()).collect() allocates a full Vec<String> for intermediate parsed parts",
+      "failure_mode": "unnecessary heap allocation on every line; a single malformed line wastes all intermediate allocations before panicking on the next unwrap",
+      "fix": "use split_once(',') to get exactly two parts, trim each, and construct the Record without collecting into Vec<String>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lossy_conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 cast from u32 is lossy - values 65536..=u32::MAX silently wrap",
+      "failure_mode": "sensor value 70000 becomes 14464 without any error or warning, corrupting domain data",
+      "fix": "use u32::try_into().map_err(|_| RecordError::ValueOutOfRange) or parse directly as u16 with u16::from_str"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler evidence for allocation hotspots in load_sensors",
+    "no allocation audit - Vec<String> per-line collection has no measured budget",
+    "no command-level evidence (no cargo test, cargo clippy, cargo bench, or Miri runs)"
+  ],
+  "residual_risk": "static review only; no commands run. Multiple panic paths on untrusted input, lossy type casts, hidden I/O in parsing pipeline, and no functional core separation make this crate non-compliant for delivery. All unwrap(), unchecked indexing, and println! in core must be eliminated before any further review."
+}

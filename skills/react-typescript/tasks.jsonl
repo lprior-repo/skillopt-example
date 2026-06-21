@@ -1,0 +1,5 @@
+{"id": "T001", "kind": "review", "code": "type Props = { name: string }; export const Hello = ({ name }: Props) => <p>Hello {name}</p>;", "expected_groups": ["ok"]}
+{"id": "T002", "kind": "review", "code": "export const parse = (s: string): number => parseInt(s, 10);", "expected_groups": ["ok"]}
+{"id": "T003", "kind": "review", "code": "export const broken = (v: any) => v.foo;", "expected_groups": ["forbidden:any"]}
+{"id": "T004", "kind": "review", "code": "export const logged = () => { console.log('hello'); return 1; };", "expected_groups": ["forbidden:console"]}
+{"id": "T005", "kind": "review", "code": "// @ts-ignore\nexport const ignored = (v: string) => v as unknown as number;", "expected_groups": ["forbidden:ts_ignore", "forbidden:as_unknown_as"]}

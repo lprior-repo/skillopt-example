@@ -1,0 +1,20 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**Findings: 9 total (8 BLOCKER, 2 WARNING)**
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `zero_forbidden_constructs` | :9 | `fs::read_to_string().unwrap()` — panics on I/O error |
+| 2 | `zero_forbidden_constructs` | :19 | `.parse::<u32>().unwrap()` — panics on non-numeric value |
+| 3 | `arithmetic_safety` | :19 | `as u16` lossy cast — silently truncates values > 65535 |
+| 4 | `parsing_and_access` | :12 | `split().collect()` + unchecked `parts[0]`/`parts[1]` — OOB panic, excess alloc |
+| 5 | `functional_core_imperative_shell` | :16 | `println!()` side-effect in core data logic |
+| 6 | `functional_core_imperative_shell` | :8 | I/O mixed into core — no pure/partial split |
+| 7 | `type_discipline` | :5 | Raw `u16` value with no domain newtype/constraints |
+| 8 | `missing_benchmark_evidence` | :8 | No benchmark/profiler/allocation evidence |
+| 9 | `missing_command_evidence` | Cargo.toml | No dev-deps for testing or benchmarking |
+
+**Missing evidence:** no benchmarks, profiler data, allocation tracking, second-ring checks (Kani/Miri/proptest), or CLI integration tests.
+
+**Residual risk:** All five Holzman forbidden constructs are present. The crate as written cannot pass Holzman gates under malformed input.

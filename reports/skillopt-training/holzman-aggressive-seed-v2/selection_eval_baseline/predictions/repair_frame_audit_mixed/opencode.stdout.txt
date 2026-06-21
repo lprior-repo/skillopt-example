@@ -1,0 +1,16 @@
+Issues identified in `src/lib.rs`:
+1. Lossy `as u32` cast (line 10) — must use `u32::try_from`
+2. `max_payload` parameter unused — test expects `PayloadTooLarge` rejection
+3. `Vec::new()` without `try_reserve` for bounded allocation
+4. No checked arithmetic for capacity
+
+Fixing now:
+All 2 tests passed. Now writing the repair output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `FrameError::PayloadTooLarge` when payload exceeds limit
+2. **Removed lossy `as u32` cast** — replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)`
+3. **Added `try_reserve`** — pre-allocates output Vec with checked capacity, maps allocation failure to `FrameError::Allocation`
+4. **Added checked arithmetic** — `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)` for capacity computation
+
+All 2 tests pass, no forbidden constructs remain, `cargo fmt` and `cargo test` both passed.

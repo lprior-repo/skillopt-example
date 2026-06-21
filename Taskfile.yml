@@ -1,0 +1,77 @@
+version: '3'
+
+vars:
+  PYTHON: '3.12'
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  install:
+    desc: Install dependencies via UV
+    cmds:
+      - uv sync --dev
+
+  lock-upgrade:
+    desc: Upgrade all dependencies in uv.lock
+    cmds:
+      - uv lock --upgrade
+      - uv sync --dev
+
+  test:
+    desc: Validate generated dataset and evaluator imports
+    cmds:
+      - uv run python -m py_compile scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+      - uv run python scripts/generate_holzman_rust_dataset.py --out /tmp/holzman_rust_aggressive_check --seed 42
+
+  smoke:
+    desc: Show current candidate evaluator help
+    cmds:
+      - uv run python scripts/run_holzman_candidate_eval.py --help
+
+  typecheck:
+    desc: Run mypy on current first-party scripts
+    cmds:
+      - uv run mypy scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+
+  lint:
+    desc: Run ruff lint
+    cmds:
+      - uv run ruff check scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+
+  format:
+    desc: Format code with ruff
+    cmds:
+      - uv run ruff format scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+
+  fix:
+    desc: Auto-fix lint issues
+    cmds:
+      - uv run ruff check --fix scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+
+  ci:
+    desc: Run the full CI gate suite locally
+    cmds:
+      - task: install
+      - task: lint
+      - task: typecheck
+      - task: test
+      - task: smoke
+
+  clean:
+    desc: Remove build artifacts and cache directories
+    cmds:
+      - rm -rf .pytest_cache .mypy_cache .ruff_cache dist build .venv __pycache__
+      - find . -type d -name '__pycache__' -not -path '*/.venv/*' -prune -exec rm -rf {} +
+
+  build:
+    desc: Build the wheel and sdist
+    cmds:
+      - uv build
+
+  docs:
+    desc: Print the README header
+    cmds:
+      - head -20 README.md

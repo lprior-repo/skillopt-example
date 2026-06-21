@@ -1,0 +1,16 @@
+Now I have a clear picture. The issues in `src/lib.rs`:
+
+1. **Lossy `as` conversion**: `payload.len() as u32` must use `u32::try_from`
+2. **Missing `max_payload` check**: Test `rejects_limit` expects `Err(PayloadTooLarge)` but code ignores `max_payload`
+3. **Missing `checked_add` and `try_reserve`**: Frame encoder pattern requires both (SKILL.md rule 33)
+All gates pass. Writing the required output.
+Repair complete. All gates passed cleanly.
+
+**Changes made to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| Lossy `payload.len() as u32` | `u32::try_from(payload.len()).map_err(...)` |
+| Missing `max_payload` check | `if payload.len() > max_payload { return Err(...) }` |
+| No checked arithmetic | `4usize.checked_add(payload.len())` |
+| No bounded allocation | `Vec::new()` + `try_reserve(capacity)` |

@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/simd-patterns.md",
+    "references/nasa-jpl-standards.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "unsafe_forbidden_by_default",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "unsafe block uses std::arch::x86_64 intrinsics without explicit user waiver",
+      "failure_mode": "unsafe code ships without documented invariants, waiver, or owner approval, violating the zero-unsafe-by-default policy",
+      "fix": "Obtain explicit user waiver naming the violated rule before shipping unsafe code, or replace with safe portable_simd or scalar fallback"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "safe_simd_only",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Uses std::arch x86_64 intrinsics instead of safe std::simd or auto-vectorization",
+      "failure_mode": "Target intrinsics without safe wrapper require explicit user approval; first-party std::arch intrinsics in first-party code are a rejection trigger",
+      "fix": "Replace with safe portable_simd (#![feature(portable_simd)]) or scalar oracle; if intrinsics are required, obtain explicit waiver and wrap behind a safe public API"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_simple_control_flow",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "Silently drops trailing elements when input.len() is not a multiple of 4",
+      "failure_mode": "For input length 5, only the first 4 elements are summed; the 5th element is dropped. This produces silently incorrect results on non-aligned inputs, a correctness violation not a performance tradeoff",
+      "fix": "Process remainder via chunks_exact(4) and handle remainder iter separately: `let chunks = input.chunks_exact(4); let remainder = chunks.remainder(); acc + remainder.iter().sum()`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "while loop with no static upper bound proof and no remainder handling",
+      "failure_mode": "The loop condition `i < input.len()` iterates at most `input.len() / 4` times, but this silently truncates input. The loop body assumes exactly 4 elements are available at every iteration without proof that remainder is handled",
+      "fix": "Use `chunks_exact(4)` which statically guarantees each chunk has exactly 4 elements, then handle the remainder path explicitly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_by_default",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "unsafe block has no SAFETY invariant comment",
+      "failure_mode": "Without documented preconditions (CPU feature proven), postconditions (correctness on all inputs), aliasing/lifetime assumptions, alignment, and initialization invariants, the unsafe block cannot be reviewed for soundness",
+      "fix": "Add the required SAFETY comment block per simd-patterns.md:CPU feature, bounds, alignment, aliasing, remainder invariants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No rust-toolchain.toml present; crate uses edition 2021 with no pinned nightly",
+      "failure_mode": "Without a checked-in rust-toolchain.toml, compilation behavior varies by developer machine and CI. The std::arch intrinsics are stable, but consistent build reproducibility requires pinned toolchain",
+      "fix": "Add rust-toolchain.toml with pinned dated nightly and required components if nightly features are later needed"
+    }
+  ],
+  "missing_evidence": [
+    "no scalar reference implementation (scalar oracle required by simd-patterns.md safe SIMD first pattern)",
+    "no scalar fallback for unsupported targets (required by simd-patterns.md required shape)",
+    "no target_feature gate or runtime feature detection for SSE (code uses cfg(target_arch=x86_64) only; runtime detection or target_feature(\"sse\") required)",
+    "no tests comparing scalar and SIMD outputs (empty, short, LANES, non-multiple, large inputs)",
+    "no benchmark proving SIMD path wins for intended input sizes",
+    "no rust-toolchain.toml with pinned nightly",
+    "no benchmark/profiler/second-ring evidence for any performance claim"
+  ],
+  "residual_risk": "Static review only, no commands executed. The crate contains an unsafe SIMD implementation that silently drops input elements on non-multiple-of-4 lengths, lacks a scalar oracle/fallback, has no tests or benchmarks, and has no explicit user waiver for unsafe code or std::arch intrinsics. These are BLOCKER-level violations that must be resolved before acceptance."
+}

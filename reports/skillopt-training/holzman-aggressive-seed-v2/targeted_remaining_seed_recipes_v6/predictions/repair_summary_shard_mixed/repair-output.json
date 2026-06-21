@@ -1,0 +1,33 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/443d37afd6a3ed77/repair_summary_shard_mixed/.skill/holzman-rust/SKILL.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    { "command": "cargo fmt", "status": "passed" },
+    { "command": "cargo test --workspace --all-features", "status": "passed" }
+  ],
+  "rules_satisfied": [
+    "No production unsafe",
+    "No unwrap in production code",
+    "No expect in production code",
+    "No panic/todo/unimplemented/unreachable in production code",
+    "No lossy as conversions (u32::try_from / u64::try_from used instead)",
+    "Checked arithmetic: checked_add for total and count",
+    "Checked division: checked_div for average",
+    "Empty input returns Err(SummaryError::Empty)",
+    "Missing comma returns Err(SummaryError::Invalid)",
+    "Too many rows returns Err(SummaryError::TooMany)",
+    "Overflow returns Err(SummaryError::Overflow)",
+    "split_once used instead of split/collect indexed access",
+    "Returned type changed from Result<String> to Result<Summary>",
+    "render_summary function added for formatting",
+    "Tests unchanged (behavior contract preserved)",
+    "Cargo.toml unchanged"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all 6 behavior tests pass, no banned patterns remain in production source, all arithmetic is checked, all conversions use try_from, split_once replaces unsafe indexing"
+}

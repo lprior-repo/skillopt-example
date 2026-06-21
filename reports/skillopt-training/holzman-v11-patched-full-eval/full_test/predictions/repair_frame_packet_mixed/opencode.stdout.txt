@@ -1,0 +1,15 @@
+Now let me read the crate files:
+Now I understand the issues. The current code has:
+1. No `max_payload` check (test `rejects_limit` will fail)
+2. Lossy `payload.len() as u32` conversion
+3. No checked capacity arithmetic or `try_reserve`
+
+Let me fix the production source:
+Repair complete. Changes to `src/lib.rs`:
+
+1. **Added `max_payload` check** — returns `PayloadTooLarge` when `payload.len() > max_payload`
+2. **Checked capacity arithmetic** — `4usize.checked_add(payload.len())` instead of unchecked addition
+3. **Bounded allocation** — `try_reserve(capacity)` instead of implicit unbounded growth
+4. **Replaced lossy `as u32`** — `u32::try_from(payload.len())` with `Overflow` error
+
+All 2 tests pass, all strict clippy gates pass, JSON output written.

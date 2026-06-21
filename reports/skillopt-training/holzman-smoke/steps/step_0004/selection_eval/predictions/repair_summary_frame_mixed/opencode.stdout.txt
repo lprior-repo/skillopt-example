@@ -1,0 +1,18 @@
+Issues found: return type mismatch, missing `render_summary`, `unwrap()`, unchecked indexing, unchecked arithmetic, no overflow detection, no empty/invalid handling.
+All 6 tests pass. Now writing the output.
+Repair complete. All 6 tests pass.
+
+**Changes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `.map_err(|_| SummaryError::Invalid)` |
+| Unchecked `parts[1]` indexing | `split_once(',')` + `match` |
+| `total += value` (no overflow check) | `checked_add` → `SummaryError::Overflow` |
+| No empty input guard | `input.trim().is_empty()` → `SummaryError::Empty` |
+| No invalid line handling | Missing comma → `SummaryError::Invalid` |
+| Return type `Result<String, ...>` mismatch | Changed to `Result<Summary, ...>` |
+| Missing `render_summary` | Added pure function |
+| Division by zero risk | Guard: `if count > 0` before average |
+
+Both `summarize_metrics` and `render_summary` are pure, deterministic, and free of all forbidden constructs.

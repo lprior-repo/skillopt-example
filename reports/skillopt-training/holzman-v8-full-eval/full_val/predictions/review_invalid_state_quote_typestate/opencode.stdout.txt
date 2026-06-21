@@ -1,0 +1,4 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with 10 findings (4 BLOCKER, 3 MAJOR, 3 MINOR), 7 missing evidence items, and residual risk assessment.
+
+Core issues: `QuoteWorkflow` represents invalid state combinations at the type level (String + bools + Option), `mark_sent` leaves quotes inconsistent (no timestamp, no idempotency), all fields are public, no error taxonomy, and no evidence exists.

@@ -1,0 +1,7 @@
+Now let me read the task crate files.
+Now I understand the issues. The `parse_numbers` function:
+1. Uses `.unwrap()` (forbidden - can panic)
+2. Ignores `max_items` parameter entirely
+3. Doesn't handle empty input
+All 4 tests pass. Now writing the output JSON.
+Repaired `src/lib.rs`: replaced `.unwrap()` panic paths with proper `Result` handling via `map_err`, added empty-input guard, and enforced `max_items` limit. All 4 behavior tests pass. Output written to `/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_csv_u16/repair-output.json` with `cargo test` passed.

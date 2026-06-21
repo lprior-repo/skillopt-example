@@ -1,0 +1,2 @@
+Now I see the issue. The `encode_frame` function doesn't validate `max_payload` against the payload length. Let me fix that.
+Repaired. The bug was that `encode_frame` never checked `max_payload` against the payload length. Added a guard returning `FrameError::PayloadTooLarge` when `payload.len() > max_payload`, and replaced the lossy `payload.len() as u32` cast with `try_into().map_err(|_| FrameError::Overflow)`. All 2 tests pass and the full Holzman verification gate passes clean.

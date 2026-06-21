@@ -1,0 +1,12 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` to the required output path with **10 findings** and **5 missing evidence** items.
+
+Key findings:
+- **4x `unwrap()`** panics on I/O and parse failures (lines 9, 19)
+- **1x `as u16`** lossy truncation (line 19) — silently corrupts values > 65535
+- **2x unchecked indexing** `parts[0]`/`parts[1]` without bounds checks (lines 16, 19)
+- **`split().collect()`** instead of `split_once` (line 12) — over-allocates, ignores extra columns
+- **`println!`** hidden I/O side effect in core parsing closure (line 16)
+- **No functional-core/imperative-shell separation** — everything monolithic
+- **No typed error return** — `Vec<Record>` can't surface any errors
+- **No benchmarks, profiler, or allocation evidence**

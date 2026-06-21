@@ -1,0 +1,10 @@
+Now I have all the context. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+- **8 findings** (5 BLOCKER, 3 MAJOR, 1 MINOR)
+- **Core issue:** `BatchWorkflow` uses `status: String` + `is_validated: bool` + `is_sent: bool` — the classic illegal-state anti-pattern. Any combination of these fields is constructable, making workflow invariants impossible to enforce at compile time.
+- **Typestate fix:** Replace all three fields with a single `BatchStatus` enum (`Pending`, `Validated`, `Sent`) with a `sent_at_epoch_ms` timestamp. Add a fallible `new()` constructor and `mark_sent()` returning `Result` with a `WorkflowError` enum.
+- **Missing evidence:** No benchmarks, profiler data, allocation analysis, or verification tool evidence.
+- **Residual risk:** Zero compile-time protection against illegal state combinations.

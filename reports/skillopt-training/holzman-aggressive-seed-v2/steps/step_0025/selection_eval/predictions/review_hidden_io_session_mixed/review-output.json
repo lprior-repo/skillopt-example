@@ -1,0 +1,112 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on I/O Result is forbidden",
+      "failure_mode": "untrusted or missing file path panics the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, _> and propagate the I/O error with ? or match"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions performs fs I/O and println! logging inside the same function that should be pure functional core",
+      "failure_mode": "core logic cannot be unit-tested without filesystem, logging leaks into pure computation, and side effects are not explicit at boundaries",
+      "fix": "split into a shell function that handles fs::read_to_string and println!, and a pure core fn parse_records(lines: &[&str]) -> Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — hidden side effect (stdout I/O) inside a data-loading function",
+      "failure_mode": "side-effect leaks into pure data processing, breaks testability, and logging is not a first-class action at the shell boundary",
+      "fix": "remove println! from core path; if logging is needed, return a diagnostic struct from the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexing into Vec without bounds check",
+      "failure_mode": "malformed line with zero commas panics with IndexOutOfPanic",
+      "fix": "use parts.get(0) and handle None with map_err or explicit error return"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] — unchecked indexing into Vec without bounds check",
+      "failure_mode": "malformed line with zero commas panics with IndexOutOfPanic",
+      "fix": "use parts.get(0) and handle None with map_err or explicit error return"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing into Vec without bounds check",
+      "failure_mode": "malformed line with only one comma panics with IndexOutOfPanic",
+      "fix": "use parts.get(1) and handle None with map_err or explicit error return"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() — unwrap() on parse Result is forbidden",
+      "failure_mode": "non-numeric value in CSV panics instead of returning a typed parse error",
+      "fix": "use .parse::<u32>().map_err(|e| ParseError::InvalidValue(...)) or ? operator in a Result-returning function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() as u16 — lossy cast from u32 to u16 using `as` is forbidden",
+      "failure_mode": "values > 65535 silently truncate, producing incorrect data without any error signal",
+      "fix": "use u16::try_from(value).map_err(|_| ParseError::Overflow) or value.try_into().map_err(...)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() — collects all split parts into a Vec when only two fields are needed",
+      "failure_mode": "unnecessary heap allocation for every line, and splits on ALL commas even if the grammar only expects one separator",
+      "fix": "use split_once(',') to extract name and value parts in a single bounded operation, then trim and parse each"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "allocation_try_reserve",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No try_reserve or capacity pre-allocation on the return Vec<Record>",
+      "failure_mode": "unbounded reallocation as records are pushed, especially wasteful for large files",
+      "fix": "accept a line count hint or use try_reserve with checked capacity computation in the shell layer"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_sessions performance",
+      "failure_mode": "performance claims about file loading and parsing cannot be verified or measured",
+      "fix": "add a criterion or miniserde benchmark measuring file load latency, allocation count, and throughput"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated file-loading and parsing performance",
+    "no allocation profiling evidence (no alloc or heapshot analysis)",
+    "no second-ring command evidence (no cargo fmt/clippy/test runs documented)",
+    "no command-line argument or CLI evidence for the I/O boundary function"
+  ],
+  "residual_risk": "static review only; no commands run. All 8 BLOCKER findings are independently fixable: replace unwrap with Result propagation, replace unchecked indexing with .get(), replace `as` cast with try_from, replace split+collect with split_once, extract I/O from core. No remaining ambiguity — every violation maps to an explicit Holzman Rust rule."
+}

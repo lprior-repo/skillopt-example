@@ -1,0 +1,80 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses `status: String` plus separate `is_validated: bool` and `is_sent: bool` fields, allowing contradictory states like status=\"sent\" with is_sent=false, status=\"pending\" with is_sent=true, or any empty/unrecognized status string.",
+      "failure_mode": "Invariants are not enforced by the type system; callers can construct ledgers that are semantically inconsistent, causing silent logic errors downstream (e.g., double-sending, processing invalid entries, or writing corrupted audit trails).",
+      "fix": "Replace `status: String`, `is_validated: bool`, `is_sent: bool` with a single `LedgerStatus` enum typestate (e.g., `Pending`, `Validated`, `Sent { sent_at_epoch_ms: u64 }`). The enum makes invalid combinations impossible at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a primitive type with no domain semantics. Any string is accepted as a valid ledger ID, including empty strings, unbounded strings, or malformed identifiers.",
+      "failure_mode": "Invalid IDs (empty, too long, wrong format) can propagate through the system. No validation boundary exists, so every caller must re-validate.",
+      "fix": "Introduce a `LedgerId` newtype wrapping a `String` with a fallible constructor (`LedgerId::new(...)`) that rejects empty strings and enforces domain constraints. Use `LedgerId` in the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_state_transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes `LedgerWorkflow` by value and unconditionally sets status and flags. It does not check the current state before transitioning, does not validate that the item was previously validated, and does not produce an error on invalid transitions.",
+      "failure_mode": "Any item can be marked sent regardless of its prior state, enabling invalid workflows (e.g., marking an unvalidated item as sent, or double-marking an already-sent item). No domain invariant enforcement.",
+      "fix": "Change the signature to `fn mark_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, TransitionError>` where the typestate enum guards transitions. Only allow transition from `Validated` to `Sent`, returning a typed error for invalid states. Use the typestate enum so unreachable transitions are compile-time errors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "encapsulation_data_inert",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `LedgerWorkflow` are `pub`, allowing external code to arbitrarily mutate the struct and violate invariants. There is no constructor, no accessor discipline, and no data validity-by-construction.",
+      "failure_mode": "Callers can set fields in contradictory combinations after construction, bypassing any transition logic. The struct is not inert by construction.",
+      "fix": "Make all fields `pub(crate)` or `private` and provide a constructor or builder that only permits valid initial states. Better yet, use a typestate enum so valid states are the only constructable ones."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_over_bool_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` and `is_sent: bool` are boolean lifecycle flags. The combination of two booleans plus a free-form `status: String` creates 2^2 * N states, most of which are invalid.",
+      "failure_mode": "State space explosion with most states being illegal. Code must manually check multiple booleans for invariants that the compiler should enforce.",
+      "fix": "Collapse into a single `LedgerStatus` enum: `enum LedgerStatus { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`. This makes the valid state space exact and illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unvalidated_string_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` accepts any arbitrary string. There is no validation that the string matches a known state (e.g., \"pending\", \"validated\", \"sent\").",
+      "failure_mode": "Typo in status string (e.g., \"snt\", \"SENT\") creates a new unhandled state that bypasses all branch logic, leading to silent data corruption or missed processing.",
+      "fix": "Replace `status: String` with a `LedgerStatus` enum. If serialization is needed, implement `serde` on the enum with explicit variant names."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for any performance claim. The crate has zero benchmarks, no allocation analysis, and no profiler evidence.",
+      "failure_mode": "Cannot verify that the struct or its transitions meet performance requirements. Allocation patterns (String ownership, .to_string() in mark_sent) are unmeasured.",
+      "fix": "Add a benchmark module measuring allocation and throughput for `mark_sent` with typical payload sizes."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `[dev-dependencies]` for testing or benchmarking, no benchmark configuration. The crate is a bare shell with no test infrastructure.",
+      "failure_mode": "No way to verify behavior or detect regressions. No `cargo test` or `cargo bench` targets are available.",
+      "fix": "Add `[[bench]]` section with appropriate harness if benchmarks are needed, or at minimum add `[[test]]` entries with behavior tests covering the typestate transitions."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent or any throughput claim", "no profiler evidence for allocation patterns", "no allocation analysis (no try_reserve, no capacity planning)", "no second-ring evidence (no integration tests or external consumer tests)", "no CLI/command entry point to audit"],
+  "residual_risk": "The typestate violation is structural — the entire domain model allows illegal states by construction. Without an enum typestate replacing String+bool fields, no amount of testing can prove invariants hold. Static review only; no commands run."
+}

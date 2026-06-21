@@ -1,0 +1,9 @@
+Now I see the issues. The current code ignores `max_payload`, uses lossy `as u32` conversion, has no overflow checks, and no allocation discipline. Let me read the references quickly, then apply the fix.
+Repair complete. Summary of changes to `src/lib.rs:8-21`:
+
+1. **Payload limit check** — `payload.len() > max_payload` → `Err(FrameError::PayloadTooLarge)` (was completely ignored)
+2. **Checked capacity arithmetic** — `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?` (was missing)
+3. **Checked length conversion** — `u32::try_from(payload.len()).map_err(...)` replaces lossy `payload.len() as u32`
+4. **Fallible allocation** — `Vec::new()` + `try_reserve(capacity)` with `FrameError::Allocation` (was unbounded)
+
+All 4 frame-encoder steps followed. Both behavior tests pass, clippy clean, JSON output written.

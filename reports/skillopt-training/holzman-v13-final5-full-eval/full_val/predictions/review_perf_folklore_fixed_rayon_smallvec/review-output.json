@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-input-rayon-smallvec-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon and SmallVec as performance improvements on a fixed [u8; 4] input. Rayon parallel overhead vastly exceeds any benefit for 4 elements. SmallVec on a 4-element return is pointless since the entire result fits in a stack array and SmallVec adds pointer indirection plus conditional branches over Vec::push.",
+      "failure_mode": "Parallelization overhead and SmallVec heap-allocated fallback path make the proposed change strictly slower, with higher tail latency and more instructions per call, while producing identical output.",
+      "fix": "Replace Vec<&'static str> return with [&'static str; 4] as a fixed array. Eliminate the allocation entirely. Remove the Rayon/SmallVec TODO. Final source: `pub fn classify_four(bytes: &[u8; 4]) -> [&'static str; 4]` with an index-based loop or array constant mapping."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-performance-claim-without-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO states Rayon and SmallVec 'will be faster' without any workload specification, target hardware, baseline command, baseline measurement, new measurement, variance notes, or regression threshold. This is an unmeasured performance claim based on folklore, not evidence.",
+      "failure_mode": "Optimization based on folklore rather than measurement leads to regressions. Rayon has thread-pool startup and synchronization costs that dwarf any work on 4 elements. SmallVec adds branch overhead per push compared to a raw Vec or fixed array.",
+      "fix": "Remove the unmeasured performance claim. If performance is a real requirement, first measure the baseline with `benchmarks` and profiler evidence, then optimize the measured bottleneck. For a 4-element input, the bottleneck is not allocation—compile to a fixed array return type with zero allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation-in-tiny-hot-path",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The function allocates a Vec for exactly 4 elements. Every call to `classify_four` heap-allocates a Vec, its backing buffer, and stores 4 pointers. For a fixed-size 4-byte input, this is a guaranteed allocation per call with no possibility of elision.",
+      "failure_mode": "Repeated calls to this function cause continuous heap allocation/deallocation, increasing GC pressure (if applicable), cache misses from heap traffic, and tail latency spikes from allocator contention. In a hot path this is a measurable performance defect.",
+      "fix": "Return `[&'static str; 4]` instead of `Vec<&'static str>`. Use a simple indexed loop or `array::from_fn` to build the result on the stack with zero allocation. If the return type must stay `Vec` for API compatibility, benchmark proves Vec is needed, and the call site is not in a hot path—but no Rayon or SmallVec."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-benchmark-and-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark harness, no benchmark command, no profiler output, and no allocation evidence exist in the crate. The Cargo.toml has no [[bench]] section and no criterion or criterion-like dependency. There is no measured baseline against which to evaluate any change.",
+      "failure_mode": "Without a benchmark and baseline measurement, no optimization can be validated. Any proposed change is guesswork. Second-ring evidence for zero-cost, vectorization, or bounds-check removal claims is entirely absent.",
+      "fix": "Add a criterion benchmark measuring the current `classify_four` baseline, then measure any proposed change. Report p50/p95/p99 latency or ops/sec with hardware and workload details. Until then, the performance TODO is speculation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "rayon-parallel-overhead-tiny-data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Rayon requires splitting work across threads, distributing data, and synchronizing results. For 4 elements, the data distribution cost alone exceeds the cost of serially evaluating 4 byte-and-branch operations. Rayon is only justified for large independent pure transforms with scaling evidence (claim-traceability.md:25).",
+      "failure_mode": "Thread spawn/task submission overhead dominates execution time. The function becomes 10-100x slower than the serial version on 4 elements. Tail latency spikes from thread scheduling jitter.",
+      "fix": "Remove any Rayon proposal. Use a simple indexed loop or `array::from_fn` for the serial path. Rayon is appropriate only when the work item count exceeds hundreds of independent items with measured scaling."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "smallvec-folklore-on-4-element-return",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SmallVec is proposed for a 4-element return. SmallVec optimizes stack allocation for small capacities but adds conditional branches on every push (stack vs heap path). For a fixed 4-element result, SmallVec adds overhead over both a fixed array and a Vec with known size.",
+      "failure_mode": "SmallVec's per-element branch for inline-vs-heap detection adds instruction count. The inline buffer is typically 1-24 elements depending on type parameters, but the branch overhead still applies. A fixed `[&'static str; 4]` eliminates the branch entirely.",
+      "fix": "Eliminate SmallVec. Use `[&'static str; 4]` for a zero-allocation, zero-branch result. SmallVec is justified only when the common case size is unknown at compile time and bounded but the typical count is small relative to heap cost."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark harness exists (no criterion or similar dependency)",
+    "no baseline measurement command or number for classify_four",
+    "no profiler output showing classify_four as a bottleneck",
+    "no allocation profiling evidence",
+    "no second-ring evidence for any zero-cost or vectorization claims",
+    "no workload, target hardware, or input distribution specification",
+    "no regression threshold defined"
+  ],
+  "residual_risk": "Static review only with no commands run. The source contains a performance TODO that proposes Rayon and SmallVec for a 4-element fixed input, which is folklore-driven optimization that will produce a measurable regression. Without benchmark evidence, the recommendation to return `[&'static str; 4]` is based on architectural analysis (fixed-size input = fixed-size output = stack array) rather than measurement. If the crate later adds benchmarks proving Vec allocation is the bottleneck with Rayon/SmallVec scaling, the findings would need revision—but no such evidence exists."
+}

@@ -1,0 +1,94 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string and println! are hidden I/O fused into a session-loading function that should separate shell (I/O) from core (parsing/domain construction). File I/O, logging, parsing, allocation, and domain construction are all fused.",
+      "failure_mode": "shell side-effects leak into core logic, making the function impossible to unit-test in isolation, breaking the Data/Calculations/Actions boundary, and making it impossible to swap I/O backends or mock file reads.",
+      "fix": "Split into shell: fn load_sessions(path: &str) -> Result<String, IoError> and core: fn parse_sessions(text: &str) -> Result<Vec<Record>, ParseError>. Move fs::read_to_string and println! into the shell layer only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file-not-found, permission errors, or invalid UTF-8.",
+      "failure_mode": "untrusted or missing file input aborts the entire process instead of returning a typed I/O error that the caller can handle gracefully.",
+      "fix": "Return Result<Vec<Record>, LoadError> and use fs::read_to_string(path).map_err(|e| LoadError::Io(e)) without unwrap."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input for the value field.",
+      "failure_mode": "malformed CSV input (e.g. \"bad,notanumber\") aborts the entire session load instead of returning a typed parse error for the specific offending row.",
+      "fix": "Use .parse::<u32>().map_err(|e| ParseError::Invalid(value_index))? to return a typed parse error instead of panicking."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked index access on a split result. If a line has fewer than 2 comma-separated fields, this panics with an index-out-of-bounds panic.",
+      "failure_mode": "A single malformed line (e.g., \"onlyonename\") causes a panic rather than a typed parse error, violating panic freedom and failing to isolate bad rows.",
+      "fix": "Replace the entire parts-collection pattern with line.split_once(',').ok_or(ParseError::InvalidRow)? and bind (_name, value_str) = ...; use value_str for parsing. For two-field records, split_once avoids indexing, bounds checks, and get() entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(parts[1].parse::<u32>().unwrap() as u16) is a lossy cast: any u32 value > 65535 silently truncates to u16 with no error.",
+      "failure_mode": "A valid u32 like 70000 silently becomes 4467 in the domain Record, corrupting data with no indication that the value exceeded the domain range.",
+      "fix": "Replace with u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow)? using destination-type try_from instead of lossy as cast."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "let parts: Vec<String> = line.split(',').map(|part| part.trim().to_string()).collect() allocates a full intermediate Vec of owned Strings for every line, when only two fields are needed.",
+      "failure_mode": "Wasted allocation per line increases memory pressure and allocation overhead. For large session files this is unnecessary and contradicts the 'avoid intermediate Vec/String materialization unless required' principle. Also enables unchecked indexing instead of structured parsing.",
+      "fix": "Eliminate the parts vector. Use line.split_once(',').ok_or(ParseError::Invalid)? to destructure directly, parse value_str, and construct Record without intermediate allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation_missing",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no bounded capacity, no domain cap, no try_reserve, and no maximum session count validation.",
+      "failure_mode": "An unbounded file (e.g., millions of lines) can allocate unbounded memory, leading to OOM kill or denial of service with no allocation budget or domain cap enforcement.",
+      "fix": "Validate a domain cap/max_rows first, collect into Vec::new(), then use values.try_reserve(max_items).map_err(|_| LoadError::Allocation)? before pushes. Reject empty input early. Add max_rows parameter or domain constant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_error_taxonomy_missing",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function signature returns Vec<Record> with no Result type. All errors (I/O, parse, overflow, allocation, malformed input) are silently converted to panics via unwrap().",
+      "failure_mode": "Callers have no way to distinguish a missing file from a malformed CSV row from an integer overflow. Error handling is impossible at the API level.",
+      "fix": "Define a typed error enum: enum LoadError { Io(std::io::Error), InvalidRow, Parse(u32), Overflow(u32), Allocation }; change signature to fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError>."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to measure load_sessions throughput or allocation patterns",
+    "no profiler evidence for memory traffic in the parsing path",
+    "no allocation audit: no try_reserve, no bounded Vec, no allocation budget",
+    "no command evidence: cargo fmt, cargo check, cargo clippy have not been run",
+    "no second-ring evidence for any performance or correctness claims",
+    "no command-truth evidence for how this function is called or validated"
+  ],
+  "residual_risk": "Static review only; no commands run. The source contains 8 blocker violations including panic surfaces (2 unwrap calls), unchecked indexing (parts[0], parts[1]), lossy cast (as u16), hidden I/O (fs::read_to_string + println!), unbounded allocation (no try_reserve, no domain cap), intermediate Vec allocation per line, missing typed error taxonomy, and fused shell/core concerns. All 8 blockers must be resolved before delivery is acceptable."
+}

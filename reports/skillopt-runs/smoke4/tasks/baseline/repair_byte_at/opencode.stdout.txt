@@ -1,0 +1,2 @@
+The issue is `input[index]` does unchecked indexing that panics on OOB, but the test expects `None`. Fix is `input.get(index).copied()`.
+Repaired `src/lib.rs` — replaced unchecked indexing `input[index]` with `input.get(index).copied()`. `cargo test` passed. Output written to `/tmp/opencode/holzman-skillopt/smoke4/tasks/baseline/repair_byte_at/repair-output.json`.

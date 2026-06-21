@@ -1,0 +1,13 @@
+Review complete. Wrote `review-output.json` to the required output path.
+
+**Summary of findings: 10 issues (7 BLOCKER, 3 MAJOR)**
+
+The core problem is that `BudgetWorkflow` encodes a state machine as independent scalar fields (`String status`, `bool is_validated`, `bool is_sent`, `Option<u64> sent_at_epoch_ms`). This makes every combination of those fields valid at the type level — including contradictory ones like `is_sent=true` with `sent_at_epoch_ms=None` and `status="draft"`.
+
+Key violations:
+- **Rules breached**: `make_illegal_states_unrepresentable` (6 findings), `functional_core_imperative_shell` (1 finding), `type_discipline` (2 findings), `no_unnecessary_allocations` (1 finding)
+- **`mark_sent`** performs no precondition checks and never sets `sent_at_epoch_ms`, producing contradictory states
+- **All fields are `pub`** with no constructor or encapsulation
+- **No benchmarks, profiler data, or command evidence** exist
+
+The residual risk is high: this struct shape cannot be fixed by adding runtime checks alone — it requires replacing with a typed state enum.

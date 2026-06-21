@@ -1,0 +1,21 @@
+Now I have full picture. The code has many Holzman violations: unchecked indexing, `.unwrap()`, unchecked arithmetic, lossy casts, wrong split approach, wrong return type (tests expect `Summary` struct + `render_summary`). Let me fix it.
+All 6 tests pass. Running strict clippy gate:
+All gates pass. Writing repair output:
+Repair complete. All gates passed.
+
+**Changes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `parts[1]` unchecked indexing | `split_once(',')` with `_name, value_str` |
+| `.unwrap()` on parse | `.map_err(\|_\| SummaryError::Invalid)?` |
+| `total += value` unchecked add | `total.checked_add(value).ok_or(Overflow)?` |
+| `count += 1` unchecked add | `count.checked_add(1).ok_or(Overflow)?` |
+| `count as u32` / `count as u64` lossy casts | `u32::try_from(count)` / `u64::try_from(count)` |
+| `total / count` unchecked division | `total.checked_div(...)` |
+| No empty-input check | `if input.is_empty() { return Err(Empty) }` |
+| `split(',').collect()` allocation + shape risk | `split_once` mandated pattern |
+| Wrong return type `Result<String>` | `Result<Summary, SummaryError>` to match tests |
+| Missing `render_summary` | Added pure formatting function |
+
+**Evidence:** 6/6 tests pass, clippy strict gate clean, valid JSON output at required path.

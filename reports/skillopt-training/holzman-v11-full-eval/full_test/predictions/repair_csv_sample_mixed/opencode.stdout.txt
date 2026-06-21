@@ -1,0 +1,25 @@
+Issues found in `src/lib.rs`:
+1. Line 12: `.unwrap()` — absolute law violation
+2. No empty-input check — test expects `Err(ParseError::Empty)`
+3. No parse-error handling — test expects `Err(ParseError::Invalid)`
+4. No max_items cap — test expects `Err(ParseError::TooMany)`
+5. No `try_reserve` — unbounded allocation
+All 4 tests pass. Let me verify the final source and run clippy for the strict lint gate.
+Repair complete. All gates passed.
+
+**Changes to `src/lib.rs`:**
+- Removed `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)`
+- Added empty-input check → `Err(ParseError::Empty)`
+- Added max_items cap enforcement → `Err(ParseError::TooMany)`
+- Added `try_reserve(max_items)` for bounded allocation → `Err(ParseError::Allocation)` on failure
+- Iterative parsing instead of `map`+`collect`, allowing per-item error handling and count enforcement
+
+**Commands run:**
+| Command | Status |
+|---|---|
+| `cargo fmt` | passed |
+| `cargo fmt --check` | passed |
+| `cargo test` | 4/4 passed |
+| `cargo clippy --lib -- -D warnings` | passed |
+
+**Output written to:** `repair-output.json`

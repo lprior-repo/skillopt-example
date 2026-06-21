@@ -1,0 +1,112 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/review-output-contract.md",
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/zero-cost-abstractions.md",
+    "references/runtime-performance-architecture.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file does not exist, is unreadable, or the path is too long. This is the primary entry point for external input and must never abort the process.",
+      "failure_mode": "An absent or inaccessible sensor file crashes the entire consumer process instead of returning a typed I/O error that a caller can retry, log, or surface.",
+      "fix": "Return Result<Vec<Reading>, io::Error> (or a domain error enum) and propagate with ? instead of unwrap()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 15,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on three failure modes: index-out-of-bounds if the line has fewer than two commas, parse failure if the value field is not a valid integer, and the subsequent lossy as u16 truncates any value above 65535 silently.",
+      "failure_mode": "A single malformed CSV line (missing field, non-numeric value, or value > 65535) crashes the entire load_readings call, losing all previously parsed readings and corrupting caller state.",
+      "fix": "Use parts.get(1).ok_or(Error::MissingField) and parse with map_err(Error::ParseValue). Use checked_into::<u16>() or checked_cast instead of as u16 to reject values outside range with a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "parts[1] and parts[2] use direct indexing into the Vec produced by split. If a line has fewer than two or three comma-separated fields, IndexOutOfBounds panics. Line 20 also indexes parts[2] for flags.",
+      "failure_mode": "Malformed lines with fewer than three fields abort the entire batch load instead of producing a per-line parse error the caller can skip or retry.",
+      "fix": "Replace parts[1] and parts[2] with parts.get(1).ok_or(Error::MissingField) and parts.get(2).ok_or(Error::MissingField). Handle the third field as optional with a default empty flags vec."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_no_post_init_alloc",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "load_readings allocates freely per line: a Vec<String> for split parts, multiple String allocations for trim/to_string on each field, and a Vec<String> for flags per Reading. The function signature returns Vec<Reading> which itself allocates a Vec on the heap. No allocation budget, no try_reserve, no capacity hint exists.",
+      "failure_mode": "A large sensor file or adversarial input with many fields per line triggers unbounded heap allocation, potentially OOM-killering the process or causing tail-latency spikes from allocator contention.",
+      "fix": "Add a max_lines and max_fields_per_line parameter. Use try_reserve on the output Vec. Accept a caller-owned output buffer via fn load_readings_into(path: &str, out: &mut Vec<Reading>) -> Result<(), Error> or use an Iterator-returning shape to defer allocation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side-effecting I/O call inside the map closure. It executes for every line including lines that will later fail to parse, and it couples the pure data-loading logic to console output. This is hidden Actions inside what should be Calculations.",
+      "failure_mode": "Logging output appears even for broken lines, the function cannot be used in headless/batch contexts without stdout interference, and the side effect prevents the function from being pure or testable without capturing stdout.",
+      "fix": "Remove println! from the parse path. If logging is needed, accept a callback or return parsed items that the caller logs. Use the tracing crate with a level filter instead of println!"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 15,
+      "problem": "as u16 is a lossy widening/narrowing cast. Values in [65536, u32::MAX] silently truncate to u16 without any overflow detection, producing incorrect sensor data without warning.",
+      "failure_mode": "A sensor emitting values like 70000 silently becomes 4464, corrupting downstream analytics and potentially causing silent control-system failures in safety-critical monitoring.",
+      "fix": "Use u32::try_into().map_err(|_| Error::ValueOutOfRange) or let value = u16::try_from(parsed).map_err(|_| Error::ValueOutOfRange) for a checked, non-lossy conversion."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() creates a per-line Vec<String> with to_string() on every part. This is allocation-heavy iterator chaining that allocates on every single line.",
+      "failure_mode": "High per-line allocation rate causes allocator pressure and GC-like pauses in the loader. For a file with millions of readings this becomes a throughput bottleneck and tail-latency spike.",
+      "fix": "Use line.split_once or a bounded split pattern. Parse directly into the Reading fields without intermediate Vec<String>. Consider using a crate like winnow or nom for zero-allocation CSV parsing, or at minimum use line.split(',').enumerate().map(|(i, p)| match i { 0 => ..., 1 => ..., 2 => ... }) without collecting into a Vec."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Reading struct has no validation invariants. sensor can be empty, value is silently truncated, and flags can contain arbitrary whitespace. Invalid domain states are representable.",
+      "failure_mode": "Downstream code cannot assume sensor names are non-empty, values fit u16, or flags are meaningful strings. Errors propagate as silent corruption rather than explicit validation failures.",
+      "fix": "Make Reading a newtype with a private constructor, or derive with a validated builder. Require sensor: non-empty string. Validate value range at construction. Trim and normalize flags."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_short_functions",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "load_readings at 14 lines does fit within one page, but it conflates I/O (fs::read_to_string), parsing (split/trim/collect), type conversion (parse/as), and side effects (println!) in a single function with no error separation.",
+      "failure_mode": "The mixed concerns make it impossible to test the pure parsing logic independently of file I/O, and any change to parsing risks breaking the I/O path and vice versa.",
+      "fix": "Split into: fn read_file(path: &str) -> Result<String, io::Error>, fn parse_lines(text: &str) -> impl Iterator<Item = Result<Reading, ParseError>>, and keep the caller wiring them together."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_simple_control_flow",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "The map closure uses .collect::<Vec<_>>() inside the iterator chain, which means each line allocates a temporary Vec even when it will immediately be discarded after extracting fields. The final .collect() allocates another Vec for the full result.",
+      "failure_mode": "Double allocation per line: one for the intermediate Vec<String> parts and one for the final Vec<Reading>. For large files this doubles the allocation pressure and cache footprint.",
+      "fix": "Replace the intermediate collect with direct indexing or enumerate-based destructuring. Return an Iterator<Item = Result<Reading, Error>> and let the caller collect once."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_readings throughput or latency on typical sensor file sizes",
+    "no profiler evidence (perf stat, flamegraph, DHAT) to establish allocation rate or cache behavior",
+    "no rust-toolchain.toml with pinned nightly; no build profile defined in Cargo.toml",
+    "no second-ring evidence (cargo asm, cargo llvm-ir, cargo llvm-lines) for any performance claims",
+    "no cargo fmt --check, clippy, or cargo test evidence was gathered",
+    "no allocation budget statement for the load_readings function under worst-case input"
+  ],
+  "residual_risk": "Static review only. No commands were run. The code has multiple BLOCKER violations of panic-free policy (unwrap on I/O and parse, unchecked indexing, lossy as cast), unbounded post-init allocation, hidden I/O side effects, and no validation invariants. The function as written would crash on any malformed input, any missing file, or any sensor value exceeding 65535. A remediated version with Result types, checked conversions, bounded allocation, and split I/O from parsing would need clippy, test compilation, and benchmark evidence before acceptance."
+}

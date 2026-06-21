@@ -1,0 +1,12 @@
+Now I see the issues:
+1. **Line 10**: `as u32` is a lossy usize→u32 conversion (violates Holzman Rule 3)
+2. **Missing payload size check**: `rejects_limit` test expects `PayloadTooLarge` error but none is checked
+3. **No bounded allocation**: `Vec::new()` should use `try_reserve` for known capacity
+All 2 tests pass. Now writing the required output.
+Repaired. Three Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** (`payload.len() as u32`) → `u32::try_from(payload.len())` returning `FrameError::Overflow`
+2. **Missing bounds check** → Added `payload.len() > max_payload` guard returning `FrameError::PayloadTooLarge`
+3. **Unbounded Vec allocation** → Added `try_reserve` with `checked_add` for the known 4+payload.len capacity
+
+All 2 behavior tests pass. Output written to `repair-output.json`.

@@ -1,0 +1,13 @@
+Issues identified:
+1. `payload.len() as u32` — lossy `as` cast (line 10)
+2. `max_payload` parameter accepted but never checked
+3. No `try_reserve` / bounded allocation handling
+
+Fixing now:
+Repair complete. Three fixes applied to `src/lib.rs`:
+
+1. **Lossy cast removed** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)`
+2. **max_payload enforced** — added `payload.len() > max_payload` guard returning `PayloadTooLarge`
+3. **Bounded allocation** — `checked_add` for capacity + `try_reserve` with `Allocation` error mapping
+
+Both tests pass: `encodes` and `rejects_limit`.

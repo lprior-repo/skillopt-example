@@ -1,0 +1,14 @@
+Now I have all the information. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/f9c39e52d777a23b/review_unsafe_simd_tail/review-output.json`.
+
+**7 BLOCKER findings** across the task crate in `src/lib.rs:1-14`:
+
+1. **Production unsafe** (line 3) — entire body is `unsafe` block; violates absolute law
+2. **No scalar fallback** (line 1) — SIMD path has no safe alternative when SSE unavailable
+3. **Remainder truncation** (line 7) — loop silently drops 1-3 trailing elements on non-multiple-of-4 inputs
+4. **No target-feature gate** (line 1) — only `#[cfg(target_arch)]`, no runtime `is_x86_feature_detected`
+5. **Missing benchmark evidence** — no baseline, workload, or measured data
+6. **Missing tests** — no test module exists
+7. **Missing command evidence** — no cargo check/clippy/test recorded
+
+**Residual risk:** CRITICAL. Function is blocked for delivery on all counts — unsafe code, correctness bug, no fallback, no evidence.

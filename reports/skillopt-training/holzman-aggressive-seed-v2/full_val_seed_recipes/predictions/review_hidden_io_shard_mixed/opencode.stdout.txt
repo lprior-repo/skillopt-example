@@ -1,0 +1,18 @@
+Now I have all the context. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 12 findings, 5 BLOCKER, 7 MAJOR**
+
+| Category | Count | Key Issues |
+|---|---|---|
+| `zero_unwrap` | 2 | Line 9 (file I/O), Line 19 (parse) |
+| `no_lossy_casts` | 1 | Line 19 (`as u16` on u32) |
+| `no_unchecked_indexing` | 2 | Lines 16, 19 (`parts[0]`, `parts[1]`) |
+| `functional_core` | 1 | Line 16 (`println!` in core logic) |
+| `type_discipline` | 1 | Line 4 (raw `String`/`u16`, no newtypes) |
+| `error_taxonomy` | 1 | Line 8 (no `Result`, panics on all failures) |
+| `allocation` | 1 | Line 12 (unbounded `Vec` per line) |
+| `core/shell` | 1 | Line 8 (I/O coupled with parsing) |
+| `missing_evidence` | 4 | No benchmark, profiler, Kani, or CI command evidence |
+
+**Residual risk**: Static review only. All five panic paths, two unchecked indexing paths, the lossy cast, hidden I/O in core, unbounded allocation, and missing evidence are BLOCKER-severity.

@@ -1,0 +1,140 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() - unwrap on fallible I/O operation",
+      "failure_mode": "Any file-not-found, permission, or I/O error aborts the entire program instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, Error> and use .map_err(|e| Error::Io(e)) or equivalent typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() - unwrap on parse of untrusted input",
+      "failure_mode": "Malformed CSV data (non-numeric value) panics the caller instead of returning a typed ParseError",
+      "fix": "Use .parse::<u32>().map_err(|_| Error::Parse) or similar typed error, then convert with u16::try_from"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 lossy width cast after parse",
+      "failure_mode": "Values in range 65536..u32::MAX silently truncate to u16, producing incorrect domain data without any error",
+      "fix": "Replace with u16::try_from(parts[1].parse::<u32>().map_err(|_| Error::Parse)?).map_err(|_| Error::Overflow) or parse directly to u16 with checked conversion"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] unchecked indexing into split result",
+      "failure_mode": "A line with fewer than 2 comma-separated fields triggers panic via index out of bounds",
+      "fix": "Use line.split_once(',').ok_or(Error::Invalid) to get name and value_str, then validate value_str is present"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] unchecked indexing into split result",
+      "failure_mode": "Same as above - a line missing the second field panics at index access",
+      "fix": "Use split_once pattern: let (name_str, value_str) = line.split_once(',').ok_or(Error::Invalid)?;"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) - hidden I/O side effect inside a data-loading function",
+      "failure_mode": "Side effects leak into a function that should be data transformation; makes testing non-deterministic and couples parsing to console logging",
+      "fix": "Remove println! from the parsing logic. If logging is required, push it to the imperative shell caller that invokes load_frames"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames mixes file I/O, console logging, parsing, and collection in a single function",
+      "failure_mode": "Violates functional core / imperative shell: no pure layer is separable; cannot unit-test parsing logic in isolation without real files and console capture",
+      "fix": "Split into: (1) shell fn load_frames(path) -> Result<Vec<Record>, E> that reads file and calls core, (2) pure fn parse_records(text: &str) -> Result<Vec<Record>, E> that handles parsing, (3) Record type with private fields and smart constructor"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record struct has public mutable fields (pub name: String, pub value: u16)",
+      "failure_mode": "Callers can construct Record with empty name, invalid value range, or inconsistent state directly without any validation",
+      "fix": "Make fields private, add a fallible constructor fn new(name: String, value: u16) -> Result<Self, Error> that validates invariants, or use a newtype for name"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! inside an iterator map closure - side effect during collection",
+      "failure_mode": "Side effect order is tied to iterator evaluation order which is unspecified for parallel iterators; logging output is non-deterministic",
+      "fix": "Remove logging from the closure entirely; log in the shell layer after records are collected if needed"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No try_reserve or capacity hint before Vec::collect on split output",
+      "failure_mode": "Unbounded reallocations on large files; OOM not handled gracefully - falls back to panic",
+      "fix": "Estimate line count or use try_reserve before the collect; count lines first or use a bounded parser"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collecting all split parts into Vec<String> when only 2 fields are needed",
+      "failure_mode": "Unnecessary heap allocation per line; each line creates a Vec of Strings then clones into Record",
+      "fix": "Use line.split_once(',').ok_or(Error::Invalid)? to get (name_str, value_str) without intermediate Vec, then parse value_str directly"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames returns Vec<Record> with no Result wrapper - all errors must panic",
+      "failure_mode": "Every failure mode (I/O, parse, invalid format, overflow) collapses into panic; callers cannot recover or distinguish error types",
+      "fix": "Define a typed enum Error { Io(io::Error), Parse, Invalid, Overflow } and return Result<Vec<Record>, Error>"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this crate",
+      "failure_mode": "Cannot verify performance claims or allocation behavior for file loading at scale",
+      "fix": "Add a benchmark measuring throughput vs file size, with allocation tracking (e.g., criterion with measurement of bytesallocated/op)"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo test, cargo fmt, or cargo clippy evidence provided",
+      "failure_mode": "Static review only; compilation, formatting, and lint compliance not verified",
+      "fix": "Run cargo fmt --check, cargo clippy, and cargo test to produce command evidence"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for file-loading throughput",
+    "no profiler data for allocation hotspots in load_frames",
+    "no allocation audit (try_reserve, Vec capacity) evidence",
+    "no behavior tests exercising invalid CSV lines, missing fields, or overflow values",
+    "no command evidence: cargo fmt --check, cargo clippy, cargo test not run"
+  ],
+  "residual_risk": "Multiple BLOCKER findings: unwrap on I/O and parse, lossy as cast, unchecked indexing, hidden println! side effect, mixed imperative/pure responsibilities, no error taxonomy, and public mutable struct fields. The crate cannot be safely used without panicking on any malformed input or I/O error. All unwrap calls, the lossy cast, and unchecked indexing must be replaced with typed error handling before this code is safe for any production use. The functional core / imperative shell violation means parsing logic cannot be tested in isolation."
+}

@@ -1,0 +1,19 @@
+{
+  "reasoning": "Both failures stem from the agent not recognizing or applying the `try_reserve` requirement for bounded allocations. In repair, it built a Vec without pre-reserving or handling allocation errors. In review, it missed flagging the absence of bounded allocation checks. The edits reinforce the `try_reserve` rule and ensure reviews explicitly check for it.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "source_type": "failure",
+      "support_count": 2
+    },
+    {
+      "op": "insert_after",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "\n- **Review Check:** In review mode, explicitly flag any `Vec` construction that lacks `try_reserve` when capacity is bounded, as a BLOCKER finding. Include \"missing bounded allocation handling\" in missing_evidence if no `try_reserve` is present.",
+      "source_type": "failure",
+      "support_count": 2
+    }
+  ]
+}

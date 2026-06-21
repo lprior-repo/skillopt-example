@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow has redundant lifecycle fields: status: String and is_sent: bool can diverge, allowing illegal states such as status=\"queued\" with is_sent=true or status=\"sent\" with is_sent=false.",
+      "failure_mode": "The struct admits logically impossible states that runtime code must defensively check but the type system cannot prevent, violating the core Holzman invariant that the compiler should enforce correctness.",
+      "fix": "Replace status and is_sent with a single typed enum or typestate (e.g., PacketState { Queued, Validated, Sent { sent_at_epoch_ms: u64 } }) so invalid combinations are unconstructable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_status_string_with_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a primitive where the domain has a finite set of states (queued, validated, sent). The functional core performance reference explicitly mandates: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.'",
+      "failure_mode": "Any code comparing status string values is fragile to typos, casing, or drift. The compiler cannot exhaustiveness-check status comparisons, enabling unhandled states at runtime.",
+      "fix": "Replace with an enum, e.g., pub enum PacketStatus { Queued, Validated, Sent { sent_at_epoch_ms: u64 } }."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enum",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle flag that should be an enum or typestate per the functional core performance reference. A boolean cannot express multi-step workflows or prevent invalid transitions (e.g., validated then un-validated).",
+      "failure_mode": "Callers can set is_validated to false after it was true, representing an illegal workflow reversal. No type-level enforcement of valid transitions.",
+      "fix": "Merge into the same enum/typestate as status (above) to capture the full workflow as a single invariant field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enum",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is redundant with status: String and should be eliminated in favor of a single typed enum/typestate.",
+      "failure_mode": "Same divergent-state risk as the status string. The bool and string can disagree, and callers must maintain both in sync manually.",
+      "fix": "Fold into the PacketState enum as a variant payload carrying sent_at_epoch_ms, eliminating the separate bool entirely."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive without domain invariants. A packet ID should be a newtype that enforces format/length rules at construction.",
+      "failure_mode": "Empty strings, malformed IDs, or oversized IDs can flow through the system silently. No compile-time guarantee that id is a valid packet identifier.",
+      "fix": "Introduce pub struct PacketId(String) or pub struct PacketId([u8; N]) with a fallible constructor that validates format/length."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "replace_option_lifecycle_fields_with_enum",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a lifecycle field that should be a typestate or variant payload. An Option on its own does not communicate that this field is only valid when the packet is in the Sent state.",
+      "failure_mode": "Callers must remember to check Option::is_some() before using the timestamp, and the field can be Some even when status != Sent, creating a silent invariant violation.",
+      "fix": "Encode sent_at_epoch_ms as a payload field on the Sent variant of the PacketState enum, so the timestamp only exists when the state justifies it."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no precondition checks — it does not verify the packet was validated before being sent, nor does it enforce that the packet is not already sent. It blindly mutates state.",
+      "failure_mode": "A packet can be marked sent without ever being validated, or sent twice, violating the domain workflow. The function performs mutation in the core without any state transition guards.",
+      "fix": "Either (a) make the state machine enum-driven with fallible transition methods that reject invalid transitions, or (b) require a validated state as input and return the new state explicitly, preventing unvalidated packets from reaching sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unchecked_allocation_in_output",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs String::to_string() allocation on every call (\"sent\".to_string()). For a hot path, this is unnecessary when the status value is a fixed string literal.",
+      "failure_mode": "Unnecessary heap allocation per packet sent. In a high-throughput pipeline, this allocation adds measurable GC pressure and latency.",
+      "fix": "Represent status as an enum variant (no allocation), or if a String is required, use a &'static str field or intern the literal to avoid repeated allocation."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or allocation profile",
+    "no profiler data for PacketWorkflow memory layout or cache behavior",
+    "no allocation evidence (e.g., mimalloc/JEMALLOC stats) for hot path",
+    "no second-ring evidence (e.g., Kani, Miri, property tests) validating state-transition invariants",
+    "no command evidence: cargo test, cargo fmt, cargo clippy not run"
+  ],
+  "residual_risk": "The crate is a minimal skeleton with no tests, no benchmarks, and no formal verification. The primary risk is that the domain model (PacketWorkflow) makes illegal states representable through redundant primitive fields, and the mark_sent function enforces no workflow invariants. A full review would require tests to validate expected behavior and benchmarks to justify any performance claims."
+}

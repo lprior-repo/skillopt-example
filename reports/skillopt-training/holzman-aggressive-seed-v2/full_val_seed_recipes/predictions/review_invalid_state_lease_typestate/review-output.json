@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses pub status: String plus booleans is_validated and is_sent, allowing illegal state combinations such as status=\"sent\" with is_sent=false, status=\"validated\" with is_validated=false, or all booleans true with status=\"unknown\".",
+      "failure_mode": "A caller can observe an inconsistent lease lifecycle: e.g., is_sent=true but status != \"sent\", making workflow correctness depend on manual coordination rather than compiler enforcement. Invalid states silently propagate through the system.",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single LeaseStatus enum (e.g., Pending, Validated, Sent) with an optional sent_at timestamp field. Make the struct private and provide a fallible constructor or builder that guarantees a valid initial state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive type with no domain rules. There is no LeaseId newtype to enforce format, length, or uniqueness constraints at the type level.",
+      "failure_mode": "Empty strings, arbitrary-length strings, or non-lease identifiers can flow into the core without rejection. Duplicate or malformed lease IDs silently pass through the type system.",
+      "fix": "Define a `pub struct LeaseId(String)` (or `pub struct LeaseId(u64)`) with a fallible constructor `LeaseId::new(s: &str) -> Result<LeaseId, LeaseError>` that validates format/length. Replace `pub id: String` with `id: LeaseId`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent directly mutates struct fields (status string and is_sent bool) with no validation, no typed error return, and no functional core boundary. The function has side-effect-like mutation semantics but returns the mutated value.",
+      "failure_mode": "No invariant checking before transition. The function cannot express failure (e.g., cannot send if not validated), so invalid state transitions silently succeed. This is not a pure function and not a proper action — it is an unguarded mutation.",
+      "fix": "Define the transition as a pure function on the typed state enum: `fn transition_sent(state: LeaseStatus) -> Result<LeaseStatus, LeaseError>` that enforces preconditions (e.g., only Pending or Validated can transition to Sent). Return a typed error on invalid transitions rather than mutating unvalidated fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LeaseWorkflow are pub, allowing external code to set any field to any value independently, bypassing all invariants.",
+      "failure_mode": "External callers can set `is_sent = true` without updating status, or clear status while leaving booleans true, producing inconsistent state without any validation or error path.",
+      "fix": "Make all fields private. Expose only domain-safe accessors (e.g., `status(&self) -> &LeaseStatus`, `is_sent(&self) -> bool`) and state transitions via methods or pure functions on the typed state enum. Provide a constructor that creates a valid initial state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle_enforcement",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Two independent booleans (is_validated, is_sent) encode a lifecycle that has ordering constraints (validate before send). Booleans cannot enforce ordering.",
+      "failure_mode": "A lease can be marked sent without being validated (is_validated=false, is_sent=true), violating the domain invariant that validation must precede sending. The boolean representation has no way to express or enforce the partial order.",
+      "fix": "Encode the lifecycle as a single enum with ordered variants: `enum LeaseStatus { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`. Transitions are enforced by the type system — Sent can only be reached from Validated, not from Pending."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No error types exist. mark_sent returns LeaseWorkflow directly with no way to signal failure (e.g., sending from an invalid state, validation failure).",
+      "failure_mode": "Callers have no way to handle transition failures. The function must either silently accept invalid transitions or panic — neither is acceptable per Holzman Rust.",
+      "fix": "Define an enum `pub enum LeaseError { InvalidTransition, NotValidated }` and change mark_sent to return `Result<LeaseWorkflow, LeaseError>` (or the equivalent on the typed state model)."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_undefined_behavior",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an optional timestamp that can diverge from the is_sent flag. When is_sent=true, sent_at_epoch_ms may be None, leaving the sent time unknown.",
+      "failure_mode": "Downstream code that relies on the timestamp for expiration, SLA tracking, or audit trails will get None unexpectedly even though is_sent=true, potentially causing data loss or incorrect behavior.",
+      "fix": "Tuck the timestamp into the Sent variant of the typed state enum so it is impossible to have Sent without a timestamp: `Sent { sent_at_epoch_ms: u64 }`. The type system guarantees the timestamp exists when the lease is sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_id_string",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id field is a bare pub String with no format validation, no newtype wrapper, and no domain constraints.",
+      "failure_mode": "Empty strings, whitespace-only strings, or strings exceeding storage limits can represent lease IDs. This breaks lookups, deduplication, and serialization assumptions.",
+      "fix": "Introduce `pub struct LeaseId(String)` with a constructor that rejects empty/whitespace/oversized input: `LeaseId::new(s: &str) -> Result<Self, LeaseError>`."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data exists for hot-path analysis",
+    "no allocation analysis (no try_reserve, no Vec capacity planning)",
+    "no second-ring safety (no fallback paths, no validation retries)",
+    "no command-level evidence (no documented commands for marking sent, querying status, or transitioning states)"
+  ],
+  "residual_risk": "The codebase represents a typestate violation at its core: primitive types (String, bool) encode a lifecycle that requires ordering and consistency guarantees. No typed domain model, no error taxonomy, no functional core boundary, and no evidence of benchmarks/profiling/allocation analysis exists. All state invariants are runtime-only and unenforced. Static review only — no commands run."
+}

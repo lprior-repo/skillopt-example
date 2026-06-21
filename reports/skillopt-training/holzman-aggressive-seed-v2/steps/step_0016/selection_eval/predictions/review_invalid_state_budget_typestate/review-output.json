@@ -1,0 +1,68 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw `String` with no domain type — any value including empty, \"foobar\", or inconsistent values can be stored. Combined with independent `is_validated` and `is_sent` bools, illegal state combinations are constructable (e.g., status=\"draft\", is_sent=true; or status=\"sent\", is_sent=false).",
+      "failure_mode": "A caller can set status to any arbitrary string and simultaneously set is_sent=true while status says something other than \"sent\", producing corrupt audit trails and silently violating business invariants.",
+      "fix": "Replace `status: String` with a domain enum `BudgetStatus { Draft, Validated, Sent }`. Remove `is_validated` and `is_sent` entirely. The enum makes illegal transitions unrepresentable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is an independent boolean alongside `status: String` and `is_sent: bool`. This creates a 3-field state space where inconsistent combinations are possible (e.g., is_validated=true, status=\"draft\", is_sent=false).",
+      "failure_mode": "The workflow can transition to sent without ever being validated, or appear validated without the status reflecting it. No invariant checking exists.",
+      "fix": "Collapse into a single enum typestate `BudgetStatus` with variants that encode valid transitions. Remove `is_validated` and `is_sent` as redundant, inconsistent fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is an independent boolean alongside `status: String` and `is_validated: bool`. This is the same anti-pattern — redundant state encoded as multiple independent primitives.",
+      "failure_mode": "A budget can have is_sent=true while status=\"draft\" or is_validated=false, producing broken downstream behavior (e.g., sending duplicate notifications or re-sending already-sent budgets).",
+      "fix": "Replace with a single `BudgetStatus` enum. The `Sent` variant subsumes the `is_sent` flag."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain semantics or validation. Any string including empty, whitespace-only, or non-unique values can serve as a budget ID.",
+      "failure_mode": "Empty or duplicate IDs can be used as budget identifiers, causing silent data corruption, duplicate processing, or key collisions.",
+      "fix": "Introduce `pub struct BudgetId(String)` or `pub struct BudgetId([u8; N])` with a fallible constructor that validates non-empty format at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_validates_transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` accepts any `BudgetWorkflow` and unconditionally mutates status to \"sent\" and is_sent to true without checking whether the budget was validated or is in a valid transition state.",
+      "failure_mode": "A budget can be marked sent directly from any state (draft, invalid, already-sent), bypassing the validation gate. No state transition guard exists.",
+      "fix": "Change `mark_sent` to accept a validated state and return a typed result: `fn mark_sent(item: ValidatedBudget) -> Result<SentBudget, TransitionError>` or use enum-based typestate where `Sent` is only constructable from `Validated`."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_cargo_cult_allocations",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`\"sent\".to_string()` allocates a new String from a known literal. While not a safety issue, it demonstrates unnecessary allocation for a fixed string value.",
+      "failure_mode": "Minor performance cost — no functional correctness impact.",
+      "fix": "After converting `status` to an enum variant, no allocation is needed at all. If a String is retained, use the literal directly or an interned/Cow strategy."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data for allocation patterns",
+    "no allocation audit for the BudgetWorkflow struct",
+    "no second-ring analysis (no tests, no behavior specs)",
+    "no command evidence (cargo test, cargo clippy not run)"
+  ],
+  "residual_risk": "Static review only — no commands run. The struct represents a textbook case of illegal states being representable: three independent fields (status String, is_validated bool, is_sent bool) encode a single lifecycle concept, creating an explosion of invalid state combinations. Converting to a typed enum typestate is the minimal fix."
+}

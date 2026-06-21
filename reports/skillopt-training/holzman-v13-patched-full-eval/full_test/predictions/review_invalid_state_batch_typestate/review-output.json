@@ -1,0 +1,102 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enums_mandatory",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow uses booleans (is_validated, is_sent) and a String status instead of a typestate enum. Any combination of these fields is representable, including physically impossible states like is_sent=true with status=pending or is_validated=true with is_sent=true but sent_at_epoch_ms=None.",
+      "failure_mode": "Callers can construct or mutate a BatchWorkflow into an impossible lifecycle state. mark_sent() blindly overwrites status without checking preconditions, so a batch can be marked sent without ever being validated.",
+      "fix": "Replace is_validated, is_sent, status, and sent_at_epoch_ms with a single typestate enum like enum BatchState { New, Validated, Sent { sent_at: u64 } }. mark_sent consumes the batch and requires Validated as input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any arbitrary string value. The value 'sent' appears as a magic string literal in mark_sent (line 10), but the status field itself accepts 'foo', '', null-equivalent strings, or any malformed input.",
+      "failure_mode": "Pattern matching on status as a String uses string equality rather than exhaustiveness-checked enum arms. A typo like 'snt' silently creates an unknown state that propagates silently through the system.",
+      "fix": "Replace status: String with an enum: enum BatchStatus { New, Validated, Sent }. All status transitions become compile-time exhaustive match arms."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that can be set in any combination. There is no enforcement that validation precedes sending, and no prevention of double-sending.",
+      "failure_mode": "A caller can set is_validated=true and is_sent=true simultaneously, or toggle them backwards (sent then unvalidate). The mark_sent function only sets is_sent without checking is_validated.",
+      "fix": "Collapse both booleans into a single typestate enum where invalid transitions are unrepresentable. mark_sent should take BatchWorkflow<Validated> and return BatchWorkflow<Sent>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is independent from is_sent. Valid states require is_sent => sent_at_epoch_ms.is_some(), and invalid states (is_sent=true with None, or is_sent=false with Some) are constructible.",
+      "failure_mode": "A batch can be marked sent without a timestamp (audit gap) or have a timestamp without being sent (data corruption). Downstream consumers cannot rely on Option<u64> semantics without extra runtime checks.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typestate enum: Sent { sent_at_epoch_ms: u64 }. Only the Sent variant carries the timestamp; invalid states become impossible."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive that carries no domain invariants. Any string, including empty, malformed, or cross-domain values, is accepted as a BatchWorkflow ID.",
+      "failure_mode": "A caller can pass an empty string, a UUID from another service, or user-controlled input as the batch ID. No validation, no uniqueness guarantee, no domain isolation from other string IDs.",
+      "fix": "Introduce a newtype: pub struct BatchId(String) { ... } with a fallible smart constructor that validates the format (e.g., non-empty, valid UUID format). Use BatchId in the struct instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_mandatory",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String for id and status, bools for lifecycle, Option<u64> for timestamp) cross the parse boundary without fallible smart constructors. The struct fields are pub so any caller can construct invalid domain states directly. mark_sent accepts a fully-formed BatchWorkflow and mutates it without any validation or error return.",
+      "failure_mode": "External callers, shell-layer code, and even unit tests can construct BatchWorkflow with any combination of fields, creating states that should be impossible. The mark_sent function is a silent mutation with no precondition check and no error type.",
+      "fix": "Make all fields private. Provide a smart constructor BatchWorkflow::new(id: BatchId) -> Result<Self, BatchError> that initializes the typestate to New. make mark_sent pub fn mark_sent(item: BatchWorkflow) -> Result<BatchWorkflow, BatchError> with precondition validation and typed error returns."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_shell_leakage",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates domain state (sets status string, sets is_sent flag) but returns no Result. The function name implies a command/action with potential failure (e.g., persistence, validation check, idempotency guard), yet there is no typed error path. Side effects are hidden behind a pure-looking signature.",
+      "failure_mode": "If mark_sent is later extended with persistence or network calls, failures will be silently dropped. Even as-is, the function mutates state without expressing that it is a command that may fail, violating the Calculations/Actions boundary.",
+      "fix": "If mark_sent is a pure calculation with no I/O, rename it and add precondition checks returning Result. If it performs I/O or may fail, wrap it in an Action that returns Result<BatchWorkflow, BatchError> and separate the pure validation logic into Calculations."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this crate. The mark_sent function performs String allocation (\"sent\".to_string()) on every call, and there is no measured justification for this allocation pattern.",
+      "failure_mode": "In a hot path, repeated to_string() allocation for a status string that could be &'static str creates unbounded heap traffic. Without measurement, the performance impact is unknown.",
+      "fix": "Replace \"sent\".to_string() with a static string reference, or better, use an enum variant (eliminating the status String field entirely). Add a benchmark measuring mark_sent throughput and allocation rate."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No test target, no benchmark target, and no integration tests are configured. The crate compiles but has no evidence that mark_sent produces correct behavior for any input.",
+      "failure_mode": "Without tests or benchmarks, there is zero evidence that the function works correctly, handles edge cases, or meets any performance threshold. No canonical gate has been executed.",
+      "fix": "Add #[cfg(test)] module with tests for mark_sent covering: valid transition (Validated -> Sent), invalid transition (New -> Sent should fail), and idempotency. Add cargo.toml [dev-dependencies] with criterion for benchmarks if performance claims exist."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation and throughput",
+    "no profiler data for the to_string() allocation in mark_sent",
+    "no test binary exists (no [dev-dependencies] or test module in Cargo.toml)",
+    "no command evidence that cargo fmt --check, cargo check, cargo clippy, or cargo test were executed",
+    "no second-ring evidence for any performance or correctness claim"
+  ],
+  "residual_risk": "High. The struct exposes pub fields allowing any caller to construct physically impossible state combinations. mark_sent performs silent mutation with no preconditions, no typed errors, and no parse boundary. All six Holzman-required typestate findings are present and unmitigated. No tests, benchmarks, or command evidence exist. The crate is not deliverable."
+}

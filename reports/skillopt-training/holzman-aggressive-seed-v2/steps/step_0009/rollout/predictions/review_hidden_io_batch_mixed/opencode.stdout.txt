@@ -1,0 +1,18 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 5 BLOCKERs, 3 WARNINGs, 4 missing evidence items**
+
+BLOCKERs:
+- `src/lib.rs:9` — `.unwrap()` on `fs::read_to_string` panics on I/O failure
+- `src/lib.rs:16` — `parts[0]` unchecked indexing
+- `src/lib.rs:19` — `parts[1]` unchecked indexing (no bounds check on Vec)
+- `src/lib.rs:19` — `as u16` lossy cast silently truncates values > 65535
+- `src/lib.rs:19` — `.unwrap()` on `.parse::<u32>()` panics on malformed input
+
+WARNINGs:
+- `src/lib.rs:12` — `split + collect` instead of `split_once` (unnecessary allocation)
+- `src/lib.rs:8` — No error type; all failures are silent panics
+- `src/lib.rs:3` — `pub` fields, no invariants, illegal states representable
+
+Missing evidence: no benchmarks, no profiler/allocation data, no binary target, no CLI evidence.

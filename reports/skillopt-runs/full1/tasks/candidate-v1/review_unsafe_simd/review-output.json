@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/evaluation-and-repair-protocol.md",
+    ".skill/holzman-rust/references/simd-patterns.md",
+    ".skill/holzman-rust/references/nasa-jpl-standards.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_by_default",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Entire function body is wrapped in unsafe { ... } using std::arch::x86_64::* intrinsics (_mm_setzero_ps, _mm_add_ps, _mm_loadu_ps, _mm_storeu_ps, _mm_add_ps). No explicit user waiver exists for unsafe code.",
+      "failure_mode": "Undefined behavior from aliasing violations, unaligned memory access, incorrect vector width, or drop-safety violations; no recovery path when invariants are violated",
+      "fix": "Use safe std::simd with #![feature(portable_simd)] and #![forbid(unsafe_code)], or obtain explicit user waiver before writing std::arch intrinsics"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "safe_simd_only",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "std::arch::x86_64 intrinsics used directly without portable_simd, target-feature gate, runtime detection, scalar fallback, alignment proof, remainder handling, or benchmark evidence.",
+      "failure_mode": "Crashes on CPUs without AVX; silent data loss when input.len() is not a multiple of 4; no performance proof exists",
+      "fix": "Implement scalar oracle with chunks_exact remainder path, add #[target_feature] or runtime detection, use safe std::simd or audited safe crate API, and provide benchmark evidence before using std::arch"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "while loop processes exactly 4 elements per iteration with no remainder handling. When input.len() is not divisible by 4, trailing elements are silently dropped.",
+      "failure_mode": "Silent data loss: sum returns incorrect result for inputs with length not divisible by 4 (e.g., len=5 drops the last element)",
+      "fix": "Use input.chunks_exact(4) with a separate remainder path (e.g., chunks.exact_remainder().iter().sum()) to process trailing elements"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_by_default",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Raw pointer arithmetic with .add(i) and _mm_loadu_ps(ptr) inside unsafe block. Pointer is derived from input.as_ptr() but no aliasing, alignment, or lifetime invariants are documented.",
+      "failure_mode": "Undefined behavior from aliasing violations; misaligned access if alignment assumptions are wrong; use-after-free if input lifetime ends whileacc is alive",
+      "fix": "Replace with safe slice access or safe std::simd; if unsafe is waivered, document all invariants in a SAFETY comment"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_limited_macros_pointers",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Raw pointer dereference (_mm_loadu_ps(ptr)) and pointer arithmetic (.add(i)) hide memory access behavior; no SAFETY comment states bounds, alignment, aliasing, or initialization invariants.",
+      "failure_mode": "Hidden undefined behavior; no reviewable contract for the memory access",
+      "fix": "Replace with safe slice indexing or safe SIMD; if unsafe is waivered, add SAFETY comment citing CPU feature, bounds proof, alignment proof, aliasing, and remainder handling"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_evidence_no_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists to prove the SIMD path outperforms scalar. No baseline measurement, no workload definition, no target hardware, no latency/throughput claim.",
+      "failure_mode": "Performance claim cannot be verified; mechanical sympathy order violated (no profiler evidence of bottleneck before SIMD)",
+      "fix": "Run cargo bench comparing scalar vs SIMD on realistic input sizes; document p50/p95/p99 latency and throughput evidence"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_evidence_no_target_feature_gate",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No #[target_feature] attribute or runtime feature detection. Function panics or SIGILLs on CPUs lacking AVX (x86_64 without SSSE3/AVX support).",
+      "failure_mode": "Crashes in production on older x86_64 hardware; no graceful fallback to scalar",
+      "fix": "Add #[target_feature(enable = \"avx\")] with is_x86_feature_detected! runtime detection and scalar fallback, or use safe portable_simd with runtime dispatch"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_evidence_no_scalar_fallback",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No scalar reference implementation exists. simd-patterns.md requires scalar oracle and benchmark comparison before committing to SIMD.",
+      "failure_mode": "No correctness baseline; no fallback path when SIMD is unavailable; SIMD correctness cannot be verified against scalar",
+      "fix": "Implement sum_f32_scalar(input: &[f32]) -> f32 as reference; compare SIMD output against scalar for correctness; use scalar as fallback when SIMD is unavailable"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_evidence_pinned_nightly",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No rust-toolchain.toml exists. Nightly feature portable_simd requires pinned nightly; floating nightly is a policy violation.",
+      "failure_mode": "Non-reproducible builds; feature gate not auditable; no toolchain provenance",
+      "fix": "Add rust-toolchain.toml with pinned nightly-YYYY-MM-DD, minimal profile, rustfmt, clippy, rust-src, llvm-tools-preview components"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "_mm_storeu_ps(out.as_mut_ptr(), acc) writes to a 4-element array but the function returns a sum of all input.len() elements. The store/load pattern is unnecessarily complex and introduces potential undefined behavior with no safety documentation.",
+      "failure_mode": "Undefined behavior if _mm_storeu_ps writes beyond bounds of [0.0; 4] array (16 bytes); alignment/aliasing assumptions are implicit not proven",
+      "fix": "Use safe iteration pattern (chunks_exact, remainder) with std::simd or safe crate API; remove store/load round-trip"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark comparing scalar vs SIMD sum_f32",
+    "no profiler evidence showing SIMD bottleneck justifies std::arch intrinsics",
+    "no #[target_feature] or runtime detection for AVX availability",
+    "no scalar reference implementation for correctness oracle",
+    "no rust-toolchain.toml with pinned nightly for portable_simd",
+    "no tests comparing SIMD and scalar outputs on edge cases (empty, len=1, len=LANES-1, len=LANES, len=LANES+1, non-multiple, large)",
+    "no SAFETY comment documenting aliasing, alignment, bounds, initialization, and lifetime invariants"
+  ],
+  "residual_risk": "static review only; cargo commands not run per task constraints. Findings are concrete violations of unsafe-forbidden-by-default, safe-simd-required, and panic-free standards."
+}

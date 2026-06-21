@@ -1,0 +1,53 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow uses `is_validated: bool` and `is_sent: bool` to encode state transitions. A MetricWorkflow can exist with is_sent=true and is_validated=false, which is a logically inconsistent state. SKILL.md line 39 explicitly flags Option/bool flags for state transitions as blockers.",
+      "failure_mode": "Any caller can construct or mutate MetricWorkflow into a state where the metric was sent without being validated, bypassing the domain invariant that sent implies validated.",
+      "fix": "Replace `is_validated: bool`, `is_sent: bool`, and `status: String` with a single typed `MetricState` enum (e.g., `MetricState::New`, `MetricState::Validated`, `MetricState::Sent { sent_at_epoch_ms: u64 }`). Remove all boolean and status string fields. Provide a constructor that enforces transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain constraints. `status: String` is a raw primitive that can hold any value, not just valid states. SKILL.md line 9 says parse at boundaries into trusted data; references say replace primitive domain APIs with newtypes.",
+      "failure_mode": "The `id` can be empty, duplicated, or malformed. `status` can be any arbitrary string, making pattern-matching on state impossible and allowing inconsistent state encoding.",
+      "fix": "Introduce `newtype MetricId(String)` with a fallible constructor that validates non-empty and domain rules. Replace `status: String` with a `MetricState` enum (see above). If `id` is used only for display, consider `&str` in the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` encodes lifecycle state. When combined with the bool `is_sent`, this is redundant and inconsistent — the Option can be None while is_sent is true, or vice versa.",
+      "failure_mode": "Inconsistent state between `is_sent` flag and `sent_at_epoch_ms` value. A caller can set both to conflicting values, violating the invariant that sent metrics always have a timestamp.",
+      "fix": "Fold `sent_at_epoch_ms` into the `MetricState` enum as a payload: `MetricState::Sent { sent_at_epoch_ms: u64 }`. Remove the standalone `Option<u64>` and `bool is_sent` fields entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_mutating_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the struct in place (mutating the imperative shell leaking into domain data). It does not validate that the metric was validated before marking sent, nor does it set `sent_at_epoch_ms`. It also does not return a typed error or Result.",
+      "failure_mode": "Any caller can mark any MetricWorkflow as sent without validation, without a timestamp, corrupting the audit trail. The function silently accepts inconsistent input state and produces inconsistent output.",
+      "fix": "Change `mark_sent` to a pure function that takes `MetricWorkflow` and a validated timestamp, returns `Result<MetricWorkflow, MetricError>` (or returns a new typed state), and enforces that the input is in a `Validated` state before transitioning to `Sent`. All state transitions should go through the enum."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler data, allocation analysis, or command evidence exist for the crate. The struct allocates a `String` for `id` and `status` on every construction, and `mark_sent` calls `.to_string()` on a string literal.",
+      "failure_mode": "No evidence to validate allocation budget, performance claims, or to guide optimization decisions like using `&str` or `Cow` in the core.",
+      "fix": "Add a criterion benchmark that measures construction and transition throughput. Profile allocations with `tracing` or `dhat`. If the string literal `.to_string()` in `mark_sent` is a pattern, replace with a direct assignment or enum variant construction."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for throughput or allocation characteristics", "no profiler data for heap allocations in construction/transitions", "no allocation audit (no dhat or allocator-tracking evidence)", "no second-ring command evidence (no clippy/fmt/test output)"],
+  "residual_risk": "Static review only; no commands run. The struct fundamentally allows illegal states via booleans and raw strings for domain state. Without a typestate enum replacing `is_validated`, `is_sent`, `status`, and `sent_at_epoch_ms`, the core invariant (sent implies validated with a timestamp) is unenforceable by the compiler."
+}

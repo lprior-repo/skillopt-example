@@ -1,0 +1,79 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "performance-claim-without-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon for a 4-element fixed-size input with no workload description, no baseline measurement, no profiler data, and no regression threshold. Rayon has ~1-5ms scheduling overhead per task, which dwarfs any savings for 4 items.",
+      "failure_mode": "Introducing Rayon would add massive overhead (thread pool dispatch, work stealing, join overhead) making this 100-1000x slower than a simple loop, inverting the claimed performance improvement.",
+      "fix": "Delete the Rayon proposal entirely. For 4 elements, a sequential loop or iterator is measurably fastest. Any performance improvement claim must include baseline command, baseline number, new number, target hardware, input distribution, and variance notes per Holzman Power-of-Ten."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smallvec-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes SmallVec for a function that takes a `[u8; 4]` and returns exactly 4 strings. SmallVec adds a heap fallback path, alignment padding, and runtime size tracking that overhead exceeds any benefit for fixed-capacity 4 elements.",
+      "failure_mode": "SmallVec for 4 elements adds code complexity, larger binary, and a heap fallback branch with no measurable benefit. The stack-aligned `Vec` capacity of 4 means SmallVec's inline storage is never useful.",
+      "fix": "Remove SmallVec proposal. Return `[&'static str; 4]` directly with no allocation. Use `[\"odd\"; 4]` or `[\"even\"; 4]` as fast paths for uniform inputs, or a simple loop into a local array."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unnecessary-heap-allocation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function signature returns `Vec<&'static str>` for a fixed 4-element input, guaranteeing a heap allocation on every call. The input is `[u8; 4]` with known compile-time size.",
+      "failure_mode": "Every call to `classify_four` performs a heap allocation for 4 elements, adding GC pressure, cache misses, and allocation failure surface for what should be a zero-allocation hot path.",
+      "fix": "Change the return type to `[&'static str; 4]`. Replace the `collect()` with a loop into a local `[&'static str; 4]` array. This eliminates all heap allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, no baseline, no profiler output, and no allocation measurement exists anywhere in the crate. The TODO makes a performance claim without any empirical evidence.",
+      "failure_mode": "Without benchmark evidence, any performance change is blind. Rayon/smallvec changes could silently degrade tail latency, increase memory usage, or break latency SLAs.",
+      "fix": "Add a Criterion or similar benchmark measuring latency (p50/p95/p99) and allocations per operation against baseline. Only after measurement can a performance change be evaluated."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-profiler-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No flamegraph, no cachegrind, no alloc counters, no `dhat-rs` heap trace, and no allocation budget exists. Hot path optimization without profiler evidence violates Holzman allocation discipline.",
+      "failure_mode": "Optimizing without profiler evidence means guessing at the bottleneck. The actual bottleneck may be cache locality of the output array, branch predictability of the parity check, or something entirely different.",
+      "fix": "Run `cargo flamegraph` or `perf record` on the hot path, add allocation counting via `dhat-rs` or `criterion` allocation benchmarks, and only then optimize the measured bottleneck."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore-over-measurement",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO encodes performance folklore ('Rayon and SmallVec will be faster') without measurement. Holzman doctrine requires: optimize the measured bottleneck in order: algorithm, memory traffic, data layout, allocation, branch predictability, synchronization/syscalls, compiler visibility.",
+      "failure_mode": "Following folklore over measurement leads to over-engineered code that is slower, larger, harder to review, and harder to prove correct — the exact opposite of Holzman goals.",
+      "fix": "Delete the TODO. Implement a zero-allocation `[&'static str; 4]` return using a simple loop. Only consider SmallVec/Rayon when measurement proves the current path is the bottleneck AND the alternative shows measurable improvement on the target workload."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim about classify_four",
+    "no profiler/flamegraph/cachegrind evidence identifies the actual bottleneck",
+    "no allocation measurement (dhat-rs, criterion alloc bench, or valgrind massif)",
+    "no baseline latency or throughput numbers exist",
+    "no second-ring evidence (assembly listing, cargo bloat, or object size tracking) for performance claims",
+    "no workload description: input distribution, call frequency, and target hardware are unspecified",
+    "no regression threshold defined for any hypothetical performance change"
+  ],
+  "residual_risk": "Review is static-only with no commands run. The source contains a TODO proposing Rayon+SmallVec for 4-element fixed input, which is fundamentally incorrect folklore. The function returns Vec for fixed-size input, incurring unnecessary heap allocation. No benchmarks, profiler output, or allocation evidence exist. The safest fix is a zero-allocation `[&'static str; 4]` return with a simple loop. All performance-related claims require measurement before implementation."
+}

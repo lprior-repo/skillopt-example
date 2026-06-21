@@ -1,0 +1,18 @@
+Now I have all the context. The crate `src/lib.rs` is a single-file metrics loader with numerous Holzman violations. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary:** 9 BLOCKER findings across `src/lib.rs`:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | no_hidden_io_in_pure_logic | 16 | `println!` inside data-parsing closure |
+| 2 | no_unwrap_in_production | 9 | `fs::read_to_string().unwrap()` on I/O |
+| 3 | no_unwrap_in_production | 19 | `.parse().unwrap()` on numeric field |
+| 4 | no_unchecked_indexing | 16 | `parts[0]` without bounds check |
+| 5 | no_unchecked_indexing | 19 | `parts[1]` without bounds check |
+| 6 | no_lossy_cast | 19 | `parse::<u32>() as u16` silently truncates |
+| 7 | shell_leakage | 8 | I/O + parsing + side effects fused in one function |
+| 8 | intermediate_allocation | 12 | `split().map().collect()` into Vec<String> per line |
+| 9 | missing_error_taxonomy | 3 | No typed error enum; all failures panic |
+
+5 missing evidence items flagged (no benchmarks, profiler, allocation audit, command evidence, or second-ring evidence).

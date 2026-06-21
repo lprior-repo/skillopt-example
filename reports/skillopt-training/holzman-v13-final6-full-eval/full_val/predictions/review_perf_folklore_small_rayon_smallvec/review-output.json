@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "Cargo.toml",
+    "src/lib.rs"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore_rayon_tiny_data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon for a fixed [u8; 4] input. Rayon parallel task scheduling, work-stealing, and thread coordination overhead vastly exceeds any throughput gain on 4-element data. The performance claim is based on folklore, not measurement.",
+      "failure_mode": "Tiny data + Rayon spawn overhead causes measurable slowdown vs sequential iteration; regression on every call.",
+      "fix": "Remove Rayon proposal entirely. For a 4-element array, sequential iteration is provably faster. Return [\\u{0026}'static str; 4] to eliminate allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore_smallvec_tiny_data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes SmallVec for 4-element fixed output. SmallVec carries inline-capacity bookkeeping and branch overhead that adds cost per element over a stack-allocated fixed array. With exactly 4 elements, SmallVec's inline storage must match or exceed 4, and its bounds-checking branches are unnecessary when the length is known at compile time.",
+      "failure_mode": "SmallVec per-element branching overhead plus potential inline-capacity bloat makes it slower than both Vec and fixed arrays for N=4.",
+      "fix": "Replace Vec<\\u{0026}'static str> with [\\u{0026}'static str; 4] return type. Populate a fixed array with explicit indexed assignment or a stack-accumulator pattern."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unmeasured_performance_claim",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment states Rayon and SmallVec 'will be faster' with zero evidence: no workload specification, no target hardware, no input distribution, no baseline command, no baseline number, no new number, no variance/noise notes, and no regression threshold. Violates Power-of-Ten claim-traceability requirement.",
+      "failure_mode": "Optimization based on folklore degrades performance; code ships slower than the sequential array-return version without anyone detecting the regression.",
+      "fix": "Delete the performance claim. If optimization is needed, establish a sequential baseline with a benchmark harness, measure under realistic input distribution, then compare candidates with a defined regression threshold."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "unnecessary_allocation_on_every_call",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "collect() allocates a heap Vec on every call for a known-4-element result. This is a hot-path allocation that could be eliminated by returning a fixed-size array or accepting a caller-owned output buffer.",
+      "failure_mode": "Per-call heap allocation increases GC pressure, causes memory fragmentation, and introduces allocation-failure risk in mission-critical paths.",
+      "fix": "Return [\\u{0026}'static str; 4] and populate via indexed assignment or a stack-based accumulator. No heap allocation possible."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for the stated performance direction. No benchmarks directory, no cargo bench configuration, no criterion or miniflox dependency in Cargo.toml. The entire crate has no measurement infrastructure.",
+      "failure_mode": "Performance changes are blind; regressions go undetected; no audit trail for the optimization rationale.",
+      "fix": "Add a benchmarks/ directory with a criterion-based harness. Add criterion to dev-dependencies in Cargo.toml. Baseline the sequential fixed-array version before any proposed change."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No command evidence exists. No cargo bench, cargo +nightly miri, cargo +nightly flamegraph, or allocative profiling commands were executed or documented. The review cannot verify the current implementation's actual cost profile.",
+      "failure_mode": "Claims about performance direction are unverifiable; the review has no raw evidence to ground its findings.",
+      "fix": "Run cargo bench against a baseline implementation, capture flamegraph or cachegrind output, and record allocation counts via criterion's statistics or allocative tracing."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim (Rayon/SmallVec faster for [u8; 4])",
+    "no profiler data (flamegraph, cachegrind, or similar) to identify actual bottleneck",
+    "no allocation measurement (alloc count, bytes allocated, or criterion stats)",
+    "no baseline implementation to compare against (current Vec<\\u{0026}'static str> vs proposed fix)",
+    "no command evidence (cargo bench, cargo +nightly miri, cargo +nightly flamegraph not run or recorded)"
+  ],
+  "residual_risk": "Static review only; no commands were run. The code compiles and is functionally correct for [u8; 4], but the proposed Rayon/SmallVec optimization is folklore and unmeasured. The recommended fix is to replace the function signature with pub fn classify_four(bytes: &[u8; 4]) -> [&'static str; 4] and populate via indexed assignment, eliminating all heap allocation and removing the folklore optimization comments. Without benchmark evidence, no regression risk has been quantified."
+}

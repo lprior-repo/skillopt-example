@@ -1,0 +1,10 @@
+{
+  "source_skill_dir": "/home/lewis/.agents/skills/holzman-rust",
+  "baseline": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4/bundles/baseline/holzman-rust",
+  "candidate": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4/bundles/candidate-v4/holzman-rust",
+  "candidate_name": "candidate-v4",
+  "candidate_overlay": "candidates/holzman-rust-candidate-v4",
+  "baseline_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+  "candidate_digest": "6485b68474bc81625c61d06859db2d3eca1374b1802566bfd19bd9db37c2aaad",
+  "created_at": "2026-06-20T01:41:38.855395+00:00"
+}

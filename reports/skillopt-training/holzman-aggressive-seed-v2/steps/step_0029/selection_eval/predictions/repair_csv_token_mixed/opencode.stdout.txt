@@ -1,0 +1,14 @@
+Now I have the full picture. The code has multiple Holzman violations: `unwrap()`, ignores `max_items`, no empty/invalid/too-many error handling. Let me fix it.
+All 4 tests pass. Let me write the output.
+Repair complete. Here's a summary of the fixes applied to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on `parse::<u16>()` | Replaced with `.map_err(\|_\| ParseError::Invalid)?` |
+| `max_items` parameter ignored | Added token count check, returns `ParseError::TooMany` |
+| No empty-input handling | Early `is_empty()` check + filter-empty guard, returns `ParseError::Empty` |
+| No invalid-value handling | Parse errors mapped to `ParseError::Invalid` via `map_err` |
+| `split(',')` + `collect` + indexing pattern | Replaced with `filter` to skip empty parts, no indexing |
+| `Vec` without capacity hint | `Vec::with_capacity(token_count)` for bounded allocation |
+
+All 4 behavior tests pass, `cargo fmt` clean, valid JSON output written.

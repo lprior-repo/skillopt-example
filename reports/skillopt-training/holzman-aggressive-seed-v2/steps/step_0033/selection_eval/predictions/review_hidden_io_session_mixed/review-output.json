@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O errors (file not found, permission denied, etc.)",
+      "failure_mode": "untrusted or missing file paths abort the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> and use ? to propagate, or map_err to a domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input",
+      "failure_mode": "malformed CSV lines crash the program instead of yielding a typed ParseError per record",
+      "fix": "return Result<Vec<Record>, ParseError> and use ? on parse, returning per-record errors rather than panicking"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast from u32 to u16; values > 65535 silently truncate",
+      "failure_mode": "out-of-range values wrap around instead of being rejected as invalid domain data",
+      "fix": "use u16::try_from(value) and return an error on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a Vec of all parts; split_once suffices for two-field records",
+      "failure_mode": "unnecessary heap allocation per line, and no bounds checking on parts length before indexing",
+      "fix": "use line.split_once(',') to get (name, rest) directly, then parse rest from the second half"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] unchecked indexing into Vec without verifying len >= 1",
+      "failure_mode": "empty lines or lines with no comma panic with index-out-of-bounds",
+      "fix": "use split_once(',') and pattern-match the Option, returning Err for missing fields"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] unchecked indexing into Vec without verifying len >= 2",
+      "failure_mode": "lines with only one comma-separated field panic with index-out-of-bounds",
+      "fix": "use the second binding from split_once(',') which is an Option that must be handled"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() is hidden I/O/side-effect inside a data-loading function that should be pure parsing",
+      "failure_mode": "side effects are not observable in the type signature, cannot be controlled or tested independently, and pollute the parsing layer with shell concerns",
+      "fix": "remove println! from the parsing logic; logging belongs in the imperative shell at the call site"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string), parsing, and domain construction in one function",
+      "failure_mode": "pure parsing cannot be unit-tested in isolation; I/O errors, parse errors, and domain errors are conflated into a Vec with no error distinction",
+      "fix": "split into (1) pure parse_records(&[str]) -> Result<Vec<Record>, ParseError> and (2) shell function load_sessions(path) -> Result<Vec<Record>, Error> that reads and delegates"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Vec<Record> return with no try_reserve and no bounded capacity handling",
+      "failure_mode": "allocation failure in hot path silently panics via unwrap on collect, or grows unboundedly on malicious input",
+      "fix": "return Result<Vec<Record>, AllocationError>, use try_reserve with checked_mul for record count budget, and handle allocation failure gracefully"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_type_discipline",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "value: u16 is a raw primitive that accepts any u16 value including domain-invalid ranges",
+      "failure_mode": "no type-level invariant enforces valid value ranges; domain rules are not enforced by the type system",
+      "fix": "introduce a newtype e.g. pub struct Value(u16) with a fallible constructor that validates the domain range"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or allocation profile",
+    "no profiler data for per-line allocation patterns (split + collect + to_string)",
+    "no allocation audit (no try_reserve, no capacity budget on Vec growth)",
+    "no second-ring analysis for downstream consumers of Record",
+    "no command evidence (cargo test, cargo clippy, cargo bench) was run"
+  ],
+  "residual_risk": "This is a static review with no commands executed. The function has 9 independent blocker violations: unhandled I/O errors, unhandled parse errors, lossy cast, unchecked indexing, hidden I/O side-effect, missing type safety for domain values, unbounded allocation, and no functional core/shell split. Every path that processes untrusted input can panic. The crate must be reworked before any delivery gate."
+}

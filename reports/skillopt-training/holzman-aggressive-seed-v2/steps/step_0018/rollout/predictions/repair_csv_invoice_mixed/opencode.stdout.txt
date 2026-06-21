@@ -1,0 +1,19 @@
+Now I understand the issues. The production code:
+1. Uses `.unwrap()` — forbidden
+2. Ignores `max_items` parameter
+3. Doesn't check for empty input
+4. Doesn't handle parse errors properly
+
+Let me fix it:
+All 4 tests pass. Now let me run the full Holzman verification gates:
+All gates pass. Writing the output JSON:
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+| Issue | Before | After |
+|-------|--------|-------|
+| `.unwrap()` | `.parse::<u16>().unwrap()` | `match .parse() { Ok(v) => ..., Err(_) => Err(ParseError::Invalid) }` |
+| Empty input | Silent empty vec | `Err(ParseError::Empty)` |
+| `max_items` ignored | Parameter unused | Check `parts.len() > max_items` → `Err(ParseError::TooMany)` |
+| Invalid values | Panics on `.unwrap()` | `Err(ParseError::Invalid)` |
+
+All 4 behavior tests pass. All Holzman verification gates pass with zero residual risk.

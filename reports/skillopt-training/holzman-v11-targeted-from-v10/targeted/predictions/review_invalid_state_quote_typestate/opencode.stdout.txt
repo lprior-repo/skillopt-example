@@ -1,0 +1,16 @@
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 BLOCKER findings, 5 WARNING findings**
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | status-must-be-enum | 3 |
+| 2 | BLOCKER | typestate-state-machine | 4 |
+| 3 | BLOCKER | option-invalid-state-combination | 6 |
+| 4 | BLOCKER | newtype-domain-ids | 2 |
+| 5 | BLOCKER | parse-boundary | 3 |
+| 6 | BLOCKER | public-mutable-fields | 1 |
+| 7 | BLOCKER | mark_sent-no-lifecycle-guards | 9 |
+| 8 | BLOCKER | no-type-driven-ddd | 1 |
+
+Core violation: `QuoteWorkflow` is a plain data bag with `String` status, independent `bool` lifecycle flags, and `Option<u64>` timestamp -- all `pub`, all independently mutable. Illegal states are directly representable. The `mark_sent` function has no preconditions, allowing transition from any state to sent without validation.

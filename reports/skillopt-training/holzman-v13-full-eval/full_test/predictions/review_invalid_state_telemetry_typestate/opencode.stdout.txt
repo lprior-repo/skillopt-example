@@ -1,0 +1,15 @@
+Now I have all source, skill, and references. Writing review output.
+Review complete. Written to `review-output.json`.
+
+**6 findings, all BLOCKER severity:**
+
+| # | Rule | Line | Problem |
+|---|------|------|---------|
+| 1 | `typestate_enum_state_machine` | 1 | No state machine; lifecycle encoded as independent fields |
+| 2 | `status_string` | 3 | `pub status: String` allows arbitrary values |
+| 3 | `bool_lifecycle` | 4 | `is_validated`/`is_sent` booleans are independent and order-enforceable |
+| 4 | `option_invalid_state_combinations` | 6 | `Option<u64>` + booleans allow contradictory state combos |
+| 5 | `newtype_domain_id` | 2 | `id: String` is a raw primitive with no domain validation |
+| 6 | `parse_boundary` | 9 | No smart constructor; raw primitives cross boundary, `mark_sent` hardcodes string |
+
+**5 missing evidence items:** benchmark, profiler, allocation bounds, second-ring evidence, validation command.

@@ -1,0 +1,11 @@
+Diff in /tmp/opencode/holzman-skillopt-train/15fb92dfc5620eaa/repair_summary_ledger_mixed/src/lib.rs:32:
+         }
+     }
+     let count_u64 = u64::try_from(count).map_err(|_| SummaryError::Overflow)?;
+[31m-    let average = total
+(B[m[31m-        .checked_div(count_u64)
+(B[m[31m-        .ok_or(SummaryError::Overflow)?;
+(B[m[32m+    let average = total.checked_div(count_u64).ok_or(SummaryError::Overflow)?;
+(B[m     let count_u32 = u32::try_from(count).map_err(|_| SummaryError::Overflow)?;
+     Ok(Summary {
+         count: count_u32,

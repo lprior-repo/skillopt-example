@@ -1,0 +1,25 @@
+Now I have a clear picture of all the issues. Let me analyze:
+
+1. `summarize_metrics` returns `Result<String, ...>` but tests expect `Result<Summary, ...>`
+2. Missing `render_summary` function (imported by tests)
+3. `unwrap()` on parse (line 24)
+4. Unchecked indexing `parts[1]` (line 24)
+5. Unchecked arithmetic `total += value` (line 25)
+6. Unchecked division `total / count as u64` (line 35)
+7. Uses `split`+`collect`+indexing instead of `split_once`
+All 6 tests pass. Now let me write the output JSON.
+I notice `count += 1` is unchecked arithmetic on an accumulator. Let me fix that for strict Holzman compliance.
+Now `max_rows as u32` is a width-reducing cast. Fix that too.
+All 6 tests pass. Let me update the output JSON with the final state.
+Repair complete. All 6 tests pass, all Holzman forbidden constructs removed from production source.
+
+**Violations fixed:**
+- `unwrap()` → `map_err(|_| SummaryError::Invalid)` 
+- Unchecked indexing `parts[1]` → `split_once(',').ok_or(...)`
+- `split`+`collect`+indexing → single `split_once`
+- `total += value` → `total.checked_add(...).ok_or(Overflow)`
+- `total / count as u64` → `total.checked_div(...)` with Empty guard
+- `count += 1` → `count.checked_add(1).ok_or(TooMany)`
+- `max_rows as u32` → `u32::try_from(max_rows)`
+- Missing `render_summary` → added
+- Wrong return type `Result<String>` → `Result<Summary>`

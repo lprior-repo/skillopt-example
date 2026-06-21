@@ -1,0 +1,20 @@
+Now I have all the context. The crate has a single `src/lib.rs` with severe Holzman violations. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**11 BLOCKER findings** across `src/lib.rs`, all Holzman absolute-law violations:
+
+| Line | Rule | Issue |
+|---|---|---|
+| 9 | `no_unwrap_panics` | `fs::read_to_string().unwrap()` panics on I/O error |
+| 16 | `no_unchecked_indexing` | `parts[0]` / `parts[1]` raw index access |
+| 19 | `no_unchecked_indexing` | `parts[1]` index + `unwrap()` on parse |
+| 19 | `no_lossy_casts` | `u32 as u16` silent truncation |
+| 16 | `hidden_io_in_pure_logic` | `println!()` in data-processing closure |
+| 8 | `functional_core_imperative_shell` | I/O + parsing + logging fused in one function |
+| 8 | `typed_error_taxonomy` | Returns `Vec` not `Result`; all failures panic |
+| 10 | `bounded_allocation_try_reserve` | Unbounded Vec with no cap or `try_reserve` |
+| 12 | `parse_boundary` | Raw `String` from CSV crosses into domain without validation |
+| 12 | `no_intermediate_allocation` | `split().map().collect()` builds unnecessary `Vec<String>` |
+| 4 | `domain_type_raw_primitive` | `name: String` has no type-level constraints |
+
+**6 missing evidence items**: no benchmarks, profiler data, allocation audit, second-ring evidence, command-truth evidence, or clippy/gate runs.

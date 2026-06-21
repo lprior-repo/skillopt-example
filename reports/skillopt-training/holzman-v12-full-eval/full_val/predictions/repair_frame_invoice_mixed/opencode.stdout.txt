@@ -1,0 +1,10 @@
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+**4 Holzman violations repaired in `encode_frame`:**
+
+1. **Lossy `as` conversion** (line 10 original): `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+2. **Missing payload-too-large guard**: Added `payload.len() > max_payload` check returning `Err(FrameError::PayloadTooLarge)`
+3. **Unchecked capacity arithmetic**: Added `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?`
+4. **Missing fallible allocation**: Added `out.try_reserve(capacity).map_err(|_| FrameError::Allocation)?`
+
+All 2 behavior tests pass. `repair-output.json` written.

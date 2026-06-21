@@ -1,0 +1,9 @@
+Repair complete. Changes made to `src/lib.rs`:
+
+- Removed `.map(...).unwrap()` — replaced with `map_err(|_| ParseError::Invalid)` for checked parsing
+- Added empty-input rejection (`ParseError::Empty`)
+- Replaced `Vec::with_capacity` with `Vec::new` + `try_reserve` for bounded, fallible allocation
+- Enforced `max_items` cap before each push (`ParseError::TooMany`)
+- Added empty-token rejection as `ParseError::Invalid`
+
+All 4 behavior tests pass. All Holzman lint gates pass (fmt, clippy with all deny flags, no forbidden macros).

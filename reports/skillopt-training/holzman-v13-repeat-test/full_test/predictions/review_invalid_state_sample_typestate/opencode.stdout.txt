@@ -1,0 +1,12 @@
+Now I have all the information needed. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+8 findings (7 BLOCKER, 1 WARNING), 4 missing evidence items. Core issues:
+
+- `status: String` instead of enum typestate
+- `is_validated: bool` + `is_sent: bool` enabling invalid state combinations
+- `sent_at_epoch_ms: Option<u64>` orphaned outside the variant that owns it
+- `id: String` raw primitive without newtype
+- No parse boundary — callers construct invalid states directly
+- `.to_string()` hidden allocation on every `mark_sent` call
+- All fields public/mutable, defeating all invariants

@@ -1,0 +1,9 @@
+Now I have a clear picture. The current function has `.unwrap()` and no bounds checking. Let me fix it.
+All 4 tests pass and clippy is clean. Now writing the required output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Removed `.unwrap()`** — replaced with `.map_err(|_| ParseError::Invalid)` for safe parsing
+- **Added empty input check** — returns `ParseError::Empty` for empty/whitespace-only input
+- **Added max_items enforcement** — returns `ParseError::TooMany` when more than `max_items` values present
+- **Added `try_reserve`** — allocation discipline per Holzman patterns
+- All 4 behavior tests pass, clippy clean

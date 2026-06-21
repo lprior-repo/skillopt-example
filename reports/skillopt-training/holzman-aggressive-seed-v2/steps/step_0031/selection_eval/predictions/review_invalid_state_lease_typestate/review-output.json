@@ -1,0 +1,62 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_state_representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses String for status and booleans for lifecycle flags, allowing any combination of invalid states (e.g. status='sent' with is_sent=false, or is_validated=false with status='validated'). The domain invariant that status and boolean flags must be consistent is not enforced by the type system.",
+      "failure_mode": "Runtime logic must redundantly check multiple fields for correctness; any future code that sets one field without updating the other silently creates an invalid state, leading to inconsistent workflow behavior.",
+      "fix": "Replace `status: String`, `is_validated: bool`, and `is_sent: bool` with a single `LeaseState` enum (e.g., `enum LeaseState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`). Make all fields private and provide a constructor that guarantees invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typestate_enforcement",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any LeaseWorkflow regardless of its current state, enabling invalid transitions (e.g. marking a non-pending lease as sent, or double-marking). No preconditions are checked and no error is returned.",
+      "failure_mode": "Business logic allows arbitrary state transitions at compile time; callers can call mark_sent on an already-sent or unvalidated lease, producing logically incorrect workflow state with no compile-time or runtime guard.",
+      "fix": "Define a typestate enum and have mark_sent accept only the pre-sent variant. Return a typed error or Result for invalid transitions. Example: `fn mark_sent(state: LeaseState) -> Result<LeaseState, LeaseTransitionError>` where only `LeaseState::Validated` transitions to `LeaseState::Sent`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a bare primitive type with no domain rules. Lease IDs should have format/length/ uniqueness constraints encoded in a newtype.",
+      "failure_mode": "Invalid lease IDs (empty, wrong format, duplicated) pass through without validation. Any function accepting `LeaseWorkflow` cannot assume id validity without repeated runtime checks.",
+      "fix": "Introduce `struct LeaseId(String)` with a fallible constructor `LeaseId::new(s: &str) -> Result<LeaseId, LeaseError>` that validates format and length. Use `LeaseId` in the workflow struct."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs string allocation (`\"sent\".to_string()`) and mutates the struct in-place inside the same function that represents a domain transition. The logic is neither pure nor clearly separated from I/O concerns.",
+      "failure_mode": "The function mixes state transition logic with allocation, making it impossible to test the transition as a pure function and coupling the domain to allocation semantics.",
+      "fix": "Split into a pure `fn transition_to_sent(state: LeaseState) -> LeaseState` (no allocation, just enum construction) and a shell function that handles I/O if needed (e.g. persistence or notification)."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns the struct directly with no error type. All state transitions must have typed fallible paths per the error taxonomy.",
+      "failure_mode": "Callers have no way to distinguish between valid transitions, invalid transitions, or future failure modes (e.g. validation failures). Error handling is impossible without returning Result.",
+      "fix": "Define `enum LeaseError { InvalidTransition, ValidationFailed }` and change the signature to return `Result<LeaseState, LeaseError>`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "public_fields_expose_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LeaseWorkflow are `pub`, allowing external code to mutate individual fields and bypass all invariants.",
+      "failure_mode": "Any caller can do `workflow.is_sent = false` while `workflow.status == \"sent\"`, creating inconsistency without any domain function knowledge.",
+      "fix": "Make all fields `pub(crate)` or private. Provide only domain-safe constructors and state-transition methods."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for any performance claim", "no profiler data for allocation patterns", "no allocation audit (no try_reserve or bounded allocation evidence)", "no second-ring command evidence (no clippy, fmt, or test output)", "no command evidence of any kind"],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental type-level violations that make every runtime usage unsafe. Without typestates and typed transitions, any downstream code inheriting LeaseWorkflow will inherit these invariant violations."
+}

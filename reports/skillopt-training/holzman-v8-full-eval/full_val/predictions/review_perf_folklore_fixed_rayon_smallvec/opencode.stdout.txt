@@ -1,0 +1,12 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of 7 findings across 3 severity levels:**
+
+| Severity | Count | Key Issue |
+|----------|-------|-----------|
+| BLOCKER | 2 | TODO prescribes Rayon + SmallVec for 4-element input without benchmark evidence; Rayon overhead will dominate |
+| WARNING | 2 | Heap `Vec` allocation for fixed-size input; no tests in entire crate |
+| INFO | 3 | Missing benchmark harness, profiler evidence, and allocation evidence |
+
+**Core violation:** `src/lib.rs:2` — the TODO comment encodes a specific performance prescription ("use Rayon and SmallVec because it will be faster") with zero evidence. For a 4-byte fixed input, Rayon's thread dispatch overhead exceeds any possible computational benefit, making the prescribed change almost certainly slower. The `Vec<&'static str>` return for 4 elements also allocates heap for data that fits in a stack array or bitmask.

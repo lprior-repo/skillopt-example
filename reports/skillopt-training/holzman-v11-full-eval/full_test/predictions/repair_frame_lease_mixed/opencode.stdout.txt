@@ -1,0 +1,15 @@
+Now I understand the issue. The `encode_frame` function is missing:
+1. `payload.len() > max_payload` check (test expects `PayloadTooLarge` error)
+2. Checked arithmetic for capacity (4 + payload.len())
+3. `try_reserve` for allocation safety
+4. Lossy `as u32` conversion on payload.len()
+
+Let me apply the minimal fix:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added payload cap check** (line 9-11): `payload.len() > max_payload` returns `FrameError::PayloadTooLarge` — satisfies `rejects_limit` test.
+2. **Checked capacity arithmetic** (line 12-14): `4usize.checked_add(payload.len())` replaces implicit unchecked addition.
+3. **Fallible allocation** (line 16-17): `out.try_reserve(capacity)` replaces unbounded `Vec::new()` → extend.
+4. **Safe width conversion** (line 18): `u32::try_from(payload.len())` replaces lossy `payload.len() as u32`.
+
+All gates passed: `cargo fmt`, `cargo check`, `cargo clippy` (strict), `cargo test` (2/2), no production source violations.

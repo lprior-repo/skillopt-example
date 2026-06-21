@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a free-form String, allowing any value (e.g. \"sent\", \"pending\", \"foobar\"). Illegal shard states are representable.",
+      "failure_mode": "Downstream code can observe arbitrary status strings or assume status semantics that the field cannot enforce, leading to silent logic errors or unhandled branches.",
+      "fix": "Replace `status: String` with a sealed enum `ShardStatus { Pending, Sent }` and enforce transitions through typed methods or constructors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is boolean-blind. It encodes a workflow phase as a raw bool instead of a typestate, allowing invalid combinations like (status=\"sent\", is_validated=false).",
+      "failure_mode": "A shard can be marked sent before validation, or the bool can drift out of sync with status, producing silent state corruption.",
+      "fix": "Model workflow phase as a typestate enum (e.g. `ShardPhase { Unvalidated, Validated, Sent }`) or require validation as a precondition of construction, making the validated state part of the type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` duplicates the information in `status == \"sent\"`. Boolean flags that overlap with other fields are a source of inconsistency.",
+      "failure_mode": "status and is_sent can diverge (e.g. status=sent but is_sent=false), causing branches that check one field but not the other to behave unpredictably.",
+      "fix": "Remove `is_sent: bool` entirely. Derive sent-ness from the `ShardStatus` enum or drop the redundant flag and use only the typed status field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`ShardWorkflow` is a plain struct with public fields and no invariants. All fields are mutable from any caller.",
+      "failure_mode": "Any caller can construct `ShardWorkflow` with arbitrary field combinations (e.g. id=\"\", status=\"sent\", is_validated=false), violating domain invariants at the type level.",
+      "fix": "Make fields private, provide a private constructor that enforces invariants, and expose only safe operations. Alternatively, use newtype wrappers for `id` and an enum for status/phase."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_model",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes `ShardWorkflow` by value, mutates it, and returns it. No validation or preconditions are checked before transitioning to sent state.",
+      "failure_mode": "Any shard, regardless of validation status or current state, can be transitioned to sent. State transition rules are not enforced.",
+      "fix": "Replace with a function that takes a validated-phase shard type (or returns a `Result`) and enforces the valid transition path. E.g., `fn mark_sent(validated: ShardValidated) -> Result<ShardSent, TransitionError>`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_raw_string_for_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id` is a raw `String`. Shard identifiers should be a dedicated value type to enforce format, uniqueness, and domain invariants.",
+      "failure_mode": "Empty strings, duplicates, or malformed IDs are representable. No domain-level validation of id format.",
+      "fix": "Introduce a `ShardId` newtype (`pub struct ShardId(String)` or similar) with a constructor that validates the id format and is the only way to produce one."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` uses `.to_string()` to set status, which is an allocation inside a state transition. The function mutates and returns the same struct rather than producing a new typed value.",
+      "failure_mode": "Unnecessary allocation on every transition; the returned value is the same struct shape, so callers cannot distinguish pre/post-transition types at compile time.",
+      "fix": "Use an enum-based status that is zero-cost to construct, and return a new struct/enum variant representing the post-transition state."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated or implied performance claim",
+    "no profiler evidence for allocation patterns (`.to_string()` on every transition)",
+    "no allocation audit: `ShardWorkflow` contains `String` fields and `.to_string()` allocation in hot path",
+    "no command-level evidence of cargo fmt, cargo test, or cargo clippy runs",
+    "no typestate or state-transition test coverage proving illegal states are unrepresentable"
+  ],
+  "residual_risk": "High. The domain model exposes all fields publicly as raw primitives with no type-level invariants. Illegal states (unvalidated sent shards, divergent status/is_sent pairs) are trivially constructible. No tests, benchmarks, or verification commands have been executed. Static review only."
+}

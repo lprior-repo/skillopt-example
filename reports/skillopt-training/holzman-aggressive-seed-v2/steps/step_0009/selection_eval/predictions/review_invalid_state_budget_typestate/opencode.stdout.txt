@@ -1,0 +1,15 @@
+Review complete. Found 5 BLOCKER findings and 6 missing evidence items.
+
+**Key violations:**
+
+1. **`illegal_states_not_blocked`** (lib.rs:1) — `is_sent: bool` + `status: String` allows impossible states like `is_sent=true` with `status="draft"`. The task name itself flags this: `review_invalid_state_budget_typestate`.
+
+2. **`primitive_string_status`** (lib.rs:3) — `status: String` permits arbitrary values. No enum enforces lifecycle ordering.
+
+3. **`option_as_lifecycle_field`** (lib.rs:6) — `sent_at_epoch_ms: Option<u64>` couples to `is_sent: bool` by convention only. Can be `Some` without `is_sent` or vice versa.
+
+4. **`functional_core_not_isolated`** (lib.rs:9) — `mark_sent` mutates in-place with a magic string literal. No pure transition function, no domain type guard.
+
+5. **`untracked_allocation`** (lib.rs:10) — `"sent".to_string()` allocates on every call with no budget tracking. Replaced entirely by enum refactoring.
+
+All findings map to Holzman Rust core contract violations: state not validated by construction, no typestates, no functional core isolation, and untracked allocation. Output written to `review-output.json`.

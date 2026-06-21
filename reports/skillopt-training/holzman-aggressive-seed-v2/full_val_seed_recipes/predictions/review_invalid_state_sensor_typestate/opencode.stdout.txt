@@ -1,0 +1,10 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Valid JSON written to `review-output.json`.
+
+**Summary of 12 findings across 4 severity levels:**
+
+- **6 BLOCKERs**: No typestate (primitive `String`/`bool` instead of enum), no domain newtypes (`String` ID), in-place mutation in core instead of pure function, unchecked string status allocation, missing error taxonomy, no parse-boundary smart constructors.
+- **4 MAJORs**: Missing error returns from `mark_sent`, unnecessary heap allocation in core, no functional core / imperative shell split, no private fields or constructor.
+- **2 MINORs**: No benchmark/profiler evidence, no second-ring command evidence (clippy/miri/kani).
+
+**Residual risk**: Static review only. The crate is structurally non-compliant — all findings are remediable by replacing primitive fields with typed enums/newtypes and refactoring `mark_sent` into a pure transition function.

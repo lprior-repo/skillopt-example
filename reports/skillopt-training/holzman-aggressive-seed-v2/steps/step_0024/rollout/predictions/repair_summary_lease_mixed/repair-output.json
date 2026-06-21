@@ -1,0 +1,36 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/1a54b317cffb2280/repair_summary_lease_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/1a54b317cffb2280/repair_summary_lease_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/1a54b317cffb2280/repair_summary_lease_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/home/lewis/.agents/skills/holzman-rust/SKILL.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::indexing_slicing -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "rg -n '(assert!|assert_eq!|assert_ne!|unreachable!)' --glob '*.rs' --glob '!**/tests/**' --glob '!**/benches/**'", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap() - replaced with .map_err() error propagation",
+    "No production expect/panic/todo/unimplemented/unreachable macros",
+    "No unchecked indexing - split_once() replaces split()+collect()+indexed access",
+    "No unchecked arithmetic - checked_add/checked_div used for accumulators",
+    "No lossy as conversions - try_from() used for u32/u64/usize crossings",
+    "Empty input returns Err(SummaryError::Empty)",
+    "Invalid line format returns Err(SummaryError::Invalid)",
+    "Overflow detected via checked_add/checked_div",
+    "TooMany rows detected before producing output",
+    "Pure core logic separated from rendering (render_summary is a pure function)",
+    "summarize_metrics returns Result<Summary, SummaryError> matching test contract",
+    "render_summary function added to match test contract",
+    "All 6 behavior tests pass",
+    "Clippy clean with strict deny flags"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All test failures repaired, all Holzman constraints satisfied, all gates passed."
+}

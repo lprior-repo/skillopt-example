@@ -1,0 +1,14 @@
+Review complete. Written to `review-output.json`.
+
+**8 findings, 6 missing evidence items.**
+
+Key violations in `src/lib.rs`:
+
+1. **BLOCKER - make_illegal_states_unrepresentable** (line 1): All struct fields are `pub` primitives, so any invalid combination (e.g., `is_sent=true, status="pending"`) is constructible.
+2. **BLOCKER - no_bool_lifecycle_flags** (line 4): `is_validated` and `is_sent` as independent bools create a 4-state space with no domain validity.
+3. **BLOCKER - no_status_string** (line 3): `status: String` allows arbitrary values; compiler cannot enforce valid transitions.
+4. **BLOCKER - no_unvalidated_transition** (line 9): `mark_sent` sets sent state without checking preconditions (e.g., validated).
+5. **BLOCKER - functional_core** (line 9): String allocation (`"sent".to_string()`) in core-domain function.
+6. **MAJOR - no_newtype_for_id** (line 2): `id: String` has no domain semantics.
+7. **MAJOR - no_smart_constructor** (line 1): No factory to enforce invariants at construction.
+8. **MAJOR - no_typed_error_domain** (line 9): `mark_sent` returns `LeaseWorkflow` directly — no `Result`.

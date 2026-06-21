@@ -1,0 +1,18 @@
+Review complete. Written to `review-output.json`.
+
+**8 findings across the crate:**
+
+| # | Severity | Rule | File:Line | Issue |
+|---|----------|------|-----------|-------|
+| 1 | BLOCKER | zero_unwrap | `src/lib.rs:9` | `unwrap()` on `fs::read_to_string` |
+| 2 | BLOCKER | zero_unchecked_indexing | `src/lib.rs:16` | `parts[0]` / `parts[1]` unchecked indexing |
+| 3 | BLOCKER | zero_lossy_cast | `src/lib.rs:19` | `as u16` silent truncation |
+| 4 | BLOCKER | zero_unwrap | `src/lib.rs:19` | `parse().unwrap()` panics on bad input |
+| 5 | BLOCKER | functional_core_no_side_effects | `src/lib.rs:16` | `println!` inside pure pipeline |
+| 6 | BLOCKER | no_hidden_io_in_pure_function | `src/lib.rs:8` | IO in function returning `Vec<Record>` with no error channel |
+| 7 | BLOCKER | no_alloc_culturing | `src/lib.rs:12` | `Vec<String>::collect()` for 2-field parse |
+| 8 | MINOR | Record_fields_not_immutable | `src/lib.rs:3` | `pub` mutable fields break invariant |
+
+**Missing evidence:** no benchmarks, no profiler/allocation traces, no compile/test command evidence, no miri/kani/fuzz analysis.
+
+**Residual risk:** All 8 findings are BLOCKER. The function panics on IO failure, panics on malformed lines, silently truncates via `as` cast, performs hidden I/O and logging, and allocates unnecessarily. It requires a full rewrite with `Result` propagation, `split_once`, checked conversions, and removed side effects.

@@ -1,0 +1,48 @@
+    Checking repair_checked_average v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v3/tasks/baseline/repair_checked_average)
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:13:31
+   |
+13 |         sum = sum.checked_add(*value as u64).ok_or(AverageError::Overflow)?;
+   |                               ^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:14:18
+   |
+14 |         if sum > u32::MAX as u64 {
+   |                  ^^^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:18:8
+   |
+18 |     Ok((sum / values.len() as u64) as u32)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:18:8
+   |
+18 |     Ok((sum / values.len() as u64) as u32)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+   = note: requested on the command line with `-D clippy::arithmetic-side-effects`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:18:15
+   |
+18 |     Ok((sum / values.len() as u64) as u32)
+   |               ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: could not compile `repair_checked_average` (lib) due to 5 previous errors

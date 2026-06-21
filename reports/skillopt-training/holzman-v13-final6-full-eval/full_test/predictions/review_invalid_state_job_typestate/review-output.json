@@ -1,0 +1,76 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "JobWorkflow has no typestate enum encoding lifecycle transitions. Any combination of is_validated/is_sent/status is constructible, so invalid states like validated-but-not-sent-then-marked-sent-again or unsent-with-sent=true are representable and undetectable.",
+      "failure_mode": "A job can reach inconsistent states (e.g., is_sent=true with status=\"new\") and can be marked sent multiple times with no guard, violating simple bounded control flow and invariant density.",
+      "fix": "Replace the struct with a typestate enum like enum JobStage { New { id: JobId }, Validated { id: JobId, validated_at: Option<u64> }, Sent { id: JobId, sent_at_epoch_ms: u64 } } with smart constructors that enforce the transition order."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_to_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String (pub status: String). Any arbitrary string value is valid, making the status field an untyped, unbounded discriminator that callers can set to anything including values that don't correspond to real states.",
+      "failure_mode": "Callers can set status to \"\", \"SENT\", \"sent\", \"deleted\", or any garbage. No exhaustive match is possible on status, so mark_sent and any other state-machine logic cannot be proven complete. The string value carries no domain meaning.",
+      "fix": "Replace with an enum: pub enum JobStatus { New, Validating, Validated, Sent, Failed }. Remove is_sent and is_validated booleans entirely. Use enum variants to carry per-stage data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_to_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans. They allow the impossible combination (is_validated=false, is_sent=true) and cannot express ordering (validated must come before sent).",
+      "failure_mode": "A JobWorkflow with is_validated=false and is_sent=true represents an inconsistent state. There is no way to distinguish 'never validated from sent' from 'validated then sent'. mark_sent sets both status and is_sent without checking validation state.",
+      "fix": "Remove both booleans. Encode lifecycle as a single typestate enum or a single status enum with variants that inherently carry the transition context (New, Validated, Sent). The type system enforces valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a detached lifecycle timestamp that can be None while is_sent=true (invalid) or Some while is_sent=false (inconsistent). The Option is semantically tied to the Sent state but is structurally independent of both is_sent and status.",
+      "failure_mode": "sent_at_epoch_ms can be None with is_sent=true, meaning a job is marked sent but has no timestamp. Conversely, Some timestamp with is_sent=false means a sent timestamp without the job being sent. These are illegal states the type system cannot prevent.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typestate enum: Sent { id: JobId, sent_at_epoch_ms: u64 }. This makes the timestamp present exactly when the job is sent, eliminating the inconsistent combination."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints. Job IDs could be empty, contain invalid characters, or be duplicated. The domain rule that IDs carry meaning is not enforced at the type level.",
+      "failure_mode": "A JobWorkflow with id=\"\" or id=\"   \" or duplicate IDs across jobs is representable. String equality on ids is ambiguous (normalized vs raw). No validation of job identity is enforced.",
+      "fix": "Replace with a newtype: pub struct JobId(pub String) or better, use a UUID/ulid crate. Add a smart constructor JobId::from_str(s) -> Result<JobId, JobError> that validates non-empty and format constraints at construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw String fields (id, status) cross the parse boundary without fallible smart constructors. Callers can construct JobWorkflow directly with any String values, so invalid domain states are creatable from any caller without going through parse/validation.",
+      "failure_mode": "parse boundary violation: raw primitives (String) are accepted directly into domain structs. There is no parse function, no smart constructor, no fallible conversion. Any caller bypasses validation by calling JobWorkflow { id: \"\".to_string(), status: \"x\", ... }. The core consumes untrusted values.",
+      "fix": "Replace public struct fields with private fields and add a single fallible constructor: impl JobWorkflow { fn from_parts(id: &str, status: &str, validated: bool, sent: bool, sent_at: Option<u64>) -> Result<Self, JobError> { ... } } or better, replace the struct entirely with a typestate enum where construction is inherently valid."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or JobWorkflow lifecycle operations",
+    "no profiler evidence for hot-path analysis of JobWorkflow usage",
+    "no allocation analysis for String allocations in id and status fields (two heap allocations per construction)",
+    "no command-truth evidence: no benchmark or test commands were run against this crate",
+    "no second-ring evidence for any performance or safety claims",
+    "no command evidence for cargo fmt, cargo check, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "Static review only. The struct has fundamental type-level violations: status as String instead of enum, independent lifecycle booleans enabling illegal states, Option timestamp detached from its lifecycle guard, raw String id without domain constraints, and no parse boundary. No commands were executed. All six typestate review findings are BLOCKERs. The code as written makes illegal states representable and cannot be proven correct without a complete typestate refactoring."
+}

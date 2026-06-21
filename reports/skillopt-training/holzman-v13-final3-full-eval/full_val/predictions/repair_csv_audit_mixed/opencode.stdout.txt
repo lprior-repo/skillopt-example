@@ -1,0 +1,10 @@
+Now I see the issues. The function uses `.unwrap()`, ignores `max_items`, and has no empty/invalid/too-many handling. Let me fix `src/lib.rs`.
+All 4 tests pass. Let me run the full Holzman verification gate.
+All gates pass. Now writing the required output.
+Repair complete. Summary of changes to `src/lib.rs:9-26`:
+
+- **Removed** `.unwrap()` on `parse::<u16>()` — replaced with `map_err(|_| ParseError::Invalid)`
+- **Added** empty-input guard returning `Err(ParseError::Empty)`
+- **Added** too-many-items enforcement using the `max_items` parameter, returning `Err(ParseError::TooMany)`
+- **Added** skip for empty parts (whitespace-only segments between commas)
+- All 4 behavior tests pass, clippy clean, format clean

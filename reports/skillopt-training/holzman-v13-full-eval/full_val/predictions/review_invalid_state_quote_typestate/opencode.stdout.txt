@@ -1,0 +1,15 @@
+Now I have all the context. The crate has a single `src/lib.rs` with 13 lines. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**6 findings, all BLOCKER severity**, all stemming from the same root cause: `QuoteWorkflow` is a data bag of raw primitives (`String`, `bool`, `Option<u64>`) with no typestate enforcement.
+
+| # | Rule | Line | Core Issue |
+|---|------|------|------------|
+| 1 | `typestate_enum_state_machine` | 1 | No enum models the lifecycle; transitions are unenforceable |
+| 2 | `status_string_domain` | 3 | `pub status: String` allows any value ("foo", "SENT", "") |
+| 3 | `bool_lifecycle_fields` | 4 | `is_validated` + `is_sent` create 4 states, 3 invalid |
+| 4 | `option_invalid_state_combinations` | 6 | `sent_at_epoch_ms` decoupled from lifecycle, can be stale/missing |
+| 5 | `newtype_domain_id` | 2 | Raw `String` ID accepts empty/malformed values |
+| 6 | `parse_boundary_boundary` | 1 | No parsing layer; external input becomes invalid domain states directly |
+
+Each finding includes concrete failure modes and the smallest safe fix (typestate enum, newtype ID, smart constructor with fallible `try_from`).

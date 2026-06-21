@@ -1,0 +1,138 @@
+[
+  {
+    "id": "repair_frame_token_mixed",
+    "hard": 0,
+    "soft": 0.9750000000000001,
+    "task_type": "repair",
+    "task_description": "Repair repair_frame_token while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "checked_add",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_frame_token_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_frame_token_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_frame_token_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_frame_token_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \".skill/holzman-rust/SKILL.md\",\n    \".skill/holzman-rust/references/functional-core-performance.md\",\n    \".skill/holzman-rust/references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [\n    {\"command\": \"cargo fmt\", \"status\": \"passed\"},\n    {\"command\": \"cargo test\", \"status\": \"passed\"}\n  ],\n  \"rules_satisfied\": [\n    \"No production unsafe\",\n    \"No unwrap/expect/panic/todo/unimplemented/unreachable\",\n    \"No lossy as conversions (replaced payload.len() as u32 with u32::try_from)\",\n    \"No unchecked indexing\",\n    \"max_payload parameter used for bounds check returning PayloadTooLarge\",\n    \"try_reserve used for Vec bounded allocation with Allocation error handling\",\n    \"Checked arithmetic for capacity (saturating_add)\",\n    \"Tests untouched - behavior contract preserved\",\n    \"Cargo.toml untouched\",\n    \"Smallest production-source change applied\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"None identified. All tests pass. Holzman violations repaired: lossy as->try_from, unused max_payload->bounds check, Vec::new()->try_reserve with allocation error.\"\n}",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0008/rollout/predictions/repair_frame_token_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_frame_token_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.9750000000000001,
+      "failures": [
+        [
+          "checked_add"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": true,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 3,
+      "total_groups": 4,
+      "missing_groups": [
+        [
+          "checked_add"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "repair_summary_frame_mixed",
+    "hard": 1,
+    "soft": 1.0,
+    "task_type": "repair",
+    "task_description": "Repair repair_summary_frame while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_summary_frame_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_summary_frame_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_summary_frame_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_summary_frame_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \".skill/holzman-rust/SKILL.md\",\n    \".skill/holzman-rust/references/functional-core-performance.md\",\n    \".skill/holzman-rust/references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\n    \"src/lib.rs\"\n  ],\n  \"commands\": [\n    {\"command\": \"cargo fmt\", \"status\": \"passed\"},\n    {\"command\": \"cargo test --workspace --all-features\", \"status\": \"passed\"},\n    {\"command\": \"cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock\", \"status\": \"passed\"}\n  ],\n  \"rules_satisfied\": [\n    \"No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable\",\n    \"Checked arithmetic via checked_add/checked_div\",\n    \"Checked conversions via try_from with unwrap_or fallback\",\n    \"split_once used for delimiter extraction instead of split+collect+indexing\",\n    \"No unchecked indexing (split_once destructured as (_, rest))\",\n    \"No lossy as conversions in production code\",\n    \"Functional core: summarize_metrics returns pure Summary struct\",\n    \"Shell layer: render_summary formats Summary to string\",\n    \"All 6 behavior tests pass\",\n    \"Clippy passes with all strict deny lints\",\n    \"No forbidden constructs in production source\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"u32::try_from(count).unwrap_or(u32::MAX) silently clamps count to u32::MAX if count exceeds u32 range on 64-bit targets; a new CountOverflow error variant would be stricter but tests do not require it\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0008/rollout/predictions/repair_summary_frame_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/repair_summary_frame_mixed",
+    "grade": {
+      "hard": 1.0,
+      "soft": 1.0,
+      "failures": [],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": true,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 9,
+      "total_groups": 9,
+      "missing_groups": [],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "review_hidden_io_budget_mixed",
+    "hard": 0,
+    "soft": 0.875,
+    "task_type": "review",
+    "task_description": "Review review_hidden_io_budget for Holzman + functional-core Rust violations.",
+    "fail_reason": "try_reserve/bounded",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_budget_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_budget_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_budget_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_budget_mixed/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permission denied, truncated file, etc.)\",\n      \"failure_mode\": \"Untrusted or environment-dependent file paths cause unconditional thread panic instead of returning a typed error\",\n      \"fix\": \"Return Result<Vec<Record>, IOError> (or domain error enum) and propagate fs::read_to_string with ? or explicit match/map_err\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \"parts[1].parse::<u32>().unwrap() panics on invalid numeric input or out-of-range values\",\n      \"failure_mode\": \"Malformed CSV data (non-numeric value field) causes unconditional thread panic instead of returning a typed parse error\",\n      \"fix\": \"Use ? or map_err to propagate ParseIntError; wrap in a domain ParseError enum variant\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \"as u16 is a lossy cast: values above 65535 silently truncate to u16 range without any error\",\n      \"failure_mode\": \"A valid u32 value in 65536..=u32::MAX silently wraps to an incorrect u16, corrupting budget data with no error signal\",\n      \"fix\": \"Use u16::try_from(parsed_u32) and propagate OutOfRangeError; the function must return Result with this error variant\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 12,\n      \"problem\": \"line.split(',').map(|part| part.trim().to_string()).collect() collects all split parts into a Vec when only the first two are needed\",\n      \"failure_mode\": \"Every line allocates a Vec of Strings regardless of field count; wasteful allocation and O(n) per line where O(1) suffices\",\n      \"fix\": \"Use line.split_once(',') to extract name and value fields directly; avoid collect() for one-shot delimiter extraction\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 16,\n      \"problem\": \"parts[0] is unchecked indexed access into a Vec produced by collect(); panics if line has no comma\",\n      \"failure_mode\": \"A line without a comma produces a single-element Vec; indexing [0] and [1] panics on the second use instead of returning a typed error\",\n      \"fix\": \"Use split_once(',') which returns Option<( &str, &str )>; handle None with a MalformedLine error variant\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \"parts[1] is unchecked indexed access into a Vec; panics if line has no second comma-delimited field\",\n      \"failure_mode\": \"Same as line 16 \u2014 malformed CSV with only one field causes panic instead of typed error\",\n      \"fix\": \"Replace split+collect+indexing with split_once(',') and handle the Option<(name, value)> explicitly\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 16,\n      \"problem\": \"println!(\\\"loaded {}\\\", parts[0]) is a side-effecting I/O call inside a function that returns domain data\",\n      \"failure_mode\": \"Hidden logging side effect makes the function non-deterministic, non-testable, and couples data loading to the console; also prevents headless/embedded deployments\",\n      \"fix\": \"Remove println! from the data-loading function. If telemetry is needed, return a separate metadata struct or push logging to the shell layer that calls this function\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 8,\n      \"problem\": \"Function signature returns Vec<Record> but performs I/O (fs::read_to_string), logging (println!), and parsing \u2014 mixing shell and core concerns with no error channel\",\n      \"failure_mode\": \"All three failure modes (I/O error, parse error, overflow) are represented only by panic; callers cannot distinguish or handle them\",\n      \"fix\": \"Change signature to pub fn load_budgets(path: &str) -> Result<Vec<Record>, LoadError> where LoadError is a domain enum with I/O, Parse, and Overflow variants\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"allocation_discipline\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 12,\n      \"problem\": \"Every line allocates a new Vec<String> with .collect(), cloning each trimmed part into owned Strings even though only two fields are needed\",\n      \"failure_mode\": \"For large files this creates O(n) heap allocations per line; memory pressure increases with file size and GC (Drop) overhead accumulates\",\n      \"fix\": \"Use split_once(',') to get (&str, &str) references, then .trim() on each; only allocate String for the name field via .to_string() or Cow\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists to measure load_budgets throughput or allocation profile\",\n    \"no profiler data (perf/ flamegraph) for this function's hot path\",\n    \"no allocation evidence (e.g., `dhat` or `allocations` crate output) showing heap pressure for typical input sizes\",\n    \"no second-ring evidence: function performs I/O but signature gives no signal \u2014 no budget or cap mechanism visible\",\n    \"no command evidence: no cargo test, cargo fmt, or cargo clippy output was produced\"\n  ],\n  \"residual_risk\": \"Static review only; no commands run. The function has nine Holzman-critical violations (5 BLOCKER, 4 MAJOR) including unwrap panics, lossy casts, unchecked indexing, unnecessary allocations, and hidden I/O/logging side effects. All failure modes are panic-only with no typed error channel. The function must be rewritten to return Result and use split_once with checked arithmetic before any implementation or further review.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0008/rollout/predictions/review_hidden_io_budget_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_budget_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.875,
+      "failures": [
+        [
+          "try_reserve",
+          "bounded"
+        ]
+      ],
+      "json_valid": true,
+      "matched_groups": 7,
+      "total_groups": 8,
+      "missing_groups": [
+        [
+          "try_reserve",
+          "bounded"
+        ]
+      ],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  },
+  {
+    "id": "review_hidden_io_job_mixed",
+    "hard": 0,
+    "soft": 0.875,
+    "task_type": "review",
+    "task_description": "Review review_hidden_io_job for Holzman + functional-core Rust violations.",
+    "fail_reason": "try_reserve/bounded",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_job_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_job_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_job_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_job_mixed/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"fs::read_to_string(path).unwrap() \u2014 unwrap() on fallible I/O will panic on missing file, permission error, or invalid UTF-8\",\n      \"failure_mode\": \"untrusted or missing file path aborts the entire process instead of returning a typed domain error\",\n      \"fix\": \"Return Result<Vec<Record>, E> and propagate errors with ? or explicit Err. Use a domain error type such as IoError or LoadError.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \"parts[1].parse::<u32>().unwrap() \u2014 unwrap() on parse failure (invalid digits, empty field) panics\",\n      \"failure_mode\": \"malformed CSV input aborts the entire job loading instead of reporting which line and field failed\",\n      \"fix\": \"Return Result and use .map_err() to convert ParseIntError into a domain error (e.g., ParseError). Chain with ? to propagate.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \".parse::<u32>().unwrap() as u16 \u2014 lossy as-cast from u32 to u16 silently truncates values > 65535\",\n      \"failure_mode\": \"a valid u32 value such as 70000 becomes 4464 without any error, corrupting the data silently\",\n      \"fix\": \"Use u16::try_from(parsed_u32) with map_err to return a typed overflow error. Never use as for narrowing casts.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 16,\n      \"problem\": \"parts[0] and parts[1] \u2014 unchecked indexed access into Vec without any bounds check\",\n      \"failure_mode\": \"a line with fewer than 2 comma-separated fields panics via index out of bounds, crashing the caller\",\n      \"fix\": \"Use get(0) and get(1) with map_err, or prefer split_once(',') to avoid collecting into Vec and to extract exactly two fields with proper None handling.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 12,\n      \"problem\": \"line.split(',').map(...).collect() \u2014 collects all split parts into a Vec when only two fields (name, value) are needed\",\n      \"failure_mode\": \"unnecessary heap allocation per line, and if a line contains extra commas the extra data is silently discarded, hiding malformed input\",\n      \"fix\": \"Use line.split_once(',') to split into exactly two parts. This avoids the intermediate Vec, the per-line allocation, and the silent data loss on extra fields.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 16,\n      \"problem\": \"println!(\\\"loaded {}\\\", parts[0]) \u2014 console-side-effect embedded in data-loading pipeline\",\n      \"failure_mode\": \"hidden I/O side effect pollutes stdout, breaks piping, and couples data-loading logic to console output; makes the function impossible to test deterministically\",\n      \"fix\": \"Remove println! entirely. If logging is needed, pass a logger abstraction or return a separate log/diagnostic collection from the shell layer.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"type_discipline\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 4,\n      \"problem\": \"Record uses raw String and u16 \u2014 no domain newtypes for name or value\",\n      \"failure_mode\": \"any string and any u16 (including 0, overflowed, or negative) can be constructed, making illegal states representable\",\n      \"fix\": \"Introduce newtype wrappers (e.g., JobName(String), JobValue(u16)) with constructors that enforce invariants such as non-empty name and value > 0.\"\n    },\n    {\n      \"severity\": \"WARNING\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 8,\n      \"problem\": \"load_jobs performs file I/O and returns concrete Vec<Record> instead of Result \u2014 hidden I/O\",\n      \"failure_mode\": \"callers have no way to handle I/O errors; the function signature lies about not failing, so callers skip error handling and the program crashes on any disk failure\",\n      \"fix\": \"Signature should be fn load_jobs(path: &str) -> Result<Vec<Record>, LoadError>. Pure parsing should be extracted into a separate pure function: fn parse_records(lines: &[&str]) -> Result<Vec<Record>, ParseError>.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for allocation behavior or throughput of load_jobs\",\n    \"no profiler evidence for the per-line heap allocation from split().collect()\",\n    \"no allocation audit \u2014 each line heap-allocates a Vec<String>, multiple String allocations per line\",\n    \"no command-line interface evidence or integration test coverage for load_jobs\"\n  ],\n  \"residual_risk\": \"static review only \u2014 no commands run. All 8 findings are directly observable in source. The function is entirely broken for any real-world input: panics on missing file, malformed lines, parse errors, and silently truncates u32 values. The architecture mixes I/O and parsing in a single impure function with no error surface. Full rewrite with Result types, split_once, checked conversions, and pure/push separation is required before this crate is acceptable.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0008/rollout/predictions/review_hidden_io_job_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/71e5fd3a4f63a268/review_hidden_io_job_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.875,
+      "failures": [
+        [
+          "try_reserve",
+          "bounded"
+        ]
+      ],
+      "json_valid": true,
+      "matched_groups": 7,
+      "total_groups": 8,
+      "missing_groups": [
+        [
+          "try_reserve",
+          "bounded"
+        ]
+      ],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  }
+]

@@ -1,0 +1,17 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 6 BLOCKER findings, 7 missing evidence items.**
+
+The crate `review_invalid_state_packet_typestate` has fundamental architectural violations:
+
+| # | Rule | Location | Issue |
+|---|------|----------|-------|
+| 1 | `make_illegal_states_unrepresentable` | `lib.rs:3` | `status: String` — any arbitrary value allowed |
+| 2 | `make_illegal_states_unrepresentable` | `lib.rs:4` | `is_validated: bool` + `is_sent: bool` — separate flags allow illegal combinations |
+| 3 | `functional_core_type_discipline` | `lib.rs:2` | `id: String` — no domain newtype enforcement |
+| 4 | `functional_core_type_discipline` | `lib.rs:6` | `sent_at_epoch_ms: Option<u64>` — desynchronizable from state flags |
+| 5 | `functional_core_pure_transform` | `lib.rs:9` | `mark_sent` does in-place mutation with `.to_string()` allocations |
+| 6 | `struct_fields_public` | `lib.rs:1` | All fields public — no constructor, no invariant enforcement |
+
+Every field is a raw primitive with no type-level constraints, no constructor, and no state machine — the opposite of "make illegal states unrepresentable."

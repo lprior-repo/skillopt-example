@@ -1,0 +1,60 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_states_not_blocked",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses `status: String` and `is_sent: bool` / `is_validated: bool` — the compiler permits impossible states such as `is_sent=true` with `status=\"draft\"`, or `is_validated=true` before any validation step. No typestate or enum enforces the lifecycle.",
+      "failure_mode": "Business logic downstream may observe or transmit a budget in a logically impossible state, corrupting audit trails, causing incorrect routing, or silently skipping validation checks.",
+      "fix": "Replace `status: String` with a `BudgetStatus` enum (`Draft`, `Validated`, `Sent`). Replace `is_sent: bool` with a `BudgetSent` typestate or fold the sentinel into `BudgetStatus`. Replace `is_validated: bool` with a workflow transition tracked by the enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_string_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` is a primitive free-form string. Any arbitrary value (\"SENT\", \"\", \"sent!\", null-equivalent) is permitted. `mark_sent` naively sets `\"sent\"` without validating prior state transitions.",
+      "failure_mode": "A caller can set `status` to any string, bypassing the intended lifecycle. No invariant check prevents e.g. going from `Sent` back to `Draft` or double-marking.",
+      "fix": "Define `enum BudgetStatus { Draft, Validated, Sent }`. Remove `is_sent` entirely — `BudgetStatus::Sent` subsumes it. Provide constructors/transitions that enforce ordering."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_as_lifecycle_field",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` couples timestamp presence to `is_sent: bool` via convention rather than type. When `is_sent=true` but `sent_at_epoch_ms=None`, the budget is in a partially-initialized state.",
+      "failure_mode": "Downstream code must check both fields; if only `is_sent` is checked, `sent_at_epoch_ms` could be `None` causing `unwrap`/`expect` panics or silent zero-timestamps.",
+      "fix": "Fold the timestamp into the typestate: `enum BudgetStatus { Draft, Validated, Sent { sent_at_ms: u64 } }` or provide a `SentDetails { sent_at_ms: u64 }` struct that is only constructible when the transition to `Sent` occurs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_not_isolated",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the struct in-place (`mut item`) and writes a magic string literal. There is no pure deterministic core — the transition logic is embedded directly in the shell-level mutator with no domain type guarding it.",
+      "failure_mode": "The function can be called from any context without validation. It cannot be unit-tested as a pure function because it has no input contract enforced by types and no deterministic return shape.",
+      "fix": "Move the transition into a pure function `fn transition_to_sent(state: BudgetStatus) -> Result<BudgetStatus, TransitionError>` that takes and returns the domain enum, returning an error if the prior state is not `Validated`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "untracked_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`item.status = \"sent\".to_string()` performs a heap allocation inside what should be a hot path or deterministic core function. The allocation is untracked (no `try_reserve`, no allocation budget).",
+      "failure_mode": "Repeated calls in a hot path cause unbounded heap pressure. Allocation failure is silently ignored — `to_string()` never returns a recoverable error.",
+      "fix": "Replace `String` status with `BudgetStatus` enum. Enum variants store no heap data for the `Sent` state (or store only `u64`), eliminating the allocation entirely."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to measure `mark_sent` or any budget transition path",
+    "no profiler data (flamegraph, perf) to identify hot paths in budget workflow",
+    "no allocation analysis (e.g., `tracing` or `dhat` snapshots) for the workflow crate",
+    "no second-ring validation or integration test showing lifecycle enforcement",
+    "no command-line or CLI entry point evidence for end-to-end budget workflow",
+    "no formal or behavior tests covering state-transition invariants"
+  ],
+  "residual_risk": "The crate has no type-enforced lifecycle — illegal states are fully representable and transitions are unprotected. Without refactoring `BudgetWorkflow` to use enums/typestates and a pure transition core, any downstream consumer can produce or act on invalid budget states. Static review only; no commands executed."
+}

@@ -1,0 +1,11 @@
+Now I have the full picture. The current `parse_tokens` has multiple violations: `unwrap()`, no empty check, no max_items enforcement, no Invalid error handling.
+All 4 tests pass. Let me verify the final source and write the output.
+Repaired. Changes to `src/lib.rs`:
+
+- **Removed `unwrap()`** on `parse::<u16>()` — replaced with `map_err(|_| ParseError::Invalid)`
+- **Added empty input check** — returns `Err(ParseError::Empty)` for empty/whitespace-only strings
+- **Added `max_items` enforcement** — returns `Err(ParseError::TooMany)` when token count exceeds limit
+- **Added `try_reserve`** — replaces `with_capacity` with allocation-error mapping to `ParseError::Allocation`
+- **Added empty-trimmed-token check** — catches cases like `"1,,3"` that would produce empty segments
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

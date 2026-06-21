@@ -1,0 +1,145 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string performs file I/O fused with parsing and domain construction inside a single pure-looking function",
+      "failure_mode": "imperative-shell logic leaks into the calculation layer, making the function non-deterministic, untestable in isolation, and unable to inject mock data or fail with typed errors",
+      "fix": "split into a shell function that reads text and a pure calculation function that parses an &[str] or Iterator<&str> into Records"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permission denied, etc.)",
+      "failure_mode": "untrusted filesystem input aborts the process instead of returning a typed error the caller can handle gracefully",
+      "fix": "return Result<Vec<Record>, Error> and use .map_err(|e| Error::Io(e)) or similar typed error, no unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on any non-numeric value in the second CSV column",
+      "failure_mode": "hostile or malformed CSV input aborts the process instead of returning a typed ParseError",
+      "fix": "use .map_err(|e| Error::Parse(value_str, e)) or return Result, no unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses index 0 of a split result with no length guard — if line has zero bytes it panics with index-out-of-bounds",
+      "failure_mode": "empty or whitespace-only lines panic the process",
+      "fix": "use split_once(',') and pattern match on Some((name, value_str)) or return None/Error for malformed lines"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses index 1 of a split result with no length guard — lines with only one comma-separated field panic",
+      "failure_mode": "malformed CSV lines (missing value column) panic instead of yielding a typed Invalid error",
+      "fix": "use split_once(',') which yields exactly two parts, removing the need for indexed access"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 is a lossy cast — any u32 value > 65535 silently truncates to u16",
+      "failure_mode": "a value of 70000 silently becomes 4464, corrupting domain data without any error or warning",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| Error::Overflow(name, parsed_u32)) instead of as cast"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds console I/O inside what should be pure parsing logic",
+      "failure_mode": "pure calculation layer leaks side effects, making output non-deterministic and contaminating the functional core",
+      "fix": "remove println entirely from the calculation layer; logging belongs in the imperative shell that calls the parser"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() unconditionally collects all split parts into Vec<String> with no domain cap or try_reserve",
+      "failure_mode": "a single extremely long line or a file with millions of lines causes unbounded heap growth and potential OOM",
+      "fix": "use split_once(',') for one-separator grammar; collect into a bounded structure or use try_reserve(validated_cap) after counting with a domain cap; push with bounds checking"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_domain_model",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses pub name: String (raw primitive) instead of a newtyped domain identifier; status/lifecycle booleans absent but name is an unvalidated string",
+      "failure_mode": "any caller can construct Record with empty, null-byte, or otherwise hostile strings; illegal names cannot be rejected at the boundary",
+      "fix": "introduce a newtype PacketName(String) or similar with a smart constructor that validates non-empty and rejects hostile input, returning a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no Result — all errors are silenced by unwrap panics rather than returned via a typed error enum",
+      "failure_mode": "callers cannot distinguish I/O errors from parse errors from overflow errors; no graceful recovery is possible",
+      "fix": "define enum Error { Io(std::io::Error), EmptyLine(usize), Invalid(usize), Overflow(String, u32), Parse(String, std::num::ParseIntError), Allocation } and return Result<Vec<Record>, Error>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_in_result_fn",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "The closure passed to .map() panics indirectly via unwrap() and indexing — even if the outer function returned Result, the closure itself has no way to propagate errors",
+      "failure_mode": "clippy::panic_in_result_fn: any unwrap inside the iterator chain panics the whole function instead of bubbling an error",
+      "fix": "change .map() to .map(...) returning Result<Record, Error>, then use .collect::<Result<Vec<_>, _>>() to collapse into a single Result at the end"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark, profiler, or allocation evidence exists; the function allocates a Vec<String> per line and collects into Vec<Record>",
+      "failure_mode": "unknown performance characteristics; unbounded Vec allocation per line is wasteful when only two fields are needed",
+      "fix": "add a benchmark with a realistic CSV workload; replace per-line Vec allocation with split_once and borrowed str references"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "command_truth",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no test targets, no benchmark targets, and no CI gate exist for this crate",
+      "failure_mode": "no automated verification that the code compiles, passes lint gates, or behaves correctly on hostile inputs",
+      "fix": "add tests for valid input, empty file, malformed lines, oversized values, and missing files; add clippy and fmt gates"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "must_use_discarded",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "part.trim().to_string() allocates a new String for every split part, then parts[0] and parts[1] clone them — the intermediate Vec<String> is fully materialized",
+      "failure_mode": "unnecessary heap allocations on every line; memory bandwidth wasted on values that are immediately cloned again",
+      "fix": "use split_once(',') to get (&str, &str), then use the borrows directly without intermediate allocation; only .to_string() when storing into the Record's String field"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated or implied performance claim",
+    "no profiler data exists to identify the actual bottleneck",
+    "no allocation tracing evidence (e.g., afl, valgrind, or custom alloc hooks)",
+    "no second-ring command evidence (no clippy, no cargo test, no cargo fmt --check)",
+    "no command-truth evidence: the function claims to load packets but no tests verify correct parsing of valid, edge, and hostile inputs"
+  ],
+  "residual_risk": "static review only — no commands were run (cargo fmt/check/clippy/test). All findings are based on source-level analysis. The code violates 11 absolute Holzman Rust laws including no-unsafe, no-panic, no-hidden-IO, no-lossy-cast, no-unchecked-access, and bounded-allocation. This crate cannot pass any strict lint gate as written."
+}

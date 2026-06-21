@@ -1,0 +1,40 @@
+    Checking repair_summary_frame_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/36c12be277a5e8f9/repair_summary_frame_mixed)
+error: indexing may panic
+  --> src/lib.rs:24:27
+   |
+24 |         let value = match parts[1].parse::<u64>() {
+   |                           ^^^^^^^^
+   |
+   = help: consider using `.get(n)` or `.get_mut(n)` instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#indexing_slicing
+   = note: requested on the command line with `-D clippy::indexing-slicing`
+
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:32:9
+   |
+32 |         count += 1;
+   |         ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+   = note: requested on the command line with `-D clippy::arithmetic-side-effects`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:40:43
+   |
+40 |     let average = match total.checked_div(count as u64) {
+   |                                           ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:45:16
+   |
+45 |         count: count as u32,
+   |                ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: could not compile `repair_summary_frame_mixed` (lib) due to 4 previous errors

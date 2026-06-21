@@ -1,0 +1,16 @@
+Now I have full context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 8 findings:
+
+**BLOCKERs (5):**
+- `make_illegal_states_unrepresentable` — all fields pub, any state combination possible (lib.rs:1)
+- `status_string_to_enum` — status is String, not a domain enum (lib.rs:3)
+- `lifecycle_bools_to_typestate` — is_validated/is_sent are independent booleans that can contradict each other (lib.rs:4)
+- `parse_boundary_no_smart_constructor` — no boundary parsing, raw primitives accepted (lib.rs:9)
+- `mark_sent_no_transition_guard` — marks any item as sent regardless of validation state (lib.rs:9)
+
+**MAJORs (3):**
+- `option_invalid_state_combination` — sent_at_epoch_ms decoupled from sent lifecycle (lib.rs:6)
+- `id_newtype_missing` — bare String ID, no domain constraints (lib.rs:2)
+- `string_literal_allocation` — `"sent".to_string()` allocation smell (lib.rs:10)
+
+**Missing evidence:** benchmarks, profiler, allocation data, second-ring tests (Miri/Kani), command evidence, test files.

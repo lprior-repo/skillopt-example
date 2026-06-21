@@ -1,0 +1,89 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, unreadable path).",
+      "failure_mode": "untrusted or missing file path aborts the entire process instead of returning a typed error the caller can handle",
+      "fix": "return Result<Vec<Record>, IOError> or an equivalent typed domain error; propagate fs::read_to_string failures with map_err or ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or missing second field.",
+      "failure_mode": "malformed CSV line aborts the entire batch load instead of skipping or returning a per-record parse error",
+      "fix": "use .map_err() or ? to propagate ParseIntError; if batch tolerance is needed, return Result per record and filter/collect with ok()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "lossy as u16 conversion after parse: values in 65536..u32::MAX silently truncate to u16 range.",
+      "failure_mode": "out-of-range values wrap silently, producing incorrect domain data without any signal to the caller",
+      "fix": "use u16::try_from(parts[1].parse::<u32>().unwrap_or_else(|_| u32::MAX)) or parse directly to u16 via parts[1].parse::<u16>() with proper error propagation; reject values > u16::MAX"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts[0] and parts[1] use unchecked indexing on a Vec with no bounds check. If a line has fewer than 2 comma-separated fields, this panics with index-out-of-bounds.",
+      "failure_mode": "malformed CSV (short line) causes panic instead of returning a typed parse error",
+      "fix": "use get(0) and get(1) with ok_or or map_err, or use split_once(',') to destructure exactly two fields without allocation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "println!(\"loaded ...\") is a side-effecting I/O call inside a library function that is supposed to be a data-loading action. This couples the core loading logic to stdout logging.",
+      "failure_mode": "library consumers cannot suppress audit logs; stdout pollution makes downstream consumers break; logging is mixed into data-loading logic instead of being pushed to the imperative shell",
+      "fix": "remove println! from the library function; return a count or per-record metadata if the caller needs to log; push logging to the shell layer that calls load_audits"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "Collecting all split parts into Vec<String> then indexing is wasteful: allocates a Vec, clones every trimmed string, then discards all but the first two. For a 2-field line this is unnecessary heap allocation.",
+      "failure_mode": "increased memory pressure and allocation latency on every line; not a correctness bug but violates bounded-allocation discipline for simple parsing",
+      "fix": "use line.split_once(',') to get two &str parts, then trim and clone only the needed fields; avoids Vec allocation entirely"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_audits mixes file I/O (fs::read_to_string), parsing, validation, and logging (println) in a single function. The functional core (parsing/validating a line into a Record) is not separated from the imperative shell (reading the file, printing).",
+      "failure_mode": "the parsing logic cannot be unit-tested in isolation without mocking filesystem access; testability and correctness are degraded",
+      "fix": "extract a pure fn parse_record(line: &str) -> Result<Record, ParseError> and have load_audits call it after reading the file; push println! to the caller/shell"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this I/O-bound loading path. The function allocates a Vec<String> per line and clones into String fields — if this is on a hot path, there is no measured baseline.",
+      "failure_mode": "performance regression risk: unmeasured allocations could become a bottleneck under load with no alert",
+      "fix": "add a criterion or divan benchmark for load_audits with a realistic input file; measure allocations and throughput; add a baseline to Cargo.toml bench section"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_audits throughput or allocation profile",
+    "no profiler evidence for hot-path characterization of the I/O + parse loop",
+    "no allocation audit (e.g., heaptrack, valgrind, or criterion allocation tracking) for the Vec<String> per-line pattern",
+    "no command-layer or CLI entry point evidence — the imperative shell that calls load_audits is not present in this crate"
+  ],
+  "residual_risk": "static review only; no commands run. The crate compiles as a minimal eval fixture. Four BLOCKERs (unwrap on I/O, unwrap on parse, lossy as-conversion, unchecked indexing) will cause panics or silent data corruption on malformed input. The functional core is not separated from I/O, preventing isolated testing. Benchmark and profiler evidence is entirely absent."
+}

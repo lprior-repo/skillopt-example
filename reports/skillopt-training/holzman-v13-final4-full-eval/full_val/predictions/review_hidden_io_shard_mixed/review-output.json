@@ -1,0 +1,93 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permissions, disk full)",
+      "failure_mode": "untrusted file path aborts the entire process instead of returning a typed recovery-able error",
+      "fix": "return Result<Vec<Record>, IoError> and use fs::read_to_string(path).map_err(|e| IoError::ReadFailed { path: path.to_owned(), source: e })?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_path",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) puts stdout logging inside the data-construction path",
+      "failure_mode": "pure domain logic leaks I/O side-effects, breaking Functional Core / Imperative Shell separation; callers cannot suppress or capture logging without suppressing all output",
+      "fix": "remove println! entirely from the data pipeline. If logging is needed, push it to the shell layer after load_shards returns, or accept a callback/builder for telemetry"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] indexes the split result without bounds check; parts is built from line.split(',').map(...).collect() with no length guard",
+      "failure_mode": "a line without a comma produces parts.len() == 1; indexing parts[0] is valid but parts[1] at line 19 will panic with index out of bounds; any malformed input aborts the process",
+      "fix": "replace line.split(',').map(...).collect() into parts with line.split_once(',').ok_or(ParseError::Invalid)? and bind (_name, value_str) = ...; access only the two validated fields"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on any non-numeric value for the value field",
+      "failure_mode": "untrusted CSV content with non-numeric value (e.g., \"abc\") causes a process panic instead of returning a typed parse error that the caller can handle",
+      "fix": "use .parse::<u32>().map_err(|_| ParseError::InvalidValue { field: \"value\" })?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 silently truncates any u32 value above 65535 without error",
+      "failure_mode": "a valid u32 like 70000 parses successfully then silently truncates to 4464, corrupting the data with no indication to the caller that information was lost",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow { field: \"value\" }) to fail explicitly when the parsed value exceeds the domain type range"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_validation",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record has pub name: String — raw primitive String crosses the parse boundary with no validation, allowing callers to construct invalid domain states directly",
+      "failure_mode": "external code can create Record with empty name, overlong name, or otherwise invalid strings without any constraint enforcement; the domain type provides no invariants",
+      "fix": "make name private (name: String with a newtype GuardedName), provide a smart constructor ParseName(String) -> Result<GuardedName, NameError> that validates length/format, and expose only the validated type externally"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards allocates Vec<Record> with no domain cap on max rows, no try_reserve, and no bounded resource control — the input file size fully controls memory",
+      "failure_mode": "a malicious or accidental large CSV file (e.g., 10 GB) causes unbounded heap allocation and OOM, with no domain cap or graceful error",
+      "fix": "validate a trusted domain cap (e.g., const MAX_ROWS: usize = 1_000_000), create Vec::new(), call values.try_reserve(cap).map_err(|_| ParseError::Allocation)?, enforce count > MAX_ROWS check per row, and return ParseError::TooManyRows when exceeded"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_separation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "File I/O (fs::read_to_string), stdout logging (println!), CSV parsing, and domain Record construction are all fused into a single function",
+      "failure_mode": "the pure data-construction logic cannot be unit-tested without fixture files or mock filesystem; logging cannot be toggled; I/O failures cannot be differentiated from parse failures; no inversion of control is possible",
+      "fix": "split into (a) shell: read_file(path) -> Result<String, IoError>, (b) pure core: parse_records(text, max_rows) -> Result<Vec<Record>, ParseError> with no I/O, and (c) shell: orchestrate read + parse + log, returning Result<Vec<Record>, AppError>"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_shards throughput or latency on representative shard sizes",
+    "no profiler data shows hot path allocation profile (intermediate Vec<String> per line, String clones)",
+    "no allocation audit — intermediate Vec<String> per line via .collect() is unbounded heap traffic",
+    "no command evidence — cargo fmt --check, cargo clippy, cargo test, and cargo check were not executed (review-only mode, no production edits permitted)"
+  ],
+  "residual_risk": "Static review identified 8 blockers across panic surfaces (unwrap x2), unchecked indexing, lossy cast (as u16), hidden stdout I/O, unbounded allocation without try_reserve/domain cap, missing parse boundary validation, and fused shell/data logic. No commands were executed because this is a read-only review — production edits, test execution, and strict clippy gates must be run after repairs to confirm all violations are resolved. The code as-is will panic on any malformed input, any I/O failure, or any oversized file."
+}

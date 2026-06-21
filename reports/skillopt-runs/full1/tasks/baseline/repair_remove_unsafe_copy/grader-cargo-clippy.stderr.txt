@@ -1,0 +1,12 @@
+    Checking repair_remove_unsafe_copy v0.1.0 (/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_remove_unsafe_copy)
+error: slicing may panic
+ --> src/lib.rs:5:10
+  |
+5 |     Some(input[..len].to_vec())
+  |          ^^^^^^^^^^^^
+  |
+  = help: consider using `.get(..n)`or `.get_mut(..n)` instead
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#indexing_slicing
+  = note: requested on the command line with `-D clippy::indexing-slicing`
+
+error: could not compile `repair_remove_unsafe_copy` (lib) due to 1 previous error

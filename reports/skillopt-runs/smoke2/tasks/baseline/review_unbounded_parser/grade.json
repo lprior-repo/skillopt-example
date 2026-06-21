@@ -1,0 +1,19 @@
+{
+  "task_id": "review_unbounded_parser",
+  "kind": "review",
+  "bundle": "baseline",
+  "workdir": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke2/tasks/baseline/review_unbounded_parser",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": null,
+  "grade": {
+    "kind": "review",
+    "hard": 1.0,
+    "soft": 1.0,
+    "matched_groups": 4,
+    "total_groups": 4,
+    "missing_groups": [],
+    "json_valid": true,
+    "source_changed": false
+  }
+}

@@ -1,0 +1,22 @@
+Now I understand the issues. The tests expect:
+1. `summarize_metrics` returns `Result<Summary, SummaryError>`, not `Result<String, ...>`
+2. A `render_summary` function that doesn't exist
+3. All the Holzman absolute laws are violated in current code
+
+Let me apply the fix:
+All 6 tests pass. Let me run the remaining strict lint gates.
+All gates pass. Writing the required output.
+Let me simplify the unused name handling to match the SKILL.md canonical pattern:
+Repair complete. All 6 tests pass, formatting clean, strict clippy gates clean.
+
+**Changes made to `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary(Summary) -> String` function
+- Replaced `unwrap()` with `ok_or` / `map_err` typed error propagation
+- Replaced unchecked `total += value` with `checked_add` + `Overflow` error
+- Replaced unchecked `count += 1` with `checked_add` + `Overflow` error
+- Replaced `total / count` with `checked_div` + `Invalid` error
+- Replaced lossy `count as u32` / `count as u64` with `try_from` / `try_into`
+- Replaced `parts[1]` unchecked indexing with `split_once(',')` + `trim()`
+- Added empty-input guard returning `SummaryError::Empty`
+- Added invalid-line guard (no comma) returning `SummaryError::Invalid`

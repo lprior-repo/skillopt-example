@@ -1,0 +1,13 @@
+Now I have full context. The production code uses `unwrap()`, has no empty check, no max_items enforcement, and doesn't use `try_reserve`. Let me fix it according to the mandatory CSV parser patterns.
+All 4 tests pass. Let me run the strict clippy gate and verify no Holzman violations remain.
+Now writing the required output.
+Repair complete. Changes to `src/lib.rs`:
+
+- Replaced `input.split(',').map(...).unwrap().collect()` (unsafe unwrap, no bounds) with a for-loop over `split(',')` that:
+  - Rejects empty input → `ParseError::Empty`
+  - Uses `Vec::new()` + `try_reserve(max_items)` (no `Vec::with_capacity`)
+  - Checks `values.len() >= max_items` before each push → `ParseError::TooMany`
+  - Parses with `map_err` → `ParseError::Invalid`
+  - Rejects empty parts after trim as `ParseError::Invalid`
+
+All 4 behavior tests pass. Clippy clean. JSON output written to `repair-output.json`.

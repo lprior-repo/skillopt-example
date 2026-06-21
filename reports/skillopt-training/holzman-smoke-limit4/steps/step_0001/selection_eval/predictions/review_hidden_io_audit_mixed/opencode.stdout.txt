@@ -1,0 +1,17 @@
+Now I have all the source. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings** across the crate in `src/lib.rs`:
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | `no_forbidden_constructs` | 9 | `unwrap()` on `fs::read_to_string` — panics on missing files |
+| 2 | BLOCKER | `no_forbidden_constructs` | 13 | `unwrap()` on `parse()` — panics on non-numeric value |
+| 3 | BLOCKER | `no_unchecked_indexing` | 12 | `parts[0]` — index out of bounds on empty/malformed lines |
+| 4 | BLOCKER | `no_unchecked_indexing` | 13 | `parts[1]` — index out of bounds on lines with <2 fields |
+| 5 | BLOCKER | `no_lossy_conversions` | 13 | `as u16` — silently truncates values >65535 |
+| 6 | BLOCKER | `functional_core_shell_separation` | 12 | `println!` inside data-loading function |
+| 7 | WARNING | `no_intermediate_allocation` | 11 | `Vec<String>` collect per line is unnecessary allocation |
+| 8 | INFO | `missing_type_error` | 8 | Function returns `Vec` not `Result`, hiding all errors |
+
+**5 missing evidence** items: no benchmark, profiler, allocation audit, assembly verification, or command-evidence gate output.

@@ -1,0 +1,18 @@
+Now I have the full picture. The crate is a small `FrameWorkflow` type with boolean/status-string lifecycle and a `mark_sent` function — exactly the kind of "invalid state frame" that typestate discipline targets. Writing review output.
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**Summary of findings (9 total):**
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | make-illegal-states-unrepresentable | `src/lib.rs:3` |
+| 2 | BLOCKER | no-bool-lifecycle-flags | `src/lib.rs:4` |
+| 3 | BLOCKER | no-bool-lifecycle-flags | `src/lib.rs:5` |
+| 4 | BLOCKER | functional-core-pure-core | `src/lib.rs:9` |
+| 5 | BLOCKER | no-alloc-in-hot-path | `src/lib.rs:10` |
+| 6 | BLOCKER | parse-at-boundary | `src/lib.rs:1` |
+| 7 | WARNING | public-mutable-fields | `src/lib.rs:1` |
+| 8 | WARNING | no-tests | `src/lib.rs:1` |
+| 9 | INFO | missing-benchmark-evidence | `src/lib.rs:9` |
+
+**Root cause:** `FrameWorkflow` uses `String status` + two `bool` flags to encode a lifecycle. This allows illegal states (e.g. `is_sent=true` with `status="draft"`) that no runtime check can fully guard against. The fix is a single enum/typestate (`FrameStatus`) that makes illegal states unrepresentable.

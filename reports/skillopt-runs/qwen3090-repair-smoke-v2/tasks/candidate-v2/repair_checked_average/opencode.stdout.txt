@@ -1,0 +1,3 @@
+Now I'll fix the two issues: empty slice division by zero and unchecked overflow addition.
+The test expects overflow when the sum itself exceeds `u32::MAX`, not when the final average does. Let me use a `u32` accumulator with checked addition:
+Repair complete: `repair-output.json` written and `cargo test` passed (3/3 tests).

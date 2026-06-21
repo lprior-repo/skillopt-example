@@ -1,0 +1,25 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap() - replaced with map_err returning ParseError::Invalid",
+    "Empty input returns ParseError::Empty",
+    "Invalid parse returns ParseError::Invalid",
+    "TooMany items returns ParseError::TooMany when len > max_items",
+    "No unsafe, panic, todo, unimplemented, unreachable, assert in production code",
+    "No ignored fallible results - Result propagated via ? operator",
+    "Smallest source change to satisfy all 4 behavior tests",
+    "Pure core: parse_orders is deterministic with no I/O side effects"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "ParseError::Allocation variant exists but is unused; this is safe as it is part of the public API contract and may be needed if future capacity-guarantee semantics are added. No production unsafe, unwrap, or panic constructs remain."
+}

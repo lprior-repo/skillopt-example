@@ -1,0 +1,13 @@
+Now I see the issues. The code has: unchecked indexing (`parts[1]`), `unwrap()`, unchecked `+=`, no zero-division check, lossy `as` casts, no `split_once`, missing `Empty`/`Invalid`/`Overflow` handling, wrong return type, and missing `render_summary`. Let me fix all of it.
+All 6 tests pass. Now let me write the output JSON.
+Repair complete. All 6 tests pass. Summary of changes to `src/lib.rs`:
+
+**Violations fixed:**
+- Replaced `split(',')` + `collect` + `parts[1]` with `split_once(',')` (Holzman bounded extraction)
+- Removed `.unwrap()` on `.parse()` - replaced with `map_err(|_| SummaryError::Invalid)`
+- Replaced `total += value` with `checked_add` returning `SummaryError::Overflow`
+- Replaced `total / count` with `checked_div` (zero check via Empty guard)
+- Replaced lossy `as u32`/`as u64` casts with `u32::try_from(count)`/`u64::try_from(count)`
+- Changed return type from `Result<String>` to `Result<Summary>` to match test contract
+- Added missing `render_summary(Summary) -> String` function
+- Added `Empty` error for zero-count input

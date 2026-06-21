@@ -1,0 +1,107 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/baseline/review_async_cpu_mutex/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/baseline/review_async_cpu_mutex/.skill/holzman-rust/references/nasa-jpl-standards.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs / no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "shared.lock().unwrap() panics if the mutex is poisoned. This violates the zero-forbidden-constructs rule (no unwrap in production-reachable code).",
+      "failure_mode": "Poisoned mutex causes a panic, taking down the entire async task and potentially the runtime worker.",
+      "fix": "Use shared.lock().map_err(...) or match on the LockResult, propagating a typed error or handling poison gracefully."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "async_cpu_split",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "A 10,000,000-iteration CPU-heavy loop (push n*n) runs inside an async function while holding a Mutex. Tokio is for I/O concurrency; CPU-heavy loops on async workers block the reactor thread and starve other tasks.",
+      "failure_mode": "The async runtime worker thread is blocked for the duration of the loop plus the sleep, preventing progress of all other tasks scheduled on that worker. This is a liveness violation in any non-trivial Tokio runtime.",
+      "fix": "Move the CPU-bound work to a rayon thread pool (tokio::task::spawn_blocking or rayon::spawn) or a bounded CPU pool. Do not run tight CPU loops on async workers."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Concurrency is explicit / no_accidental_Arc_Mutex",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Arc<Mutex<Vec<u64>>> is used as the shared state pattern. The skill doctrine explicitly forbids accidental Arc<Mutex<T>> in favor of ownership transfer, message passing, atomics, sharding, or bounded lock-free structures.",
+      "failure_mode": "Mutex contention becomes a serialization bottleneck. All concurrent callers serialize on one lock, destroying the concurrency the async function is supposed to provide.",
+      "fix": "Use message passing (flume/async_channel) to send work to a dedicated worker, or use atomic operations (AtomicU64) with a lock-free append pattern, or shard the Vec and merge deterministically."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Power of Ten Rule 2 - fixed loop bounds",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "The for-loop iterates 10,000,000 times pushing squares. While this has a static bound, it is a hardcoded magic number with no documentation of why that bound exists, no parameterization for different workloads, and no bounded alternative.",
+      "failure_mode": "The bound is unproven in context - no spec or comment explains why 10M is correct, safe, or sufficient. Changing this number requires understanding the full system context.",
+      "fix": "Accept a bounded parameter (e.g., max_iterations: u64) validated at the function boundary, or use a const with a doc comment explaining the bound. Validate the caller-supplied value does not exceed a reasonable maximum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Power of Ten Rule 7 - checked returns",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "The function returns () but mutates shared state via Arc<Mutex<Vec<u64>>>. Vec::push can fail only if OOM; Vec::reserve (used internally by push) can also fail. The caller has no way to know if the operation completed.",
+      "failure_mode": "Silent partial completion: some elements are pushed before OOM, and the caller sees no error, leading to data inconsistency.",
+      "fix": "Return Result<(), AllocationError> or use Vec::try_reserve upfront before the loop so the operation is all-or-nothing, then return Ok(()) or a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_post_init_dynamic_allocation / allocation_budget",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "guard.push(n * n) performs 10,000,000 heap allocations (Vec reallocations) inside the loop. No pre-allocation, no capacity reservation, no allocation budget.",
+      "failure_mode": "O(n) reallocations cause memory fragmentation, allocator lock contention (if held during the loop), and unpredictable tail latency. Each reallocation copies the entire Vec so far.",
+      "fix": "Call guard.try_reserve(10_000_000) before the loop to pre-allocate, or use a known initial capacity. Return a typed error if reservation fails."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "async_cpu_split / await_holding_lock",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "The MutexGuard is held across sleep().await. While tokio::sync::Mutex is aware of async, std::sync::Mutex is a blocking mutex - .await while holding it is catastrophic for async runtimes.",
+      "failure_mode": "std::sync::Mutex::lock() blocks the OS thread. If the runtime worker is pinned to an OS thread, blocking it on sleep (even async sleep) while holding the mutex means no other task can acquire the lock AND that worker cannot process other async tasks. This deadlocks the worker.",
+      "fix": "Drop the MutexGuard before the await. Restructure: lock, push, drop guard, then sleep. Or use tokio::sync::Mutex if async-aware locking is required."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No rust-toolchain.toml file exists. The skill requires a checked-in rust-toolchain.toml with pinned dated nightly for any Rust work targeting Holzman compliance.",
+      "failure_mode": "Floating toolchain versions can introduce new warnings, changed lint behavior, or breaking changes in nightly features, undermining reproducibility and the zero-slippage gate.",
+      "fix": "Add rust-toolchain.toml with a pinned nightly date (e.g., nightly-2025-01-01), minimal profile, and required components."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "benchmark_proof",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for this async CPU-bound mutex function. The function performs 10M iterations with heap allocations and async sleep - a performance-sensitive pattern with no measured evidence.",
+      "failure_mode": "No one can verify whether this function meets latency, throughput, or allocation targets. Performance regressions are undetectable.",
+      "fix": "Add a named benchmark target (e.g., benches/process_bench.rs) measuring p50/p95/p99 latency, allocations, and throughput under concurrent access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mechanical_empathy_order / no_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (perf stat, cargo-asm, or similar) exists for the hot loop. The CPU-heavy computation inside a locked async context has not been profiled to confirm the bottleneck is the loop versus the lock or async machinery.",
+      "failure_mode": "Optimization decisions are based on guesses rather than measured bottlenecks, violating the mechanical empathy standard.",
+      "fix": "Run perf stat or equivalent on a representative workload to measure cycles, cache misses, and branches. Use cargo-asm to inspect the generated loop code."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmark target or benchmark binary exists for the process function",
+    "No profiler evidence (perf stat, cargo-asm, cargo llvm-lines) for the hot loop",
+    "No rust-toolchain.toml for pinned nightly toolchain",
+    "No assembly/IR evidence to verify loop vectorization or bounds-check elimination",
+    "No allocation profile showing per-call allocation count/bytes"
+  ],
+  "residual_risk": "The crate contains multiple BLOCKER-level Holzman Rust violations: unwrap on mutex lock (panic surface), CPU-heavy loop on async worker thread (liveness violation), std::sync::Mutex held across .await (deadlock potential), unbounded heap allocations inside the critical path, and absence of any benchmark/profiler/toolchain evidence. This code cannot be accepted under Holzman Rust policy without all BLOCKERs resolved."
+}

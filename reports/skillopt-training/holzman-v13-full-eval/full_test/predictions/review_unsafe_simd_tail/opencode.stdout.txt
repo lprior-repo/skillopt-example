@@ -1,0 +1,10 @@
+Review complete. Wrote `review-output.json` with 6 BLOCKER findings:
+
+1. **No production unsafe** — `unsafe` block in `lib.rs:3` violates absolute laws
+2. **SIMD without scalar fallback/evidence** — no fallback, no target-feature gate, no tests, no benchmarks
+3. **Unchecked slice access** — `_mm_loadu_ps` reads 16 bytes per iteration without bounds check; UB when `len % 4 != 0`
+4. **No perf claim evidence** — no benchmark, baseline, or profiler data
+5. **No tests or command evidence** — zero test coverage, no gate commands run
+6. **Missing target_feature gate** — only `cfg(target_arch)` but no `target_feature(enable="sse")` annotation
+
+Residual risk is CRITICAL: the function has UB on non-multiple-of-4 inputs, no safe path, and zero evidence. Must not ship.

@@ -1,0 +1,9 @@
+Now I understand the crate. The `parse_tokens` function has multiple issues: `unwrap()` on parse, no empty input check, no `max_items` enforcement. Let me write the fix following the Mandatory Repair Patterns.
+All 4 tests pass. Now writing the required output file.
+Repaired. All 4 tests pass. Changes to `src/lib.rs`:
+
+- **Removed** `unwrap()` on `.parse::<u16>()` — replaced with `map_err(|_| ParseError::Invalid)`
+- **Added** empty-input guard — returns `ParseError::Empty` for blank/whitespace-only input
+- **Added** `max_items` enforcement — returns `ParseError::TooMany` when parsed count exceeds limit
+- **Added** `try_reserve` with `ParseError::Allocation` for bounded allocation
+- **Added** filter to skip whitespace-only split parts

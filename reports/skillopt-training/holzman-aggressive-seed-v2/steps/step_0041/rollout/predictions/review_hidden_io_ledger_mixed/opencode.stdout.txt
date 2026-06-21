@@ -1,0 +1,16 @@
+Now I have all the source. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**14 findings** across `src/lib.rs` (23 lines):
+
+**10 BLOCKERs:**
+- `unwrap()` on I/O (line 9) and parse (line 19) — panics on any failure
+- Unchecked indexing `parts[0]` (line 16) and `parts[1]` (line 19) — panic on malformed input
+- `as u16` lossy narrowing cast (line 19) — silent truncation above 65535
+- `split(',')` + `collect()` + indexing (line 12) — unnecessary heap alloc per line; should use `split_once`
+- `println!` side effect (line 16) — breaks deterministic purity
+- Mixed I/O/logging/parsing in single function (line 8) — no functional core/shell split
+- No typed error taxonomy — all failures collapse to panic
+
+**4 WARNINGs:**
+- No benchmarks, profiler evidence, allocation audits, test suite, or command evidence (fmt/clippy/test)

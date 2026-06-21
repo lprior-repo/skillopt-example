@@ -1,0 +1,137 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permissions, encoding). Absolute law forbids unwrap.",
+      "failure_mode": "Missing or unreadable session file aborts the entire process instead of returning a typed I/O error.",
+      "fix": "Return a Result<Vec<Record>, IoError> and propagate with ? instead of unwrap()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "File I/O is fused into load_sessions which is called by name as if it were pure data loading. The shell (I/O) is not separated from parsing logic.",
+      "failure_mode": "No abstraction boundary exists; caller cannot supply test data, mock the file system, or compose with other data sources.",
+      "fix": "Split into a pure parse_sessions(&[RecordLine]) -> Result<Vec<Record>, ParseError> in the functional core and a shell function that reads the file and feeds lines to the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is hidden I/O (stdout logging) inside parsing logic. Functional Core must contain no I/O.",
+      "failure_mode": "Parsing logic is coupled to stdout; breaks determinism, prevents testing, and leaks side effects into pure data transformation.",
+      "fix": "Remove println! entirely. If logging is needed, pass a logging callback or event channel from the imperative shell."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] and parts[1] are unchecked Vec index accesses. A line with fewer than 2 comma-separated fields panics with index-out-of-bounds.",
+      "failure_mode": "Malformed CSV input causes a panic crash instead of returning a typed Invalid/TooFewFields error.",
+      "fix": "Use line.split_once(',').ok_or(ParseError::Invalid)? to get (_name, value_str), eliminating all index access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on any non-numeric value. Absolute law forbids unwrap.",
+      "failure_mode": "A single non-numeric field in the CSV aborts the entire batch load instead of returning a typed ParseError.",
+      "fix": "Use .parse::<u32>().map_err(|_| ParseError::InvalidValue)? to return a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(u32 as u16) is a lossy cast. Values in range 0..=65535 are silently truncated to 0..=65535, losing data for any value > 65535.",
+      "failure_mode": "A valid u32 value of 70000 becomes 4464 without any warning, corrupting domain data silently.",
+      "fix": "Use u16::try_from(value).map_err(|_| ParseError::Overflow)? to reject out-of-range values with a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>() into Record.value: u16 involves width narrowing without checked conversion or domain cap validation.",
+      "failure_mode": "Wide integer input silently narrows to a smaller type, violating Make Illegal States Unrepresentable.",
+      "fix": "Parse directly to u16 with .parse::<u16>().map_err(|_| ParseError::Invalid)?, or use u16::try_from after parse."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No try_reserve or domain cap on the Vec before filling. Arbitrary input can cause unbounded heap allocation.",
+      "failure_mode": "A CSV file with millions of lines triggers OOM allocation with no graceful error.",
+      "fix": "Accept an optional max_items parameter; after validation call values.try_reserve(max_items).map_err(|_| ParseError::Allocation)? before the loop."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Raw primitives (String path, String name, numeric field) cross the parse boundary without fallible smart constructors. The function accepts unvalidated input and returns domain structs directly.",
+      "failure_mode": "Callers can construct invalid domain states (negative values, empty names, over-range integers) without any validation at the parse boundary.",
+      "fix": "Define a ParseRecord function with fn parse_record(line: &str, max_items: usize) -> Result<Record, ParseError> that validates all inputs with typed errors before constructing Record."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_driven_ddd",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record.name is a raw String with no validation or domain semantics. No newtype for the name field.",
+      "failure_mode": "Empty strings, whitespace-only names, or arbitrary-length strings are all valid, breaking domain invariants.",
+      "fix": "Introduce a newtype Name(String) with a smart constructor that validates non-empty, trimmed input, returning a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] used in println! is also an unchecked index that panics if line has zero fields.",
+      "failure_mode": "A blank line in the CSV causes a panic before any error can be returned.",
+      "fix": "Use split_once and pattern matching to extract fields without indexing."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_sessions. No allocation baseline for the Vec/collect pattern.",
+      "failure_mode": "Cannot verify whether the unbounded collect-and-reserve pattern is acceptable for the workload size.",
+      "fix": "Add a benchmark measuring allocations and throughput for representative input sizes; add try_reserve with domain cap."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test file, no behavior tests, no verification that the module compiles with strict lint gates.",
+      "failure_mode": "Unknown whether the crate passes cargo fmt, cargo clippy -- -D warnings, or any correctness tests.",
+      "fix": "Add src/tests.rs or tests/ directory with behavior tests covering valid input, malformed CSV, missing file, and large input scenarios."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions allocation pattern",
+    "no profiler data for any performance claim",
+    "no allocation baseline (Vec::with_capacity or try_reserve evidence)",
+    "no command evidence (cargo fmt --check, cargo clippy, cargo test) was run",
+    "no test files found in the task crate",
+    "no second-ring evidence (Kani, Miri, proptest, property tests)"
+  ],
+  "residual_risk": "Multiple absolute law violations remain unaddressed: panic surfaces (unwrap on I/O and parse), hidden I/O (fs::read_to_string and println! in parsing logic), unchecked indexing (parts[0], parts[1]), lossy cast (u32 as u16), no bounded allocation, no typed error taxonomy, no parse boundary with smart constructors, and raw String for domain name. The crate cannot pass strict lint gates (clippy -- -D panic_in_result_fn -D indexing_slicing -D as_conversions) without substantive refactoring."
+}

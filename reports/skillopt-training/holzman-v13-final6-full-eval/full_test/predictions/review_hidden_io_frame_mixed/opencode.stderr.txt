@@ -1,0 +1,4 @@
+[91m[1mError: [0mUnexpected error
+
+Failed query: insert into "project" ("id", "worktree", "vcs", "name", "icon_url", "icon_url_override", "icon_color", "time_created", "time_updated", "time_initialized", "sandboxes", "commands") values (?, ?, ?, null, null, null, null, ?, ?, null, ?, null) on conflict ("project"."id") do update set "worktree" = ?, "vcs" = ?, "time_updated" = ?, "sandboxes" = ?
+params: global,/,,1778864716944,1781989415604,[],/,,1781989415604,[]

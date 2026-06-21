@@ -1,0 +1,19 @@
+{
+  "reasoning": "The agent failed to use checked_div for division operations and used 'as' casts instead of try_from for width/type conversions. These are explicit violations of the Holzman safety contract. The edits reinforce these specific requirements in the Core Contract and Repair Mode sections to prevent recurrence.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check and error handling), and `try_from` for all casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "source_type": "failure",
+      "support_count": 1
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Ensure all division operations use `checked_div` with proper error propagation, and all type conversions use `try_from` instead of `as`.",
+      "source_type": "failure",
+      "support_count": 1
+    }
+  ]
+}

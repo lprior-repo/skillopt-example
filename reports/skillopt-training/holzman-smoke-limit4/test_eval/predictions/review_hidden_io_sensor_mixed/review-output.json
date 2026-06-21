@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, oversized file)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, io::Error> and propagate with ? or explicit map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value or out-of-range value",
+      "failure_mode": "malformed CSV line aborts the entire load instead of reporting which record is invalid",
+      "fix": "use try_fold over lines, parse with map_err returning a typed ParseError, and include line/field context"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "as u16 is an unchecked lossy cast from u32 that silently truncates values > 65535",
+      "failure_mode": "a valid u32 value in the CSV silently wraps to an incorrect u16, corrupting data without any error signal",
+      "fix": "use u32::try_into().map_err(...) or u16::try_from() to return a typed error on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden side effect inside a pure-looking data parser",
+      "failure_mode": "I/O is embedded in the core parsing logic, making the function non-deterministic, untestable in isolation, and producing stdout pollution when used as a library",
+      "fix": "remove println!; if telemetry is needed, return a separate metadata vector or pass an explicit sink callback in the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts[0] is unchecked indexing into a Vec that may have fewer than 1 element",
+      "failure_mode": "a blank line or single-field CSV line panics on index-out-of-bounds",
+      "fix": "use split_once(',') and pattern-match the two-field result, or guard with parts.get(0).ok_or(...)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "parts[1] is unchecked indexing into a Vec that may have fewer than 2 elements",
+      "failure_mode": "a line missing the second CSV field panics on index-out-of-bounds",
+      "fix": "use split_once(',') and destructure the two-field result explicitly"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "Collecting all parts into Vec<String> with .collect() allocates heap memory for every line",
+      "failure_mode": "high line counts cause excessive heap allocations and GC pressure; each line creates multiple String allocations for trimmed copies",
+      "fix": "use split_once(',') to get two &str fragments, trim them in place, and avoid Vec/String collection entirely"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function returns Vec<Record> with no try_reserve or capacity hint",
+      "failure_mode": "frequent reallocations as the vector grows, especially bad for large sensor files",
+      "fix": "accept a line count hint or use try_reserve before collecting; or return Result with capacity estimation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "I/O (fs::read_to_string), parsing, logging, and type conversion are all mixed into a single function",
+      "failure_mode": "violates functional core / imperative shell; the pure parsing logic cannot be unit-tested without a real file on disk; side effects are inseparable from computation",
+      "fix": "split into (a) shell: fn load_sensors(path: &str) -> Result<Vec<Record>, Error> that reads and delegates, and (b) core: fn parse_records(lines: impl IntoIterator<Item=&str>) -> Result<Vec<Record>, ParseError> that is pure and testable"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated or implied performance claim",
+    "no profiler data (flamegraph, perf record) for allocation hotspots",
+    "no allocation tracking (e.g., mimalloc stats, jemalloc profiling) for the parsing pipeline",
+    "no second-ring evidence: no Kani proof, property tests, or fuzzing for the parse boundary",
+    "no command evidence: cargo test, cargo fmt, cargo clippy not executed"
+  ],
+  "residual_risk": "static review only; no commands run. All 6 BLOCKER findings involve constructs that will panic or silently corrupt data on untrusted input. The function as written cannot safely handle any malformed CSV, missing file, or out-of-range value. Functional core/shell separation is absent, making the parsing logic untestable in isolation."
+}

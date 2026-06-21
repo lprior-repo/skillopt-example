@@ -1,0 +1,21 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**10 findings** across the single source file `src/lib.rs`:
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | zero_forbidden_constructs | 9 | `fs::read_to_string().unwrap()` |
+| 2 | BLOCKER | zero_forbidden_constructs | 16 | `println!` side effect + unchecked `parts[0]` |
+| 3 | BLOCKER | zero_forbidden_constructs | 19 | `parts[1].parse().unwrap()` — unchecked index + unwrap |
+| 4 | BLOCKER | arithmetic_safety | 19 | lossy `as u16` cast on u32 parse result |
+| 5 | BLOCKER | parsing_and_access | 12 | `split+collect` instead of `split_once`; unchecked indexing |
+| 6 | BLOCKER | functional_core_shell | 8 | I/O + parsing + logging mixed in one function, no Result type |
+| 7 | BLOCKER | allocation_safety | 8 | no `try_reserve` for Vec growth |
+| 8 | MAJOR | type_discipline | 4 | `name: String` raw type instead of domain newtype |
+| 9 | MAJOR | error_taxonomy | 8 | no typed domain error enum |
+| 10 | MAJOR | performance_evidence | 1 | no benchmark/profiler/allocation evidence |
+
+**5 missing evidence** items flagged (benchmarks, profiler, allocation tracing, test output, clippy).
+
+All violations are BLOCKER/MAJOR — the crate has no error surface, panics on any bad input, and hides I/O side effects.

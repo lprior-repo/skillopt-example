@@ -1,0 +1,7 @@
+Now I have the full picture. Let me write the review.
+Review complete. Written to `review-output.json` with 10 findings:
+
+- **7 BLOCKERs**: typestate state machine (enum replaces bools/String), status as String, bool lifecycle fields, Option invalid-state combinations, ID newtype missing, parse boundary absent, mark_sent has no error path, public fields break encapsulation
+- **2 WARNINGs**: missing benchmark evidence, missing command/test evidence
+
+All findings include severity, rule, file, numeric line, problem, failure_mode, and fix. Residual risk documents the foundational typestate failure.

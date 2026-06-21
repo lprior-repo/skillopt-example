@@ -1,0 +1,134 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing file, permission errors, or invalid UTF-8",
+      "failure_mode": "entire program aborts with panic when the data file is absent, unreadable, or contains malformed UTF-8, instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, IoError> and propagate with ? or explicit map_err for typed I/O failure"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) performs console I/O inside the parsing/mapping closure",
+      "failure_mode": "parsing logic is no longer pure or deterministic; output ordering affects behavior, tests become order-dependent, and the shell/functional boundary is violated",
+      "fix": "move all logging/metrics to the imperative shell layer; the parsing closure must be a pure function with no I/O side effects"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses index 0 without bounds validation on split result",
+      "failure_mode": "malformed line with zero commas panics via IndexOut ofBounds instead of returning a typed parse error",
+      "fix": "use split_once(',') and pattern match on (name, value_str) to avoid indexing entirely"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses index 1 without bounds validation on split result",
+      "failure_mode": "malformed line with only one comma (trailing comma, no value) panics via IndexOutOfBoundsException instead of returning a typed parse error",
+      "fix": "use split_once(',') and pattern match to get the value side; no indexing needed"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value strings",
+      "failure_mode": "any non-integer field value (e.g. \"abc\", \"3.14\", empty) causes a panic rather than returning a typed ParseError",
+      "fix": "return Result and use .map_err(|e| ParseError::InvalidValue)? to convert parse failures into typed errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_as_conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() as u16 performs a lossy cast from u32 to u16",
+      "failure_mode": "values in range 65536..=4294967295 silently truncate to u16 range, corrupting data without any error or warning; a value like 70000 becomes 4463",
+      "fix": "use u16::try_from(parsed_u32) or parse directly as u16: .parse::<u16>().map_err(...)? to fail on out-of-range values instead of silently truncating"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell_violation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets fuses file I/O (fs::read_to_string), logging (println!), parsing, validation, and collection into a single function with no separation of concerns",
+      "failure_mode": "parsing logic cannot be unit-tested in isolation; I/O failures are indistinguishable from parse errors; the function is not reusable in contexts where input comes from a different source",
+      "fix": "split into (1) a pure parse_packet(line: &str) -> Result<Record, ParseError> for core logic and (2) a shell function that handles file I/O, delegates to parse_packet, and handles typed errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no Result type; all failures are expressed through panics rather than typed errors",
+      "failure_mode": "callers cannot distinguish between file-not-found, parse-invalid, parse-out-of-range, and other error classes; no structured error recovery is possible",
+      "fix": "define a ParseError enum with variants (e.g., IoError, EmptyLine, InvalidName, InvalidValue, Overflow) and return Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unbounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "no max_items cap, no try_reserve, and no bound on the number of lines or per-line Vec allocations",
+      "failure_mode": "a large or adversarial file can trigger unbounded memory allocation leading to OOM or denial of service with no cap enforcement",
+      "fix": "add a max_items parameter, validate lines against it before allocation, create Vec::new() with try_reserve(max_items).map_err(|_| ParseError::Allocation)?, and enforce the cap during iteration"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "raw primitive String from file I/O crosses the parse boundary directly into Record construction without fallible smart constructor validation",
+      "failure_mode": "callers can construct invalid domain states (out-of-range values, empty names, non-numeric content) because the parse boundary has no validation gate",
+      "fix": "create a ParseError enum and a parse_record(line: &str) -> Result<Record, ParseError> smart constructor that validates name non-emptiness and value range before constructing Record"
+    },
+    {
+      "rule": "use_split_once_for_one_separator",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "line.split(',').map(...).collect() allocates a full Vec for a two-field CSV grammar",
+      "failure_mode": "unnecessary intermediate allocation per line; also silently accepts lines with more than one comma, silently ignoring extra fields",
+      "fix": "use line.split_once(',').ok_or(ParseError::Invalid) to get (name, value_str) directly with a single allocation"
+    },
+    {
+      "rule": "no_intermediate_allocation_per_line",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts: Vec<String> allocates a new Vec and clones every field per line",
+      "failure_mode": "quadratic allocation pattern for large files; each line creates two String allocations and one Vec allocation",
+      "fix": "use split_once(',') to get &str parts and parse directly without intermediate Vec or String allocations"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "no benchmark, profiler, or allocation evidence exists for any performance claim about load_packets throughput or memory usage",
+      "failure_mode": "performance characteristics are unknown; claims about speed, memory, or scalability cannot be verified or regressed against",
+      "fix": "add a criterion or divan benchmark for load_packets with a realistic file, report baseline throughput and allocation count, and set a regression threshold"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_packets throughput or allocation behavior",
+    "no profiler data exists to identify hot paths",
+    "no allocation tracking evidence (e.g., mimalloc stats, jemalloc profiling, or cargo-geiger)",
+    "no second-ring evidence for any performance or safety claims",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy, or cargo test were not run"
+  ],
+  "residual_risk": "Static review identified 12 findings including 10 blockers: multiple panic surfaces (unwrap on I/O, parse, and indexing), lossy as conversion silently truncating values, hidden console I/O in pure parsing logic, fused shell/core violating functional boundaries, no typed error taxonomy, no resource bounds or try_reserve, and missing parse boundary validation. All unwrap/expect/panic surfaces must be replaced with typed Result propagation before any delivery. The function as written will abort on any malformed input, missing file, or out-of-range value. No commands were executed; verification gate (cargo fmt, check, clippy, test) must be run to confirm compilation state."
+}

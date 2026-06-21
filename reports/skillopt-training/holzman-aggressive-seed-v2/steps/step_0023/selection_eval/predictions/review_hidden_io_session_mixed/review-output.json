@@ -1,0 +1,108 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, etc.)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, std::io::Error> (or a domain error enum) and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on invalid numeric input",
+      "failure_mode": "malformed CSV line with non-numeric second field causes panic instead of returning a parse error",
+      "fix": "Use ? or map_err to propagate ParseError; return Result<Vec<Record>, E> from the function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy width-reducing cast from u32 to u16; values > 65535 silently truncate",
+      "failure_mode": "out-of-range parsed values wrap around silently, producing invalid domain data",
+      "fix": "Use u16::try_from(parsed) and propagate the error via ? or map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the Vec by index without bounds checking",
+      "failure_mode": "empty or whitespace-only lines produce an empty parts Vec; indexing panics at runtime",
+      "fix": "Use split_once(',') and handle the None case; skip or error on malformed lines"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses the Vec by index without bounds checking",
+      "failure_mode": "lines with only one comma-delimited field (missing value) panic at runtime",
+      "fix": "Use split_once(',') to get exactly two fields and handle the missing-second-field case"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_required",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates a full Vec for a two-field CSV record",
+      "failure_mode": "unnecessary heap allocation and iteration; HOLzman rule mandates split_once for first-delimiter extraction",
+      "fix": "Replace with line.split_once(',') and handle the (name, value) tuple directly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string), logging (println), and parsing logic in one function",
+      "failure_mode": "impossible to unit-test parsing without mocking filesystem; println side effect cannot be suppressed in tests; violates pure core / imperative shell boundary",
+      "fix": "Extract a pure parse_record: &str -> Result<Record, ParseError> for the core; keep the shell function for fs::read_to_string and println at the boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side effect inside a data-parsing pipeline",
+      "failure_mode": "logging leaks into the pure calculation layer; cannot be tested or suppressed; breaks deterministic core",
+      "fix": "Remove println from the pure function; if logging is needed, return a log event alongside the record or handle it in the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record has public fields (pub name: String, pub value: u16) allowing construction of invalid state outside the module",
+      "failure_mode": "callers can create Record with empty name or out-of-range value without going through validation",
+      "fix": "Make fields private and provide a constructor or builder that enforces invariants, or use newtypes for name (e.g., struct Name(String)) with validation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "return_result_not_vec",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> instead of Result<Vec<Record>, E>, swallowing all per-line parse failures",
+      "failure_mode": "a single malformed line would panic (via unwrap) rather than failing the entire load with a typed error describing which line and why",
+      "fix": "Change signature to load_sessions(path: &str) -> Result<Vec<Record>, SessionLoadError> where SessionLoadError wraps IoError and ParseError"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions performance (CSV parsing throughput)",
+    "no profiler data to confirm this hot path or any other is actually hot",
+    "no allocation analysis (no measured per-record allocation budget)",
+    "no second-ring review (black-hat review, contract verification, or proof artifacts absent)",
+    "no command evidence (cargo fmt, cargo test, cargo clippy not run)"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has 10 blocker-level Holzman violations spanning unwrap, unchecked indexing, lossy cast, split misuse, functional core violation, and missing error propagation. Every violation is independently gradable with concrete failure modes. The code must be fully rewritten to return Result types, use split_once, eliminate unwrap/as, separate pure parsing from I/O/shell, and add invariant enforcement before any delivery gate."
+}

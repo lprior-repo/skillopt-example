@@ -1,0 +1,13 @@
+Now I see the issues. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function that doesn't exist. The current code has `unwrap()`, no error handling, and wrong return type.
+All 6 tests pass. Now writing the output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Changed return type** of `summarize_metrics` from `Result<String, SummaryError>` to `Result<Summary, SummaryError>` to match test contract
+2. **Added `render_summary`** function that formats a `Summary` into the expected string
+3. **Replaced `.unwrap()`** with `.map_err()` for parse failures → `SummaryError::Invalid`
+4. **Added `checked_add`** for overflow detection → `SummaryError::Overflow`
+5. **Replaced `split(',')` + Vec allocation** with `split_once(',')` for parse-don't-validate
+6. **Added empty-input check** → `SummaryError::Empty`
+7. **Reordered overflow** before `too_many` check so overflow is caught even if it occurs past max_rows
+
+All 6 behavior tests pass. Valid JSON written to `repair-output.json`.

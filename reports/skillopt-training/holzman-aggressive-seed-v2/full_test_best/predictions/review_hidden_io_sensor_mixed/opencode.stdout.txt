@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**12 findings** (10 BLOCKER, 2 MAJOR) across `src/lib.rs`:
+
+| Rule | Severity | Lines |
+|---|---|---|
+| `zero_forbidden_constructs` | BLOCKER x3 | 9, 19 |
+| `parsing_and_access` | BLOCKER x3 | 12, 16, 19 |
+| `functional_core_imperative_shell` | BLOCKER x2 | 8, 16 |
+| `domain_contracts` | BLOCKER | 3 |
+| `error_taxonomy` | MAJOR | 8 |
+| `allocation_discipline` | MAJOR | 12 |
+| `performance_evidence` | MAJOR | 8 |
+
+Key violations: `unwrap()` on I/O and parse, lossy `as u16` cast, unchecked `parts[0]`/`parts[1]` indexing, `println!` side effect in core, no Result/error type, raw domain fields without invariants, and no benchmarks.
+
+**5 missing evidence** items: no benchmark, profiler, allocation tracking, second-ring tests, or CLI integration evidence.

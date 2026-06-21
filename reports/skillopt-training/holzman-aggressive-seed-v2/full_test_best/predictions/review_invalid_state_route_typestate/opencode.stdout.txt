@@ -1,0 +1,8 @@
+Now I have all the context needed. Let me write the review.
+Review complete. Written valid JSON to `review-output.json` with 9 findings:
+
+- **4 BLOCKERs**: illegal states representable (`pub` struct), bool/string lifecycle flags instead of typestate enum, `mark_sent` with no precondition guards, `sent_at_epoch_ms` invariant broken
+- **2 MAJORs**: no functional-core separation, no behavioral tests, missing typestate enum
+- **3 MINORs**: missing benchmark/profiler/allocation/command evidence
+
+Residual risk: **High** — the domain model has no typestate, no invariant enforcement, and no tests.

@@ -1,0 +1,102 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "performance-folklore-rayon-tiny-workload",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "TODO: use Rayon and SmallVec because it will be faster.",
+      "problem": "TODO asserts Rayon will be faster for a fixed 4-element workload. Rayon has thread-pool dispatch overhead that is orders of magnitude larger than processing 4 bytes. This is performance folklore, not measured fact.",
+      "failure_mode": "Adding Rayon would introduce measurable slowdown for this workload while increasing code complexity, dependencies, and binary size with zero throughput gain.",
+      "fix": "Remove the TODO entirely. Rayon is never appropriate for 4 independent elements. If allocation reduction is the goal, use a fixed-size array or caller-owned buffer instead."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unnecessary-heap-allocation-tiny-fixed-output",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "Returns Vec for a fixed-size output of exactly 4 elements. The caller always gets exactly 4 results matching the 4 input bytes. Heap allocation for 4 &str pointers is wasteful.",
+      "failure_mode": "Every call to classify_four allocates a heap Vec, triggers potential malloc/free overhead, and generates GC pressure for data that fits in a stack array. For hot-path code processing many 4-byte inputs, this allocation dominates total cost.",
+      "fix": "Return [Option<&'static str>; 4] or use a caller-owned output buffer pattern (e.g., fn classify_four(bytes: &[u8; 4], out: &mut [&'static str; 4])). If the function must always return 4 valid entries, consider returning a struct with a fixed-size array or using SmallVec<[&'static str; 4]> only if benchmarked evidence shows benefit for the expected distribution."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-benchmark-baseline-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "TODO: use Rayon and SmallVec because it will be faster.",
+      "problem": "The TODO makes a performance claim without any benchmark, baseline command, baseline number, target hardware, or variance data. No benchmark directory or cargo bench configuration exists in the crate.",
+      "failure_mode": "Optimizing without measurement leads to anti-performance. Any change would be based on unverified folklore rather than measured bottleneck data.",
+      "fix": "Remove the TODO. Before any optimization, add a criterion or similarly rigorous benchmark measuring the current implementation, establish a baseline, then measure any proposed change against it with workload specification and regression threshold."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "No profiler evidence exists to identify the actual bottleneck. The TODO assumes Rayon/SmallVec would help without profiling data showing where time is spent.",
+      "failure_mode": "Misallocation of optimization effort on non-bottleneck code paths.",
+      "fix": "Run perf, flamegraph, or similar profiler on realistic workload before optimizing. For a 4-byte classify function, profiling would likely show allocation overhead or cache effects dominate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "No allocation tracking evidence (e.g., alloc_counter, dlmalloc stats, or criterion allocator benchmark) exists to confirm whether Vec allocation is the actual performance problem.",
+      "failure_mode": "Assuming allocation is the bottleneck without evidence may lead to suboptimal optimization choices.",
+      "fix": "Add allocator-level measurement or use criterion with allocator tracking to quantify allocation cost before switching data structures."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-output-buffer-pattern",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "The function owns its output via Vec allocation rather than using borrowed data or caller-owned buffers. The core calculation is pure and deterministic but forces heap allocation on the caller.",
+      "failure_mode": "Caller cannot reuse output storage across calls, forcing repeated allocations for what is a pure function with deterministic output size.",
+      "fix": "Adopt caller-owned buffer pattern: fn classify_four(bytes: &[u8; 4], out: &mut [Option<&'static str>; 4]) -> Result<(), Error> or return a fixed-size array type. This aligns with functional-core performance defaults for borrowed data and caller-owned buffers."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-command-truth",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "No cargo bench or benchmark command exists in the crate. The crate has no benches/ directory, no [dev-dependencies] for criterion, and no benchmark binary.",
+      "failure_mode": "No verifiable command-truth evidence exists for any performance claim about this function.",
+      "fix": "Add a benches/ directory with criterion benchmarks establishing baseline performance before any optimization work. The review cannot verify any performance claim without this."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-try-reserve-bounds",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "bytes.iter().map(...).collect()",
+      "problem": "Uses collect() which may reallocate. While the size is known (4), collect() does not use try_reserve with a domain cap.",
+      "failure_mode": "Potential extra allocation if Vec grows beyond initial capacity during iteration.",
+      "fix": "If Vec is retained as return type, pre-allocate with Vec::with_capacity(4) or better yet use a fixed-size array return type to eliminate allocation entirely."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim in the TODO",
+    "no profiler evidence identifying actual bottleneck",
+    "no allocation tracking evidence for Vec overhead",
+    "no baseline command or baseline number for the performance claim",
+    "no target hardware specification for performance claims",
+    "no second-ring evidence (assembly, SBOM, release provenance) for any optimization claim",
+    "no regression threshold defined",
+    "no benches/ directory or criterion dependency in Cargo.toml"
+  ],
+  "residual_risk": "Static review only with no commands run and no benchmark/profiler evidence. The function compiles cleanly with zero forbidden constructs. The primary risk is following the TODO to add Rayon (measurable slowdown for 4 elements) or SmallVec (unproven benefit) without measurement. The most impactful fix—replacing Vec return with a fixed-size array or caller-owned buffer—can be implemented safely without benchmarks, but optimization decisions should be guided by profiling and benchmark data before implementation."
+}

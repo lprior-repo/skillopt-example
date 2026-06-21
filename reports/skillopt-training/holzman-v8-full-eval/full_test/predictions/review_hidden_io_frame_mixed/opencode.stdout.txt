@@ -1,0 +1,17 @@
+Now I have all the context needed. Let me write the review.
+Review complete. Wrote `review-output.json` with 10 BLOCKER findings across `src/lib.rs`:
+
+| Rule | Line | Issue |
+|---|---|---|
+| zero_forbidden_constructs | 9 | `fs::read_to_string().unwrap()` — I/O panic |
+| zero_forbidden_constructs | 19 | `parse().unwrap()` — parse panic |
+| zero_forbidden_constructs | 19 | `as u16` lossy cast — silent truncation |
+| bounded_resource_policy | 12 | Unbounded `collect::<Vec<String>>` — OOM risk |
+| functional_core_domain | 16 | `println!` hidden I/O side effect |
+| zero_forbidden_constructs | 18 | `parts[0]` unchecked index |
+| zero_forbidden_constructs | 19 | `parts[1]` unchecked index |
+| domain_modeling_rules | 3 | Raw `String`/`u16` — no newtypes or smart constructors |
+| functional_core_domain | 8 | I/O + parsing + logging + collection fused — no separation |
+| hardening_input_validation | 8 | No path validation — traversal attack surface |
+
+5 missing evidence items (no benchmarks, profiler data, allocation budgets, or command evidence). Residual risk: all panics are production-blockers under Holzman doctrine.

@@ -1,0 +1,136 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-hidden-io-in-pure-logic",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics has a pure-parsing signature (takes &str, returns Vec<Record>) but performs file I/O via fs::read_to_string on line 9. I/O is hidden inside what should be a calculation function.",
+      "failure_mode": "Caller cannot reason about side effects; function cannot be composed, tested deterministically, or used in contexts without a filesystem. Violates Functional Core / Imperative Shell.",
+      "fix": "Split into two functions: a shell function that performs fs::read_to_string and passes the string to a pure parse_metrics(&str) -> Result<Vec<Record>, ParseError> calculation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-panic-surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on Result panics on I/O error (permission denied, missing file, etc.).",
+      "failure_mode": "Untrusted or hostile file paths cause process abort instead of returning a typed error the caller can handle gracefully.",
+      "fix": "Return Result<Vec<Record>, MetricError> and use .map_err(|e| MetricError::Io(e)) or ? operator."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-hidden-io-in-pure-logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — stdout I/O inside parsing logic. This is a side effect fused into domain parsing.",
+      "failure_mode": "Parsing function produces observable side effects, making it non-deterministic from an external observer perspective and impossible to test without capturing stdout. Logging belongs in the shell, not the core.",
+      "fix": "Remove println! entirely. If metrics/logging is needed, return a structured result that the shell can log."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-panic-surfaces",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on parse Result panics on invalid numeric input.",
+      "failure_mode": "Malformed CSV data (non-numeric value in second field) causes process abort instead of returning a typed parse error.",
+      "fix": "Use .map_err(|e| MetricError::Parse(field, e)) or similar typed error, then convert with checked u32->u16."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lossy-casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(...) as u16 — lossy narrowing cast from u32 to u16. Values >65535 silently truncate.",
+      "failure_mode": "A value of 70000 becomes 4464 (70000 mod 65536). Data corruption with no warning, producing silently incorrect domain values.",
+      "fix": "Use u32::try_from(parsed).map_err(|_| MetricError::Overflow(field))? and then u16::try_from().map_err(|_| MetricError::OutOfRange(field))?, or parse directly as u16: parts[1].trim().parse::<u16>().map_err(|e| MetricError::Parse(field, e))."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-panic-surfaces",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] — unchecked indexing into Vec from split. If the line has no comma, parts has length 1 and parts[0] accesses a valid element but parts[1] on line 19 panics.",
+      "failure_mode": "Malformed CSV lines (missing comma, empty lines) panic on index out of bounds rather than returning a typed error.",
+      "fix": "Use split_once(',') and .ok_or(MetricError::InvalidLine)? to handle the single-separator grammar safely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unbounded-allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() into Vec<String> — no domain cap on number of records; allocates for every line without validated capacity bounds. Also collects intermediate strings unnecessarily.",
+      "failure_mode": "A file with millions of lines exhausts memory. No try_reserve, no domain cap, no bounded resource policy enforced before allocation.",
+      "fix": "Validate an absolute domain cap (e.g., MAX_RECORDS) before allocation; call Vec::try_reserve(validated_cap).map_err(|_| Error::Allocation)?; use split_once to avoid per-field String allocations; prefer &str views where possible."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type-missing-domain-model",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses pub name: String and pub value: u16 — raw primitives for domain concepts. No newtype for name (should be non-empty string), no newtype for value (should carry range semantics), no domain error type, no typestate.",
+      "failure_mode": "Illegal states are representable: empty names, negative values via conversion, unbounded value ranges. The domain invariants are not enforced by the type system.",
+      "fix": "Define newtypes: struct MetricName(&'static str) or newtype with smart constructor; struct MetricValue(u16) with range validation; define enum MetricError { EmptyName, InvalidValue(ParseError), Overflow, Allocation, Io(io::Error) }."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-error-taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function returns Vec<Record> with no error type. All failures (I/O, parse, overflow, allocation) are communicated through panic rather than typed errors.",
+      "failure_mode": "Caller cannot distinguish between a missing file, malformed data, or resource exhaustion. No retry strategy possible, no graceful degradation.",
+      "fix": "Return Result<Vec<Record>, MetricError> with a typed error enum covering Io, Parse, Overflow, Allocation, and InvalidLine variants."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark crate dependency or benchmark module exists. Performance claims (if any) cannot be validated.",
+      "failure_mode": "Performance regressions go undetected. No baseline to measure against for allocation patterns or throughput.",
+      "fix": "Add criterion or similar benchmark dependency with a benchmark for load_metrics/parsing throughput and allocation count."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiling evidence exists. The use of Vec<String> per field (allocating strings for every CSV field) may be unnecessary — split_once + &str would avoid allocations entirely for read paths.",
+      "failure_mode": "Unoptimized allocation pattern could be the actual bottleneck, but without profiler data the optimization target is guesswork.",
+      "fix": "Run cargo-flamegraph or similar to verify allocation hotspots before optimizing."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-truth",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module exists. No command evidence that the crate compiles, lints clean, or passes tests.",
+      "failure_mode": "No proof that the code compiles, let alone behaves correctly. Cannot verify any invariant or behavior.",
+      "fix": "Add tests module with unit tests for parse_metrics covering valid input, malformed input, empty lines, and boundary values."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "second-ring-metrics-hidden-in-core",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! serves as ad-hoc metrics/logging fused into the parsing core. This is a second-ring concern (observability) leaking into the calculation layer.",
+      "failure_mode": "Metrics are unstructured (human-readable string), non-machine-parseable, and cannot be routed to proper observability backends (metrics, tracing, structured logging).",
+      "fix": "Remove println! and return structured data. Shell layer handles all observability via typed return values."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler data exists to validate allocation patterns",
+    "no test module exists — no command evidence of compilation or behavior",
+    "no allocation evidence (allocations per record, total bytes) for load_metrics",
+    "no command-truth evidence (no CI gate, no test run output)"
+  ],
+  "residual_risk": "Static review only with no commands run. The code contains 9 blockers and 3 warnings across all Holzman v9 absolute laws: panic surfaces (unwrap), hidden I/O (fs::read_to_string + println!), unchecked indexing, lossy cast (u32 as u16), unbounded allocation, missing domain modeling, and absent error taxonomy. Without running cargo fmt/check/clippy/test, there is residual uncertainty about compilation state, but the semantic violations are independent of compile state and must be fixed before any promotion."
+}

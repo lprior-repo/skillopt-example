@@ -1,0 +1,87 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses String for status, bool for is_validated and is_sent, and Option<u64> for sent_at_epoch_ms. This allows illegal states such as status=\"sent\" with is_sent=false, is_validated=true with status=\"draft\", or is_sent=true without sent_at_epoch_ms being Some.",
+      "failure_mode": "Domain invariants are not enforced by the type system; callers can construct and mutate a LedgerWorkflow into a logically inconsistent state, causing silent data corruption or incorrect workflow decisions downstream.",
+      "fix": "Replace status with a sealed enum (e.g., enum LedgerStatus { Draft, Sent { sent_at_epoch_ms: u64 } }). Replace is_validated and is_sent with typestate transitions so that 'sent' state requires sent_at_epoch_ms and cannot be reverted. Remove redundant bool flags."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_discipline",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Status field is a plain String, allowing arbitrary values (e.g., \"SENT\", \"sent!\", \"\"). The skill requires replacing status strings with enums.",
+      "failure_mode": "Pattern matches on status string content are fragile; typos or case mismatches silently skip transitions. No exhaustive matching possible.",
+      "fix": "Replace `pub status: String` with an enum such as `pub status: LedgerStatus` where LedgerStatus is an enum with only the valid domain states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_discipline",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are independent bools. They encode lifecycle state but can be set inconsistently (e.g., is_validated=false and is_sent=true). The skill explicitly mandates replacing bool lifecycle flags with enums or typestates.",
+      "failure_mode": "Callers can set is_sent=true before validation, or leave both flags false after a transition. Any future flags compound the combinatorial explosion of illegal states.",
+      "fix": "Use a single enum or typestate that captures the full lifecycle: enum LedgerState { Created, Validated, Sent { sent_at_epoch_ms: u64 } }. Remove individual bools."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_discipline",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64>, decoupled from is_sent. A ledger can be is_sent=true while sent_at_epoch_ms is None, violating the invariant that a sent ledger must record its send time.",
+      "failure_mode": "Downstream code assuming sent_at_epoch_ms is Some when is_sent is true will panic or produce incorrect timestamps. The invariant is not enforced by the type.",
+      "fix": "Bake sent_at_epoch_ms into the typestate: when the ledger reaches the Sent variant, sent_at_epoch_ms is required (not optional). Remove Option<u64> and the is_sent bool."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_discipline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a plain String with no domain-level newtype. Ledger IDs may have format constraints (prefix, length, checksum) that are not enforced.",
+      "failure_mode": "Invalid or empty IDs can be assigned at any call site. No validation at construction, no guaranteed format.",
+      "fix": "Introduce a newtype `LedgerId` with a fallible constructor `LedgerId::new(str) -> Result<LedgerId, ParseError>` that validates format. Use `LedgerId` in place of `String` for the id field."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes and returns the full struct by value, mutating it in place. The function name implies it marks a ledger as sent (an action), but it does not validate preconditions or produce a typed error.",
+      "failure_mode": "A ledger can be marked sent from any state (even invalid ones). No validation that the ledger is in a valid transition state. Returns the mutated struct instead of a Result, so callers cannot distinguish success from precondition failure.",
+      "fix": "Change to a fallible constructor or transition function: `fn transition_to_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, TransitionError>`. Validate the source state before allowing the transition."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parsing_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is accepted as a raw String. Per the skill, the core should receive validated, trusted data. If this struct is exposed at an API boundary, raw String ids bypass the 'parse at boundaries into trusted data' rule.",
+      "failure_mode": "Every call site must redundantly validate the id format. If a caller forgets, invalid data enters the core.",
+      "fix": "Introduce a LedgerId newtype with a validated constructor. Accept the newtype at all public API boundaries."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_data_inert",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow fields are all pub, allowing external mutation of internal state without any transition guards.",
+      "failure_mode": "External code can directly assign `item.status = \"foo\"` or `item.is_sent = true` bypassing any logic in mark_sent or future transitions.",
+      "fix": "Make fields private. Provide only transition constructors and methods. Or use a newtype + sealed enum pattern where the only construction path is through validated constructors."
+    }
+  ],
+  "missing_evidence": [
+    "no behavior tests exist to verify transition invariants",
+    "no benchmark exists for mark_sent or any workflow throughput claim",
+    "no profiler data for allocation patterns in the core",
+    "no allocation evidence (try_reserve not needed here but no bounded-growth analysis present)",
+    "no second-ring defense: no clippy, miri, or property-based test evidence",
+    "no command evidence: cargo test, cargo fmt, cargo clippy not run"
+  ],
+  "residual_risk": "The LedgerWorkflow struct fundamentally violates the 'make illegal states unrepresentable' principle. Bool flags and String status encode a combinatorial state space where most combinations are invalid. Without typestates or an enum-based lifecycle, any consumer must manually check invariants at every use site. The mark_sent function performs mutation without precondition validation. Static review only; no commands run."
+}

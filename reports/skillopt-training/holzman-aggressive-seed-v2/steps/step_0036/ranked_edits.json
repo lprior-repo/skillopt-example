@@ -1,0 +1,26 @@
+{
+  "reasoning": "The agent consistently fails to apply checked arithmetic and safe allocation patterns despite explicit instructions. The previous edits were too verbose and failed to stick. A concise, high-contrast rule in the Core Contract and a strict verification checklist in Repair Mode will enforce these patterns without overfitting. We also need to explicitly forbid false command claims. [optimizer-ranked: selected 2/4 edits]",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** ALL integer arithmetic involving totals, counts, or capacity MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. Never use `+`, `-`, `*`, `/`, or `as` for these operations. Division MUST use `checked_div` with error propagation.",
+      "source_type": "failure",
+      "support_count": 1
+    },
+    {
+      "op": "replace",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Never use `Vec::with_capacity` in production code.",
+      "source_type": "failure",
+      "support_count": 1
+    }
+  ],
+  "ranking_details": {
+    "reasoning": "Edit [0] is the highest priority because it addresses the most critical safety and correctness failure pattern in Rust: unchecked arithmetic. It tightens the rule to explicitly ban all unchecked operators (`+`, `-`, `*`, `/`) for totals/counts, which is a widespread source of bugs and security vulnerabilities. It also mandates `checked_div` with error propagation, closing a gap in the original text. Edit [1] is the next most important as it reinforces the `try_reserve` vs `with_capacity` distinction, which is a key part of the 'Holzman' style for handling allocation failures gracefully. While Edit [2] improves the checklist, it is redundant with the Core Contract updates. Edit [3] is about process accuracy, which is important but less impactful on the code quality and safety than the arithmetic and allocation rules.",
+    "selected_indices": [
+      0,
+      1
+    ]
+  }
+}

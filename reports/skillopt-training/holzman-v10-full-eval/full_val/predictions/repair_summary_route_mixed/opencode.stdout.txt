@@ -1,0 +1,15 @@
+Repair complete. All 6 behavior tests pass. All Holzman gates clean.
+
+**Changes to `src/lib.rs`:**
+- `summarize_metrics` return type: `Result<String, SummaryError>` → `Result<Summary, SummaryError>`
+- Added `render_summary(Summary) -> String` function
+- Replaced `.unwrap()` with `.map_err()` for parse failures
+- Replaced unchecked `+=` with `checked_add` (+ Overflow error)
+- Replaced lossy `as u32`/`as u64` with `try_from` (+ Overflow error)
+- Replaced unchecked `/` with `checked_div` (+ Invalid error)
+- Replaced `.split(',').collect()[1]` with `split_once(',')` (+ Invalid error)
+- Added empty input detection → `Err(Empty)`
+
+**Gates passed:** `cargo fmt`, `cargo fmt --check`, `cargo clippy` (strict deny), `cargo test` (6/6).
+
+**Output:** `/tmp/opencode/holzman-skillopt-train/d794e21935e98088/repair_summary_route_mixed/repair-output.json`

@@ -1,0 +1,18 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m• [0mLoad skill bundle and references[90m General Agent[0m
+[0m✓ [0mLoad skill bundle and references[90m General Agent[0m
+[0m
+[0m$ [0mfind /tmp/opencode/holzman-skillopt-train/631d84de9339a7d2/review_invalid_state_budget_typestate -type f | grep -v '.skill/' | head -50
+/tmp/opencode/holzman-skillopt-train/631d84de9339a7d2/review_invalid_state_budget_typestate/src/lib.rs
+/tmp/opencode/holzman-skillopt-train/631d84de9339a7d2/review_invalid_state_budget_typestate/Cargo.toml
+[0m
+[0m→ [0mRead src/lib.rs
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; json.load(open('/tmp/opencode/holzman-skillopt-train/631d84de9339a7d2/review_invalid_state_budget_typestate/review-output.json')); print('valid')"
+valid
+[0m

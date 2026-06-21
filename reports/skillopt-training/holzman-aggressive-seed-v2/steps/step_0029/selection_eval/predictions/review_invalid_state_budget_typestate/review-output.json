@@ -1,0 +1,78 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are pub and independently mutable. Callers can set is_sent=true with is_validated=false, status=\"\" or status=\"garbage\", and sent_at_epoch_ms=None, creating multiple illegal states the compiler cannot prevent.",
+      "failure_mode": "Domain invariants (e.g., sent budgets must be validated, must have a timestamp, must have a valid status) are enforced by convention not by the type system. Any crate user can corrupt budget lifecycle state without compilation errors.",
+      "fix": "Make all fields private. Replace status: String with a typed enum (BudgetStatus: Draft, Validated, Sent). Replace is_validated/is_sent bools with the enum or a typestate. Require sent_at_epoch_ms at construction for Sent state. Provide a fallible constructor or builder that enforces invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_over_bool_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are separate primitive flags instead of a single typestate enum. This allows inconsistent combinations like (is_validated=false, is_sent=true) which represents a budget marked sent but never validated.",
+      "failure_mode": "Business logic that assumes sent budgets are validated will encounter runtime errors or silently process invalid budgets. The bool pair has 4 states but only 3 are valid (draft, validated, sent), making one illegal state representable.",
+      "fix": "Replace both bools with a single enum: pub enum BudgetStage { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }. This makes invalid states unrepresentable at compile time and encodes the timestamp requirement into the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_string_over_freeform_text",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary values (\"sent\", \"SENT\", \"\", null-embedded, future unknown values). The mark_sent function sets status=\"sent\" by string literal, which is fragile and unenforceable.",
+      "failure_mode": "Typos in status strings, case mismatches, or unknown status values break downstream logic at runtime. No exhaustive matching is possible on a String.",
+      "fix": "Replace with a sealed enum: pub enum BudgetStatus { Draft, Validated, Sent }. Use exhaustive match everywhere status is inspected."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership of the entire struct, mutates all fields inline, and returns the same struct. There is no validation gate — it transitions any state (including already-sent or invalid states) to sent without checking prerequisites like is_validated.",
+      "failure_mode": "A budget can be sent without validation, or sent multiple times. The function has no preconditions and cannot reject invalid transitions, violating the functional-core principle of pure, invariant-enforcing logic.",
+      "fix": "Replace with a fallible method or function: pub fn mark_sent(item: &BudgetWorkflow) -> Result<BudgetWorkflow, BudgetError>. Validate is_validated is true, check status is not already Sent, then construct the new state with sent_at_epoch_ms set. Return a typed error for rejected transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a free-form identifier with no validation, formatting, or newtype wrapping. The domain treats IDs as values with rules (format, uniqueness, lifetime) but the type provides no constraints.",
+      "failure_mode": "Empty strings, malformed IDs, or duplicate IDs are silently accepted. Downstream code must repeatedly validate the same invariant.",
+      "fix": "Introduce a typed newtype: pub struct BudgetId(String) with a fallible constructor BudgetId::new(s: &str) -> Result<Self, BudgetError> that validates format rules at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_mutable_state",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are pub, meaning any caller can mutate BudgetWorkflow fields directly without going through the domain API. This completely bypasses mark_sent and any future validation logic.",
+      "failure_mode": "External code can set item.is_sent = false after mark_sent runs, or set item.status = \"\" without any domain check, breaking all invariants in a single line of code.",
+      "fix": "Remove pub from all fields. Provide immutable accessors (pub fn id(&self), pub fn status(&self)) and a single public mutation path (mark_sent or a builder pattern) that enforces all invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_errors_over_void",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no error return type. It silently accepts invalid source states and overwrites them, providing no feedback to the caller about rejected transitions.",
+      "failure_mode": "Callers cannot detect or handle failed transitions. A budget sent without validation proceeds silently through the system, causing data integrity issues downstream.",
+      "fix": "Define a domain error enum: pub enum BudgetError { AlreadySent, NotValidated }. Change signature to pub fn mark_sent(item: &BudgetWorkflow) -> Result<BudgetWorkflow, BudgetError> and return specific errors for rejected transitions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle operation",
+    "no profiler evidence for hot-path analysis of budget state transitions",
+    "no allocation analysis — mark_sent performs .to_string() on every call creating a new String for status even when setting the same literal \"sent\"",
+    "no second-ring evidence (assembly, cache, or provenance) for any performance claim",
+    "no command evidence — no cargo check, cargo clippy, cargo test, or cargo fmt run",
+    "no benchmark/profiler/allocation/command evidence for any stated or implied performance claim"
+  ],
+  "residual_risk": "The crate represents a fundamentally underspecified domain model: all state is externally mutable, no invariants are enforced by the type system, and mark_sent has no validation or error reporting. Every field combination is legal, making this code unsuitable for any production budget workflow. The structural issues require a full typestate redesign, not incremental fixes. No commands were executed; all findings are static review."
+}

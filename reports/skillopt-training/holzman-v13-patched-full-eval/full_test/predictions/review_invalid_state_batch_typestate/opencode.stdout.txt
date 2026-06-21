@@ -1,0 +1,19 @@
+Now I have all the context. This crate is a small but heavily violating example. Let me write the review.
+Review complete. Wrote 9 findings and 5 missing evidence items to `review-output.json`.
+
+Summary of violations found:
+
+- **6 BLOCKER findings** on typestate/structural issues per the skill's mandatory typestate review rule:
+  1. Booleans and String status used instead of typestate enum (line 1)
+  2. `status: String` allows arbitrary values instead of exhaustive enum (line 3)
+  3. `is_validated`/`is_sent` booleans allow impossible combinations (line 4)
+  4. `Option<u64>` for timestamp is independent from `is_sent` bool (line 6)
+  5. `id: String` is a raw primitive without newtype validation (line 2)
+  6. Raw primitives cross parse boundary with no smart constructors (line 1)
+  7. `mark_sent` is a hidden-I/O mutation with no typed errors (line 9)
+
+- **2 WARNING findings** on missing evidence:
+  8. Missing benchmark/profiler/allocation evidence for `to_string()` in mark_sent
+  9. Missing command/test evidence — no test target configured
+
+- **Residual risk: High** — the struct allows construction of physically impossible state combinations, mark_sent has no preconditions or error types, and no tests or benchmarks exist.

@@ -1,0 +1,27 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    "Cargo.toml",
+    "src/lib.rs",
+    "tests/behavior.rs"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No unsafe, unwrap, expect, panic, todo, unimplemented, unreachable in production code",
+    "Replaced lossy as conversion (usize to u32) with u32::try_from mapping to Overflow error",
+    "Used checked_add for total capacity calculation with Overflow error on failure",
+    "Used try_reserve for bounded Vec growth with Allocation error on failure",
+    "Enforced max_payload boundary check (was missing, causing rejects_limit test failure)",
+    "Smallest production change satisfying all tests and Holzman constraints",
+    "Functional core: encode_frame is pure deterministic with typed error boundaries"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "AllocationError detail discarded by map_err(|_| FrameError::Allocation) — acceptable since FrameError has only one allocation variant. No other violations."
+}

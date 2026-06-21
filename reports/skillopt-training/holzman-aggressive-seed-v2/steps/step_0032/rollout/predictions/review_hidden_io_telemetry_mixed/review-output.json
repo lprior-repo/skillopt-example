@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permission denied, oversized file)",
+      "failure_mode": "untrusted file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "Return Result<Vec<Record>, IoError>. Use fs::read_to_string(path).map_err(|e| ...) or ? operator to propagate errors to the caller."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value or if parts has fewer than 2 elements",
+      "failure_mode": "a single malformed CSV line crashes the entire telemetry load, losing all previously parsed records",
+      "fix": "Use split_once(',') to extract the two fields. Call parse() with map_err to return a typed ParseError. Handle the case where split_once returns None (missing delimiter)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast from u32 to u16 — silently truncates values > 65535",
+      "failure_mode": "a telemetry reading of 70000 becomes 4464 with no warning, corrupting the data silently",
+      "fix": "Use u16::try_from(parsed_u32)? or check range with .checked_into() and return a typed OverflowError if out of bounds."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates a Vec<String> for a two-field CSV line. Then parts[0] and parts[1] are unchecked index accesses.",
+      "failure_mode": "a line with more or fewer commas produces an out-of-bounds panic on parts[1], and every line heap-allocates an intermediate Vec",
+      "fix": "Use split_once(',') to get (&str, Option<&str>) for the second field. Trim and parse each field directly without collecting into a Vec. Use .get() or match/split_once pattern matching for field access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden side-effect (stdout I/O) inside a data-loading function that should be pure computation",
+      "failure_mode": "side effects in the core/telemetry-loading path make the function non-deterministic, untestable, and produce interleaved output when called from tests or other I/O contexts",
+      "fix": "Remove println! from the parsing pipeline. If logging is needed, push it to the imperative shell layer (caller) after parsing completes, or pass a logging callback. The pure core should not write to stdout."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked indexing into a Vec without bounds check",
+      "failure_mode": "if the line is empty or has zero fields, index 0 panics with out-of-bounds",
+      "fix": "Use split_once(',') and match on the Some((first, rest)) pattern, or use parts.first().ok_or(Error::MissingName) for bounds-safe access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] is unchecked indexing into a Vec without bounds check",
+      "failure_mode": "a line with only one field (no comma) produces parts with length 1, and parts[1] panics with out-of-bounds",
+      "fix": "Use split_once(',') — the second field comes from the Option<&str> return value, eliminating the need for indexing entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_telemetys returns Vec<Record> directly instead of Result — all errors (I/O, parse, overflow, missing fields) are hidden behind panics",
+      "failure_mode": "the function signature promises success but can fail silently via panic at any line, making error handling impossible for callers",
+      "fix": "Change signature to pub fn load_telemetry(path: &str) -> Result<Vec<Record>, TelemetryError>. Define a sealed error enum covering IoError, ParseError, OverflowError, and MalformedLine."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to measure telemetry parsing throughput",
+    "no profiler data exists to identify hot paths in the parsing pipeline",
+    "no allocation analysis exists — split+collect+Vec allocates per-line and should be measured",
+    "no second-ring test evidence (property-based, fuzz, or adversarial input testing)",
+    "no command evidence for cargo fmt, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "static review only — no commands run. The crate has 8 BLOCKER violations: three unwrap calls, one lossy as cast, three unchecked index accesses, hidden println side-effect, and a return type that hides all error paths. A reviewer with access to the crate and cargo tooling should run cargo fmt, cargo clippy, and cargo test to confirm findings before passing any delivery gate."
+}

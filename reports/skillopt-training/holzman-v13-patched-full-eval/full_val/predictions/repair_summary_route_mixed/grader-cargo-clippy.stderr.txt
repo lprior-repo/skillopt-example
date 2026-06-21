@@ -1,0 +1,21 @@
+    Checking repair_summary_route_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_summary_route_mixed)
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:37:21
+   |
+37 |     let count_u32 = count as u32;
+   |                     ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:38:21
+   |
+38 |     let count_u64 = count as u64;
+   |                     ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: could not compile `repair_summary_route_mixed` (lib) due to 2 previous errors

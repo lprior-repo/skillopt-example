@@ -1,0 +1,19 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (7 findings, 4 BLOCKERs, 3 MAJOR):**
+
+**BLOCKERs:**
+1. **Illegal state representable** (`lib.rs:1`) — Independent `bool` fields (`is_validated`, `is_sent`) + `String status` create 32 possible state combinations, far more than the 4 valid ones. The compiler cannot enforce valid transitions.
+2. **No typestate for lifecycle** (`lib.rs:3`) — `status: String` accepts arbitrary values; `mark_sent` blindly sets it without validation.
+3. **No typestate for lifecycle** (`lib.rs:4`) — `is_validated` is independent of `is_sent`, allowing invalid orderings (sent before validated).
+4. **No typestate for lifecycle** (`lib.rs:5`) — `is_sent: bool` is orthogonal to `status`, forcing callers to cross-check multiple fields.
+
+**MAJORs:**
+5. **Primitive obsession** (`lib.rs:2`) — `id: String` has no validation, bounds, or domain newtype.
+6. **Functional core issue** (`lib.rs:9`) — `mark_sent` has no transition guards; Pending auditable can jump directly to Sent.
+7. **No parsing boundary** (`lib.rs:1`) — No constructor; any caller can build an invalid `AuditWorkflow`.
+
+**Missing evidence:** No benchmarks, profiler data, allocation analysis, assembly proofs, or command evidence.
+
+**Residual risk:** BLOCK_GLOBAL — the domain model is fundamentally broken. Typestate redesign required before any downstream code can be trusted.

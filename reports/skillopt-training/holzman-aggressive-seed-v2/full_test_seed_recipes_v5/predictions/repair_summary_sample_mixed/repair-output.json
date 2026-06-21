@@ -1,0 +1,41 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_summary_sample_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_summary_sample_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_summary_sample_mixed/.skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "No production unsafe",
+    "No unwrap/expect/panic/todo/unreachable in production source",
+    "No unchecked arithmetic (checked_add for total, checked_add for count)",
+    "No lossy as casts (u32::try_from for count conversion)",
+    "No unchecked integer division (checked_div for average)",
+    "No Vec::collect for split parsing (split_once used)",
+    "Empty input rejected early with SummaryError::Empty",
+    "Invalid line format rejected via split_once OkOr Invalid",
+    "Invalid value parse rejected via map_err Invalid",
+    "TooMany enforced per-line before exceeding max_rows",
+    "Overflow detected via checked_add on total and count",
+    "Summary returned by value (not String) from summarize_metrics",
+    "render_summary separates formatting from calculation (functional core)",
+    "count kept as usize until final checked conversions",
+    "No test files edited",
+    "Cargo.toml not edited"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All Holzman violations removed: unwrap replaced with map_err, unchecked += replaced with checked_add, lossy as cast replaced with try_from, unchecked division replaced with checked_div, Vec::collect replaced with split_once. Function split into pure core (summarize_metrics returning Summary) and rendering shell (render_summary)."
+}

@@ -1,0 +1,24 @@
+Now I have full context. Let me analyze the issues and repair:
+
+1. `summarize_metrics` returns `Result<String>` but tests expect `Result<Summary>`
+2. Missing `render_summary` function
+3. `.unwrap()` on parse (line 24)
+4. Unchecked `+=` on total (line 25)
+5. `count += 1` not using checked_add (line 26)
+6. `count as u32` lossy cast (line 33)
+7. `total / count as u64` - unchecked division + lossy cast (line 35)
+8. No empty-input check
+9. `parts[1]` unchecked indexing
+All 6 tests pass. Writing the repair output.
+Repaired. All 6 behavior tests pass. Changes in `src/lib.rs`:
+
+- **`summarize_metrics`** now returns `Result<Summary, SummaryError>` (was `Result<String>`)
+- **`render_summary`** added as formatting-only shell function
+- Removed `.unwrap()` on parse → `.map_err(|_| SummaryError::Invalid)`
+- Replaced `parts[1]` unchecked indexing → `split_once(',')`
+- Replaced `total += value` → `checked_add` with `Overflow` error
+- Replaced `count += 1` → `checked_add` with `Overflow` error
+- Replaced `count as u32` → `u32::try_from(count).map_err(...)`
+- Replaced `total / count as u64` → `checked_div` with `Invalid` error
+- Added empty-input rejection via `count == 0` check
+- Added per-line `TooMany` enforcement (early exit)

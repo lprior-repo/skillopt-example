@@ -1,0 +1,14 @@
+Issues found in `src/lib.rs`:
+1. `unwrap()` on line 12 — forbidden by Holzman Rust
+2. No empty input check — test expects `Err(ParseError::Empty)`
+3. `max_items` parameter unused — test expects `Err(ParseError::TooMany)`
+4. No parse error handling — test expects `Err(ParseError::Invalid)`
+All 4 tests passed. Now writing the repair output.
+All tests pass. Writing the repair output.
+Repair complete. Changes made to `src/lib.rs`:
+
+- **Removed `unwrap()`** — replaced with `map_err` for parse failures
+- **Added empty-input check** — returns `Err(ParseError::Empty)` for `""`
+- **Added `max_items` enforcement** — returns `Err(ParseError::TooMany)` when items exceed limit
+- **Added empty-part rejection** — trims then validates each part is non-empty
+- **All 4 behavior tests pass**

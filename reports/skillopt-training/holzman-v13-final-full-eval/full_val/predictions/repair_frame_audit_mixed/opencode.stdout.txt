@@ -1,0 +1,9 @@
+Now I understand the task. The current `encode_frame` has multiple Holzman violations: lossy `as` conversion, no payload-size check, no `try_reserve`, no `checked_add`. The SKILL.md mandates all four steps for frame encoders.
+Repair complete. Four Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)`
+2. **Missing payload cap check** — added `payload.len() > max_payload` guard returning `FrameError::PayloadTooLarge`
+3. **Missing `checked_add`** — `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?`
+4. **Missing `try_reserve`** — `out.try_reserve(capacity).map_err(|_| FrameError::Allocation)?`
+
+All gates clean: `cargo fmt`, `cargo test` (2/2), strict clippy (zero warnings).

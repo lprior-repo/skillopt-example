@@ -1,0 +1,15 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written `review-output.json` with 9 findings:
+
+**6 BLOCKERs:**
+- `src/lib.rs:9` — `unwrap()` on `fs::read_to_string` (panic surface)
+- `src/lib.rs:9` — Hidden I/O fused with parsing (violates Data/Calculations/Actions)
+- `src/lib.rs:16` — `println!` in pure parsing closure (hidden I/O)
+- `src/lib.rs:16` — Unchecked indexing `parts[0]`/`parts[1]` (no bounds validation)
+- `src/lib.rs:19` — Lossy `u32` to `u16` cast via `as` (silent truncation)
+- `src/lib.rs:19` — `unwrap()` on `.parse::<u32>()` (panic on malformed input)
+- `src/lib.rs:4` — Raw `String`/`u16` domain fields with no newtypes or smart constructors
+
+**2 WARNINGs:**
+- `src/lib.rs:8` — Unbounded `Vec` with no `try_reserve` or domain cap
+- `src/lib.rs:8` — No benchmark/profiler/test evidence

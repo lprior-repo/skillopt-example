@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any string value, including values that contradict is_sent (e.g., status=\"draft\" with is_sent=true). There is no type-level enforcement of valid status transitions.",
+      "failure_mode": "Invalid state combinations can be constructed freely by callers or through mutations, violating domain invariants. The bool/String pair is the canonical example of a representable-but-illegal state.",
+      "fix": "Replace `status: String` with a sealed enum `LeaseStatus { Draft, Sent, ... }` and remove `is_sent` as a redundant field. The enum value alone encodes the lifecycle stage."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_or_option_lifecycle_fields",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive flag that allows two states (validated/unvalidated) with no encoding of why or what happens next. It is orthogonal to status, creating cross-field invalid states.",
+      "failure_mode": "A lease could be is_validated=true with status=\"draft\" (invalid: validated drafts) or is_validated=false with status=\"sent\" (invalid: unsent validated). The bool cannot express the full lifecycle.",
+      "fix": "Fold validation state into the LeaseStatus enum (e.g., `Draft { validated: bool }` or separate variants like `PendingValidation` / `Sent`) so that validation state is tied to the correct lifecycle stage."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_or_option_lifecycle_fields",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is redundant with status and creates an impossible-to-enforce invariant. The boolean is independent of the status string, so both can disagree.",
+      "failure_mode": "Callers can set is_sent=true while status remains \"draft\" or vice versa. No constructor enforces consistency between the two fields.",
+      "fix": "Remove `is_sent` entirely. Replace it with an enum variant or an on-discriminant field in `LeaseStatus::Sent { sent_at_epoch_ms: u64 }`. The sent timestamp subsumes the boolean."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow has all pub fields with no constructor or invariant enforcement. Any code can mutate status and is_sent independently, bypassing domain rules entirely.",
+      "failure_mode": "Struct literals like `LeaseWorkflow { id: \"x\", status: \"foo\", is_validated: true, is_sent: false, sent_at_epoch_ms: None }` compile with zero validation. The type provides no guarantee that the lease is in a valid state.",
+      "fix": "Make all fields private. Provide a constructor (or derive via enum) that builds the struct only in valid states. Use `impl` methods for state transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_does_not_enforce_transition_invariant",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent unconditionally sets status to \"sent\" and is_sent to true regardless of the prior state. It does not check that the lease was in a valid prior state (e.g., validated draft). It also does not populate sent_at_epoch_ms.",
+      "failure_mode": "A lease in any state (including already-sent, or unvalidated) can be \"marked sent\" with no guard. The sent_at_epoch_ms field is left as None, meaning sent leases have no timestamp — a domain invariant violation.",
+      "fix": "Accept a type that can only be constructed from valid pre-sent states (e.g., `LeaseWorkflow` with `LeaseStatus::PendingValidation` or `LeaseStatus::Draft { validated: true }`). Return a typed result with the sent-at timestamp populated. If the prior state is invalid, return a domain error rather than silently overwriting."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs mutation on the struct but does not accept or return a timestamp/clock value. In a pure functional core, time-dependent operations should accept an explicit clock parameter, not silently use whatever mechanism the caller provides.",
+      "failure_mode": "The function signature promises to mark a lease sent but cannot produce sent_at_epoch_ms without a time source. This leaks the imperative shell concern (time) into the core, or produces stale/wrong timestamps.",
+      "fix": "Design mark_sent to accept an explicit `epoch_ms: u64` parameter (or a `Clock` trait object) and return a new struct with sent_at_epoch_ms set. Keep the pure calculation separate from the time source."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [dev-dependencies], no test dependencies, no benchmark section. The crate has zero tests and no benchmark infrastructure.",
+      "failure_mode": "No automated verification that the domain invariants hold, no regression tests for mark_sent transitions, and no performance baseline for the core function.",
+      "fix": "Add `[[test]]` and `[[bench]]` sections with appropriate dependencies (e.g., `criterion` for benchmarks, `proptest` or `quickcheck` for property tests). Even a minimal eval crate needs test infrastructure."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for mark_sent or any function in the crate. No allocation profiling evidence.",
+      "failure_mode": "Cannot verify that the refactored enum-based representation does not increase allocation pressure compared to the current String-based approach. No evidence that the functional core remains zero-allocation.",
+      "fix": "Add a criterion benchmark for mark_sent that measures throughput and allocation. Compare baseline (String/bool) vs refactored (enum/typestate) representations."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "id_as_string",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive type with no domain identity semantics. Any string is a valid id, including empty strings or malformed identifiers.",
+      "failure_mode": "Empty or duplicate IDs can be constructed. No domain-level uniqueness or format enforcement at the type level.",
+      "fix": "Wrap in a newtype `LeaseId(String)` or `LeaseId` with a constructor that validates format/non-empty, making invalid IDs unrepresentable."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or allocation",
+    "no profiler data for the core function",
+    "no behavior tests for valid/invalid state transitions",
+    "no allocation audit for the refactored enum representation",
+    "no second-ring review (black-hat) evidence"
+  ],
+  "residual_risk": "The crate has fundamental type-level violations: String/bool fields allow illegal state combinations that cannot be caught by the compiler. The mark_sent function silently overwrites state without guards. Without refactoring to enums/typestates, no amount of testing can fully prevent invalid state construction. Static review only; no commands run."
+}

@@ -1,0 +1,2 @@
+Reference files read: `runtime-performance-architecture.md`, `nasa-jpl-standards.md`.
+Review output written to `/tmp/opencode/holzman-skillopt/qwen5090-review-v2/tasks/baseline/review_dense_ir_hot_path/review-output.json`.

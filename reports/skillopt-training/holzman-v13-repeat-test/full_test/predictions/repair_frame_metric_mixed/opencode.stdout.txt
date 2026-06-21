@@ -1,0 +1,17 @@
+Now I understand the issues. Let me read the references, then apply the fix.
+Now I see the issues in `src/lib.rs`:
+1. No `payload.len() > max_payload` check (test `rejects_limit` will fail)
+2. Lossy `payload.len() as u32` cast
+3. No checked capacity arithmetic or `try_reserve`
+
+Applying the fix:
+All 2 tests pass. Now running the full mandatory verification gate:
+All gates pass. Writing the required output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added `payload.len() > max_payload` check** — returns `FrameError::PayloadTooLarge` when payload exceeds the limit (fixes `rejects_limit` test)
+2. **Replaced lossy `payload.len() as u32`** with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+3. **Added checked capacity arithmetic** — `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?`
+4. **Added `try_reserve`** for bounded allocation with typed `Allocation` error
+
+All 6 verification gates passed: `cargo fmt`, `cargo test`, `cargo fmt --check`, `cargo check`, `cargo clippy` (strict), and forbidden-macro scan.

@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses `pub status: String` and `pub is_validated: bool` / `pub is_sent: bool` primitive fields, making illegal states fully representable. Any combination like status=\"sent\" with is_validated=false, or status=\"new\" with is_sent=true, compiles and is indistinguishable at the type level.",
+      "failure_mode": "A shard can transition to sent without ever being validated, or carry contradictory status+flag combinations. No invariant enforcement exists at the type or constructor level; runtime checks are the only defense and can be bypassed.",
+      "fix": "Replace `status: String` with a sealed enum `ShardStatus { New, Validated, Sent }`. Replace `is_validated: bool` and `is_sent: bool` with typestate transitions on the enum. Remove `pub` field accessors; provide constructors that enforce valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-bool-lifecycle-flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`pub is_validated: bool` is a primitive lifecycle flag. Booleans cannot encode which of multiple states an entity is in, and cannot prevent contradictory states (e.g., is_validated=true AND is_sent=true without an ordered transition).",
+      "failure_mode": "Callers can set is_validated and is_sent independently, creating states like validated-but-not-sent and sent-but-not-validated simultaneously with no ordering guarantee.",
+      "fix": "Collapse `is_validated: bool` and `is_sent: bool` into a single `ShardStatus` enum with ordered variants. Remove both bool fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-primitive-status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`pub status: String` allows arbitrary status strings. There is no enum or constrained type limiting values to the domain's valid states (new, validated, sent).",
+      "failure_mode": "Any caller can set status to an arbitrary value like \"deleted\", \"corrupted\", or \"\", breaking downstream logic that assumes a finite set of states. Pattern matching on status requires exhaustive string comparison rather than compile-time exhaustiveness.",
+      "fix": "Replace with `status: ShardStatus` where `ShardStatus` is an enum with exactly `{ New, Validated, Sent }`. Derive PartialEq, Eq, Clone, Copy."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-state-transition-validation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` accepts any `ShardWorkflow` and unconditionally sets status to \"sent\" and is_sent to true, regardless of whether the shard was validated. No precondition check on `is_validated` or current status.",
+      "failure_mode": "Invalid (unvalidated) shards can be marked sent, violating the domain invariant that sent implies validated. This is a state-machine violation where an out-of-order transition is silently permitted.",
+      "fix": "Make `mark_sent` a fallible method on a typestate-gated type: `fn mark_sent(self) -> Result<ShardWorkflowSent, TransitionError>`. Check that the current status is Validated before allowing the transition. Return a typed error otherwise."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pub-struct-fields-expose-invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `ShardWorkflow` are `pub`, allowing external code to mutate any field directly without going through domain methods or constructors.",
+      "failure_mode": "External callers can set `item.status = \"whatever\"` or `item.is_validated = true` without any domain logic, completely bypassing type-level invariants and making the type unsafe to extend.",
+      "fix": "Make fields private. Provide `pub fn new(id: String) -> ShardWorkflow` constructor. Provide accessors only for fields that callers need, and state-transition methods for mutations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "id-newtype-missing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id` is a bare `String` with no domain newtype. Any string can be used as a shard ID, and IDs cannot be distinguished from other string values at the type level.",
+      "failure_mode": "Accidental misuse of unrelated strings as shard IDs, or swapping IDs between different entity types in code that accepts/returns `String` parameters.",
+      "fix": "Introduce `pub struct ShardId(String)` with a private inner field, and use `ShardId` in the struct instead of `String`."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler data, allocation analysis, or second-ring evidence exist for this crate. The `mark_sent` function allocates a new `String` via `.to_string()` on the literal \"sent\".",
+      "failure_mode": "Undetected allocation overhead on the hot path. In a high-throughput shard processing scenario, per-item String allocation for status becomes a measurable performance liability.",
+      "fix": "Add a benchmark in `benches/` measuring `mark_sent` throughput. Consider using an enum-based status with no allocation, or a static reference `&'static str` if string status is required."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No `cargo fmt --check`, `cargo clippy`, `cargo test`, or `cargo check` command evidence was produced. Static review cannot verify compilation, lint, or test status.",
+      "failure_mode": "Code may not compile under strict Holzman clippy gates (e.g., clippy::missing_const_for_fn for `mark_sent`, dead code warnings on `sent_at_epoch_ms`).",
+      "fix": "Run `cargo fmt --check`, `cargo clippy --workspace --lib --bins --all-features -- -D warnings`, and `cargo check --workspace --all-targets --all-features` to establish a verified baseline."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or ShardWorkflow hot path",
+    "no profiler evidence for allocation patterns in mark_sent",
+    "no allocation audit for per-item String allocation on status field",
+    "no command evidence (cargo fmt/check/clippy/test) produced",
+    "no second-ring evidence for any performance or zero-cost claims"
+  ],
+  "residual_risk": "High. The crate represents a state machine with primitive fields (String status, bool flags) that make every illegal state constructible and indistinguishable from valid states. The mark_sent function has zero precondition validation, allowing out-of-order state transitions. The entire domain invariant (shard must be validated before being sent) is absent from the type system. Without typestate enums, sealed constructors, and transition-gated methods, the type can be misused by any caller at any time. Static review only; no commands run."
+}

@@ -1,0 +1,16 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings across the task crate:**
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | `illegal_states_representable` | `src/lib.rs:1` — `status:String` + `is_validated:bool` + `is_sent:bool` allows inconsistent combinations |
+| 2 | BLOCKER | `missing_typestate_lifecycle` | `src/lib.rs:3` — No enum/typestate enforcing validated→sent ordering; `sent_at_epoch_ms` decoupled |
+| 3 | MAJOR | `domain_id_not_newtyped` | `src/lib.rs:2` — `id: String` is a raw primitive, no `LedgerId` newtype |
+| 4 | MAJOR | `mark_sent_mutates_in_place` | `src/lib.rs:9` — `mark_sent` mutates in-place, bypassing any precondition gate |
+| 5 | MINOR | `ownership_by_value` | `src/lib.rs:9` — Repeated `String` allocations without evidence |
+| 6 | MINOR | `no_benchmark_or_profiler_evidence` | `src/lib.rs:1` — No benchmarks, profiler, or allocation trace |
+| 7 | MINOR | `no_second_ring_defense` | `src/lib.rs:9` — No behavior test suite for transitions |
+
+**Missing evidence:** 5 items (benchmarks, profiler, allocation trace, behavior tests, command evidence).

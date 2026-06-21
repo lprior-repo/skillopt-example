@@ -1,0 +1,7 @@
+Repaired. All 4 tests pass. Changes to `src/lib.rs`:
+
+- **Removed** `unwrap()` — parse errors now mapped to `ParseError::Invalid` via `map_err`
+- **Added** empty-input check → `ParseError::Empty`
+- **Added** `max_items` cardinality check → `ParseError::TooMany`
+- **Replaced** `Vec::with_capacity` + `unwrap` collection with `Vec::new` + `try_reserve` + checked `for` loop
+- **Eliminated** `split().map().unwrap().collect()` pattern — replaced with explicit iteration and error propagation

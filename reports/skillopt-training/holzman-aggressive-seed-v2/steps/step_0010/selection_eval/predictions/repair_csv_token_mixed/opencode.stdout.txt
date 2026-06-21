@@ -1,0 +1,10 @@
+Now I have the full picture. The implementation has multiple violations: `unwrap()`, no empty check, no max_items check, no invalid value handling. Let me fix it.
+All 4 tests pass. Let me run the full verification gate.
+Repair complete. Changes in `src/lib.rs`:
+
+- **Removed** `.unwrap()` on `parse::<u16>()` — replaced with `.map_err(|_| ParseError::Invalid)`
+- **Added** empty-input guard returning `Err(ParseError::Empty)`
+- **Added** `max_items` enforcement returning `Err(ParseError::TooMany)`
+- **Added** skip of whitespace-only split parts (empty tokens from trailing/leading commas)
+
+All 4 behavior tests pass, clippy passes with strict deny flags, JSON output written.

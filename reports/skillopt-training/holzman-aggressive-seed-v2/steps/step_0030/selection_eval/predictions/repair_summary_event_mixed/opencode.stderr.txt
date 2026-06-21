@@ -1,0 +1,104 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+[0m
+[0m→ [0mSkill "holzman-rust"
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead tests
+[0m→ [0mRead tests/behavior.rs
+[0m
+[0m← [0mEdit src/lib.rs
+Index: /tmp/opencode/holzman-skillopt-train/a1b1be344aeb469c/repair_summary_event_mixed/src/lib.rs
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/a1b1be344aeb469c/repair_summary_event_mixed/src/lib.rs
++++ /tmp/opencode/holzman-skillopt-train/a1b1be344aeb469c/repair_summary_event_mixed/src/lib.rs
+@@ -12,26 +12,34 @@
+     pub total: u64,
+     pub average: u64,
+ }
+ 
+-pub fn summarize_metrics(input: &str, max_rows: usize) -> Result<String, SummaryError> {
++pub fn summarize_metrics(input: &str, max_rows: usize) -> Result<Summary, SummaryError> {
++    if input.is_empty() {
++        return Err(SummaryError::Empty);
++    }
+     let mut total = 0u64;
+     let mut count = 0usize;
+     for line in input.lines() {
+-        let parts: Vec<String> = line
+-            .split(',')
+-            .map(|part| part.trim().to_string())
+-            .collect();
+-        let value = parts[1].parse::<u64>().unwrap();
+-        total += value;
++        let (name, value_str) = line.split_once(',').ok_or(SummaryError::Invalid)?;
++        let _name = name.trim();
++        let value = value_str.trim().parse::<u64>().map_err(|_| SummaryError::Invalid)?;
++        total = total.checked_add(value).ok_or(SummaryError::Overflow)?;
+         count += 1;
+     }
+     if count > max_rows {
+         return Err(SummaryError::TooMany);
+     }
+-    Ok(format!(
+-        "count={} total={} average={}",
+-        count as u32,
++    let average = total / count as u64;
++    Ok(Summary {
++        count: count as u32,
+         total,
+-        total / count as u64
+-    ))
++        average,
++    })
+ }
++
++pub fn render_summary(summary: Summary) -> String {
++    format!(
++        "count={} total={} average={}",
++        summary.count, summary.total, summary.average
++    )
++}
+
+[0m
+[0m$ [0mcargo fmt
+(no output)
+[0m
+[0m$ [0mcargo test
+Compiling repair_summary_event_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/a1b1be344aeb469c/repair_summary_event_mixed)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/33ff11bc8eb63b0e/debug/deps/repair_summary_event_mixed-fb3a12f058c7c29e)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/33ff11bc8eb63b0e/debug/deps/behavior-6c42ec9e6c079038)
+   Doc-tests repair_summary_event_mixed
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test detects_overflow ... ok
+test renders ... ok
+test rejects_empty ... ok
+test rejects_invalid ... ok
+test rejects_too_many ... ok
+test summarizes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[0m
+[0m← [0mWrite repair-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; json.load(open('/tmp/opencode/holzman-skillopt-train/a1b1be344aeb469c/repair_summary_event_mixed/repair-output.json')); print('valid JSON')"
+valid JSON
+[0m

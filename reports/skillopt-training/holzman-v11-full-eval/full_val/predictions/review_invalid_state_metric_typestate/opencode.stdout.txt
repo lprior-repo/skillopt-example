@@ -1,0 +1,15 @@
+Now I have all the context. The crate is tiny but has multiple Holzman violations. Let me write the review output.
+Review complete. Written to `review-output.json` with:
+
+- **7 BLOCKER findings** covering:
+  - `typestate-state-machine`: `status: String` instead of enum typestate (src/lib.rs:3)
+  - `bool-lifecycle`: independent `is_validated`/`is_sent` booleans (src/lib.rs:4-5)
+  - `option-invalid-state`: `sent_at_epoch_ms` decoupled from lifecycle (src/lib.rs:6)
+  - `newtype-domain-id`: raw `id: String` (src/lib.rs:2)
+  - `parse-boundary`: raw primitives cross boundary without smart constructors (src/lib.rs:2,3)
+  - `direct-mutation`: `mark_sent` mutates status string directly (src/lib.rs:10)
+  - `public-domain-fields`: all fields pub, no encapsulation (src/lib.rs:1)
+
+- **5 WARNING findings** covering: public fields, missing command/benchmark/profiler/allocation/second-ring evidence
+
+- **6 missing evidence entries** and a residual risk summary describing the illegal-state representability problem (the core issue matching the task name `review_invalid_state_metric_typestate`).

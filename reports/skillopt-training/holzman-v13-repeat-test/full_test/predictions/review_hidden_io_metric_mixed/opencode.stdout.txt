@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**10 findings, 6 BLOCKERs, 2 WARNINGs:**
+
+| # | Line | Rule | Issue |
+|---|------|------|-------|
+| 1 | 9 | no_unwrap | `fs::read_to_string(...).unwrap()` panics on I/O error |
+| 2 | 16 | no_hidden_io | `println!` inside parsing logic violates Data/CALC/Actions |
+| 3 | 16 | no_unchecked_indexing | `parts[0]` panics on malformed lines |
+| 4 | 19 | no_unchecked_indexing | `parts[1]` panics on lines with no comma |
+| 5 | 19 | no_unwrap | `.parse::<u32>().unwrap()` panics on non-numeric input |
+| 6 | 19 | no_lossy_cast | `as u16` silently wraps values > 65535 |
+| 7 | 8 | hidden_io_parser_fused | I/O, logging, parsing, and domain construction are all fused in one `pub` fn |
+| 8 | 12 | split_once_mandatory | `split(',').collect()` allocates per-line instead of mandatory `split_once` |
+| 9 | 3 | missing_typestate_record | Raw `String`/`u16` with no validation invariants |
+| 10 | 10 | missing_bounded_allocation | No `try_reserve` or domain cap on input size |
+
+**Missing evidence:** no benchmark, profiler, allocation analysis, or command-truth evidence.

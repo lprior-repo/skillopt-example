@@ -1,0 +1,7 @@
+Repair complete. Three violations fixed in `src/lib.rs`:
+
+1. **Missing `max_payload` gate** — added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge`
+2. **Lossy `as` cast** — replaced `payload.len() as u32` with `u32::try_from(payload.len())`, returning `FrameError::Overflow` on failure
+3. **No checked allocation** — replaced `Vec::new()` with `try_reserve(total)` using checked_add for capacity, returning `FrameError::Allocation` on failure
+
+Both behavior tests pass. `repair-output.json` written.

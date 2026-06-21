@@ -1,0 +1,14 @@
+Now let me run `cargo test` to see the current failures before making changes.
+All 6 tests pass. Now writing the repair output:
+Repair complete. All 6 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+1. **Return type**: `Result<String, SummaryError>` → `Result<Summary, SummaryError>` (matches test contract)
+2. **Added `render_summary`**: New public function that formats a `Summary` into the expected string
+3. **Removed `unwrap()`**: Replaced with `map_err` for parse failures
+4. **Removed unchecked indexing `parts[1]`**: Replaced with `split_once(',')` 
+5. **Removed unchecked arithmetic `total += value`**: Replaced with `checked_add`, returning `Overflow` on failure
+6. **Removed unchecked division**: Guarded by `count == 0` check before use
+7. **Removed `Vec` allocation**: Parsed directly with `split_once` on trimmed lines
+8. **Added empty-line skip**: Trims lines and skips blanks before processing

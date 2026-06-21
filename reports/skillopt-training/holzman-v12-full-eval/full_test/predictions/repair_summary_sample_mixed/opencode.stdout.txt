@@ -1,0 +1,17 @@
+Now I have full picture. The source has many Holzman violations: `unwrap`, unchecked indexing, unchecked arithmetic, lossy casts, wrong return type, missing `render_summary`, and `split('.').collect()` instead of `split_once`. Tests expect `Result<Summary, SummaryError>`.
+Repair complete. All 6 tests pass, clippy clean, valid JSON output written.
+
+**Violations repaired in `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| SummaryError::Invalid)?` |
+| `parts[1]` unchecked indexing | `split_once(',').ok_or(...)` |
+| `total += value` unchecked add | `total.checked_add(value).ok_or(...)` |
+| `count += 1` unchecked increment | `count.checked_add(1).ok_or(...)` |
+| `total / count` unchecked div | `total.checked_div(count_u64).ok_or(...)` |
+| `count as u32` / `count as u64` lossy casts | `u32::try_from(count)` / `u64::try_from(count)` |
+| `split(',').map(...).collect()` allocations | `split_once(',')` single parse |
+| Wrong return type `Result<String,...>` | `Result<Summary,...>` matching tests |
+| Missing `render_summary` function | Pure formatting function added |
+| No empty-input rejection | Early `input.trim().is_empty()` check + post-loop zero-count check |

@@ -1,0 +1,26 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test encodes ... ok
+test rejects_limit ... FAILED
+
+failures:
+
+---- rejects_limit stdout ----
+
+thread 'rejects_limit' (4136870) panicked at tests/behavior.rs:12:5:
+assertion `left == right` failed
+  left: Ok([0, 0, 0, 6, 97, 98, 99, 100, 101, 102])
+ right: Err(PayloadTooLarge)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rejects_limit
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,75 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead tests
+[0m→ [0mRead tests/behavior.rs
+[0m
+[0m← [0mEdit src/lib.rs
+Index: /tmp/opencode/holzman-skillopt-train/ed060f494acb9512/repair_csv_event_mixed/src/lib.rs
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/ed060f494acb9512/repair_csv_event_mixed/src/lib.rs
++++ /tmp/opencode/holzman-skillopt-train/ed060f494acb9512/repair_csv_event_mixed/src/lib.rs
+@@ -6,10 +6,18 @@
+     Allocation,
+ }
+ 
+ pub fn parse_events(input: &str, max_items: usize) -> Result<Vec<u16>, ParseError> {
+-    let values: Vec<u16> = input
+-        .split(',')
+-        .map(|part| part.trim().parse::<u16>().unwrap())
+-        .collect();
++    if input.is_empty() {
++        return Err(ParseError::Empty);
++    }
++    let mut values: Vec<u16> = Vec::new();
++    values.try_reserve(max_items).map_err(|_| ParseError::Allocation)?;
++    for part in input.split(',') {
++        if values.len() >= max_items {
++            return Err(ParseError::TooMany);
++        }
++        let v = part.trim().parse::<u16>().map_err(|_| ParseError::Invalid)?;
++        values.push(v);
++    }
+     Ok(values)
+ }
+
+[0m
+[0m$ [0mcargo fmt
+(no output)
+[0m
+[0m$ [0mcargo test
+Compiling repair_csv_event_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/ed060f494acb9512/repair_csv_event_mixed)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/c2194ff7651180c3/debug/deps/repair_csv_event_mixed-8761595bedcf92ea)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/c2194ff7651180c3/debug/deps/behavior-6ef1b08ad2c16c8d)
+   Doc-tests repair_csv_event_mixed
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test rejects_empty ... ok
+test rejects_invalid ... ok
+test parses_values ... ok
+test rejects_too_many ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[0m
+[0m← [0mWrite repair-output.json
+Wrote file successfully.
+[0m

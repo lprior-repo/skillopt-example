@@ -1,0 +1,30 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "Removed unwrap() - parse failure returns SummaryError::Invalid via map_err",
+    "Removed unchecked += - replaced with checked_add returning SummaryError::Overflow",
+    "Removed lossy as casts for division - used u32::try_from for count conversion",
+    "Removed unchecked indexing parts[1] - added bounds validation via parts.len() < 2 check",
+    "Removed string return from pure logic - summarize_metrics now returns Summary struct; rendering delegated to render_summary",
+    "Added empty-input rejection returning SummaryError::Empty",
+    "Added line format validation (comma-separated minimum) returning SummaryError::Invalid",
+    "Preserved max_rows enforcement returning SummaryError::TooMany",
+    "No tests edited; all 6 behavior tests pass",
+    "No Cargo.toml edits",
+    "Functional core: pure Summary computation separated from render_summary string formatting"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "usize-to-u32 conversion on count uses try_from with Invalid fallback; this covers the theoretical overflow of 4 billion rows which is functionally unreachable in practice and would not cause memory safety issues"
+}

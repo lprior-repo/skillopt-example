@@ -1,0 +1,74 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow has no explicit lifecycle state machine. The struct allows any combination of is_validated/is_sent without enforcing valid transitions (e.g., sent without validated, or re-sending after already sent).",
+      "failure_mode": " callers can construct a BudgetWorkflow in an invalid lifecycle configuration (e.g., is_sent=true with is_validated=false), and mark_sent can be called repeatedly without checking prior state.",
+      "fix": "Replace is_validated and is_sent with an explicit enum typestate such as enum BudgetStage { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }. Constructors enforce valid transitions; the enum owns lifecycle data so Option is unnecessary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String. Any caller can set it to any string value (e.g., \"foo\", \"\", \"SENT\", \"sent\"), making the domain state space unbounded and unenforceable.",
+      "failure_mode": " callers can assign arbitrary strings to status, breaking invariant that status must be one of a known set (draft/validated/sent). Comparison becomes case-sensitive string equality rather than enum variant match.",
+      "fix": "Replace status: String with a domain enum: enum BudgetStatus { Draft, Validated, Sent }. Remove the separate status field and is_sent boolean; encode transitions in the enum variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent booleans with no invariant enforcing their relationship. They represent a two-bit state machine (4 combinations) but only 3 are valid.",
+      "failure_mode": " callers can set is_sent=true while is_validated=false (sent without validation), or set both to true simultaneously without an ordered transition. No enforcement of the single-source-of-truth for lifecycle.",
+      "fix": "Replace both booleans with a single enum typestate: enum BudgetStage { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }. The enum variants enforce valid states and carry lifecycle data in the variant that owns it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate optional field coexisting with a boolean is_sent, allowing sent_at_epoch_ms to be Some without is_sent=true, or is_sent=true without sent_at_epoch_ms being Some.",
+      "failure_mode": " callers can leave sent_at_epoch_ms=None while is_sent=true (sent with no timestamp), or set sent_at_epoch_ms=Some(x) while is_sent=false (timestamp without being sent). The Option is a dangling lifecycle field not owned by a variant.",
+      "fix": "Fold sent_at_epoch_ms into the Sent variant: enum BudgetStage { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }. This makes the timestamp present only when the budget is sent, eliminating invalid Option/bool combinations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain invariants. Any string (empty, unbounded, non-unique) is accepted as a budget ID. Raw primitives cross the parse boundary without fallible smart constructors.",
+      "failure_mode": " callers can construct a BudgetWorkflow with an empty string, whitespace, or otherwise invalid id. The domain cannot enforce rules like minimum length, format, or uniqueness. id is not a newtyped primitive.",
+      "fix": "Create a BudgetId newtype with a smart constructor: pub struct BudgetId(String); impl BudgetId { fn new(s: &str) -> Result<Self, BudgetError::InvalidId> { ... } }. Parse hostile input once at the boundary into trusted BudgetId; the core consumes BudgetId, not String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow exposes all fields as pub with raw primitives (String, bool, Option<u64>). There is no parse boundary: callers can construct the struct directly with any values, bypassing validation. Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": " any code in the crate (or downstream crates) can instantiate BudgetWorkflow with id=\"\", status=\"bogus\", is_validated=false, is_sent=true, sent_at_epoch_ms=None — an internally inconsistent and invalid domain object with zero validation at construction.",
+      "fix": "Make all fields private. Provide a single fallible constructor or builder that validates invariants (e.g., validated before sent, sent requires timestamp). Replace raw primitives with domain types (BudgetId newtype, BudgetStage enum). The public API becomes: impl BudgetWorkflow { fn new(id: BudgetId) -> Self { ... } fn validate(&mut self) -> Result<(), BudgetError> { ... } fn mark_sent(&mut self) -> Result<(), BudgetError> { ... } }."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent hot-path latency or throughput",
+    "no profiler evidence that BudgetWorkflow layout is cache-optimal",
+    "no allocation analysis: mark_sent creates String via \"sent\".to_string() on every call instead of using a static enum variant",
+    "no second-ring evidence for zero-cost abstraction claims",
+    "no command evidence (cargo fmt/check/clippy/test) was run during this static review"
+  ],
+  "residual_risk": "Static review only. The crate has severe typestate violations: status as String instead of enum, independent lifecycle booleans instead of a unified state machine, dangling Option lifecycle field, raw String ID without newtype, and no parse boundary. A caller can construct any invalid state combination at compile time. The mark_sent function adds String allocation per call instead of using enum variants. These are fundamental architectural defects requiring full enum/typestate replacement, not incremental repairs."
+}

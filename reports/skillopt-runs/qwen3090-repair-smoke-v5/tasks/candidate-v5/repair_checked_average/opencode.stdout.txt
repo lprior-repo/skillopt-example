@@ -1,0 +1,4 @@
+Now I understand the issues. The function has unchecked arithmetic and no empty-slice check. Let me fix it.
+The overflow test expects sum overflow in u32 to be detected even if the final average would fit. Let me adjust:
+All tests pass. Let me also verify clippy compliance:
+`repair-output.json` written; `cargo test` passed all 3 tests (averages_values, rejects_empty_slice, detects_overflow).

@@ -1,0 +1,7 @@
+Repaired. Two fixes in `src/lib.rs`:
+
+1. **Added `max_payload` bounds check** — `rejects_limit` test failed because `max_payload` was unused. Added `payload.len() > max_payload` guard returning `FrameError::PayloadTooLarge`.
+
+2. **Replaced lossy `as u32`** — `payload.len() as u32` violates Holzman constraint on lossy conversions. Replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)`.
+
+Both tests pass. Output written to `repair-output.json`.

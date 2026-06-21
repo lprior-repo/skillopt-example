@@ -1,0 +1,40 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test parses_values ... ok
+test rejects_invalid ... FAILED
+test rejects_empty ... FAILED
+test rejects_too_many ... FAILED
+
+failures:
+
+---- rejects_invalid stdout ----
+
+thread 'rejects_invalid' (2952883) panicked at src/lib.rs:12:48:
+called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }
+
+---- rejects_empty stdout ----
+
+thread 'rejects_empty' (2952882) panicked at src/lib.rs:12:48:
+called `Result::unwrap()` on an `Err` value: ParseIntError { kind: Empty }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- rejects_too_many stdout ----
+
+thread 'rejects_too_many' (2952884) panicked at tests/behavior.rs:17:5:
+assertion `left == right` failed
+  left: Ok([1, 2, 3])
+ right: Err(TooMany)
+
+
+failures:
+    rejects_empty
+    rejects_invalid
+    rejects_too_many
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

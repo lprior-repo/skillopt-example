@@ -1,0 +1,12 @@
+Now I have a clear picture. The source has multiple Holzman violations: `unwrap()`, `split`+`collect`+unchecked indexing, unchecked `+=`, unchecked `/`, lossy `as` casts, and missing `render_summary`. The tests expect `Result<Summary, ...>` not `Result<String, ...>`.
+All 6 tests pass. Writing the output file.
+Repaired. All 6 tests pass. Changes in `src/lib.rs`:
+
+- **`unwrap()` removed** -- parse errors now map to `SummaryError::Invalid`
+- **`split`+`collect`+`parts[1]` removed** -- replaced with `split_once(',')`
+- **Unchecked `total += value` removed** -- replaced with `checked_add`, overflow maps to `SummaryError::Overflow`
+- **Unchecked `total / count as u64` removed** -- replaced with `checked_div`
+- **Lossy `count as u32` removed** -- replaced with `u32::try_from(count)`
+- **Added `render_summary`** function matching the test contract
+- **Changed return type** from `Result<String>` to `Result<Summary>` matching tests
+- **Added empty-input detection** (`count == 0` → `SummaryError::Empty`)

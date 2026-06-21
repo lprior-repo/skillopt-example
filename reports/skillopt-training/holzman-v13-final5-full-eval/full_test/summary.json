@@ -1,0 +1,19 @@
+{
+  "candidate": "holzman-rust-candidate-v13-final5",
+  "skill_sha256": "ca9f71b6a3beba628b9c788de93c39a822bce11a722091cb4ab2bf036e75ca6f",
+  "split": "test",
+  "n": 22,
+  "hard": 0.9545454545454546,
+  "soft": 0.9990909090909091,
+  "passed": 21,
+  "failed": [
+    "repair_csv_route_mixed"
+  ],
+  "fail_reasons": {
+    "repair_csv_route_mixed": "try_reserve"
+  },
+  "model_counts": {
+    "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf": 12,
+    "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf": 10
+  }
+}

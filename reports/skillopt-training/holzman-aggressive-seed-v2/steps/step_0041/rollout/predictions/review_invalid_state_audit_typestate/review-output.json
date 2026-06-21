@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "AuditWorkflow uses bool flags (is_validated, is_sent) and a raw String for status instead of enums or typestates. Any combination of these fields is constructible, including impossible states like is_sent=true with status=\"draft\", or is_validated=true with is_sent=false when domain requires validation before sending.",
+      "failure_mode": "Downstream code must defensively check every combination of flags and string values. A caller can construct an AuditWorkflow with is_sent=true and sent_at_epoch_ms=None, or is_validated=false and status=\"sent\", causing logic errors that compile but fail at runtime.",
+      "fix": "Replace status: String with an enum AuditStatus { Draft, Validated, Sent }. Replace is_validated: bool and is_sent: bool with a single typestate enum AuditState { Draft, Validated, Sent } that encodes valid transitions. The type system enforces valid states at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from is_sent: bool. When is_sent is true, sent_at_epoch_ms should always be Some, but there is no invariant enforcement. When is_sent is false, it should always be None.",
+      "failure_mode": "A caller can set is_sent=true while sent_at_epoch_ms=None (missing timestamp for a sent audit), or is_sent=false while sent_at_epoch_ms=Some(123) (timestamp without send). Any consumer checking is_sent cannot trust the timestamp presence.",
+      "fix": "Encode sent_at_epoch_ms into the typestate enum. For example: enum AuditState { Draft } with no timestamp, enum AuditState { Sent { sent_at_epoch_ms: u64 } } where the timestamp is required and stored in the variant. This makes the illegal state of sent-without-timestamp unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive. An audit workflow ID has domain identity semantics and should be a typed newtype to prevent mixing with other string values (e.g., status strings, timestamps).",
+      "failure_mode": "Accidentally passing a status string or other string where an ID is expected compiles and runs. Domain intent is lost, making refactoring error-prone.",
+      "fix": "Introduce a newtype: pub struct AuditId(String) or pub struct AuditId(u64). Add a fallible constructor if the ID has format constraints. This makes illegal ID usage a compile error."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership of AuditWorkflow and mutates it in the imperative shell style, but does not enforce any preconditions (e.g., must be validated before sending). The function signature allows calling mark_sent on a Draft workflow with no validation gate.",
+      "failure_mode": "Any caller can send an unvalidated audit workflow, violating a likely domain invariant. The function accepts any AuditWorkflow regardless of its current state.",
+      "fix": "Change the signature to accept a state-gated type: fn mark_sent(state: AuditStateValidated) -> AuditWorkflowSent. This uses the typestate to enforce that only a validated workflow can be sent. The validated state type carries the necessary data."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle flag that should be an enum or typestate. Two separate bools (is_validated, is_sent) create a 4-state space where only 2-3 are valid, but the compiler cannot distinguish valid from invalid.",
+      "failure_mode": "Callers must remember to check both flags and their relationship. A state with is_validated=false and is_sent=false is structurally identical to the initial state, making state inspection ambiguous. Adding new states requires adding more bools, creating exponential combinations.",
+      "fix": "Replace both bools with a single enum: enum AuditState { Draft, Validated, Sent } or a typestate pattern with zero-sized marker types (Draft, Validated, Sent) on the struct. The compiler tracks valid states and transitions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_string_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary values. The mark_sent function hardcodes \"sent\" but callers can set any string value. No enum enforces valid status values.",
+      "failure_mode": "A caller can set status=\"sent\" without going through mark_sent, or status=\"SENT\" (wrong case), or status=\"\" (empty). Pattern matching on status requires exhaustive string comparisons instead of enum variants. Typos in string literals are silent runtime bugs.",
+      "fix": "Replace with: pub status: AuditStatus where enum AuditStatus { Draft, Validated, Sent }. Pattern matching becomes exhaustive, typos are compile errors, and the domain language is explicit."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent creates a new String allocation via \"sent\".to_string() for every call. Combined with id: String (already a heap allocation), this struct has no small-vector or string-interning optimization for hot paths.",
+      "failure_mode": "Frequent mark_sent calls in hot paths cause repeated heap allocations. For a simple status transition, this is unnecessary overhead.",
+      "fix": "Use an enum for status (zero-cost at runtime). If a String id is needed, consider string interning or a numeric ID newtype. For the id field, use a typed newtype like AuditId(u64) to avoid heap allocation entirely."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent performance or AuditWorkflow lifecycle operations",
+    "no profiler data for allocation patterns in hot paths",
+    "no allocation audit showing Vec::with_capacity vs try_reserve usage (no Vec present but String allocations unbounded)",
+    "no second-ring evidence (no fuzzing, property tests, or state-space exploration of AuditWorkflow valid/invalid state transitions)",
+    "no command evidence: cargo fmt, cargo clippy, or cargo test not run or reported"
+  ],
+  "residual_risk": "The struct fundamentally violates the Power-of-Ten principle of making illegal states unrepresentable. All 4 field combinations are valid at compile time, but likely only 2-3 are domain-valid. Without typestate/enum refactoring, runtime invariant checks are mandatory everywhere AuditWorkflow is used. Static review only; no commands run."
+}

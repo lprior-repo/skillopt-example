@@ -1,0 +1,11 @@
+Diff in /tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v3/tasks/baseline/repair_checked_average/src/lib.rs:10:
+     }
+     let mut sum: u64 = 0;
+     for value in values {
+[31m-        sum = sum.checked_add(*value as u64).ok_or(AverageError::Overflow)?;
+(B[m[32m+        sum = sum
+(B[m[32m+            .checked_add(*value as u64)
+(B[m[32m+            .ok_or(AverageError::Overflow)?;
+(B[m         if sum > u32::MAX as u64 {
+             return Err(AverageError::Overflow);
+         }

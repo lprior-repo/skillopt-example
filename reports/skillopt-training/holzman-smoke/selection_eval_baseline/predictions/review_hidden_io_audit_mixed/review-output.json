@@ -1,0 +1,85 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, etc.)",
+      "failure_mode": "External/untrusted file path causes process abort instead of returning a typed error to the caller",
+      "fix": "Return Result<Vec<Record>, io::Error> (or a domain error enum) and propagate with ? operator"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unwrap",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input",
+      "failure_mode": "Malformed CSV data (e.g. 'alpha,beta') aborts the process instead of returning a typed parse error",
+      "fix": "Use parts[1].parse::<u32>().map_err(|e| ParseError::InvalidValue { field: parts[0].clone(), reason: e.to_string() }) and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "as u16 cast silently truncates u32 values above 65535",
+      "failure_mode": "A valid u32 like 70000 silently wraps to 4464, producing incorrect audit data with no indication of data loss",
+      "fix": "Use u16::try_from(parts[1].parse::<u32>()?).map_err(|_| RangeError::ValueTooLarge) or parse directly as u16 with parts[1].parse::<u16>().unwrap()..."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts[0] accesses index 0 of a Vec that could be empty if line is empty or has no commas",
+      "failure_mode": "Empty line or line with no comma causes index-out-of-bounds panic",
+      "fix": "Use split_once(',') and handle None, or check parts.len() before indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parts[1] accesses index 1 without checking length; line with single field (no comma) has Vec length 1",
+      "failure_mode": "Line with no comma (e.g. 'solo_line') panics on index 1 access before even reaching parse",
+      "fix": "Check parts.len() >= 2 or use split_once(',') which yields exactly 0 or 2 branches"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_boundary",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "println!() is a side-effecting I/O call inside what should be a pure parsing pipeline",
+      "failure_mode": "Hidden logging side effect makes the function non-deterministic, harder to test in isolation, and couples the parsing core to stdout. Violates functional core / imperative shell separation.",
+      "fix": "Remove println! from the core. If audit logging is needed, return a separate log/trace type from a shell function, or accept a writer callback in the shell layer"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_shell_boundary",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_audits mixes file I/O (fs::read_to_string) with parsing logic in a single function",
+      "failure_mode": "Cannot unit-test the parsing logic without mocking the filesystem; pure parse behavior is not isolated from I/O failure modes",
+      "fix": "Split into (a) fn parse_records(lines: &[&str]) -> Result<Vec<Record>, ParseError> (pure core) and (b) fn load_audits(path: &str) -> Result<Vec<Record>, IoError> (shell that reads file and delegates to core)"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "Collects every split part into Vec<String> with owned clones instead of using split_once or borrowed slices",
+      "failure_mode": "Unnecessary heap allocations per line; for large audit files this compounds into significant memory pressure and GC pressure. The grammar expects exactly 2 fields but collects all of them into owned Strings.",
+      "fix": "Use line.split_once(',') to get (&str, &str) directly without allocation, then .trim() those borrowed slices"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for file I/O throughput or parsing performance",
+    "no profiler data for allocation profiles under realistic audit file sizes",
+    "no second-ring command evidence (no cargo test, cargo clippy, or Miri runs)",
+    "no benchmark/profiler/allocation/command evidence per Holzman performance discipline"
+  ],
+  "residual_risk": "Static review only; no commands run. All 6 blocker findings are direct violation of zero-forbidden-constructs rules (unwrap, unchecked indexing, lossy cast, hidden I/O side effect). The function as-written will panic on any malformed input, missing file, or value outside u16 range. Functional core/shell boundary is violated with println! in the parsing loop."
+}

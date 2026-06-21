@@ -1,0 +1,32 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/ed4ac7735f44d13a/repair_summary_ledger_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/ed4ac7735f44d13a/repair_summary_ledger_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/ed4ac7735f44d13a/repair_summary_ledger_mixed/.skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    { "command": "cargo fmt", "status": "passed" },
+    { "command": "cargo test", "status": "passed" }
+  ],
+  "rules_satisfied": [
+    "No production unsafe, unwrap, expect, panic, todo, unimplemented, unreachable",
+    "No unchecked indexing (split_once replaces parts[1] vector indexing)",
+    "No unchecked arithmetic (checked_add for total, checked_div for average)",
+    "No lossy as casts (u32::try_from replaces count as u32)",
+    "Empty input rejected with SummaryError::Empty",
+    "max_rows enforced before processing (TooMany returned on overflow)",
+    "Parse errors mapped via map_err to SummaryError::Invalid",
+    "Overflow detected via checked_add returning SummaryError::Overflow",
+    "Functional core: summarize_metrics returns pure Summary value",
+    "render_summary separated as formatting-only shell function",
+    "Tests untouched - behavior contract preserved",
+    "Cargo.toml untouched - no dependency changes needed",
+    "6/6 behavior tests pass"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all forbidden constructs removed, all tests pass, checked arithmetic covers overflow edge case, split_once covers malformed line edge case, render_summary handles pure formatting"
+}

@@ -1,0 +1,93 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_shell_leakage",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "File I/O (fs::read_to_string) and logging (println!) are fused into a single function that also does parsing and allocation. Data/Calculations/Actions architecture requires I/O in the shell and pure logic in the core.",
+      "failure_mode": "Caller cannot mock or test parsing logic without hitting the filesystem; side effects in core break determinism and prevent composable retry/error-recovery strategies.",
+      "fix": "Split into a shell function that reads bytes and a pure function that parses Vec<u8> or &[u8] into records. Move println! into the shell layer only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing file, permission denied, or I/O error instead of returning a typed error.",
+      "failure_mode": "Untrusted file paths abort the process; no graceful recovery, retry, or error context.",
+      "fix": "Return Result<Vec<Record>, LoadError>; use .map_err(|e| LoadError::Io(e)) instead of unwrap()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or out-of-range value fields.",
+      "failure_mode": "Malformed CSV rows abort the entire load instead of reporting a per-record parse error.",
+      "fix": "Use Result-returning pipeline: parts[1].trim().parse::<u32>().map_err(|_| ParseError::Invalid(field_index))?."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_access_no_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing on a Vec<String> without bounds verification.",
+      "failure_mode": "A line with fewer than 2 comma-separated fields panics at runtime via index out of bounds.",
+      "fix": "Use parts.get(0) and parts.get(1).ok_or(ParseError::InvalidFieldCount)? with explicit error on missing fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(...).parse::<u32>().unwrap() as u16 is a lossy cast: values in [65536, u32::MAX] silently truncate.",
+      "failure_mode": "A valid u32 value like 70000 silently becomes 14464 in the Record, corrupting data with no error.",
+      "fix": "Replace with u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow(field_index))? to catch out-of-range values."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_mandatory",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates a Vec for every field of every line. SKILL.md mandates split_once(',') for one-separator grammars.",
+      "failure_mode": "Wasted allocations per row; lines with extra commas silently ignored; no enforced 2-field shape; harder to reason about field boundaries.",
+      "fix": "Use let (name_str, value_str) = line.split_once(',').ok_or(ParseError::InvalidRow)?; parse each half independently."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unbounded_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "text.lines().map(...).collect() allocates an unbounded Vec with no capacity reservation, no max_items cap, and no try_reserve.",
+      "failure_mode": "A large file can exhaust memory; allocation failure returns OOM panic instead of a typed error.",
+      "fix": "Accept a max_items parameter; validate file length or line count against the cap; call values.try_reserve(max_items).map_err(|_| LoadError::Allocation)?; enforce max before push."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_raw_primitives",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String for name and raw u16 for value. No parse boundary smart constructor validates or constrains domain values. Raw primitives cross the parse boundary without validation, so callers can construct invalid domain states directly.",
+      "failure_mode": "Empty names, names with leading/trailing whitespace, or value=0 (if semantically invalid) are silently accepted by the domain.",
+      "fix": "Introduce a Name newtype with a smart constructor that rejects empty/whitespace-only strings. Keep u16 but validate zero-range at parse time. Provide Record::new(name: Name, value: u16) with domain validation."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied performance characteristics",
+    "no profiler evidence for allocation hot path in load_frames",
+    "no allocation budget or capacity evidence for Vec growth",
+    "no command evidence: cargo fmt, cargo check, cargo clippy, or cargo test were not run",
+    "no second-ring evidence (no target hardware, workload, or measurement baseline)"
+  ],
+  "residual_risk": "Static review only; no commands run. Eight BLOCKER findings remain: panic surfaces (unwrap), unchecked indexing, lossy cast, hidden I/O, unbounded allocation, missing split_once, missing typed error taxonomy, and raw primitive domain state. All eight violate absolute laws from SKILL.md. Delivery must not proceed until all are remediated."
+}

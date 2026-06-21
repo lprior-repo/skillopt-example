@@ -1,0 +1,19 @@
+Now I have all the information needed. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**12 findings across the task crate `src/lib.rs`:**
+
+**6 BLOCKERs:**
+- Line 9: `fs::read_to_string().unwrap()` — panics on IO errors
+- Line 19: `.parse::<u32>().unwrap()` — panics on invalid numeric input
+- Line 19: `as u16` lossy cast — values >65535 silently truncate
+- Line 12: `split(',') + collect()` — over-collecting instead of `split_once`
+- Line 16: `parts[0]` — unchecked indexing without bounds check
+- Line 19: `parts[1]` — unchecked indexing without bounds check
+
+**3 WARNINGs:**
+- Line 16: `println!` embedded in data-parsing logic (side effect in pipeline)
+- Line 8: `load_leases` mixes I/O, parsing, and domain construction (not functionally pure)
+
+**3 INFOs (missing evidence):**
+- No benchmark, no profiler evidence, no allocation tracking, no tests, no command evidence

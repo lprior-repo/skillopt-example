@@ -1,0 +1,8 @@
+Now I have all the information needed. Let me write the review.
+Review complete. Written to `review-output.json` with 9 findings:
+
+- **6 typestate findings** (per SKILL.md mandatory review mode): enum/state machine, status/String, bool/lifecycle, Option invalid-state, newtype/domain IDs, parse boundary
+- **2 additional violations**: public fields (no encapsulation), magic string literal
+- **1 missing evidence**: no benchmark/profiler/allocation data
+
+Core issues: `PacketWorkflow` uses raw `String`, `bool`, and `Option<u64>` fields instead of a typestate enum, making illegal states fully representable. `mark_sent` mutates status via a magic string literal. All fields are `pub`, allowing arbitrary external mutation.

@@ -1,0 +1,108 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String instead of a typed enum, permitting invalid lifecycle combinations",
+      "failure_mode": "Any arbitrary string can be assigned to status (e.g. \"foobar\", \"\"), violating the workflow domain invariant that status must be a valid lifecycle state",
+      "fix": "Replace `pub status: String` with `pub status: JobStatus` where `JobStatus` is an explicit enum with all valid lifecycle states"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are raw bools that redundantly encode lifecycle state alongside status String",
+      "failure_mode": "Illegal states are representable: status could be \"sent\" while is_sent is false, or status could be \"validated\" while is_sent is true. The compiler cannot prevent these invalid combinations",
+      "fix": "Replace all three fields (status, is_validated, is_sent) with a single typestate enum like `JobStage` with explicit variants (e.g. `Pending`, `Validated`, `Sent`), or use typestate newtypes that enforce transitions at the type level"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-optional-lifecycle-data",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a global optional field that permits sent timestamps on non-sent jobs",
+      "failure_mode": "sent_at_epoch_ms can hold a value while is_sent=false and status is not \"sent\", creating an invalid state where a job has a send timestamp but hasn't been sent. Optional lifecycle data should live inside the enum variant that owns it",
+      "fix": "Move sent_at_epoch_ms into the enum variant that represents the sent state, e.g. `JobStage::Sent { sent_at_epoch_ms: u64 }`, making it impossible to have a timestamp without the sent state"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-newtype-id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain meaning or validation, allowing empty, duplicate, or malformed IDs to roam through the core",
+      "failure_mode": "Empty strings, null bytes, or non-unique identifiers can flow through the workflow system unchecked, leading to ambiguous job references and potential data corruption",
+      "fix": "Replace with a newtype `struct JobId(String)` or similar, with a smart constructor that validates format (e.g. non-empty, UUID pattern) and returns a typed error"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-side-effect",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs `.to_string()` allocation on a hardcoded literal and directly mutates struct fields, fusing action-level mutation into the core without a parse boundary",
+      "failure_mode": "The function allocates on every call for a known string literal \"sent\", and takes/returns a mutable struct instead of a pure function that transforms between typestates. This breaks the functional core / imperative shell boundary",
+      "fix": "Replace with a pure function that takes a `JobStage::Validated` (or equivalent pre-sent state) and returns `JobStage::Sent { sent_at_epoch_ms: <provided> }`, eliminating the allocation and enforcing the transition at the type level"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero-forbidden-constructs",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "Uses `.to_string()` on a hardcoded string literal, which allocates unnecessarily for a known value",
+      "failure_mode": "Unnecessary heap allocation on every call. While not a safety issue, it violates the performance default of avoiding intermediate allocations and the broader principle of predictable resource usage",
+      "fix": "Eliminate the allocation entirely by using an enum type for status and removing the string assignment; the enum variant discriminant is zero-cost"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive-domain-roaming",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields (id, status, booleans, Option<u64>) are primitive types with no domain semantics at the type level",
+      "failure_mode": "The compiler provides zero protection against invalid job states. Any combination of fields is legal at compile time, and runtime validation would be needed everywhere the struct is used — which is unlikely given there are no smart constructors visible",
+      "fix": "Apply the full Holzman domain modeling stack: newtype for id, enum for lifecycle stage with associated data in variants, and typed smart constructors at the parse boundary"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for mark_sent or any hot-path throughput measurement",
+      "failure_mode": "No evidence that the function (or a future replacement) meets latency or throughput requirements under load",
+      "fix": "Add a `benches/` directory with a criterion or similar benchmark measuring mark_sent throughput and allocation count"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-profiler-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No allocation profiling evidence (e.g., `--profiler`, `perf`, `cargo-flamegraph`, or allocation tracing) for the function",
+      "failure_mode": "Cannot verify whether the `.to_string()` allocation is a real bottleneck or benign",
+      "fix": "Run allocation profiler (e.g., `cargo-flamegraph --root` or `dhat-rs` in a test harness) to confirm allocation count and latency impact"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-second-ring-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No clippy/fmt/check gate evidence reported; no second-ring static analysis was run against this crate",
+      "failure_mode": "Unknown whether the crate passes strict lint gates (unwrap, expect, panic, indexing_slicing, etc.)",
+      "fix": "Run `cargo fmt --check`, `cargo check --workspace --all-targets --all-features`, and `cargo clippy --workspace --lib --bins --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used` and include exact results"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any throughput measurement",
+    "no profiler or allocation tracing evidence for the .to_string() call",
+    "no clippy/fmt/check second-ring gate results reported",
+    "no behavior tests for state transitions or invalid state prevention"
+  ],
+  "residual_risk": "The crate represents a textbook case of primitive-driven struct design with no type-level invariants. Any consumer of JobWorkflow can construct illegal states at compile time. The mark_sent function allocates on a known literal and mutates raw fields. Without enum-based typestate and newtype guards, the core has zero protection against invalid domain states. This is a structural domain-modeling failure, not a superficial lint issue. Full rewrite to enum typestate is required before this crate can be considered Holzman-compliant."
+}

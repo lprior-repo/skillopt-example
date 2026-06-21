@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production code uses `std::mem::transmute` inside an `unsafe` block to convert `[u8; 4]` to `u32`. Holzman Rust forbids all production `unsafe`.",
+      "failure_mode": "transmute bypasses endianness guarantees; on big-endian hosts it returns host-byte-order instead of the intended little-endian wire format, silently corrupting the parsed length",
+      "fix": "Replace with `u32::from_le_bytes([input[0], input[1], input[2], input[3]])` (or `from_be_bytes` if big-endian is the protocol). Remove `unsafe` entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Unbounded array indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` with no length check before access.",
+      "failure_mode": "Caller passes a slice shorter than 4 bytes; the function panics at runtime via `IndexOutofBounds`, converting a recoverable protocol error into a process abort",
+      "fix": "Add `require!(input.len() >= 4)` or use a `match input { [a, b, c, d, ..] => ... }` pattern to reject undersized input at the function boundary with a typed error instead of panicking."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_transmute",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`std::mem::transmute::<[u8; 4], u32>` is used for byte-to-integer conversion. `transmute` asserts bitwise equivalence but does not express intent or guarantee endianness to callers or tools.",
+      "failure_mode": "Static analysis and reviewers cannot tell whether LE or BE is intended; tooling like Miri and Kani cannot reason about the intent. Big-endian hosts silently produce wrong values, and the function name `read_len` suggests reading from a wire format (typically LE or BE explicitly), not host memory layout",
+      "fix": "Use `u32::from_le_bytes` or `u32::from_be_bytes` from the standard library. These are `const`, safe, endianness-explicit, and reviewable."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for `read_len`. Any performance claim about byte-to-integer parsing speed is unmeasured.",
+      "failure_mode": "Optimization decisions (e.g., replacing with `from_le_bytes`, adding bounds checking, or SIMD) are made without data, risking regression or missed gains",
+      "fix": "Add a `cargo bench` benchmark comparing the current implementation against `from_le_bytes` with and without bounds checks on representative input sizes."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (perf, flamegraph, etc.) exists to show `read_len` cost in the caller's workload.",
+      "failure_mode": "The function may be a hot path or a cold path; without profiling, optimization effort is misallocated",
+      "fix": "Profile the containing workload to establish whether `read_len` is in a critical path before optimizing."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation analysis for the stack-allocated `[u8; 4]` temporary. While this is stack-only (zero allocation), no evidence confirms the caller's memory profile is not tight.",
+      "failure_mode": "In constrained environments (e.g., embedded, kernel, or deep call stacks), even stack temporaries can contribute to stack pressure",
+      "fix": "Note the zero-allocation property in code review; add allocation tracking if the caller runs in constrained stack environments."
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_return_type_error",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns `u32` directly with no error type for undersized input. The caller has no way to distinguish a valid `0` from an underslice error.",
+      "failure_mode": "Protocol errors are lost; the caller cannot distinguish a legitimately-zero length from a truncated frame",
+      "fix": "Change signature to `pub fn read_len(input: &[u8]) -> Result<u32, ReadLenError>` where `ReadLenError` encodes `InsufficientData { expected: 4, got: input.len() }`."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for `read_len`", "no profiler evidence for caller workload", "no allocation analysis for stack pressure in constrained callers"],
+  "residual_risk": "Static review only; no commands run. The crate has no tests, no benchmarks, and no CI. Three BLOCKERs (unsafe transmute, unchecked indexing, transmute misuse) must be fixed before delivery. The function as written will panic on short inputs and silently produce wrong values on big-endian hosts."
+}

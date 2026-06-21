@@ -1,0 +1,48 @@
+{
+  "step": 14,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 4,
+  "failure_patterns": [
+    {
+      "pattern": "missing_try_reserve: Agents consistently use Vec::with_capacity instead of try_reserve for bounded allocations in both repair and review tasks.",
+      "count": 2,
+      "task_ids": [
+        "repair_csv_quote_mixed",
+        "repair_csv_telemetry_mixed"
+      ]
+    },
+    {
+      "pattern": "missing_checked_arithmetic: Agents fail to use checked_add/checked_mul/checked_div for accumulators, capacity math, and summary calculations.",
+      "count": 2,
+      "task_ids": [
+        "review_hidden_io_audit_mixed",
+        "review_hidden_io_token_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.8,
+  "score_after": 0.7,
+  "rejected_edits": [
+    {
+      "op": "replace",
+      "content": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.\n- **Allocation:** For `Vec` with known/bounded capacity, compute capacity with `checked_add`/`checked_mul` (never unchecked `+`/`*`). Call `try_reserve` (not `Vec::with_capacity`) before pushing/extending, and map allocation failure to a typed error. Never use `Vec::with_capacity` for bounded allocations.\n- **Arithmetic:** Use `checked_add`/`checked_mul` for all accumulators, sizes, totals, and capacity calculations. Use `checked_div` for division (with non-zero check). Use `try_from` for all width casts (e.g., `usize` to `u32`). Never use `as` for width changes or unchecked `+`/`*`/`/` for totals.\n- **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.",
+      "target": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.\n- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.\n- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.\n- **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`."
+    },
+    {
+      "op": "replace",
+      "content": "## Review Mode\n\nFindings must be independently gradable: severity, rule, file, line, problem, concrete failure mode, and smallest compliant fix. Flag missing evidence as a finding. Review outputs requested as JSON must be valid.\n\n**Mandatory Review Checklist:**\n1. **Allocation:** Any `Vec` with a known or bounded capacity must use `try_reserve` (not `with_capacity`) to handle `Allocation` errors.\n2. **Arithmetic:** All accumulators, sizes, and totals must use `checked_add`/`checked_mul`. Division must use `checked_div` after verifying non-zero divisors.\n3. **Conversions:** Width changes (e.g., `usize` to `u32`) must use `try_from`, not `as`.\n4. **Parsing:** String splitting for first-delimiter or fixed-field parsing must use `split_once` or `get`, not manual indexing or `split` + `collect`.\n5. **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.\n\nExplicitly call out any violations of these rules as BLOCKER findings.",
+      "target": "## Review Mode\n\nFindings must be independently gradable: severity, rule, file, line, problem, concrete failure mode, and smallest compliant fix. Flag missing evidence as a finding. Review outputs requested as JSON must be valid. In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback."
+    },
+    {
+      "op": "replace",
+      "content": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints.\n\n**Pre-Commit Safety Audit:**\nBefore finalizing, verify the source contains:\n- `try_reserve` (not `with_capacity`) for any `Vec` with bounded capacity.\n- `checked_add`/`checked_mul` for all accumulators and size calculations.\n- `checked_div` for all divisions, with explicit non-zero checks.\n- `try_from` for all width conversions (e.g., `usize` to `u32`).\n- `split_once` or `get` for string field extraction, not manual indexing.\n- No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.\n\n**Command Verification:**\nRun `cargo fmt`, then `cargo test`. Run `cargo clippy` if feasible. **Do not claim success unless the command output explicitly confirms it.** If a command fails, report the failure, do not claim success, and do not fabricate output.",
+      "target": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.\n\nBefore reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+    },
+    {
+      "op": "replace",
+      "content": "## Performance Discipline\n\nDo not cargo-cult Rayon, SmallVec, Cow, zero-copy, manual loops, or iterator chains. Use them because the workload, lifetime, allocation budget, or benchmark supports them. For tiny fixed-size inputs, avoid parallelism and heap collections unless measured.",
+      "target": "## Performance Discipline\n\nDo not cargo-cult Rayon, SmallVec, Cow, zero-copy, manual loops, or iterator chains. Use them because the workload, lifetime, allocation budget, or benchmark supports them. For tiny fixed-size inputs, avoid parallelism and heap collections unless measured."
+    }
+  ]
+}

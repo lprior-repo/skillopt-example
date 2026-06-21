@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 BLOCKER findings** across the crate:
+
+| # | Rule | File:Line | Core Issue |
+|---|------|-----------|------------|
+| 1 | make-illegal-states-unrepresentable | `src/lib.rs:1` | `bool` flags + `String` status instead of typestate enum — all illegal states are representable |
+| 2 | make-illegal-states-unrepresentable | `src/lib.rs:9` | `mark_sent` has no preconditions, accepts unvalidated budgets, and leaves `sent_at_epoch_ms` unset |
+| 3 | primitive-obsession | `src/lib.rs:2` | `id: String` and `status: String` lack domain newtypes or enum constraints |
+| 4 | encapsulated-domain-model | `src/lib.rs:1` | All fields `pub` — external code can construct impossible states directly |
+| 5 | typed-domain-errors | `src/lib.rs:9` | No `Result` return, no `BudgetError` type, no railway error taxonomy |
+| 6 | functional-core-imperative-shell | `src/lib.rs:9` | `sent_at_epoch_ms` field exists but is never populated; no clock/time abstraction |
+| 7 | no-benchmark-or-test-evidence | `src/lib.rs:1` | Zero tests, zero benches, zero verification |
+| 8 | no-allocation-evidence | `src/lib.rs:10` | `"sent".to_string()` heap allocates on every call for a constant string |

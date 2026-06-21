@@ -1,0 +1,43 @@
+{
+  "id": "review_unsafe_transmute_header",
+  "hard": 0,
+  "soft": 0.6,
+  "task_type": "review",
+  "task_description": "Review review_unsafe_transmute_header for Holzman + functional-core Rust violations.",
+  "fail_reason": "scalar/fallback; target/feature",
+  "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/review_unsafe_transmute_header/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/review_unsafe_transmute_header/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/review_unsafe_transmute_header\nRequired output path: /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/review_unsafe_transmute_header/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+  "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/review-output-contract.md\", \"references/functional-core-performance.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_unsafe\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"Production `unsafe` with `std::mem::transmute` used to convert a byte array to `u32`. Holzman Rust forbids all production `unsafe`.\",\n      \"failure_mode\": \"transmute bypasses Rust's type and alignment guarantees; any future caller passing misaligned or non-[u8;4] data through a wrapper would invoke undefined behavior with no soundness proof.\",\n      \"fix\": \"Remove `unsafe` entirely. Use `u32::from_le_bytes`, `u32::from_be_bytes`, or `u32::from_ne_bytes` (document the chosen endianness) which are safe, explicit, and require `[u8; 4]` at the type level.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_unchecked_indexing\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"Unchecked array indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` on a `&[u8]` with no bounds check before access.\",\n      \"failure_mode\": \"If `input.len() < 4` the function panics at runtime, crashing the caller instead of returning a typed domain error.\",\n      \"fix\": \"Accept `[u8; 4]` by value at the function boundary instead of `&[u8]`, or add `input.get(0..4).ok_or(Error::ShortInput)` before indexing. Using `[u8; 4]` as the parameter type makes illegal states unrepresentable.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_unsafe_transmute\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"`std::mem::transmute::<[u8; 4], u32>` is used for a byte-to-int conversion. Transmute is the wrong tool for endian-aware serialization.\",\n      \"failure_mode\": \"`transmute` preserves the bit pattern but silently binds the API to the host byte order. On big-endian platforms the value is byte-swapped relative to little-endian consumers, producing silently incorrect numeric results without any compiler warning.\",\n      \"fix\": \"Replace with `u32::from_le_bytes(...)` (or `from_be_bytes`/`from_ne_bytes` with an explicit doc comment declaring the wire format). This is safe, explicit about endianness, and prevents silent cross-platform data corruption.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_lossy_or_hidden_side_effects\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"The function signature `read_len(input: &[u8]) -> u32` signals a pure read but has two hidden failure modes (panic on short input, undefined behavior via transmute) not reflected in the return type.\",\n      \"failure_mode\": \"Callers cannot handle failure via the type system. The fallibility is invisible, violating the functional-core principle that data is valid by construction and errors are typed.\",\n      \"fix\": \"Change the signature to return a typed error: `fn read_len(input: &[u8]) -> Result<u32, ReadLenError>` or accept `[u8; 4]` and return `Result<u32, ReadLenError>` where the error type covers short-input and any future validation failures.\"\n    },\n    {\n      \"severity\": \"WARNING\",\n      \"rule\": \"missing_benchmark_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmark exists for this hot-path function that reads a length field from bytes.\",\n      \"failure_mode\": \"Without benchmarks the performance claim (or lack thereof) is unverified; a replacement using `from_le_bytes` or bounds-checked paths must be measured to confirm no regression.\",\n      \"fix\": \"Add a `criterion` or `divan` benchmark comparing the current transmute path against `from_le_bytes` and a bounds-checked variant.\"\n    },\n    {\n      \"severity\": \"WARNING\",\n      \"rule\": \"missing_profiler_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No profiler evidence (perf, flamegraph, or sampler) for this function.\",\n      \"failure_mode\": \"Without profiling the hotness of `read_len` is unknown; unsafe shortcuts are unjustified if the function is not on a critical path.\",\n      \"fix\": \"Profile the call site to determine if this is a hot path before deciding on any low-level optimization.\"\n    },\n    {\n      \"severity\": \"WARNING\",\n      \"rule\": \"missing_allocation_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No allocation analysis showing whether the temporary `[u8; 4]` array or any intermediate allocations occur.\",\n      \"failure_mode\": \"The `[input[0], input[1], input[2], input[3]]` expression constructs a stack-temporary array; allocation behavior should be confirmed via compiler output or profiler.\",\n      \"fix\": \"Inspect MIR/assembly or use `no_alloc` testing to confirm zero heap allocation for the replacement.\"\n    }\n  ],\n  \"missing_evidence\": [\"no benchmark exists for `read_len`\", \"no profiler evidence for hot-path classification\", \"no allocation analysis for the byte-array construction\"],\n  \"residual_risk\": \"static review only; no commands run. The crate contains `unsafe` code and unchecked indexing that are BLOCKERs. A safe replacement using `u32::from_le_bytes` with `[u8; 4]` input and `Result` return type would eliminate all BLOCKERs. Performance and allocation claims are unsubstantiated.\"\n}\n",
+  "n_turns": 1,
+  "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0012/rollout/predictions/review_unsafe_transmute_header",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/review_unsafe_transmute_header",
+  "grade": {
+    "hard": 0.0,
+    "soft": 0.6,
+    "failures": [
+      [
+        "scalar",
+        "fallback"
+      ],
+      [
+        "target",
+        "feature"
+      ]
+    ],
+    "json_valid": true,
+    "matched_groups": 3,
+    "total_groups": 5,
+    "missing_groups": [
+      [
+        "scalar",
+        "fallback"
+      ],
+      [
+        "target",
+        "feature"
+      ]
+    ],
+    "execution_errors": [],
+    "mutation_errors": []
+  }
+}

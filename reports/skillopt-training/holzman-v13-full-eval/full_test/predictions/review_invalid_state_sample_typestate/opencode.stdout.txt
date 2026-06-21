@@ -1,0 +1,15 @@
+Now I have all the context needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+6 findings, all BLOCKER severity, covering:
+
+| # | Rule | File:Line | Violation |
+|---|------|-----------|-----------|
+| 1 | `typestate_state_machine` | `src/lib.rs:1` | No enum-based typestate; lifecycle expressed as scattered fields |
+| 2 | `no_status_string` | `src/lib.rs:3` | `status: String` — must be an enum |
+| 3 | `no_bool_lifecycle` | `src/lib.rs:4` | `is_validated: bool` + `is_sent: bool` — must be typestate transitions |
+| 4 | `no_option_invalid_state_combinations` | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` — must live in the variant that owns it |
+| 5 | `newtype_domain_ids` | `src/lib.rs:2` | `id: String` — must be a domain newtype |
+| 6 | `parse_boundary` | `src/lib.rs:1` | Raw primitives cross parse boundary without fallible smart constructors |
+
+5 missing evidence items (no benchmark/profiler/allocation/second-ring/command evidence).

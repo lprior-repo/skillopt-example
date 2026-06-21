@@ -1,0 +1,107 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_states_representable_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String — any arbitrary string value is valid, including \"draft\", \"deleted\", \"sent\", or \"\". Domain lifecycle states should be an enum so illegal states are unrepresentable at compile time.",
+      "failure_mode": "Callers can assign invalid lifecycle strings (e.g., status = \"deleted\") bypassing domain invariants. No constructor or validator enforces allowed values.",
+      "fix": "Replace `pub status: String` with `pub status: BudgetStatus` where `BudgetStatus` is a non-exhaustive enum with variants like Draft, Validated, Sent. Remove public setter access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_states_representable_bools",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent flags. This allows logically inconsistent states such as is_validated=false with is_sent=true, or both true simultaneously. Boolean lifecycle flags should be replaced with enums or typestates.",
+      "failure_mode": "The struct can represent impossible state combinations (e.g., sent without validated). Callers can set is_sent=true without ever setting is_validated=true, violating domain invariants.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single `state: BudgetState` enum or use a typestate pattern where the type itself encodes the lifecycle stage (e.g., `BudgetDraft`, `BudgetValidated`, `BudgetSent`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "all_fields_public",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of BudgetWorkflow are pub, allowing external code to construct the struct with arbitrary values and set any field directly. This completely bypasses invariants.",
+      "failure_mode": "Any caller can create `BudgetWorkflow { id: \"\".into(), status: \"whatever\".into(), is_validated: false, is_sent: false, sent_at_epoch_ms: None }` or mutate fields to enter invalid states without going through any domain method.",
+      "fix": "Make all fields `pub(crate)` or private. Provide a fallible constructor (e.g., `BudgetWorkflow::new(id) -> Result<Self, Error>`) that sets valid initial state. Expose only domain methods like `mark_sent`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow is a single struct with no typestate discrimination. The type does not encode which lifecycle stage the budget is in. This is a fundamental domain model violation.",
+      "failure_mode": "The Rust compiler cannot prevent invalid transitions (e.g., marking a non-validated budget as sent). All state-machine logic is runtime-only with no compile-time guarantees.",
+      "fix": "Use a typestate pattern with separate structs or an enum: `enum BudgetPhase { Draft(BudgetDraft), Validated(BudgetValidated), Sent(BudgetSent) }` where each variant carries only the fields needed for that phase."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "io_in_calculation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `\"sent\".to_string()` — this is a heap allocation inside what should be a pure calculation function. The functional core should not perform allocations.",
+      "failure_mode": "Allocation in the pure core path increases GC pressure and prevents the function from being used in no-alloc contexts. Also ties the core to a specific string representation.",
+      "fix": "Use an enum variant for the status (e.g., `BudgetStatus::Sent`) which is zero-copy. Remove `to_string()` entirely. If the status must be a string for serialization, handle it at the imperative shell boundary, not in the core."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_fallible_constructor",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No constructor exists to validate or initialize BudgetWorkflow. The struct can be instantiated via struct literal with any combination of values.",
+      "failure_mode": "Without a constructor, there is no enforcement point for domain invariants. Invalid BudgetWorkflow instances can be created at any call site.",
+      "fix": "Add `impl BudgetWorkflow { fn new(id: String) -> Result<Self, BudgetError> { ... } }` that initializes all fields to valid defaults and performs any needed validation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "sent_at_epoch_ms_no_validation",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> that can hold any u64 value including 0 (Unix epoch) or future timestamps. There is no validation that it is only set when is_sent=true, and no validation of the value itself.",
+      "failure_mode": "sent_at_epoch_ms can be set to an arbitrary u64 independently of is_sent flag, allowing inconsistent state (sent_at_epoch_ms=Some(0) with is_sent=false). Zero could be mistaken for Unix epoch.",
+      "fix": "Tie sent_at_epoch_ms to the typestate — only Sent phase carries the timestamp. Use `Option<NonZeroU64>` or a dedicated `EpochMs` newtype to prevent zero-value confusion."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for any performance claims about BudgetWorkflow allocation patterns or throughput.",
+      "failure_mode": "Without benchmarks, allocation behavior (e.g., .to_string() in mark_sent) cannot be validated as acceptable. Performance regressions go undetected.",
+      "fix": "Add a criterion or simple bench for mark_sent to measure allocation count and time. Even a basic `criterion` benchmark showing zero or one allocation per call provides evidence."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, perf, or similar) exists to validate the performance characteristics of the core calculation path.",
+      "failure_mode": "Cannot verify that the functional core remains fast or that allocations are bounded under real workload.",
+      "fix": "Run `cargo flamegraph` or `cargo prof` to produce profiling evidence for the mark_sent call path."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No allocation tracking evidence exists. The use of `to_string()` in mark_sent allocates a heap String on every call.",
+      "failure_mode": "Repeated calls to mark_sent cause unbounded heap allocations that may not be acceptable in latency-sensitive paths.",
+      "fix": "Replace `to_string()` with an enum variant to eliminate allocation. Add `#[global_allocator]` tests or `tracemalloc`-style tracking to prove zero-allocation behavior."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No CI commands, test evidence, or formal verification artifacts exist for this crate.",
+      "failure_mode": "No automated gate prevents regressions to the domain invariants or introduces new violations.",
+      "fix": "Add a CI gate with `cargo test` and `cargo clippy` runs. For high-assurance, add property tests (proptest) that verify BudgetWorkflow invariants."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent allocation profile", "no profiler data for core calculation path", "no allocation tracking evidence for BudgetWorkflow lifecycle", "no CI command evidence (cargo test/clippy)", "no formal verification or property-test evidence for domain invariants"],
+  "residual_risk": "High. The BudgetWorkflow struct is a plain data bag with public fields, no typestate, no enum types, and no constructor. Any caller can create and mutate it into illegal states with zero compiler enforcement. The mark_sent function performs a heap allocation in the pure core. Without type-level domain invariants, all correctness is runtime-only. This violates the core Holzman principles: illegal states are fully representable, the functional core performs I/O-side allocations, and there is no evidence chain."
+}

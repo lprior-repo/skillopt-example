@@ -1,0 +1,16 @@
+[
+  {
+    "op": "replace",
+    "target": "- No production `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, unchecked arithmetic, lossy `as`, ignored fallible results, or hidden side effect",
+    "content_preview": "- No production `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, unchecked arithmetic, lossy `as`, ignored fallible results, or hidden side effect",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "## Repair Mode\n\nRead tests and production source before editing. Do not edit tests. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; ru",
+    "content_preview": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (e.g., `tests/*.rs`, `*_test.rs`). Tests are the immutable behavior contract. Make the smallest source change",
+    "status": "applied_replace",
+    "index": 2
+  }
+]

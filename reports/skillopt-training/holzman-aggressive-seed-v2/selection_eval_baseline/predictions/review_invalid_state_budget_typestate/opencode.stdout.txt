@@ -1,0 +1,22 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 13 findings, 5 missing evidence items**
+
+**BLOCKERs (5):**
+- Illegal states representable — `pub String` status, `pub bool` flags allow inconsistent state combinations
+- Boolean lifecycle flags — `is_validated`/`is_sent` should be an enum/typestate
+- Primitive obsession — `status: String` should be a typed `BudgetStatus` enum
+- Mutable functional core — `mark_sent` mutates input without enforcing preconditions
+- Public fields — external code bypasses all invariants by direct field mutation
+
+**MAJORs (4):**
+- No typestate lifecycle — no compile-time enforcement of valid transitions
+- No typed domain errors — no `BudgetError` enum for failure modes
+- No tests — zero coverage, no behavior tests for state transitions
+- `id: String` — should be a `BudgetId` newtype
+
+**MINORs (4):**
+- Missing benchmark, profiler, second-ring (Kani/Miri/proptest), and command evidence
+
+**Residual risk:** High. The struct is inherently un-safe by construction — public fields with `String`/`bool` types cannot enforce domain invariants at compile time.

@@ -1,0 +1,12 @@
+Now I understand the issues. The current `parse_frames` uses `unwrap()`, has no empty check, no max_items enforcement, and no proper error handling. Let me fix it.
+All 4 tests pass. Now writing the output.
+Repair complete. Here's the summary:
+
+**Changes made to `src/lib.rs`:**
+- Removed `unwrap()` — parse errors now return `ParseError::Invalid`
+- Added empty-input check returning `ParseError::Empty`
+- Added `max_items` enforcement returning `ParseError::TooMany`
+- Added `try_reserve` with `ParseError::Allocation` mapping
+- Loop-based iteration instead of `.collect()` to enforce the `max_items` guard before allocation
+
+**All 4 behavior tests pass:** `parses_values`, `rejects_empty`, `rejects_invalid`, `rejects_too_many`.

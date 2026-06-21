@@ -1,0 +1,12 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with **12 BLOCKER findings** and **7 missing evidence** items.
+
+Key violations found in `src/lib.rs`:
+- **Panic surfaces** (line 9, 19): `unwrap()` on I/O and parse
+- **Unchecked indexing** (line 16, 14): `parts[0]`, `parts[1]` with no bounds guard
+- **Lossy cast** (line 19): `as u16` silently truncates u32 values > 65535
+- **Hidden I/O in pure logic** (line 1, 8, 16): `fs::read_to_string` + `println!` fused into parsing
+- **No typed error taxonomy**: function returns `Vec<Record>` with zero error signaling
+- **Unbounded allocation** (line 12): no `try_reserve`, no domain cap on records
+- **Raw domain primitives** (line 4): `String name` and `u16 value` with no newtypes/smart constructors
+- **Functional Core violated**: I/O, logging, parsing, and construction in one function

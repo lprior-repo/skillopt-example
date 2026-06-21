@@ -1,0 +1,27 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable",
+    "Checked arithmetic: checked_add for accumulator, checked_div avoided via integer division with non-zero guard",
+    "split_once used instead of split+collect+indexing",
+    "Empty input rejected with SummaryError::Empty",
+    "Invalid line format (missing comma or bad parse) rejected with SummaryError::Invalid",
+    "Overflow detected via checked_add returning SummaryError::Overflow",
+    "TooMany check enforced during iteration",
+    "Return type matches test contract: Result<Summary, SummaryError>",
+    "render_summary function added to satisfy test contract",
+    "No Cargo.toml or test files edited",
+    "Clean cargo fmt and cargo test with zero warnings"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None — all Holzman violations removed, all tests pass cleanly."
+}

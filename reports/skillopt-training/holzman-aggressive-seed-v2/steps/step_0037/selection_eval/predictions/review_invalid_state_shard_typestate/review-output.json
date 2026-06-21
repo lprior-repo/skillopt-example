@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses primitive fields (String status, bool is_validated, bool is_sent, Option<u64> sent_at_epoch_ms) instead of enums/typestates. Any combination of these fields is constructible, including illegal states like status='sent' with is_sent=false, or status='created' with is_sent=true.",
+      "failure_mode": "The struct admits unreachable and contradictory state combinations at the type level. Callers can construct ShardWorkflow with inconsistent fields, and no constructor enforces domain invariants.",
+      "fix": "Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single ShardStatus enum typestate (e.g., enum ShardStatus { Created { id: String }, Validated { id: String, validated_at: Instant }, Sent { id: String, sent_at: u64 } }). Remove is_validated and is_sent bools and Option<u64> as separate fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain validation. No newtype wraps the identifier to enforce format/prefix rules at the type level.",
+      "failure_mode": "Callers can set id to any arbitrary string including empty, null-like, or malformed values. Invalid IDs propagate into the core without rejection at the boundary.",
+      "fix": "Introduce a newtype ShardId(String) with a fallible constructor that validates the expected format (e.g., non-empty, required prefix) and returns a domain error on invalid input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String. The string 'sent' is used as a magic value in mark_sent, but any other string (e.g., 'SENT', 'sent_pending', '') is equally valid at the type level.",
+      "failure_mode": "String status allows typos, case-sensitivity bugs, and state confusion. Magic string comparison is fragile and unenforceable at compile time.",
+      "fix": "Replace with a ShardStatus enum as described above. The enum variants encode valid states; impossible values like 'SENT' or '' cannot exist."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bool lifecycle flag. A bool can only express two states (validated/not validated) and cannot encode the ordering or direction of the workflow transition.",
+      "failure_mode": "is_validated can flip back and forth arbitrarily. There is no way to distinguish 'never validated' from 'unvalidated after validation' or enforce a one-way transition.",
+      "fix": "Fold validation into the typestate enum. Validated is a transition target, not a toggle flag."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a bool lifecycle flag with no coordination with status or sent_at_epoch_ms. A shard can be is_sent=true while status is not 'sent' or sent_at_epoch_ms is None.",
+      "failure_mode": "Inconsistent state: is_sent=true with status='created' is a logical contradiction that compiles and runs. Downstream consumers cannot trust any single field in isolation.",
+      "fix": "Fold sent state into the typestate enum. sent_at_epoch_ms becomes part of the Sent variant, not a standalone Option field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent directly mutates the raw struct fields (item.status = \"sent\".to_string(); item.is_sent = true). There is no typestate transition, no validation, and no error handling for invalid source states.",
+      "failure_mode": "mark_sent is a no-op for correctness—it sets status and flag regardless of the current state. A shard already marked sent, or an unvalidated shard, transitions identically. No error path for invalid source states.",
+      "fix": "Replace mark_sent with a pure function ShardStatus::try_into_sent(self) -> Result<ShardStatus, ShardError> that rejects invalid transitions at compile time and returns a typed error for invalid source states."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "pub_fields_encapsulation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of ShardWorkflow are pub. External code can mutate id, status, is_validated, is_sent, and sent_at_epoch_ms directly without any invariant checking.",
+      "failure_mode": "Any caller can corrupt the struct state by direct field assignment, bypassing any constructor or transition logic.",
+      "fix": "Make all fields private. Expose accessors as needed. Construction and mutation must go through constructors and typed transition methods."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_magic_strings",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses the magic string literal \"sent\". String literals for state names are fragile and not enforced by the type system.",
+      "failure_mode": "Typos in string literals silently create new states. Refactoring the state name requires updating all string usages manually.",
+      "fix": "Use an enum variant name instead of a string literal. The enum is the source of truth for valid state names."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any workflow throughput claim",
+    "no profiler data exists to measure struct size, cache behavior, or transition latency",
+    "no allocation analysis exists—String id and status each heap-allocate; no SmallVec or interned string strategy evaluated",
+    "no command-layer contract exists defining which transitions are allowed from which states",
+    "no behavior tests exist for ShardWorkflow state transitions or invariant enforcement"
+  ],
+  "residual_risk": "The struct represents every possible field combination, including contradictions. mark_sent does no validation. Without typestate enums, the compiler cannot prevent illegal states. This is a fundamental DDD violation that must be resolved before any performance or verification work."
+}

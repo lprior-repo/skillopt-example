@@ -1,0 +1,9 @@
+Now I have a complete picture of the crate. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**9 findings** across the crate:
+
+- **6 BLOCKERs**: `status: String` instead of enum, independent lifecycle booleans (`is_validated`, `is_sent`) forming illegal combinations, raw `String` ID without newtype, `Option<u64>` lifecycle data decoupled from owning state, no smart constructor, and imperative mutation in `mark_sent` bypassing type guarantees.
+- **3 WARNINGs**: missing benchmarks, no verification command evidence, no allocation profiling.
+
+**Root issue**: The entire `ShardWorkflow` model uses primitives, making every illegal state representable. Replacing with a typestate enum (e.g. `ShardStatus { New, Validated { validated_at: u64 }, Sent { sent_at: u64 } }`) with a smart constructor and state-gated transitions would eliminate all blocker findings.

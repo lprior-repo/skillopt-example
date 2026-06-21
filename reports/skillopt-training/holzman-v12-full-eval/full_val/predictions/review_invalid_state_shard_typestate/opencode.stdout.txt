@@ -1,0 +1,16 @@
+Now I have a complete picture. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**7 BLOCKER findings** across `src/lib.rs`:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `enum_typestate_state_machine` | 3 | Flat struct with independent booleans instead of a typed state machine |
+| 2 | `no_status_string` | 3 | `status: String` — any arbitrary string accepted, no exhaustive matching |
+| 3 | `no_bool_lifecycle` | 4 | `is_validated` + `is_sent` booleans create 16 reachable states, only ~4 valid |
+| 4 | `no_option_invalid_state_combinations` | 5 | `is_sent: bool` and `sent_at_epoch_ms: Option<u64>` independent — invalid combinations constructible |
+| 5 | `newtype_domain_id` | 2 | Raw `String` ID with no validation or domain invariants |
+| 6 | `functional_core_shell_boundary` | 9 | `mark_sent` mutates domain fields, violating functional-core immutability |
+| 7 | `parse_boundary` | 1 | All fields `pub`, constructible with raw primitives via struct literal — no smart constructor |
+
+**6 missing evidence items**: no benchmark, profiler, allocation analysis, second-ring evidence, command-truth output, or state-space enumeration.

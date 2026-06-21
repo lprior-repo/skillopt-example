@@ -1,0 +1,89 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permissions, disk error)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> and propagate with ? instead of unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) performs console I/O inside load_sessions, which is a data-loading function that should be pure",
+      "failure_mode": "side-effectful logging in a core data function makes it impossible to test deterministically and couples domain logic to stdout",
+      "fix": "remove println! from load_sessions; move logging to the caller/shell layer after loading completes"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked array indexing without bounds verification",
+      "failure_mode": "malformed line with zero fields causes a panic at runtime via out-of-bounds access",
+      "fix": "use parts.get(0) and handle None with a typed error or skip"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() creates a full Vec allocation to access two fields, violating the split_once rule",
+      "failure_mode": "unnecessary heap allocation for every line; also makes it easy to index unsafely on subsequent fields",
+      "fix": "use split_once(',') to extract name and remainder, then parse remainder for value without collecting all parts"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on invalid numeric input and on missing second field",
+      "failure_mode": "malformed CSV data (non-numeric value or missing field) aborts the program instead of returning a parse/validation error",
+      "fix": "use parts.get(1) with ? propagation, then parse with .map_err() to return a typed ParseError, never unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "arithmetic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 performs a lossy cast from u32 to u16, silently truncating values above 65535",
+      "failure_mode": "a value like 70000 parses successfully as u32 then truncates to 4444 when cast to u16, producing incorrect data with no error signal",
+      "fix": "use u16::try_from(parsed_u32) or parse directly as u16, propagating error via map_err on Infallible"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no try_reserve for bounded capacity pre-allocation",
+      "failure_mode": "unknown line count causes repeated reallocations as the Vec grows, degrading performance and wasting memory",
+      "fix": "estimate capacity, compute with checked_mul, and call Vec::try_reserve; handle Allocation error by returning Result"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark, profiler, or allocation evidence exists for the I/O-bound load_sessions function",
+      "failure_mode": "performance claims (or regressions) for file loading cannot be measured or tracked",
+      "fix": "add a criterion or similar benchmark measuring throughput and memory allocations for typical input sizes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or memory allocations",
+    "no profiler data for I/O-bound path",
+    "no allocation tracing (e.g., mimalloc profiler or similar) for Vec growth behavior",
+    "no CLI command harness or exit-code contract documented for load_sessions usage"
+  ],
+  "residual_risk": "static review only; no commands run. All six BLOCKER violations (unwrap/panic on I/O and parse, unchecked indexing, lossy as cast, I/O side effect in core, unnecessary split+collect) require immediate repair before any delivery gate. The function as-written will panic on missing files, malformed lines, and oversized values."
+}

@@ -1,0 +1,9 @@
+Now I understand the issues. Let me apply the minimal fix to `src/lib.rs`.
+Repaired. Changes to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `PayloadTooLarge` when `payload.len() > max_payload`
+2. **Removed lossy `as u32` cast** — replaced with `u32::try_from(payload.len())`
+3. **Added checked capacity arithmetic** — `checked_add(4, payload.len())` for overflow safety
+4. **Added `try_reserve`** — before extending the vector, mapping allocation failure to `FrameError::Allocation`
+
+All 2 behavior tests pass, strict clippy is clean, no production unsafe/unwrap/expect/panic/arithmetic_side_effects/as_conversions remain.

@@ -1,0 +1,10 @@
+Now I have the full picture. The function has `unwrap()`, no empty check, no `max_items` enforcement, no `try_reserve`, and no error handling. Let me fix it following the CSV-to-Vec parser recipe.
+All 4 tests pass. Writing the repair output.
+Repair complete. All 4 behavior tests pass. Changes to `src/lib.rs`:
+
+- Replaced `unwrap()` with `map_err(|_| ParseError::Invalid)` for parse failures
+- Added empty-input check returning `ParseError::Empty`
+- Added `try_reserve(max_items)` returning `ParseError::Allocation` on OOM
+- Added `max_items` enforcement returning `ParseError::TooMany` before each push
+- Removed all production `unwrap`, unchecked indexing, and unchecked operations
+- Public API signature unchanged; tests unchanged

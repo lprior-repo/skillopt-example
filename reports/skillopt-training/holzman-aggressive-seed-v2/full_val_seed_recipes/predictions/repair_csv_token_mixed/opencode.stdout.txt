@@ -1,0 +1,11 @@
+I've read all files. The current `parse_tokens` has: `unwrap()` on parse, no empty check, no max_items enforcement, no allocation safety. Let me repair.
+All 4 tests pass. Let me verify no forbidden constructs remain and write the output.
+Repaired. Changes to `src/lib.rs`:
+
+1. **Empty input check** — returns `Err(ParseError::Empty)` for blank/whitespace-only input
+2. **Replaced `unwrap()`** — parse errors now use `map_err(|_| ParseError::Invalid)`
+3. **`max_items` enforcement** — returns `Err(ParseError::TooMany)` when more items than the limit are encountered
+4. **`try_reserve`** — pre-allocates with allocation-failure mapped to `Err(ParseError::Allocation)`
+5. **No forbidden constructs** — zero `unwrap`/`panic`/`unsafe`/`assert`/lossy casts
+
+All 4 behavior tests pass.

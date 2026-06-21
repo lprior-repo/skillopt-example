@@ -1,0 +1,13 @@
+Now I have the full picture. Let me write the review output.
+The `parse_boundary` finding is missing `severity`. Let me fix that.
+Review complete. Written to `review-output.json` with 7 findings covering:
+
+1. **enum_typestate_state_machine** - Flat fields instead of typestate enum
+2. **status_string_to_enum** - `String` status instead of sealed enum
+3. **bool_lifecycle_to_typestate** - Independent booleans allow invalid combinations
+4. **option_invalid_state_combinations** - Detached `Option<u64>` timestamp not coupled to sent state
+5. **newtype_domain_id** - Raw `String` id with no domain validation
+6. **parse_boundary** - No smart constructor; raw primitives accepted directly
+7. **public_mutable_struct** - `mark_sent` has no precondition guards
+
+Missing evidence: no benchmarks, profiler data, allocation analysis, CI commands, or behavior tests. Residual risk: blocked — all illegal states are representable.

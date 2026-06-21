@@ -1,0 +1,11 @@
+I see the issues. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. The source has multiple Holzman violations. Let me fix it.
+All 6 tests pass. Now writing the output.
+Repaired. All 6 tests pass. Changes in `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, ...>`
+- **Parsing**: Replaced `split(',') + collect + parts[1]` with `split_once(',')` (Holzman rule)
+- **No unwrap**: `parse()` error mapped to `SummaryError::Invalid` via `map_err`
+- **Checked arithmetic**: `checked_add` for overflow detection, `checked_div` for division
+- **No lossy casts**: `u32::try_from` / `usize::try_from` instead of `as` casts
+- **Empty input**: Returns `Err(SummaryError::Empty)` when no valid rows found
+- **New function**: Added `render_summary(Summary) -> String` per test contract

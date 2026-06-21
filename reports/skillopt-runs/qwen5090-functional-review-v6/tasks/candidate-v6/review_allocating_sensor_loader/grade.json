@@ -1,0 +1,35 @@
+{
+  "task_id": "review_allocating_sensor_loader",
+  "kind": "review",
+  "bundle": "candidate-v6",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen5090-functional-review-v6/tasks/candidate-v6/review_allocating_sensor_loader",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen5090-functional-review-v6/tasks/candidate-v6/review_allocating_sensor_loader",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": null,
+  "bundle_digest": "e9bd2f9b1f72c8540dd4c2a89248d8c8e6d3f327514ba49b702d2ae2bf85ba57",
+  "task_digest": "5da9d3455294563a7450ea1085c0c6e56fda78adaf7ddb580c878d4c650823db",
+  "grade": {
+    "kind": "review",
+    "hard": 0.0,
+    "soft": 0.8,
+    "matched_groups": 8,
+    "total_groups": 10,
+    "missing_groups": [
+      [
+        "Data/Calculations/Actions",
+        "actions layer",
+        "I/O boundary"
+      ],
+      [
+        "pure calculation",
+        "calculation layer",
+        "separate parsing"
+      ]
+    ],
+    "json_valid": true,
+    "json_errors": [],
+    "mutation_errors": [],
+    "execution_errors": []
+  }
+}

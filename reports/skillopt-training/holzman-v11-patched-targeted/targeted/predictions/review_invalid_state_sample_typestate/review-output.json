@@ -1,0 +1,145 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SampleWorkflow has no state machine — any combination of is_validated/is_sent/sent_at_epoch_ms is allowed, including is_sent=true with is_validated=false, or duplicate transitions with no history",
+      "failure_mode": "Callers can construct and mutate SampleWorkflow into logically impossible states (e.g., sent but not validated), violating domain invariants at compile time",
+      "fix": "Replace fields with a single State enum (e.g., State { Unvalidated, Validated, Sent { sent_at: u64 } }) and make transition methods fallible on State"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String, allowing any arbitrary value (\"sent\", \"sent \", \"SENT\", \"\", \"deleted\") — no finite set of valid domain states is enforced by the type",
+      "failure_mode": "Pattern matches on status strings are brittle and incomplete; callers can set status to an unhandled value and the program silently accepts it instead of failing at the boundary",
+      "fix": "Replace String with a sealed Status enum and match exhaustively; remove pub accessors that expose raw status strings"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent booleans with no enforced ordering — nothing prevents both being true, both false after a reset, or is_sent=true before is_validated",
+      "failure_mode": "Logic branches on is_sent will execute for objects that were never validated; concurrent or retry paths can produce inconsistent lifecycle snapshots",
+      "fix": "Fold lifecycle booleans into a single State enum with explicit transition variants (Unvalidated -> Validated -> Sent) and make transitions single-dispatch fallible methods"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from is_sent — is_sent can be true while sent_at_epoch_ms is None (contradictory), or sent_at_epoch_ms can be Some while is_sent is false",
+      "failure_mode": "Downstream code that checks is_sent before reading sent_at_epoch_ms.unwraps will panic; code that reads sent_at_epoch_ms without checking is_sent will process unsent items",
+      "fix": "Move the timestamp into the Sent variant of a State enum (e.g., State::Sent { sent_at_epoch_ms: u64 }) so Some/None is guaranteed by the variant, not an independent Option"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a plain String with no newtype — callers can pass empty strings, non-ASCII strings, or mix up IDs from different domains without compile-time distinction",
+      "failure_mode": "Calling send_with_id(\"\") or send_with_id(other_workflow.id.clone()) compiles and may corrupt workflow state; IDs cannot be validated at parse time",
+      "fix": "Introduce a pub struct WorkflowId(String) with a smart constructor fn new_workflow_id(s: &str) -> Result<WorkflowId, WorkflowError> that validates non-empty and rejects illegal characters"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts raw SampleWorkflow with no validation — raw primitives and booleans cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly and mark_sent will happily mutate them into a sent state",
+      "failure_mode": "A caller passing is_sent=false, is_validated=false, status=\"\" will have mark_sent set status=\"sent\" and is_sent=true, creating a sent record with no validation history and no audit trail",
+      "fix": "Replace mark_sent with fn transition_to_sent(state: State) -> Result<State, TransitionError> or use a builder/constructor that validates preconditions (is_validated) before returning a Sent variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_no_preconditions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent unconditionally sets status=\"sent\" and is_sent=true without checking any preconditions (e.g., is_validated must be true, status must not already be \"sent\")",
+      "failure_mode": "Duplicate send calls succeed silently; unvalidated items can be marked sent; re-sending overwrites sent_at_epoch_ms with None, losing audit data",
+      "fix": "Guard with a precondition check: if item.status == \"sent\" return Err(WorkflowError::AlreadySent); require is_validated==true before allowing the transition"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_to_string",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses \"sent\".to_string() which allocates a heap String on every call — the pure domain transition should use an enum variant, not heap-allocate a literal string",
+      "failure_mode": "Every transition allocates unnecessarily; in hot paths this becomes a measurable allocation overhead; the String allocation hides the fact that the transition is a simple state change",
+      "fix": "Replace with an enum variant (State::Sent) which is zero-cost — no heap allocation, no String indirection"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields (id, status, is_validated, is_sent, sent_at_epoch_ms) are pub and mutable — any caller can mutate any field without going through a domain method",
+      "failure_mode": "External code can set item.is_sent = false after mark_sent, reverting the sent state without any audit trail or invariant check",
+      "fix": "Make fields private and expose only domain-method accessors; implement DDD aggregate pattern with controlled mutation"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for mark_sent or any performance-sensitive path. The .to_string() allocation on every transition is unmeasured.",
+      "failure_mode": "If mark_sent is in a hot loop, the per-call allocation may become a bottleneck; without a baseline there is no way to detect regression",
+      "fix": "Add a Criterion or simple microbenchmark for mark_sent comparing current String-based approach against an enum-based approach"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, perf record, or similar) exists to verify the allocation pattern or identify actual bottlenecks in this module",
+      "failure_mode": "Optimizations may target the wrong code path; the real bottleneck could be elsewhere (parsing, I/O, serialization)",
+      "fix": "Run cargo flamegraph or perf record on a representative workload and include the profile in the evidence bundle"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No allocation profiling (valgrind/dhat/memfd) evidence exists to quantify the number and size of heap allocations per mark_sent call",
+      "failure_mode": "Unbounded allocation count could cause memory pressure in long-running services",
+      "fix": "Use dhat or valgrind --tool=massif to measure allocations per transition and compare against enum-based implementation"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_second_ring_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring evidence (property tests, fuzzing, or state-machine property tests) exists to verify that all state transitions maintain invariants across arbitrary sequences of operations",
+      "failure_mode": "Edge-case state transition sequences that violate invariants may not be caught by unit tests alone",
+      "fix": "Add proptest-based property tests that generate random state transition sequences and assert invariant preservation (e.g., sent implies validated, sent_at_epoch_ms is present when sent)"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No evidence that required verification commands (cargo fmt --check, cargo clippy, cargo test) were actually run for this review task",
+      "failure_mode": "Code may have formatting violations, clippy warnings, or compilation errors that go undetected",
+      "fix": "Run and report results for: cargo fmt --check, cargo check --workspace --all-targets --all-features, cargo clippy with strict lint flags, cargo test --workspace --all-features"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark for mark_sent allocation performance",
+    "no profiler evidence (flamegraph/perf) for this module",
+    "no allocation profiling (valgrind/dhat) to quantify heap usage per transition",
+    "no second-ring evidence (property tests/fuzzing) for state transition invariants",
+    "no command evidence (cargo fmt/clippy/test) was run or reported"
+  ],
+  "residual_risk": "This is a static review of a small crate. The six typestate/blocker findings are structural violations of the Holzman Rust absolute laws (make illegal states unrepresentable, typed domain state, parse boundary). All blockers are fixable by refactoring SampleWorkflow into a State enum with a smart constructor and fallible transition methods. No commands were executed; residual risk includes unverified clippy/formatter status and untested edge cases in the refactored code."
+}

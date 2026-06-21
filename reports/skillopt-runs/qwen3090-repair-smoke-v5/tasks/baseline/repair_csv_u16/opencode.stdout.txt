@@ -1,0 +1,8 @@
+Now let me read the references and fix the source.
+Now I'll fix `src/lib.rs`. The issues are:
+1. `.unwrap()` on parse (forbidden by Holzman rules)
+2. `max_items` parameter is ignored
+3. Empty input not handled
+4. Invalid input not handled
+All 4 tests pass. Let me also verify clippy and fmt:
+Repair complete: wrote `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v5/tasks/baseline/repair_csv_u16/repair-output.json` and `cargo test` passed (4/4).

@@ -1,0 +1,33 @@
+{
+  "reasoning": "The agent repeatedly fails on three specific safety patterns: try_reserve, checked arithmetic, and try_from. Previous edits tried to add checklists and verbose rules, but the agent still misses them. The fix is to make these rules absolute, non-negotiable, and explicitly tied to the 'illegal state' contract. We also need to reinforce that review mode must catch these specific patterns as BLOCKERs, not just general issues.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. **This is non-negotiable.** If capacity is bounded, `try_reserve` is mandatory.",
+      "source_type": "failure",
+      "support_count": 30
+    },
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals. **All width-reducing casts (e.g., usize to u32) MUST use `try_from`. All division MUST use `checked_div`.**",
+      "source_type": "failure",
+      "support_count": 30
+    },
+    {
+      "op": "replace",
+      "target": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback.",
+      "content": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback. **Flag missing `try_reserve`, missing `checked_div`, and missing `try_from` as BLOCKER findings.**",
+      "source_type": "failure",
+      "support_count": 30
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. **Verify that all bounded Vec uses `try_reserve`, all division uses `checked_div`, and all width-reducing casts use `try_from`.**",
+      "source_type": "failure",
+      "support_count": 30
+    }
+  ]
+}

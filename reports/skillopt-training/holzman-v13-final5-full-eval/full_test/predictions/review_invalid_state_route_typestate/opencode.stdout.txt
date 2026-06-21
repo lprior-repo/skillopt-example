@@ -1,0 +1,11 @@
+Now I have all the information. Let me write the review output.
+Review complete. Wrote `review-output.json` with 6 BLOCKER findings and 4 missing-evidence entries.
+
+Key violations in `src/lib.rs`:
+
+1. **typestate_state_machine** (line 1) — `is_validated` + `is_sent` booleans allow illegal composite states (e.g., validated=false, sent=true)
+2. **no_status_string** (line 3) — `status: String` accepts arbitrary values including empty strings
+3. **no_bool_lifecycle** (line 4) — `is_validated: bool` cannot enforce ordering or prevent invalid transitions
+4. **no_option_invalid_state** (line 6) — `sent_at_epoch_ms: Option<u64>` is detached from `is_sent`, allowing inconsistent states
+5. **newtype_domain_ids** (line 2) — `id: String` has no domain constraints, accepts empty/duplicate/malformed values
+6. **parse_boundary** (line 1) — Raw primitives cross the parse boundary without fallible smart constructors; callers can construct any illegal state combination directly

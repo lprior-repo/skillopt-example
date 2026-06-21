@@ -1,0 +1,19 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**10 findings, all BLOCKER severity:**
+
+| # | Rule | File:Line |
+|---|------|-----------|
+| 1 | `no_unwrap` | `src/lib.rs:9` — `fs::read_to_string().unwrap()` panics on I/O error |
+| 2 | `no_unwrap` | `src/lib.rs:19` — `.parse().unwrap()` panics on bad numeric input |
+| 3 | `no_lossy_cast` | `src/lib.rs:19` — `as u16` silently truncates u32 > 65535 |
+| 4 | `no_unchecked_indexing` | `src/lib.rs:16` — `parts[0]` panics on empty/blank lines |
+| 5 | `no_unchecked_indexing` | `src/lib.rs:19` — `parts[1]` panics on single-field lines |
+| 6 | `split_once_required` | `src/lib.rs:12` — `split().collect()` allocates unnecessarily |
+| 7 | `functional_core_imperative_shell` | `src/lib.rs:8` — I/O, logging, and parsing mixed in one function |
+| 8 | `functional_core_imperative_shell` | `src/lib.rs:16` — `println!` in pure parsing pipeline |
+| 9 | `no_pub_fields` | `src/lib.rs:3` — `pub` fields allow invalid Record construction |
+| 10 | `return_result_not_vec` | `src/lib.rs:8` — returns `Vec<Record>` instead of `Result<_, E>` |
+
+**5 missing evidence items:** no benchmark, no profiler data, no allocation analysis, no second-ring review, no command evidence.

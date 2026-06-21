@@ -1,0 +1,9 @@
+Now I have the full picture. The production code has multiple Holzman violations and a type mismatch with tests. Let me fix it.
+All 6 tests pass. Now writing the required output.
+Repair complete. All 6 tests pass. Changes made to `src/lib.rs`:
+
+- **Return type**: `Result<String, _>` → `Result<Summary, _>` to match test contract
+- **Removed**: `unwrap()`, unchecked indexing (`parts[1]`), unchecked arithmetic (`total += value`), lossy `as` casts, `split`+`collect` pattern
+- **Added**: `split_once` for delimiter parsing, `checked_add` for overflow detection, `try_from` for width conversion, `SummaryError::Empty` guard, `SummaryError::Invalid` for malformed lines
+- **Added**: `render_summary(Summary) -> String` as pure shell formatter
+- **Split**: core calculation (summarize_metrics → Summary) separated from rendering (render_summary → String)

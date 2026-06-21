@@ -1,0 +1,11 @@
+Issues found:
+1. `max_payload` is never checked (test `rejects_limit` expects `PayloadTooLarge`)
+2. `payload.len() as u32` — lossy `as` cast
+3. `Vec::new()` without `try_reserve`
+Repair complete. Changes made to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` (was previously ignored)
+2. **Replaced lossy `as u32`** with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)` (Holzman: no lossy casts)
+3. **Added `try_reserve`** for bounded allocation (Holzman: allocation-aware Vec construction)
+
+All 2 behavior tests pass: `encodes`, `rejects_limit`.

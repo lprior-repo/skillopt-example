@@ -1,0 +1,17 @@
+Review complete. Written to `review-output.json`.
+
+**10 findings, 7 missing evidence items:**
+
+**Blockers (6):**
+- `make_illegal_states_unrepresentable` — `status: String`, `is_validated: bool`, `is_sent: bool` allow every invalid combination
+- `typestate_state_machine` — no enum/typestate; lifecycle not enforced by compiler
+- `parse_boundary` — raw primitives enter domain with no smart constructor
+- `no_pub_fields` — all fields public, enabling arbitrary external mutation
+- `no_magic_strings` — `"sent".to_string()` magic string for state
+- `fallible_domain_operations` — `mark_sent` returns `SensorWorkflow`, not `Result`
+
+**Majors (4):**
+- `functional_core_imperative_shell` — string allocation + in-place mutation
+- `sent_at_epoch_ms_invariant` — timestamp independent from sent state
+- `id_newtype` — `id: String` with no domain identity semantics
+- `missing_command_evidence` — no test/benchmark/verification infrastructure

@@ -1,0 +1,34 @@
+{
+  "reasoning": "The agent repeatedly fails on three specific safety patterns: try_reserve, checked arithmetic, and try_from. Previous edits tried to add checklists and verbose rules, but the agent still misses them. The fix is to make these rules absolute, non-negotiable, and explicitly tied to the 'illegal state' contract. We also need to reinforce that review mode must catch these specific patterns as BLOCKERs, not just general issues. [optimizer-ranked: selected 3/4 edits]",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback.",
+      "content": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback. **Flag missing `try_reserve`, missing `checked_div`, and missing `try_from` as BLOCKER findings.**",
+      "source_type": "failure",
+      "support_count": 30
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. **Verify that all bounded Vec uses `try_reserve`, all division uses `checked_div`, and all width-reducing casts use `try_from`.**",
+      "source_type": "failure",
+      "support_count": 30
+    },
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals. **All width-reducing casts (e.g., usize to u32) MUST use `try_from`. All division MUST use `checked_div`.**",
+      "source_type": "failure",
+      "support_count": 30
+    }
+  ],
+  "ranking_details": {
+    "reasoning": "The current skill document already contains strong prohibitions against `unsafe`, `unwrap`, `as`, and unchecked arithmetic in the Core Contract. However, the enforcement mechanisms (Review and Repair modes) are where failures often occur because the LLM might miss these specific patterns during complex refactoring or review tasks. \n\nEdit [2] is the highest priority because it changes the Review Mode to explicitly flag missing `try_reserve`, `checked_div`, and `try_from` as 'BLOCKER' findings. This addresses the systematic impact of missed safety checks in code reviews, which is a high-value use case. It complements the existing general rules by making them actionable and graded.\n\nEdit [3] is the second priority because it updates the Repair Mode's pre-reporting checklist to explicitly verify `try_reserve`, `checked_div`, and `try_from`. This ensures that repairs are validated against these specific high-frequency failure modes before being reported as done. It complements the existing checklist by adding the specific safety checks that are most prone to omission.\n\nEdit [1] is the third priority. While the Core Contract already mentions `try_from` and `checked_div`, Edit [1] reinforces this with stronger language ('MUST', 'All division MUST'). However, since the Core Contract is already quite explicit, the marginal gain is lower than improving the enforcement mechanisms in Review and Repair modes. Edit [0] is less important because `try_reserve` is already well-covered in the Core Contract and Repair checklist; the main gap is in the Review mode's explicit flagging, which is covered by Edit [2].",
+    "selected_indices": [
+      2,
+      3,
+      1
+    ]
+  }
+}

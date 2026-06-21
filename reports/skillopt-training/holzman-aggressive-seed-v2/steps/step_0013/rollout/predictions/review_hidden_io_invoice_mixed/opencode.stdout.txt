@@ -1,0 +1,14 @@
+Now I have all the context. Let me write the review.
+Review complete. Written to `review-output.json` with 8 BLOCKER and 3 WARNING findings:
+
+**BLOCKERs:**
+- 2x `unwrap()` on I/O (line 9) and parse (line 19) — panics instead of typed errors
+- `as u16` lossy cast (line 19) — silent truncation
+- `split()` + `collect()` + indexing (line 12-19) — allocates full Vec, should use `split_once`
+- Unchecked `parts[0]`/`parts[1]` indexing (lines 16, 18) — OOB panic on malformed lines
+- `println!` side effect in core (line 16) — breaks purity
+- No `Result` return type (line 8) — all failures unsignalled
+
+**WARNINGs:**
+- No `try_reserve`/allocation budget on output Vec
+- Missing benchmark, profiler, and allocation evidence

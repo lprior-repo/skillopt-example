@@ -1,0 +1,120 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file does not exist or is unreadable",
+      "failure_mode": "untrusted file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, LoadMetricsError> and use .map_err(|e| LoadMetricsError::Io(e))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) performs I/O inside what should be a parsing step",
+      "failure_mode": "pure data parsing is fused with shell-side logging; side effects leak into the calculation layer, making the function non-deterministic and untestable",
+      "fix": "remove println! from load_metrics; logging belongs exclusively in the action/shell layer that calls this function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] and parts[1] use unchecked slice indexing without bounds check",
+      "failure_mode": "a malformed line with fewer than 2 comma-separated fields causes a panic at runtime instead of returning a typed parse error",
+      "fix": "use parts.get(0).ok_or(ParseError::Invalid) and parts.get(1).ok_or(ParseError::Invalid) with map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input",
+      "failure_mode": "invalid numeric field in a CSV line aborts the program instead of returning a typed ParseError::Invalid",
+      "fix": "use .parse::<u32>().map_err(|_| ParseError::Invalid) and propagate via Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_as_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 performs a lossy truncating cast from u32 to u16 with no range check",
+      "failure_mode": "values in range 65536..=4294967295 silently wrap to 0..=2791631763, producing incorrect domain values without any error",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow) for a checked conversion"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_required",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() allocates a Vec<String> for every line",
+      "failure_mode": "unbounded intermediate allocation per line; violates allocation discipline and Functional Core principle; also parses all fields when only first two are needed",
+      "fix": "use let (name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)?; parse value_str.trim() directly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics fuses file I/O (Action), parsing (Calculation), and domain construction (Data) in a single function",
+      "failure_mode": "violates Data/Calculations/Actions architecture; shell side-effects leak into data loading; impossible to test parsing logic in isolation",
+      "fix": "split into: (1) parse_record(line: &str) -> Result<Record, ParseError> for pure calculation, (2) load_metrics(path: &str) -> Result<Vec<Record>, LoadMetricsError> for shell I/O orchestration"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_raw_primitive_domain_state",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "pub value: u16 exposes a raw primitive in the domain struct without a newtype wrapper",
+      "failure_mode": "any caller can construct Record with any u16 value, including invalid domain states; no invariant enforcement on the value field",
+      "fix": "create a MetricValue newtype struct with a private constructor that validates the range, and use it in Record"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "raw String primitives from split cross the parse boundary without fallible smart constructors; callers can construct invalid domain states from unvalidated input",
+      "failure_mode": "the parse boundary does not enforce invariants; invalid data shapes produce panics or silent truncation rather than typed errors at the parse point",
+      "fix": "define ParseError enum with Invalid/Overflow variants; use split_once with ok_or for shape validation; use try_from for width conversion; use smart constructor on Record"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "no try_reserve or domain cap on the Vec allocation; file size directly controls allocation magnitude",
+      "failure_mode": "an attacker or misconfigured system can supply an arbitrarily large file, causing unbounded heap allocation and potential OOM crash",
+      "fix": "add a max_records parameter or constant cap; call values.try_reserve(min(cap, file_line_count)).map_err(|_| LoadMetricsError::Allocation) before the iterator"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_or_unchecked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>() followed by as u16 uses unchecked arithmetic path: no checked_add, checked_div, or checked_cast anywhere",
+      "failure_mode": "arithmetic side effects are unguarded; overflow and truncation produce silent data corruption rather than typed errors",
+      "fix": "use u16::try_from(parsed).map_err(|_| ParseError::Overflow) for a checked width conversion returning typed error"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_metrics throughput or latency",
+    "no profiler data identifying hot paths in parsing",
+    "no allocation budget or try_reserve evidence for Vec capacity",
+    "no second-ring evidence (benchmark, profiler, or measured data) for any performance claim",
+    "no command evidence: cargo fmt, cargo check, cargo clippy, or cargo test were not run"
+  ],
+  "residual_risk": "This crate has pervasive violations of Holzman absolute laws: five unwrap surfaces, unchecked indexing, lossy casts, hidden I/O in parsing logic, fused shell/core responsibilities, raw primitive domain state, and unbounded allocation. No verified evidence exists. Delivery is blocked until all findings are remediated with Result-returning APIs, typed error taxonomy, split_once parsing, checked conversions, and architecture separation."
+}

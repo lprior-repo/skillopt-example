@@ -1,0 +1,30 @@
+Now I have a clear picture. The current code has multiple Holzman violations. Let me repair it.
+
+Key issues to fix:
+1. Returns `String` instead of `Summary` (tests expect `Summary`)
+2. Missing `render_summary` function
+3. Uses `split(',').collect()` instead of `split_once`
+4. `unwrap()` on parse
+5. Unchecked `+=` arithmetic
+6. `count as u32` lossy cast
+7. `total / count` unchecked division
+8. No empty input check
+9. No invalid line handling
+All 6 tests pass. Let me fix the `mut` warning and run the strict clippy gate.
+All gates pass. Let me write the required output file.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| Returned `String` instead of `Summary` | Changed return type to `Result<Summary, SummaryError>` |
+| Missing `render_summary` | Added `render_summary(Summary) -> String` |
+| `split(',').collect()` | Replaced with `split_once(',')` parse boundary |
+| `.unwrap()` on parse | `.map_err(|_| SummaryError::Invalid)` |
+| `total += value` (unchecked) | `checked_add` with `Overflow` error |
+| `count += 1` (unchecked) | `checked_add` with `Overflow` error |
+| `count as u32` (lossy cast) | `u32::try_from(count).map_err(...)` |
+| `total / count` (unchecked div) | `total.checked_div(count_u64).ok_or(Invalid)` |
+| No empty input check | Early check on empty lines + zero-count guard |
+| No invalid line handling | `split_once` failure returns `Invalid` |
+
+All 6 tests pass. Zero clippy warnings. Zero forbidden constructs in production source.

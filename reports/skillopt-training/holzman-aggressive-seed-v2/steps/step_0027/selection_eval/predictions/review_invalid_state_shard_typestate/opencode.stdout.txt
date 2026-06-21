@@ -1,0 +1,8 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Found 10 Holzman Rust violations in the crate:
+
+- **3 BLOCKERs**: Illegal states representable via bool/String fields, mutation instead of pure transitions, no domain newtypes
+- **4 MAJORs**: Public mutable fields, no typed error return, Option decoupling for sent_at, unused validation typestate, missing benchmark evidence
+- **3 MINORs**: Unnecessary String allocations, missing doc comments
+
+The core issue: `ShardWorkflow` uses primitive types (bool flags, String status) instead of enum typestates, making illegal states representable and allowing invalid lifecycle transitions with no compile-time enforcement.

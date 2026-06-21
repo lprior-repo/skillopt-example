@@ -1,0 +1,18 @@
+Now I have the full crate. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+- **8 BLOCKERs:**
+  1. `unwrap()` on `fs::read_to_string` (line 9) — I/O failure panics
+  2. `unwrap()` on `.parse()` (line 19) — bad input panics
+  3. Lossy `as u16` cast (line 19) — silent truncation for values >65535
+  4. Unchecked `parts[0]` indexing (line 16) — panics on empty lines
+  5. Unchecked `parts[1]` indexing (line 19) — panics on single-field lines
+  6. `println!` in parsing function (line 16) — breaks functional core / imperative shell
+  7. `Vec::collect()` without `try_reserve` (line 12) — unbounded allocation
+  8. No typed error taxonomy — all failures are panics
+
+- **2 Warnings:**
+  - No benchmark evidence for `load_frames`
+  - No profiler evidence for allocation profile

@@ -1,0 +1,19 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 10 findings across the crate.
+
+**Summary of violations found in `src/lib.rs`:**
+
+| Severity | Rule | Description |
+|----------|------|-------------|
+| BLOCKER | `make_illegal_states_unrepresentable` | `status: String` + `is_validated: bool` + `is_sent: bool` + `sent_at_epoch_ms: Option<u64>` permits every impossible combination |
+| BLOCKER | `domain_enums_not_strings` | `status` is an unchecked `String`, not a sealed enum |
+| BLOCKER | `lifecycle_booleans_typestate` | Two independent booleans model a lifecycle that should be a single typestate enum |
+| BLOCKER | `optional_lifecycle_data_variant_owned` | `sent_at_epoch_ms` is a global `Option` instead of being owned by the `Sent` variant |
+| BLOCKER | `smart_constructors_validation` | All fields are `pub`, no smart constructor, no validation at construction |
+| BLOCKER | `functional_core_imperative_shell` | `mark_sent` mutates in-place with no transition guards |
+| MAJOR | `no_id_newtype` | `id` is a raw `String`, no `BatchId` newtype |
+| MAJOR | `no_benchmark_evidence` | No benchmarks or profiler/allocation evidence |
+| MAJOR | `no_test_evidence` | No tests for state transitions |
+| MINOR | `allocations_in_hot_path` | `.to_string()` on literal creates unnecessary heap alloc |
+
+**Residual risk:** All risks are architectural — illegal states are fully representable. No unsafe code or FFI present. Fix requires full domain model rewrite (Status enum + typestate + variant-owned data).

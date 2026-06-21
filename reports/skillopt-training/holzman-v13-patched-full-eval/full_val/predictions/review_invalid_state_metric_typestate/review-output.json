@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "hardening-checklist.md",
+    "functional-core-performance.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_state_representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow struct allows inconsistent state combinations: is_validated and is_sent are independent bools, and status is a free-form String. Any combination of these three fields is a valid Rust value, including logically impossible states like is_sent=true with status='pending'.",
+      "failure_mode": "Downstream consumers cannot rely on the state model. A metric may appear sent while status reads 'pending', or be marked validated after being sent, leading to duplicate sends, missed validations, or silent data loss.",
+      "fix": "Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single MetricStatus enum that encodes valid transitions and carries sent_at_epoch_ms in the Sent variant. Make id a newtype."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string_should_be_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String instead of a domain enum. Any arbitrary string value is accepted, including 'sent', 'pending', 'foo', or empty string. The mark_sent function overwrites it with .to_string() rather than a type-safe transition.",
+      "failure_mode": "Callers can set status to any string value, bypassing the state machine entirely. The .to_string() on line 10 is redundant heap allocation for a literal. Consumers must match on string equality rather than exhaustive enum variants.",
+      "fix": "Replace `pub status: String` with `pub status: MetricStatus` enum. Change mark_sent to return MetricStatus::Sent with optional metadata instead of mutating a String field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_should_be_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is an independent lifecycle flag that can be set without any ordering constraint relative to is_sent. Combined with is_sent: bool on line 5, this creates a 4-state boolean product where only 2+ are valid.",
+      "failure_mode": "A metric can reach is_validated=true, is_sent=true (validated after sent, possibly a data integrity issue) or is_validated=false, is_sent=true (sent without validation, violating audit requirements). No transition logic enforces the correct order.",
+      "fix": "Merge is_validated and is_sent into a single MetricStatus enum with variants like Pending, Validated, Sent. The enum itself encodes the valid ordering of lifecycle transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a free-floating optional field independent of is_sent. It can be Some(timestamp) while is_sent=false (timestamp for a non-sent metric), or None while is_sent=true (sent without a record of when).",
+      "failure_mode": "Audit trails are unreliable. sent_at_epoch_ms=Some(12345) with is_sent=false gives false evidence of an event that never completed. The Option leaks lifecycle data outside the state machine.",
+      "fix": "Move sent_at_epoch_ms into the MetricStatus::Sent(u64) variant so the timestamp is only present when the metric is actually in the sent state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "raw_primitive_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive exposed directly in the domain struct. Metric IDs likely carry domain invariants (format, uniqueness, lifetime) but the String type provides zero validation.",
+      "failure_mode": "Empty strings, duplicate IDs, or malformed identifiers are all representable. Any code using id must repeat validation logic or risk operating on invalid identifiers.",
+      "fix": "Introduce a MetricId newtype struct with a smart constructor that validates the identifier format, and use `pub id: MetricId` instead of `pub id: String`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_violation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow exposes raw primitives (String for id, String for status, bools for flags) at the domain boundary instead of parsed domain types. Callers can construct any invalid state combination directly via struct literal without a smart constructor or parse boundary.",
+      "failure_mode": "The parse boundary is absent: external input reaches domain logic as unvalidated primitives, so callers can construct illegal states directly. There is no smart constructor, no validation, and no fallible parsing to prevent invalid domain values from entering the system.",
+      "fix": "Replace pub struct with a private struct and a pub fn try_new(...) -> Result<MetricWorkflow, MetricError> smart constructor, or fully model the domain with enum-based typestate and newtyped IDs."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or latency",
+    "no profiler evidence for allocation profile of MetricWorkflow construction and transitions",
+    "no allocation evidence: mark_sent performs .to_string() allocation on line 10 per call, which is unnecessary heap work for a string literal",
+    "no second-ring evidence (flamegraph, assembly) for the hot path of metric lifecycle transitions",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy were not executed"
+  ],
+  "residual_risk": "Structural typestate violation: the domain model makes illegal states representable through independent bools and a String status. Without the enum-based typestate replacement, no amount of testing can prove the state machine is never entered into an invalid configuration. The mark_sent function compounds this by mutating state unsafely rather than performing a typed transition."
+}

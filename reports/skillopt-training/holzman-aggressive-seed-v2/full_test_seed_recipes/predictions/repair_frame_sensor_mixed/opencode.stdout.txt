@@ -1,0 +1,10 @@
+Now I can see the issues clearly. The `encode_frame` function ignores `max_payload`, uses a lossy `as u32` cast, and has no allocation safety. Let me fix it.
+All 2 tests pass. Now I'll write the required output.
+Repair complete. Changes to `src/lib.rs`:
+
+1. **Added payload bound check** — returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload` (fixes `rejects_limit` test)
+2. **Replaced lossy `as u32` cast** with `u32::try_from(payload.len())` (Holzman constraint)
+3. **Added checked capacity arithmetic** — `4usize.checked_add(payload.len())` for overflow safety
+4. **Added `try_reserve`** before pushing bytes for allocation safety
+
+All 2 behavior tests pass. `repair-output.json` written to the required path.

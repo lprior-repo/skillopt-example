@@ -1,0 +1,8 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json` with 6 findings:
+
+- **3 BLOCKERs**: illegal states representable (`String` status + independent bools), no typestate for lifecycle, `mark_sent` has no preconditions
+- **2 MAJORs**: in-place mutation instead of pure transitions, primitive obsession (raw `String`/`u64` instead of domain newtypes)
+- **1 MINOR**: public fields allow direct mutation bypassing transitions
+
+Missing evidence: no tests, no benchmarks, no profiler/allocation data, no command evidence.

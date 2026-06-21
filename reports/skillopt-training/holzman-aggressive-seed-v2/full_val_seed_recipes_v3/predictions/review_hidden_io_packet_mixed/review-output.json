@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap on I/O",
+      "failure_mode": "Any filesystem error (missing file, permissions, ENOENT) panics the thread instead of returning a typed error",
+      "fix": "Use fs::read_to_string(path).map_err(|e| IOError::ReadFailed(e))? and propagate via a typed error or Result<Vec<Record>, IOError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on untrusted parse",
+      "failure_mode": "A non-numeric field value panics the thread instead of returning a typed parse error",
+      "fix": "Replace with parts[1].parse::<u32>().map_err(|_| ParseError::Invalid)? or equivalent typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy `as u16` cast after parse — truncation on values > 65535",
+      "failure_mode": "A valid u32 value above 65535 silently truncates to u16, corrupting data with no error signal",
+      "fix": "Use `u16::try_from(parsed_u32).map_err(|_| ParseError::OutOfRange)?` to reject out-of-range values with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] — unchecked indexing into Vec without bounds check",
+      "failure_mode": "A line with fewer than 2 comma-separated fields panics via IndexOut ofBounds",
+      "fix": "Replace with split_once or get(i) with ok_or(...) to produce a typed parse error for malformed lines"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — hidden I/O side effect in data-loading function",
+      "failure_mode": "Pure-appearing function has observable logging side effects, violating functional-core design; makes testing, composability, and audit harder",
+      "fix": "Move all println!/logging into the imperative shell layer. The core loader should return data only, no console output."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_contracts",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String and u16 — no newtype, no enum, no typestate",
+      "failure_mode": "Any string is a valid record name; any u16 is a valid value. Illegal domain states are representable. No invariants enforced by the type system.",
+      "fix": "Introduce newtypes (e.g., RecordName(String) with a smart constructor, or a bounded enum for value categories) and a fallible constructor that rejects empty names and invalid ranges."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_contracts",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> — no error taxonomy at all",
+      "failure_mode": "All failure modes (I/O error, malformed line, missing field, overflow, allocation) are silently converted to panics with no way to distinguish them",
+      "fix": "Return `Result<Vec<Record>, PacketError>` where PacketError is an enum with variants like ReadFailed, EmptyInput, Malformed, InvalidValue, Overflow, AllocationFailed"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec<String> intermediate collection via .collect() without try_reserve or capacity planning",
+      "failure_mode": "Unbounded allocation growth; on very large files the parser will allocate memory proportional to input size with no capacity bound or allocation-failure handling",
+      "fix": "If max items is known, call values.try_reserve(max).map_err(|_| PacketError::AllocationFailed)? before collecting. Otherwise use split_once in a streaming loop to avoid the intermediate Vec entirely."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Intermediate Vec<String> allocation for every line — unnecessary heap allocations",
+      "failure_mode": "Each line allocates 2 String objects (split results), then clones them into Record. For high-throughput packet loading this is a measurable performance cost.",
+      "fix": "Use `line.split_once(',').ok_or(PacketError::Malformed)?` to get `&str` references, then parse directly into Record fields without intermediate Vec<String> or .clone()."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record fields use owned String instead of borrowed &str or Cow<str>",
+      "failure_mode": "Every Record owns its name String even when the source data may be short-lived or reused. Wastes memory and prevents zero-copy parsing patterns.",
+      "fix": "If lifetimes permit (e.g., Record takes &str), use `&str`. Otherwise `Cow<'static, str>` allows zero-copy when input already owns the data."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_packets throughput or latency",
+    "no profiler data (flamegraph, perf) to validate allocation patterns",
+    "no allocation analysis (e.g., #[global_allocator] tracker, or cargo-bench with --bench -- --noplot) to measure per-record heap cost",
+    "no behavior tests — load_packets has no test coverage at all",
+    "no benchmark/profiler/allocation evidence to support any performance claim about this function"
+  ],
+  "residual_risk": "Static review only; no commands run. The function is fundamentally unsafe: every code path that handles real-world input can panic (I/O error, parse error, index out of bounds, numeric overflow via lossy cast, and logging side effects in the core). No error taxonomy, no tests, no benchmarks, no type-level invariants. A production reviewer would block this for all five BLOCKERs before any implementation work."
+}

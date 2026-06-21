@@ -1,0 +1,16 @@
+Now I have all the context needed. The source is a single `src/lib.rs` with a `QuoteWorkflow` struct and `mark_sent` function. This is a textbook invalid-state-representable case. Let me write the review.
+Review complete. Written to `review-output.json`:
+
+- **8 BLOCKER findings** covering:
+  1. Missing typestate state machine (line 1)
+  2. `status: String` instead of enum (line 3)
+  3. Lifecycle booleans `is_validated`/`is_sent` (lines 4-5)
+  4. `Option<u64>` decoupled from state (line 6)
+  5. `id: String` raw primitive, no newtype (line 2)
+  6. No parse boundary / smart constructor (line 1)
+  7. `mark_sent` returns `QuoteWorkflow` not `Result` (line 9)
+  8. Unbounded allocation with two `String` fields (line 1)
+
+- **6 missing evidence items**: no benchmarks, profiler data, CI logs, test suite, or commands run.
+
+- **Residual risk**: static review only; all violations confirmed at source but unverified by commands.

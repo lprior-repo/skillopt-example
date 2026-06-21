@@ -1,0 +1,27 @@
+Now I have full context. Let me read the review output contract reference too, then fix the crate.
+Now I have the full picture. The issues are:
+
+1. `summarize_metrics` returns `Result<String, ...>` but tests expect `Result<Summary, ...>`
+2. Missing `render_summary` function
+3. `unwrap()` on parse (line 12)
+4. Unchecked indexing `parts[1]`
+5. No empty-input rejection
+6. No invalid-line rejection
+7. No overflow detection
+8. No `split_once` usage
+
+Fixing:
+All 6 tests pass. Now writing the required output:
+Repair complete. All 6 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Issue | Fix |
+|---|---|
+| `unwrap()` on parse | `parse().map_err(|_| SummaryError::Invalid)?` |
+| Unchecked indexing `parts[1]` | `split_once(',')` |
+| No empty-input rejection | `input.trim().is_empty()` check |
+| No invalid-line rejection | `split_once` + `parse` error mapping |
+| `total += value` overflow risk | `total.checked_add(value)` |
+| `summarize_metrics` returned `String` | Changed to return `Summary` struct |
+| Missing `render_summary` | Added pure formatting function |

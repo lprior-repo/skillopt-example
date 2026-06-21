@@ -1,0 +1,129 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SampleWorkflow allows any combination of status string, lifecycle booleans, and optional timestamp. Validating combinations are unreachable (is_sent=true with sent_at_epoch_ms=None), and invalid combinations like is_validated=false with is_sent=true compile and run silently.",
+      "failure_mode": "Any caller can construct a SampleWorkflow that violates domain invariants. The type system gives zero protection against impossible state: marked-as-sent with no timestamp, not-validated but marked-sent, or a status string not matching any lifecycle boolean.",
+      "fix": "Replace status: String plus is_validated: bool / is_sent: bool with a single enum WorkflowState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }. Remove the separate booleans and optional timestamp. Construction via a single smart constructor enforces invariants at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_status_strings_and_lifecycle_booleans",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String combined with is_validated: bool and is_sent: bool creates an explosion of reachable states (3 strings x 2 x 2 = 12), most of which are meaningless. The status string and booleans are redundant and mutually inconsistent by design.",
+      "failure_mode": "Pattern matching on status string yields unreachable arms. Comparing booleans yields inconsistent results. Adding a new status requires updating three independent fields correctly.",
+      "fix": "Replace all three fields with a single enum WorkflowState with variants for each lifecycle stage. Put optional lifecycle data (sent_at_epoch_ms) inside the variant that owns it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession_domain_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive that carries no domain constraints. Any string value, empty string, or malformed ID is accepted with zero validation.",
+      "failure_mode": "Empty string IDs, duplicate IDs, or IDs exceeding domain bounds pass through unchecked. Core logic cannot assume id validity without revalidating at every use site.",
+      "fix": "Use a newtype Id(String) or Id([u8; N]) with a smart constructor that validates and returns a typed error. Core logic consumes Id, never raw String for identity."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_does_not_enforce_invariants",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent sets status and is_sent but does NOT set sent_at_epoch_ms, leaving a sent item with no timestamp. It also does not verify the precondition that the item was validated before being sent.",
+      "failure_mode": "An item can be marked as sent without ever being validated, and with no sent_at_epoch_ms timestamp. Downstream code reading sent_at_epoch_ms gets None and must handle it, or the invariant 'sent items have timestamps' is silently broken.",
+      "fix": "With the enum typestate approach, sent_at_epoch_ms becomes part of the Sent variant and is required at construction. mark_sent should be replaced by a state-transition function or smart constructor that takes the prior state and returns the next state, making transitions compile-time enforced."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_smart_constructor_parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "There is no constructor, smart constructor, or parse boundary for SampleWorkflow. Any caller can call SampleWorkflow { id: \"\".into(), status: \"blah\".into(), is_validated: false, is_sent: true, sent_at_epoch_ms: None } and the code compiles.",
+      "failure_mode": "Domain invariants are enforced nowhere. External callers, tests, and the core itself can construct invalid states. No typed error is returned for invalid input.",
+      "fix": "Add a private constructor or a factory function SampleWorkflow::new(...) -> Result<SampleWorkflow, WorkflowError> that validates all invariants. Make fields private and expose only through methods."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "fields_not_private_encapsulation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of SampleWorkflow are pub, allowing external mutation of any field without going through an API method. This bypasses any invariant enforcement.",
+      "failure_mode": "A caller can do item.is_validated = false after mark_sent(item), re-opening a sent workflow. The struct has no encapsulation barrier.",
+      "fix": "Make all fields private. Expose behavior through methods on the struct. With an enum typestate, the type itself prevents invalid mutation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns SampleWorkflow directly with no error type. There is no WorkflowError enum for expected domain failures (e.g., cannot send unvalidated item, item already sent).",
+      "failure_mode": "Error conditions must be communicated via panic, Option, or a String error — none of which are railway-friendly. Callers cannot pattern-match on expected failure modes.",
+      "fix": "Return Result<SampleWorkflow, WorkflowError> where WorkflowError is an enum with typed variants like AlreadySent, NotValidated, InvalidState(String). The enum typestate approach makes some of these unreachable at compile time."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for any performance-relevant path. The crate has zero performance evidence despite marking items and managing workflow state.",
+      "failure_mode": "Cannot verify that workflow operations meet latency or throughput requirements. Allocation patterns (to_string on every mark_sent) are unmeasured.",
+      "fix": "Add a criterion or tiny_bench benchmark for mark_sent and any hot-path operations."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_prover_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No proptest, Kani, Miri, or invariant test evidence. The struct invariants (sent implies timestamp, validated before sent) are untested programmatically.",
+      "failure_mode": "No automated proof or property-based testing that invariants hold across state transitions. Invalid states can be introduced by refactoring with zero detection.",
+      "fix": "Add proptest properties: sent implies has timestamp, validated precedes sent, status enum exhaustiveness. Run cargo clippy -- -D warnings before claiming clean."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_test_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module exists. mark_sent behavior is untested. Invalid state construction is untested.",
+      "failure_mode": "Regression in mark_sent or workflow state machine will not be detected. New callers can introduce invalid states without test coverage.",
+      "fix": "Add tests for: valid lifecycle transitions, invalid transition rejection, enum exhaustiveness."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "allocations_in_hot_path",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent allocates a new String via \"sent\".to_string() on every call. With the enum typestate approach, the status field would be an enum variant (zero-allocation).",
+      "failure_mode": "Every state transition allocates a heap String. In high-throughput workflows, this is measurable overhead. The sent_at_epoch_ms allocation (Option<u64> is cheap, but the String is not).",
+      "fix": "Replace status String with an enum variant. The typestate enum has no heap allocation for status representation. If id must remain String, consider if &str parameter is sufficient for the operation."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_must_use_on_result",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "If mark_sent were changed to return Result<_, _>, callers could silently discard the result with let _ = mark_sent(...). However, as-is the function returns a value directly.",
+      "failure_mode": "Future changes to return Result without #[must_use] allow silent error suppression.",
+      "fix": "When introducing Result return, add #[must_use] to the error type."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any workflow operation",
+    "no proptest or property-based tests for invariants",
+    "no Kani/Miri execution for state-transition safety",
+    "no clippy check evidence (cargo clippy --workspace --all-targets --all-features)",
+    "no fmt check evidence (cargo fmt --check)",
+    "no compilation check evidence (cargo check --workspace --all-targets --all-features)",
+    "no test execution evidence (cargo test --workspace --all-features)"
+  ],
+  "residual_risk": "Static review only. No commands were run. The core issue is architectural: SampleWorkflow makes illegal states representable through primitive fields (String status + bool flags + Option<u64>). This is the single highest-severity finding — replacing the struct with an enum typestate resolves the majority of BLOCKER and MAJOR findings simultaneously. Until this refactoring is done, any downstream code inherits the invalid-state problem."
+}

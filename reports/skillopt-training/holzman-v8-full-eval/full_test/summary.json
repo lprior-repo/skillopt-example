@@ -1,0 +1,25 @@
+{
+  "candidate": "holzman-rust-candidate-v8",
+  "skill_sha256": "52ac593e9dcea9b2833324ad53d71f008bb9259e9d71a00310945efeb915ab32",
+  "split": "test",
+  "n": 22,
+  "hard": 0.36363636363636365,
+  "soft": 0.9051515151515152,
+  "passed": 8,
+  "failed": [
+    "repair_csv_event_mixed",
+    "repair_csv_frame_mixed",
+    "repair_csv_packet_mixed",
+    "repair_csv_route_mixed",
+    "repair_csv_sample_mixed",
+    "repair_csv_shard_mixed",
+    "repair_frame_lease_mixed",
+    "repair_frame_ledger_mixed",
+    "repair_frame_packet_mixed",
+    "repair_frame_sensor_mixed",
+    "repair_summary_sample_mixed",
+    "review_invalid_state_batch_typestate",
+    "review_invalid_state_route_typestate",
+    "review_perf_folklore_tiny_rayon_smallvec"
+  ]
+}

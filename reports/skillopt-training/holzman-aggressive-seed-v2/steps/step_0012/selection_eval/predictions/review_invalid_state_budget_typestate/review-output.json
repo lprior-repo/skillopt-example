@@ -1,0 +1,98 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String — any string value is constructible, including invalid states like \"sent\" without is_sent=true, empty string, or arbitrary values. The domain invariant that status must be one of a finite set is not enforced by the type system.",
+      "failure_mode": "Callers can construct BudgetWorkflow with status=\"bogus\" or status=\"sent\" without is_sent=true, violating the budget workflow state machine invariants at compile-time silence.",
+      "fix": "Replace pub status: String with a private status: BudgetStatus field where BudgetStatus is an enum with explicit variants (e.g., Pending, Validated, Sent). Remove pub accessor; expose only domain-meaningful methods."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a pub bool — a boolean lifecycle flag that cannot express the three-state reality (not-yet-validated / validated / rejected) and can be set inconsistent with status. The type name signals a lifecycle but the primitive provides zero domain semantics.",
+      "failure_mode": "A BudgetWorkflow can exist with is_validated=false but status=\"sent\", or is_validated=true with status=\"pending\". The invariant \"only validated budgets may be sent\" is invisible to the compiler and must be checked manually at every call site.",
+      "fix": "Replace with a typestate enum (e.g., ValidationState { NotValidated, Validated, Rejected }) as a private field. Remove pub visibility. Introduce fallible constructors that enforce validation-before-sent ordering."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a pub bool — redundant with status field and independently mutable. A boolean cannot express sent/unsent as an enforced transition; it can be flipped backward.",
+      "failure_mode": "Callers can set is_sent=true independently of status, or flip it false after marking sent, creating an inconsistent state where the budget appears both sent and unsent. The is_sent status bit is an independent mutable boolean — no ordering guarantee exists between it and status.",
+      "fix": "Remove is_sent entirely. Derive sent-ness from the BudgetStatus enum (e.g., BudgetStatus::Sent is the sole sent variant). If a timestamp is needed on send, use sent_at_epoch_ms which already exists as Option<u64>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_mutation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates item.status and item.is_sent in-place via mut param. This is imperative mutation, not a pure functional core transformation. It also does not validate that the budget was validated before sending — no pre-condition check exists.",
+      "failure_mode": "Any caller can mark any BudgetWorkflow as sent regardless of validation state, producing invalid domain transitions (e.g., pending→sent bypassing validation). The function silently accepts invalid preconditions and returns an inconsistent result.",
+      "fix": "Replace with a fallible method or constructor: fn try_mark_sent(self) -> Result<BudgetWorkflow, SentError> that checks the typestate invariant (validated → sent transition) and returns a typed error on violation. Or encode transitions in a typestate machine where only a validated state can transition to sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_struct_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BudgetWorkflow are pub (id, status, is_validated, is_sent, sent_at_epoch_ms). Public fields allow callers to construct and mutate the struct arbitrarily, bypassing all domain invariants.",
+      "failure_mode": "Callers can directly set item.status = \"anything\", item.is_sent = true, item.is_validated = false without going through any domain method. This defeats the purpose of any future typestate or enum refinements — the fields remain externally mutable.",
+      "fix": "Make all fields private. Provide a constructor (e.g., BudgetWorkflow::new(id) -> BudgetWorkflow) that initializes the struct to a valid default state. Expose only read-only accessors or domain-meaningful methods that enforce invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is pub String — a raw primitive with no domain validation. Budget IDs should be a newtype that encodes format rules (length, character set) at the type level.",
+      "failure_mode": "Invalid ID formats (empty, too long, malformed) can propagate through the entire system as plain strings, causing downstream errors instead of being rejected at the boundary with a typed error.",
+      "fix": "Introduce a BudgetId newtype struct with a private String field and a fallible constructor BudgetId::new(s: String) -> Result<BudgetId, IdError> that validates format rules. Use BudgetId as the field type."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocations_in_core",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses \"sent\".to_string() to allocate a new String on the heap for what should be a static domain value. The status string \"sent\" is a compile-time constant.",
+      "failure_mode": "Unnecessary heap allocation on every mark_sent call. In hot paths this adds measurable overhead. Should use an enum variant or &'static str if a string is retained.",
+      "fix": "Replace the String-based status with an enum (BudgetStatus) so no heap allocation is needed for status transitions. The enum discriminant is a compile-time constant — zero heap cost."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "unused_field",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a field on the struct but never populated by mark_sent and never referenced. If sent timestamps are intended, they should be set during the send transition.",
+      "failure_mode": "After mark_sent, sent_at_epoch_ms remains None even though the workflow is marked sent. Consumers checking this field will see an inconsistent state. This is a data integrity gap.",
+      "fix": "Populate sent_at_epoch_ms in mark_sent with the current time (via a timestamp provider injected at the shell boundary), or remove the field if it is not needed. If kept, ensure the typestate enforces that sent_at_epoch_ms is Some only when status is Sent."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark, profiler, or allocation evidence exists for the mark_sent function or BudgetWorkflow. The crate has no benches/ directory.",
+      "failure_mode": "Without baseline measurements, there is no evidence that the implementation meets performance requirements. Any future changes cannot be validated against a performance budget.",
+      "fix": "Add a benches/ directory with a criterion or similar benchmark measuring mark_sent throughput and allocation profiles under representative workloads."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or BudgetWorkflow operations",
+    "no profiler evidence for allocation profiles",
+    "no allocation analysis (e.g., cargo bench --bench with --alloc-check or similar)",
+    "no command-layer evidence or CLI integration tests"
+  ],
+  "residual_risk": "The BudgetWorkflow struct represents every possible combination of status, is_validated, and is_sent as constructible — including states that should be illegal (e.g., sent-but-not-validated). No typestate enforcement, no typed error taxonomy, and no fallible constructors exist. The entire domain model is representable as an invalid state machine. Static review only; no commands run."
+}

@@ -1,0 +1,15 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `review-output.json` with 9 findings:
+
+**7 BLOCKERs:**
+1. **make_illegal_states_unrepresentable** (line 1) — all public primitives allow contradictory state combinations
+2. **status_enum_required** (line 3) — `status: String` accepts arbitrary values
+3. **typestate_lifecycle** (line 4-5) — independent `bool` fields allow invalid orderings (e.g., sent before validated)
+4. **option_invalid_state_combination** (line 6) — `Option<u64>` timestamp can exist outside sent state
+5. **newtype_domain_id** (line 2) — `String` ID has no validation or domain semantics
+6. **parse_boundary** (line 9) — raw primitives cross boundary; no fallible smart constructor
+7. **functional_core_imperative_shell** (line 9) — mutation instead of pure state transition
+
+**2 WARNINGs:**
+- Missing benchmark evidence
+- Missing test/clippy/command evidence

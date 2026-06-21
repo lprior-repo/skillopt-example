@@ -1,0 +1,17 @@
+Now let me check references and then implement the fix.
+Now I have the full picture. The source has multiple Holzman violations and doesn't match test contracts. Writing the fix.
+All 6 tests pass. Writing the required output JSON.
+Done. All repairs complete:
+
+**Changes to `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary(Summary) -> String` for formatting (shell concern)
+- Replaced `line.split(',').collect()` with `line.split_once(',')` (mandatory pattern)
+- Replaced `.unwrap()` on parse with `.map_err(|_| SummaryError::Invalid)`
+- Replaced `total += value` with `total.checked_add(value).ok_or(Overflow)`
+- Replaced `count += 1` with `count.checked_add(1).ok_or(Overflow)`
+- Replaced `count as u32` with `u32::try_from(count)`
+- Replaced `total / count` with `total.checked_div(count_u64)`
+- Added empty-input check returning `SummaryError::Empty`
+
+**All 6 tests pass.** Output written to `repair-output.json`.

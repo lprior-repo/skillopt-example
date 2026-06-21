@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**6 BLOCKER findings** across the task crate (`src/lib.rs`):
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `typestate_state_machine` | 1 | No typestate enum; mark_sent can fire on any instance |
+| 2 | `status_string_not_enum` | 3 | `status: String` allows arbitrary values |
+| 3 | `bool_lifecycle_flags` | 4 | Independent `is_validated`/`is_sent` booleans permit impossible combinations |
+| 4 | `option_invalid_state_combinations` | 6 | `sent_at_epoch_ms: Option<u64>` decoupled from sent flag |
+| 5 | `newtype_domain_id` | 2 | `id: String` is a raw primitive with no validation |
+| 6 | `parse_boundary` | 9 | `mark_sent` mutates raw struct directly with no preconditions |
+
+**5 missing evidence items**: no benchmarks, profiler, allocation analysis, second-ring evidence, or command-truth records.
+
+**Residual risk**: BLOCK_GLOBAL — all illegal state combinations are representable and the transition function has no validation.

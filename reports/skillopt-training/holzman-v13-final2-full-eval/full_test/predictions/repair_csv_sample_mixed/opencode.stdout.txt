@@ -1,0 +1,21 @@
+I see the issues. The production source uses `unwrap()`, `collect()`, and lacks empty/max_item checks — all forbidden by Holzman rules. The skill's CSV parser pattern requires `try_reserve`, `Vec::new`, checked capacity, and typed error returns.
+
+Let me fix the production source:
+All 4 tests pass. Let me verify no forbidden patterns remain and run clippy:
+Clippy clean. Let me verify no forbidden tokens remain:
+Now writing the required output:
+Repair complete. Here's the summary:
+
+**Changes made to `src/lib.rs`:**
+1. Replaced `split(',').map().collect()` (panic-on-fail) with iterative loop + `Vec::new` + `try_reserve`
+2. Added empty-input check returning `ParseError::Empty`
+3. Added `max_items` cap enforcement before each push, returning `ParseError::TooMany`
+4. Replaced `.unwrap()` with `.map_err(|_| ParseError::Invalid)` on parse
+5. Added fallible `try_reserve(max_items)` mapping to `ParseError::Allocation`
+
+**Verification:**
+- `cargo fmt` — clean
+- `cargo test` — 4/4 passed
+- `cargo clippy -D warnings` — clean
+- No forbidden patterns (`unwrap`, `expect`, `unsafe`, `Vec::with_capacity`, etc.)
+- Output JSON written to `repair-output.json`

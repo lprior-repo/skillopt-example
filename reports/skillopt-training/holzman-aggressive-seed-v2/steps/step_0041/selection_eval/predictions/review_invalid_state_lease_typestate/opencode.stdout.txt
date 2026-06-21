@@ -1,0 +1,14 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with **7 findings**, all BLOCKER severity:
+
+| # | Rule | File:Line | Core Issue |
+|---|------|-----------|------------|
+| 1 | `make_illegal_states_unrepresentable` | `src/lib.rs:1` | `status: String` + `is_sent: bool` + `is_validated: bool` allow impossible states |
+| 2 | `replace_bool_lifecycle_with_typestate` | `src/lib.rs:4` | `is_validated: bool` is a primitive lifecycle flag |
+| 3 | `replace_bool_lifecycle_with_typestate` | `src/lib.rs:5` | `is_sent: bool` duplicates `status`, guaranteeing divergence |
+| 4 | `domain_newtypes` | `src/lib.rs:2` | `id: String` has no `LeaseId` newtype for domain constraints |
+| 5 | `functional_core_no_side_effects` | `src/lib.rs:9` | `mark_sent` allocates via `.to_string()` in pure domain logic |
+| 6 | `no_primitive_obsession_at_boundaries` | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` is decoupled from lifecycle |
+| 7 | `functional_core_pure` | `src/lib.rs:9` | `mark_sent` mutates in-place with no validation or error path |
+
+The fundamental issue: `LeaseWorkflow` admits **all** illegal states by construction. The fix is a single `LeaseStatus` enum typestate with variants that carry their associated data, plus a `LeaseId` newtype.

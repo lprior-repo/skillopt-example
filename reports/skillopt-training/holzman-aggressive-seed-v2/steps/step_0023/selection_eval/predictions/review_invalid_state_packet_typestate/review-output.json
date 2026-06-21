@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses raw String status, bool is_validated, and bool is_sent fields that allow impossible states (e.g. status='pending' with is_sent=true, or is_validated=false with is_sent=true). The type does not enforce the domain workflow invariant that validation must precede sending.",
+      "failure_mode": "A caller can construct or mutate PacketWorkflow into an invalid lifecycle state at any time. No constructor, no typestate, no enum gating — the compiler cannot prevent corrupted state, leading to silent business-logic errors or incorrect downstream behavior.",
+      "fix": "Replace status, is_validated, is_sent with a single typestate enum (e.g. PacketState { Unvalidated, Validated, Sent { sent_at: Instant } }) that makes invalid transitions unconstructable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_with_enum_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle flag. The functional-core-performance reference explicitly requires: replace bool lifecycle flags with enums or typestates.",
+      "failure_mode": "Callers can toggle is_validated independently of other state. The boolean carries no semantic meaning — you cannot pattern-match on it to distinguish lifecycle phases, and you cannot encode which fields are valid in each phase.",
+      "fix": "Remove is_validated; fold it into a typestate enum like PacketState::Validated or include it as part of a structured state that guarantees correct field relationships."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_with_enum_typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a lifecycle flag that, combined with status: String, creates redundant and contradictory state. The same domain information (whether a packet was sent) is represented twice with no consistency enforcement.",
+      "failure_mode": "is_sent can be true while status != 'sent', or status can be 'sent' while is_sent is false. These contradictions cause unpredictable branch logic in any consumer that checks one field but not the other.",
+      "fix": "Replace both is_sent and status with a single typestate enum. The Sent variant carries the sent_at_epoch_ms timestamp as an associated value."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_option_lifecycle_with_enum_typestate",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a lifecycle field. When the packet is not sent, this field has no meaningful value. The functional-core-performance reference requires replacing Option lifecycle fields with enums or typestates.",
+      "failure_mode": "A caller can set sent_at_epoch_ms to Some value even when is_sent is false, or leave it as None after marking sent. No type-level relationship ties the timestamp to the sent lifecycle phase.",
+      "fix": "Fold sent_at_epoch_ms into the typestate enum's Sent variant: PacketState::Sent { sent_at_epoch_ms: u64 }. The timestamp becomes part of the Sent state, not a separate optional field."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates fields directly on a pass-by-value struct rather than returning a new typed state. This is an imperative action pattern leaking into the domain module without a clear core/shell boundary. The function signature takes and returns the same struct type, hiding the state transition.",
+      "failure_mode": "There is no compile-time guarantee that mark_sent can only be called in a valid pre-state. Any caller with a PacketWorkflow instance can call it regardless of the current lifecycle phase. No domain invariants are enforced.",
+      "fix": "Define mark_sent as a method or standalone function on the typestate enum: fn into_sent(self) -> Self or fn mark_sent(self) -> Result<PacketWorkflow, TransitionError> with exhaustive pattern matching on the enum to enforce valid transitions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "id_value_object",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive. Domain identifiers should be newtyped to enforce length, format, or uniqueness invariants at the type level.",
+      "failure_mode": "Any string value — empty, malformed, or unbounded — can flow into the domain core. There is no validation or type-level guarantee that id is a valid packet identifier.",
+      "fix": "Create a newtype PacketId(String or Bytes) with a fallible constructor that validates format/length, and use it in PacketWorkflow instead of raw String."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "allocation_efficiency",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent creates a new String via 'sent'.to_string() on every call, allocating heap memory for a constant string literal. The id field also stores an owned String unnecessarily when a &str reference or newtype would suffice.",
+      "failure_mode": "Unnecessary heap allocation on each mark_sent call. For high-throughput packet processing this adds measurable GC pressure and latency overhead.",
+      "fix": "If status must be retained, use a typestate enum instead (which eliminates the String entirely). If id must be owned, consider whether &str with lifetime constraints or a PacketId newtype with compact storage reduces allocation."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields on PacketWorkflow are pub and mutable (mut parameter). This allows external code to mutate any field directly, bypassing any domain logic or invariants.",
+      "failure_mode": "Callers can set item.is_validated = true without any validation actually occurring, or modify status arbitrarily. The struct provides zero encapsulation or invariant enforcement.",
+      "fix": "Make fields private and expose behavior through methods or enum variants. If the struct must remain public, remove pub from fields and provide a constructor that validates all invariants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for packet processing throughput or latency",
+    "no profiler data for allocation patterns in mark_sent path",
+    "no allocation analysis — String allocations on hot path not measured or bounded",
+    "no second-ring review or black-hat review evidence for typestate design",
+    "no command evidence (cargo fmt, cargo test, cargo clippy) for any gate"
+  ],
+  "residual_risk": "The crate's type model is fundamentally non-compliant with Holzman Rust: illegal states are fully representable, lifecycle flags are raw booleans, and the domain has no typestate or enum gating. A caller can construct or mutate PacketWorkflow into any arbitrary state combination. Without a typestate redesign, no amount of runtime checking or testing can guarantee domain invariants. The core/shell boundary is undefined. Benchmark, profiler, and allocation evidence is entirely absent. Static review only — no commands run."
+}

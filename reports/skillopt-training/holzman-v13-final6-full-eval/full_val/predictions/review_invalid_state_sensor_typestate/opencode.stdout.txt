@@ -1,0 +1,13 @@
+Now I have full context. Let me write the review output.
+Done. Review output written to the required path with 7 findings covering all Holzman + Functional Rust violations:
+
+- 6 typestate findings (per SKILL.md line 49): typestate machine, status/String, bool/lifecycle, Option invalid-state, newtype/domain IDs, parse boundary
+- 1 additional finding: `mark_sent` bypasses invariants
+
+Key violations found:
+- `status: String` instead of enum
+- `is_validated: bool` / `is_sent: bool` as independent lifecycle booleans  
+- `sent_at_epoch_ms: Option<u64>` decoupled from sent state
+- `id: String` raw primitive without newtype
+- No parse boundary constructors
+- `mark_sent` free function bypasses all invariants

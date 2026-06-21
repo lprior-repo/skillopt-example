@@ -1,0 +1,13 @@
+Repair complete. All 6 behavior tests pass. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `parts[1]` unchecked indexing | `split_once(',')` for safe delimiter extraction |
+| `.unwrap()` on parse | `.map_err(\|_ \|\| SummaryError::Invalid)` |
+| `total += value` unchecked add | `checked_add` → `SummaryError::Overflow` |
+| `count += 1` unchecked add | `checked_add` → `SummaryError::Overflow` |
+| `total / count` unchecked div | `checked_div` → `SummaryError::Overflow` |
+| `count as u32` lossy cast | `u32::try_from(count)` → overflow on failure |
+| Wrong return type `Result<String>` | Changed to `Result<Summary>` matching test contract |
+| Missing `render_summary` | Added pure function producing formatted output |
+| `split + collect` idiomatic issue | Replaced with `split_once` |

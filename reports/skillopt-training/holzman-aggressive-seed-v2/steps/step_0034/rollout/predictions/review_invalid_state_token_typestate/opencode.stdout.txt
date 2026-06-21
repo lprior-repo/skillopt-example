@@ -1,0 +1,8 @@
+Now I have all the information. Let me write the review output.
+Review complete. 5 findings written to `review-output.json`:
+
+- **2 BLOCKERs**: No typestate for token lifecycle (allows illegal states), raw `String` ID (no domain newtype)
+- **2 MAJORs**: `mark_sent` has no pre-condition checks (sent without validated), all fields `pub` (no invariant enforcement)
+- **1 MINOR**: Raw `u64` for timestamp (no temporal newtype)
+
+Missing evidence flagged: no benchmark, profiler, allocation analysis, or second-ring tests.

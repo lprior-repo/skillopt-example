@@ -1,0 +1,24 @@
+{
+  "task_id": "review_dense_ir_hot_path",
+  "kind": "review",
+  "bundle": "candidate-v5",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/candidate-v5/review_dense_ir_hot_path",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen5090-review-v5/tasks/candidate-v5/review_dense_ir_hot_path",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": null,
+  "bundle_digest": "e43300a081a26e869944ce4cc417c3e2707c84fd20c337ac3001b67d0316b826",
+  "task_digest": "1f9abfabb28bace8ed19163d82bf2a433021cc29cc6120f75c37082f149da65b",
+  "grade": {
+    "kind": "review",
+    "hard": 1.0,
+    "soft": 1.0,
+    "matched_groups": 5,
+    "total_groups": 5,
+    "missing_groups": [],
+    "json_valid": true,
+    "json_errors": [],
+    "mutation_errors": [],
+    "execution_errors": []
+  }
+}

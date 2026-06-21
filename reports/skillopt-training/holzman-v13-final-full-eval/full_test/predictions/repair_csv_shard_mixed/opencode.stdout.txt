@@ -1,0 +1,10 @@
+Now I have full understanding. The current `parse_shards` has `.unwrap()`, `.split(',').collect()`, no empty check, no max_items enforcement, and no fallible reserve. Let me apply the mandatory CSV/parser repair pattern.
+Repaired. All 4 tests pass, zero clippy warnings, valid JSON output written.
+
+**Changes in `src/lib.rs`:**
+- Replaced `.split(',').map(...).unwrap().collect()` with manual bounded loop
+- Added empty-input rejection → `ParseError::Empty`
+- Added `try_reserve(max_items)` with `ParseError::Allocation` fallback
+- Added `max_items` guard before each push → `ParseError::TooMany`
+- Added `map_err(|_| ParseError::Invalid)` for parse failures
+- Zero `unsafe`, `unwrap`, `expect`, `panic`, or unchecked operations remain

@@ -1,0 +1,16 @@
+[
+  {
+    "op": "replace",
+    "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` fo",
+    "content_preview": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check and error handling), and `try_from` for ALL integer width changes or casts. Never us",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "content_preview": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded, unchecked `+`/`-`/`*` in capacity/len",
+    "status": "applied_replace",
+    "index": 2
+  }
+]

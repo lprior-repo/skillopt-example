@@ -1,0 +1,18 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Wrote valid JSON to the required output path.
+
+**Summary of findings (9 findings, 6 BLOCKERs, 2 MAJORs):**
+
+| # | Rule | File:Line | Issue |
+|---|------|-----------|-------|
+| 1 | `make_illegal_states_unrepresentable` | `lib.rs:1` | `status: String` + two `bool` flags allow any state combination — illegal states are fully constructible |
+| 2 | `domain_newtypes` | `lib.rs:2` | `id: String` is a raw primitive with no domain constraints |
+| 3 | `domain_newtypes` | `lib.rs:3` | `status: String` is free-form instead of a closed enum |
+| 4 | `mark_sent_enforces_invariants` | `lib.rs:9` | `mark_sent` doesn't check `is_validated` or already-sent before transitioning |
+| 5 | `functional_core_imperative_shell` | `lib.rs:10` | `.to_string()` heap allocation in pure core function |
+| 6 | `missing_fallible_constructor` | `lib.rs:1` | No `new()` constructor; all fields `pub`, enabling invalid construction |
+| 7 | `missing_try_reserve` | `lib.rs:10` | Unchecked allocation pattern in core |
+| 8 | `missing_checked_arithmetic` | `lib.rs:6` | No `checked_*` on `sent_at_epoch_ms` arithmetic |
+| 9 | `missing_domain_error_types` | `lib.rs:9` | No `Result` return; no typed error taxonomy |
+
+**Missing evidence:** no benchmarks, profiler data, allocation analysis, integration tests, or CI command evidence.

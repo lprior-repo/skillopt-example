@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses String for status and bool flags (is_validated, is_sent) instead of typed enums or typestates. Any string value and any bool combination is constructable, including impossible states like status='draft' with is_sent=true.",
+      "failure_mode": "Invalid budget states are representable and can persist; no compile-time guarantee that a budget cannot be sent without validation, or that status conflicts with lifecycle flags.",
+      "fix": "Replace `status: String` with an enum `BudgetStatus { Draft, Validated, Sent }`. Replace `is_validated: bool` and `is_sent: bool` with a single `BudgetState` typestate enum. Make fields private or remove redundant flags entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no error return and mutates the struct in-place. It cannot reject invalid transitions (e.g., marking a draft budget as sent without validation). No functional-core separation — the function is both state machine transition and data carrier.",
+      "failure_mode": "Business rule violations silently succeed. An unvalidated, cancelled, or already-sent budget can be marked as sent with no feedback to the caller. No audit trail of why a transition failed.",
+      "fix": "Return `Result<BudgetWorkflow, BudgetError>` from mark_sent. Use a typed error enum. Only allow transition from Validated -> Sent. Move mutation logic out of the struct and into a pure function that validates invariants before returning a new state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain validation or newtype wrapping. The struct accepts any string as an identifier with no constraints.",
+      "failure_mode": "Empty, malformed, or malicious IDs are accepted. No domain-level guarantee that an ID matches expected format or uniqueness invariants.",
+      "fix": "Introduce `newtype struct BudgetId(String)` with a fallible constructor that validates ID format. Use `BudgetId` in the struct instead of raw `String`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BudgetWorkflow are pub and mutable. Any code outside the module can set status to arbitrary values and toggle bool flags independently, bypassing all domain invariants.",
+      "failure_mode": "External code can corrupt budget state without going through validated transition functions. The struct cannot maintain invariants across its lifetime.",
+      "fix": "Make all fields private. Provide constructors and transition methods that enforce invariants. Use `#[non_exhaustive]` if the struct needs to grow."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `.to_string()` which always allocates a new String, even when the string is identical to the existing value. In a tight loop or hot path, this causes unnecessary heap allocations.",
+      "failure_mode": "Allocation pressure from redundant String allocations. No measured evidence that this allocation is necessary or bounded.",
+      "fix": "Use `&str` where possible, or prefer an enum for status (eliminating the String entirely). If String is required, use `Cow<'static, str>` or intern the value."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an independent Option<u64> that can be set without is_sent being true, or left None while is_sent is true. This decouples the timestamp from the lifecycle flag, creating inconsistent state.",
+      "failure_mode": "A budget can appear sent (is_sent=true) without a timestamp, or have a timestamp without being marked sent. Downstream consumers cannot trust the timestamp as a reliable sent-marker.",
+      "fix": "Tie the timestamp to the Sent state variant. If using an enum, the timestamp belongs only in the `Sent { sent_at: Instant }` variant. If using typestate, the timestamp is stored in the Sent typestate struct."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_checked_conversions",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms stores raw u64 epoch milliseconds. No conversion guards exist if this value is later used in arithmetic (e.g., duration calculations, comparisons with system time).",
+      "failure_mode": "Unchecked arithmetic on epoch milliseconds can overflow or produce incorrect durations when mixed with other time units.",
+      "fix": "Use `checked_mul`/`checked_add` when converting between time units. Prefer `std::time::Instant` or `SystemTime` in the core, only storing raw u64 at the I/O boundary."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation behaviour",
+    "no profiler evidence for BudgetWorkflow size or hot-path allocation patterns",
+    "no allocation audit (try_reserve or capacity analysis) despite String fields",
+    "no second-ring evidence: no formal spec, no test suite, no property-based tests for state transitions",
+    "no command-level evidence: no cargo test, cargo fmt, or cargo clippy output"
+  ],
+  "residual_risk": "Static review only; no commands run. The code violates core Holzman Rust principles: illegal states are fully representable, no functional core separation, no typestate discipline, no error taxonomy, and no allocation or performance evidence. The struct shape alone permits every impossible business state."
+}

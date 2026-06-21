@@ -1,0 +1,42 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    "Cargo.toml",
+    "src/lib.rs",
+    "tests/behavior.rs"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "No production unwrap() - replaced with checked parse and map_err",
+    "No unchecked indexing - replaced parts[1] with split_once",
+    "No unchecked arithmetic - used checked_add for overflow detection",
+    "Empty input rejected with SummaryError::Empty",
+    "Invalid lines (missing comma, bad parse) rejected with SummaryError::Invalid",
+    "Overflow detected via checked_add returning SummaryError::Overflow",
+    "Division by zero guarded with count==0 check",
+    "split_once used for delimited parsing per Holzman rules",
+    "Render logic extracted as pure render_summary function",
+    "Return type matches behavior contract: Result<Summary, SummaryError>",
+    "Tests were not edited",
+    "Cargo.toml was not edited",
+    "Functional core: Summary struct is pure data, render_summary is pure formatting",
+    "No unsafe, panic, todo, unimplemented, unreachable, assert macros, or lossy as conversions"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all tests pass, all forbidden constructs removed, all Holzman rules satisfied"
+}

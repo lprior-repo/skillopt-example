@@ -1,0 +1,35 @@
+Now I have full picture. The source has numerous Holzman law violations. Let me write the corrected version:
+
+**Violations found:**
+1. `summarize_metrics` returns `Result<String>` — tests expect `Result<Summary>`
+2. Missing `render_summary` function
+3. `parts[1]` — unchecked indexing
+4. `.unwrap()` — panic surface
+5. `total += value` — unchecked arithmetic
+6. `count += 1` — unchecked arithmetic
+7. `total / count` — unchecked division (panic on 0)
+8. `count as u32` — lossy cast
+9. `split(',').map(...).collect()` — unnecessary intermediate Vec, not `split_once`
+10. No empty-input detection
+11. No overflow detection
+12. `TooMany` check after loop (should reject early)
+All 6 tests pass. Let me run the remaining verification gates:
+Clean — zero violations. Now writing the required output:
+Repair complete. All 6 tests pass, clippy clean, zero Holzman law violations.
+
+**Summary of changes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| Returns `Result<String>` | Returns `Result<Summary>` |
+| Missing `render_summary` | Added function |
+| `parts[1]` unchecked index | `split_once(',', )` with typed error |
+| `.unwrap()` panic surface | `.map_err(|_| SummaryError::Invalid)` |
+| `total += value` unchecked | `checked_add` |
+| `count += 1` unchecked | `checked_add(1)` |
+| `total / count` unchecked div | `checked_div` |
+| `count as u32` lossy cast | `u32::try_from(count)` |
+| `split(',').collect()` Vec | Direct iteration via `split_once` |
+| Empty input no error | Returns `SummaryError::Empty` |
+| No overflow detection | `checked_add` + `checked_div` |
+| TooMany after loop | Rejects early per-line |

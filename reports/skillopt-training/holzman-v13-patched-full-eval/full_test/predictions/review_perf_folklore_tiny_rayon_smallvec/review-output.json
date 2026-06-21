@@ -1,0 +1,76 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "perf-folklore-no-rayon-tiny-fixed-input",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment proposes Rayon for a [u8; 4] input. Rayon task-creation, work-stealing, and sync overhead dwarfs any benefit on four elements. No benchmark, baseline, or hardware target exists.",
+      "failure_mode": "Adding Rayon on four elements will measurably slow the hot path due to thread-pool dispatch overhead, producing a regression on every call.",
+      "fix": "Remove the Rayon proposal. For four elements, a direct iterator chain (current code) is already the fastest measured option. If zero-allocation is required, return [u8; 4] of tag bytes instead of Vec<&str>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "perf-folklore-no-smallvec-tiny-fixed-input",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment proposes SmallVec for a [u8; 4] input producing exactly four elements. SmallVec's inline capacity and layout overhead bloats the return type with no heap-savings benefit on known-four elements.",
+      "failure_mode": "SmallVec<&'static str; N> with N>=4 heap-allocates on a four-element input just like Vec, adding layout indirection and a capacity check for zero benefit.",
+      "fix": "Replace Vec<&'static str> with [u8; 4] of inline tag bytes (e.g., 0 = even, 1 = odd) or a [u32; 4] packed bitfield. This eliminates all allocation and is cache-friendly."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "alloc-discipline-vec-for-fixed-four",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Returns Vec<&'static str> for a fixed four-element input. Every call heap-allocates a new Vec, which is unnecessary for a known-bound size.",
+      "failure_mode": "Every invocation performs a heap allocation and deallocation. Under sustained call rate this generates GC pressure (on FFI boundaries), allocator contention, and tail-latency spikes.",
+      "fix": "Return [u8; 4] of inline even/odd tags, or accept a caller-owned output buffer: fn classify_four(bytes: &[u8; 4], out: &mut [u8; 4]). This gives zero-allocation performance with static bounds."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "perf-claim-no-baseline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No benchmark, no baseline number, no workload definition, no target hardware. The comment claims Rayon+SmallVec 'will be faster' without any measurement.",
+      "failure_mode": "Performance claims without evidence are folklore. Deploying folklore changes as optimization regresses throughput and latency on all realistic workloads.",
+      "fix": "Delete the unmeasured claim. Run cargo bench with a realistic workload before proposing any change. For [u8; 4] the baseline is already near optimal."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-performance-no-alloc",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function signature returns Vec, forcing allocation on every call. The domain is four independent even/odd tags with no variable length.",
+      "failure_mode": "Caller cannot reuse output storage. Allocator fragmentation under repeated calls. Impossible to use in allocation-free hot paths or embedded contexts.",
+      "fix": "Change signature to fn classify_four(bytes: &[u8; 4]) -> [u8; 4] encoding even as 0 and odd as 1, or fn classify_four(bytes: &[u8; 4], out: &mut [u8; 4]) -> Result<(), ()>."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "benches/",
+      "line": 0,
+      "problem": "No benches/ directory or benchmark crate exists. No profiler output, no allocation counts, no command evidence for any performance claim.",
+      "failure_mode": "Without benchmarks the codebase cannot validate that any change improves performance. Folklore-driven changes silently regress.",
+      "fix": "Add a benches/ crate with criterion or similar. Benchmark classify_four with representative byte distributions at realistic call rates. Report ops/sec with p50/p95/p99 and allocation counts."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark crate or criterion configuration exists",
+    "no profiler output (flamegraph, perf record, or equivalent)",
+    "no allocation analysis (Rustc -Z sanitisers, valgrind, or malloc_count)",
+    "no second-ring evidence (assembly diff, LLVM IR, or cache-line analysis)",
+    "no command evidence for the claimed Rayon+SmallVec speedup",
+    "no baseline measurement to compare any proposed change against"
+  ],
+  "residual_risk": "Static review only. No commands ran. The code compiles and is structurally correct for its domain, but returns Vec for fixed-four input and carries an unmeasured folklore performance claim. The function is safe and deterministic. Risk is moderate: no correctness or safety violations, but the signature forces allocation and the TODO comment encourages folklore-driven changes that will regress performance if followed."
+}

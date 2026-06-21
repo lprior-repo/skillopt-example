@@ -1,0 +1,18 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Wrote `/tmp/opencode/holzman-skillopt-train/d794e21935e98088/review_invalid_state_quote_typestate/review-output.json`.
+
+**9 findings across 4 reference files read.** Core violations:
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | `status: String` allows arbitrary states | :3 |
+| 2 | BLOCKER | `is_validated: bool` not in typestate | :4 |
+| 3 | BLOCKER | `is_sent: bool` redundant, diverges from status | :5 |
+| 4 | BLOCKER | `sent_at_epoch_ms: Option<u64>` outside typestate | :6 |
+| 5 | BLOCKER | `id: String` no newtype validation | :2 |
+| 6 | BLOCKER | `mark_sent` accepts any state, no guards | :9 |
+| 7 | BLOCKER | All fields public, no encapsulation | :1 |
+| 8 | BLOCKER | No typed error taxonomy | :1 |
+| 9 | MAJOR | No benchmark / command evidence | :1 |
+
+Residual risk: The struct is structurally incapable of preventing invalid states — any combination of fields is valid, and `mark_sent` has no preconditions.

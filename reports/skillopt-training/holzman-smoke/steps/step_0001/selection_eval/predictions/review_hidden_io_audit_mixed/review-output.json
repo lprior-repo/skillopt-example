@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing or unreadable audit file",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, std::io::Error> and propagate with ? or map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value in audit file",
+      "failure_mode": "malformed input line crashes the loader instead of returning a parse error",
+      "fix": "use .parse::<u32>().map_err(|e| ...)? and return typed parse error through Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "lossy as u16 cast discards high bits without checking range",
+      "failure_mode": "values > 65535 silently truncate to u16 range, producing incorrect audit data with no error",
+      "fix": "use u32::try_into().map_err(...) or check range before casting; return typed error on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "Unchecked indexing into parts Vec via parts[0] and parts[1] with no bounds check",
+      "failure_mode": "a line with fewer than 2 comma-separated fields panics with index-out-of-bounds instead of returning a parse error",
+      "fix": "use parts.get(0) and parts.get(1) with Ok(_)? early returns, or use split_once(',') for single-split parsing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden I/O side effect inside what should be a pure parsing step",
+      "failure_mode": "side effect couples logging to data parsing, prevents deterministic testing, and leaks I/O into the core logic",
+      "fix": "remove println! from the parser; move all logging to the imperative shell layer that calls the pure parser"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_audits mixes I/O (fs::read_to_string, println) with parsing logic in a single function",
+      "failure_mode": "cannot unit-test the parsing logic in isolation without mocking filesystem I/O; violates pure core / imperative shell boundary",
+      "fix": "split into a pure fn parse_records(lines: impl IntoIterator<Item=&str>) -> Result<Vec<Record>, ParseError> and a shell fn load_audits(path: &str) -> Result<Vec<Record>, io::Error> that reads, logs, and delegates to parse_records"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record struct uses public String field with no validation; name can be empty, value is unbounded u16",
+      "failure_mode": "consumers cannot guarantee Record represents valid audit data; empty names or truncated values are silently allowed",
+      "fix": "use a private constructor or newtype: impl Record { fn new(name: String, value: u16) -> Result<Self, RecordError> { ... } } with validation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "Collecting all split parts into Vec<String> allocates heap for what could be a single split_once",
+      "failure_mode": "unnecessary heap allocation per line increases memory pressure; for audit-heavy workloads this is a measurable performance defect",
+      "fix": "use line.split_once(',') to get (name, rest) without allocating intermediate Vec"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to measure load_audits throughput or allocation profile",
+    "no profiler data (flamegraph, perf record) for the parsing path",
+    "no allocation evidence (e.g., `cargo +nightly binstall heaptrack` or allocator tracing) for per-line Vec allocation from .collect()",
+    "no second-ring audit command evidence (e.g., Miri for UB, Kani for arithmetic overflow on the as u16 cast)",
+    "no command evidence that the crate compiles or passes tests under current toolchain"
+  ],
+  "residual_risk": "static review only; no commands run. All fallible operations (file I/O, parsing, casting) are unguarded and will panic on adversarial input. No benchmarks or allocation evidence exist. The entire function is a monolithic I/O+parse mix with hidden logging. All blockers must be fixed before delivery."
+}

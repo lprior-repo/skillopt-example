@@ -1,0 +1,14 @@
+Review complete. 8 BLOCKER + 4 WARNING findings written to `review-output.json`.
+
+Key violations in `src/lib.rs`:
+
+| Line | Rule | Issue |
+|------|------|-------|
+| 3 | status-string-to-enum | `status: String` allows any arbitrary value |
+| 4-5 | lifecycle-bools-to-typestate | `is_validated`/`is_sent` booleans can form impossible combinations |
+| 6 | optional-lifecycle-data-in-variant | `sent_at_epoch_ms: Option<u64>` lives on all states, not just Sent |
+| 2 | id-newtype | `id: String` is a raw primitive with no validation |
+| 1 | parse-boundary | No smart constructor; illegal states are representable |
+| 9 | mark_sent-pure-mutation | Sets sent without validating preconditions or setting timestamp |
+| 1 | no-typed-error-taxonomy | No `Result` return; error conditions cannot be expressed |
+| — | missing-evidence | No tests, benchmarks, profiler data, or command-truth evidence |

@@ -1,0 +1,31 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/8ef4c92c371b46ab/repair_csv_route_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/8ef4c92c371b46ab/repair_csv_route_mixed/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/8ef4c92c371b46ab/repair_csv_route_mixed/Cargo.toml",
+    "/tmp/opencode/holzman-skillopt-train/8ef4c92c371b46ab/repair_csv_route_mixed/src/lib.rs",
+    "/tmp/opencode/holzman-skillopt-train/8ef4c92c371b46ab/repair_csv_route_mixed/tests/behavior.rs"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --all-features -- -D warnings", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic",
+    "Vec::new + try_reserve pattern (no Vec::with_capacity)",
+    "Direct iteration over split (no intermediate Vec collect)",
+    "max_items enforced via values.len() >= max_items before push",
+    "Empty input rejected first with ParseError::Empty",
+    "Parse errors use map_err (no unwrap on parse)",
+    "Empty trimmed parts rejected as Invalid",
+    "All 4 behavior tests pass",
+    "Zero clippy warnings",
+    "No formatting drift"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All Holzman absolute laws satisfied. Parser uses safe Rust, typed errors, bounded allocation via try_reserve, and direct iteration without intermediate collections."
+}

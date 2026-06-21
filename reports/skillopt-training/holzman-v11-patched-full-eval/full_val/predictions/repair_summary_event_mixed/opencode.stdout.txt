@@ -1,0 +1,15 @@
+Now I have the full picture. Let me read the remaining references.
+Now I have the full picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. Let me fix the source.
+All 6 tests pass. Let me run strict clippy as a final gate.
+Repair complete. All 6 tests pass, clippy clean, valid JSON output written.
+
+**Changes made to `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary(Summary) -> String` function
+- Replaced `split(',').collect()` + `parts[1]` with `split_once(',')` + `map_err`
+- Replaced `unwrap()` with `.map_err(|_| SummaryError::Invalid)`
+- Replaced `total += value` with `checked_add`
+- Replaced `count += 1` with `checked_add`
+- Replaced `total / count` with `checked_div`
+- Replaced `count as u32` / `count as u64` with `u32::try_from` / `u64::try_from`
+- Added empty input check → `SummaryError::Empty`

@@ -1,0 +1,103 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses `status: String` allowing any arbitrary string value (e.g., \"cancelled\", \"draft\", \"\"), making illegal states fully representable. The domain invariant that a ledger entry must be in a valid lifecycle state cannot be enforced at the type level.",
+      "failure_mode": "Any code holding a LedgerWorkflow can set status to an invalid string, breaking protocol invariants. Serialization/deserialization or parsing can produce impossible states without any domain validation.",
+      "fix": "Replace `status: String` with a sealed enum `LedgerStatus { Pending, Validated, Sent, Archived }` with a fallible constructor or parse method."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a boolean lifecycle flag that does not express the full state machine. Combined with `status: String` and `is_sent: bool`, the three fields can be in contradictory configurations (e.g., status=\"pending\", is_validated=true, is_sent=false).",
+      "failure_mode": "Boolean flags are independently mutable, allowing inconsistent state combinations that violate domain invariants. No code path enforces that is_validated=true implies status=\"validated\" or that is_sent=true implies status=\"sent\".",
+      "fix": "Replace `is_validated` and `is_sent` with a single enum typestate or integrate them into the `LedgerStatus` enum so only valid transitions are representable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is a separate boolean from the status field, creating redundant and contradictory state representation. `mark_sent` sets both `status` and `is_sent` but this coordination is not type-enforced.",
+      "failure_mode": "Callers can set `is_sent = true` without calling `mark_sent`, or call `mark_sent` without updating `is_sent` (if fields were mutable). The two fields can diverge, violating the invariant that sent entries have status=\"sent\".",
+      "fix": "Subsume `is_sent` into the `LedgerStatus` enum. If the sent timestamp is needed, include it as `Option<u64>` on the `Sent` variant only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive type with no domain constraints. Ledger IDs typically have format rules, length limits, or uniqueness invariants that are not captured.",
+      "failure_mode": "Invalid, empty, or malformed IDs can be stored. No validation at construction time means illegal IDs propagate through the system silently.",
+      "fix": "Replace with a newtype `LedgerId(String)` that has a fallible constructor enforcing format/length rules, making invalid IDs unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes and returns `LedgerWorkflow` by value, mutating it in place. This is an imperative mutation pattern, not a pure functional transformation. The function has no validation — it unconditionally transitions any ledger to sent, even if validation was skipped or the ledger is already sent.",
+      "failure_mode": "Any caller can call `mark_sent` on any `LedgerWorkflow` regardless of its current state, enabling invalid state transitions (e.g., sent→sent, pending→sent without validation). No precondition checking or state-machine enforcement exists.",
+      "fix": "Return a `Result<LedgerWorkflow, TransitionError>` with a pattern-match guard on current status (via the enum). The function should only permit the transition from `Validated` to `Sent`, returning an error otherwise."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtypes_enums_typestates",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The entire struct is a data bag of primitives with no domain semantics encoded in types. This violates the core Holzman principle of making illegal states unrepresentable by using newtypes, enums, and typestates.",
+      "failure_mode": "The API exposes raw mutable fields and primitive types, allowing callers to construct and mutate states that violate all domain invariants. There is no compilation-level guarantee that any invariants hold.",
+      "fix": "Rewrite `LedgerWorkflow` as a struct with a `LedgerStatus` enum (typestate) that encodes the full lifecycle, `LedgerId` newtype, and private fields. Provide only state-transition methods that enforce valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of `LedgerWorkflow` are `pub`, allowing external code to mutate any field directly without going through invariant-enforcing methods.",
+      "failure_mode": "External code can set `item.status = \"anything\"`, `item.is_sent = true`, or `item.is_validated = false` directly, completely bypassing any workflow logic and creating illegal states.",
+      "fix": "Make all fields private and provide only controlled accessors and state-transition methods."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for `mark_sent` or the `LedgerWorkflow` type. Without benchmarks, there is no evidence for performance claims or allocation behavior.",
+      "failure_mode": "If `mark_sent` is called in a hot path, unmeasured allocations (e.g., `.to_string()` on line 10) could cause performance regressions under load.",
+      "fix": "Add a `benches/` directory with a benchmark measuring `mark_sent` allocation count and throughput."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`item.status = \"sent\".to_string()` performs an unnecessary heap allocation. The literal string could use `&str` or the enum variant name without allocation. No profiler or allocation evidence exists to justify this allocation pattern.",
+      "failure_mode": "Under high-throughput workloads, repeated unnecessary `String` allocations from `.to_string()` on string literals cause unnecessary heap pressure and GC cost.",
+      "fix": "Use an enum variant instead of `String` to eliminate the allocation entirely. If a string is needed, use `\"sent\"` as `&str` or the enum's `Display` impl."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No benchmark, profiler, allocation analysis, or second-ring verification tooling is present in the crate. The Holzman review mode requires evidence for performance and safety claims.",
+      "failure_mode": "Without command evidence (bench, profiler, allocation tools), all claims about correctness and performance are unverified assumptions.",
+      "fix": "Add `[[bench]]` section with criterion or similar, and run allocation/profiler analysis to produce evidence."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or LedgerWorkflow operations",
+    "no profiler evidence for allocation patterns",
+    "no allocation analysis (e.g., --cfg=release with memory tracking)",
+    "no second-ring verification (miri, kani, or similar)"
+  ],
+  "residual_risk": "Static review only; no commands run. The code is a primitive data bag with zero type-level invariants — illegal states are fully representable, all fields are publicly mutable, and mark_sent has no precondition enforcement. A full rewrite using enums, newtypes, and typestates is required before this crate meets Holzman standards."
+}

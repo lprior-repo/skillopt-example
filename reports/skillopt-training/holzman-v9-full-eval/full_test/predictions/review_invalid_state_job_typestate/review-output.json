@@ -1,0 +1,94 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "functional-core-performance.md", "hardening-checklist.md", "review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-enums-over-strings",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "pub status: String",
+      "problem": "JobWorkflow encodes its lifecycle phase as a free-form String. Any string value is a valid state, so the compiler cannot enforce valid transitions or prevent invalid values like \"sent\" without corresponding is_sent = true.",
+      "failure_mode": "Runtime callers can set status to arbitrary strings (e.g., \"\", \"deleted\", \"sent\" while is_sent is false), creating illegal states the type system cannot catch.",
+      "fix": "Replace with an enum: pub enum JobStatus { Created, Validated, Sent { sent_at_epoch_ms: u64 } }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-typestate-lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub is_validated: bool",
+      "problem": "Lifecycle boolean decoupled from the status string. There is no invariant enforcing that is_validated == true implies status == \"validated\", and no type-level encoding of the state machine.",
+      "failure_mode": "is_validated and status can drift out of sync (e.g., status=\"sent\" and is_validated=false), representing an invalid workflow state that the type system cannot detect.",
+      "fix": "Fold lifecycle booleans into an enum typestate so each variant owns the data it needs (e.g., JobStatus::Validated carries no extra data, JobStatus::Sent carries sent_at_epoch_ms)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-typestate-lifecycle",
+      "file": "src/lib.rs",
+      "line": 5,
+      "construct": "pub is_sent: bool",
+      "problem": "Lifecycle boolean that duplicates the sentinel role of status==\"sent\". Together with status: String and is_validated: bool, any combination of these three fields represents 3*2*2=12 possible states, most of which are illegal.",
+      "failure_mode": "Can construct JobWorkflow{status:\"sent\", is_sent:false} or status:\"created\", is_sent:true, both illegal by the workflow contract.",
+      "fix": "Remove is_sent and is_validated; encode transitions in a single enum typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-typestate-invalid-combination",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "pub sent_at_epoch_ms: Option<u64>",
+      "problem": "Timestamp field is an optional standalone field, not owned by the variant that requires it. It can be Some while status is not \"sent\", violating the domain invariant that the timestamp only exists in the sent state.",
+      "failure_mode": "sent_at_epoch_ms=Some(12345) with status=\"created\" represents a ghost timestamp that has no semantic meaning and should not be constructible.",
+      "fix": "Tuck sent_at_epoch_ms inside the enum variant: JobStatus::Sent { sent_at_epoch_ms: u64 }."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-newtype-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub id: String",
+      "problem": "Job ID is a raw String with no domain semantics. Any string (empty, whitespace, arbitrary text) is accepted as a job ID.",
+      "failure_mode": "Caller can pass \"\" or \"   \" as an ID; the domain cannot enforce non-empty, well-formed IDs at the type level.",
+      "fix": "pub struct JobId(String); with a smart constructor that validates non-empty and returns a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-newtype-timestamps",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "sent_at_epoch_ms: Option<u64>",
+      "problem": "Epoch millisecond counter is a raw u64 with no domain wrapper. It carries no semantic meaning in type signatures and cannot enforce that values are positive or within valid ranges.",
+      "failure_mode": "Zero or negative (if cast from signed) epoch values are silently accepted; arithmetic on timestamps (e.g., duration calculation) has no domain safety.",
+      "fix": "pub struct EpochMs(u64); with a smart constructor returning a typed error for invalid values."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smart-constructor-absent",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub struct JobWorkflow { ... }",
+      "problem": "The struct has all public fields with no smart constructor. Callers can directly instantiate it with any combination of invalid values (empty id, nonsensical status string, mismatched booleans).",
+      "failure_mode": "Every call site in the codebase can create illegal JobWorkflow instances directly via struct literal syntax with no validation gate.",
+      "fix": "Make fields private, provide a smart constructor: impl JobWorkflow { fn new(id: JobId) -> Result<Self, Error::Invalid> { ... } }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-invalid-state-transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: JobWorkflow) -> JobWorkflow",
+      "problem": "mark_sent unconditionally sets status=\"sent\" and is_sent=true regardless of the prior state. It does not enforce that the job was validated before sending, nor does it reject re-sending a job that is already sent.",
+      "failure_mode": "A job in any state (including invalid or never-validated) can be transitioned to \"sent\". Calling mark_sent twice on the same job is idempotent at the string level but logically wrong (double-sent).",
+      "fix": "Accept the previous state enum variant as input and return the next variant. E.g., impl JobStatus { fn mark_sent(self) -> Result<JobStatus, Error::AlreadySent> { match self { JobStatus::Validated => Ok(JobStatus::Sent{...}), other => Err(Error::InvalidTransition) } } }"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any workflow throughput claim",
+    "no profiler evidence for allocation behavior of JobWorkflow construction or mark_sent",
+    "no allocation analysis - String fields and .to_string() in mark_sent allocate on every call",
+    "no command-truth evidence: no cargo check, clippy, or test execution records",
+    "no behavior tests for state transitions or invariant enforcement"
+  ],
+  "residual_risk": "Static review only. The codebase uses raw Strings and booleans for all domain state with no enum typestate, no smart constructors, and no transition invariants. All 12 combinatorial states of (id, status, is_validated, is_sent) are constructible, most of which are illegal. mark_sent performs unguarded transitions with heap allocation (.to_string()). The domain model is entirely untyped with zero compile-time guarantees."
+}

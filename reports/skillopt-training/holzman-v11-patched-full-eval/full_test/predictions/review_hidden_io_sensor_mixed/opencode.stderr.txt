@@ -1,0 +1,35 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/hardening-checklist.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/ca88fdbcb6eb19f9/review_hidden_io_sensor_mixed/review-output.json'); d=json.load(f); print('Valid JSON'); print(f'Status: {d[\"status\"]}'); print(f'Findings: {len(d[\"findings\"])}'); print(f'Missing evidence: {len(d[\"missing_evidence\"])}'); [print(f'  [{f[\"severity\"]}] {f[\"rule\"]} @{f[\"file\"]}:{f[\"line\"]}') for f in d['findings']]"
+Valid JSON
+Status: reviewed
+Findings: 13
+Missing evidence: 5
+  [BLOCKER] hidden_io_pure_logic @src/lib.rs:8
+  [BLOCKER] typed_error_taxonomy @src/lib.rs:8
+  [BLOCKER] no_unwrap_or_panic @src/lib.rs:9
+  [BLOCKER] no_unwrap_or_panic @src/lib.rs:19
+  [BLOCKER] unchecked_indexing @src/lib.rs:16
+  [BLOCKER] lossy_cast @src/lib.rs:19
+  [BLOCKER] parse_boundary @src/lib.rs:11
+  [BLOCKER] bounded_allocation @src/lib.rs:8
+  [BLOCKER] hidden_io_in_pure_logic @src/lib.rs:16
+  [BLOCKER] split_once_mandatory @src/lib.rs:12
+  [MAJOR] hidden_io_in_pure_logic @src/lib.rs:1
+  [MAJOR] no_benchmark_evidence @src/lib.rs:8
+  [MINOR] domain_type_newtypes @src/lib.rs:3
+[0m

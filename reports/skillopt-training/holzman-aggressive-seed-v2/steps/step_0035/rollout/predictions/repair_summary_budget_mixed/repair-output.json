@@ -1,0 +1,42 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "no_unsafe",
+    "no_unwrap",
+    "no_expect",
+    "no_panic",
+    "no_unreachable",
+    "no_unchecked_indexing",
+    "no_lossy_as",
+    "checked_arithmetic_total",
+    "checked_division_average",
+    "checked_overflow_detection",
+    "split_once_not_split_collect",
+    "empty_input_returns_empty_error",
+    "invalid_line_returns_invalid_error",
+    "return_type_matches_summary_struct",
+    "render_summary_provides_string_output",
+    "functional_core_pure_deterministic",
+    "tests_unchanged"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "No residual risk. All banned constructs removed. Every arithmetic path uses checked operations. split_once replaces split+collect+indexing. Function signature and return type match the test contract."
+}

@@ -1,0 +1,68 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "Cargo.toml",
+    "src/lib.rs"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore_performance_no_measurement",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon and SmallVec for performance without any benchmark, baseline, or measurement evidence. This is folklore optimization for a fixed [u8; 4] input where Rayon parallel overhead is guaranteed to be slower than sequential iteration.",
+      "failure_mode": "Blindly replacing sequential .iter().map().collect() with Rayon parallel iterators on 4 elements adds thread-pool dispatch, work-sharing, and result-merging overhead that dwarfs the computation cost, producing a measurable regression.",
+      "fix": "Remove the TODO. If optimization is needed, return [u32, 2] or use a stack-allocated buffer. Only consider SmallVec or Rayon after benchmarking proves this is a real bottleneck, which for 4-byte inputs is highly unlikely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "vec_for_fixed_size_output",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Returns Vec<&'static str> for a fixed-size output of exactly 4 elements derived from [u8; 4]. This forces a heap allocation for data whose size is known at compile time.",
+      "failure_mode": "Every call to classify_four performs a heap allocation and deallocation for exactly 4 string-slice elements, increasing GC pressure and cache footprint unnecessarily.",
+      "fix": "Return [&'static str; 4] instead of Vec<&'static str>. This eliminates allocation entirely and makes the output size statically known."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, baseline, profiler data, or allocation evidence exists for any performance claim. The TODO on line 2 makes a performance claim ('it will be faster') without workload, target hardware, input distribution, baseline number, or regression threshold.",
+      "failure_mode": "Per Holzman PLUS: 'No performance claim without workload, target hardware, input distribution, hot path, baseline command, baseline number, new number, variance/noise notes, and regression threshold.' Unmeasured changes risk regressing performance while adding complexity.",
+      "fix": "Write a benchmark comparing sequential Vec collect vs [&'static str; 4] array return. Measure latency (p50/p95/p99) and allocation count with a profiler. Only refactor if measurement proves a real bottleneck exists."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "alloc_discipline_hot_path",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Uses .collect() into Vec for a fixed 4-element output. Holzman requires allocation budgets and bounded allocation discipline; hot paths should avoid per-call heap allocation.",
+      "failure_mode": "Each call allocates a new Vec, copies 4 usize pointers, and later deallocates. In a hot path this generates allocation traffic, cache misses, and potential allocation failure.",
+      "fix": "Return [&'static str; 4] directly. If the caller needs a Vec, they can collect or to_vec() from the array — pushing the allocation decision to the caller who knows whether it is needed."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "smallvec_folklore_tiny_input",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SmallVec is proposed by folklore for a fixed 4-element output. SmallVec's stack buffer is useful when the common case is small AND the size is variable at runtime. Here the size is always exactly 4 and known at compile time.",
+      "failure_mode": "SmallVec<[T; N]> adds a stack buffer + heap fallback + capacity tracking overhead. For fixed-size 4, a plain array [T; 4] or Vec<[T; 4]> is strictly simpler and faster with zero runtime overhead.",
+      "fix": "Use [u32; 4] or [&'static str; 4] as the return type. SmallVec is only justified when the output size varies at runtime and the common case fits on the stack — neither condition holds here."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim (Rayon/SmallVec faster)",
+    "no profiler data or allocation analysis for classify_four",
+    "no baseline measurement to compare against",
+    "no workload characterization (call frequency, input distribution, throughput requirements)",
+    "no second-ring evidence (assembly, cache-line analysis, allocation counting)"
+  ],
+  "residual_risk": "The function is functionally correct for its inputs but violates Holzman allocation discipline by heap-allocating per call for fixed-size output. The folklore TODO proposing Rayon/SmallVec would worsen performance for 4-element inputs. Without benchmark evidence, no optimization direction is justified. Returning [&'static str; 4] would eliminate all allocation and be measurably faster for this input size."
+}

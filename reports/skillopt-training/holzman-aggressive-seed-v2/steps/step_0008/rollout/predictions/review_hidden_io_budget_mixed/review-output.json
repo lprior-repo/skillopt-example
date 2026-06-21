@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permission denied, truncated file, etc.)",
+      "failure_mode": "Untrusted or environment-dependent file paths cause unconditional thread panic instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, IOError> (or domain error enum) and propagate fs::read_to_string with ? or explicit match/map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on invalid numeric input or out-of-range values",
+      "failure_mode": "Malformed CSV data (non-numeric value field) causes unconditional thread panic instead of returning a typed parse error",
+      "fix": "Use ? or map_err to propagate ParseIntError; wrap in a domain ParseError enum variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast: values above 65535 silently truncate to u16 range without any error",
+      "failure_mode": "A valid u32 value in 65536..=u32::MAX silently wraps to an incorrect u16, corrupting budget data with no error signal",
+      "fix": "Use u16::try_from(parsed_u32) and propagate OutOfRangeError; the function must return Result with this error variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() collects all split parts into a Vec when only the first two are needed",
+      "failure_mode": "Every line allocates a Vec of Strings regardless of field count; wasteful allocation and O(n) per line where O(1) suffices",
+      "fix": "Use line.split_once(',') to extract name and value fields directly; avoid collect() for one-shot delimiter extraction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked indexed access into a Vec produced by collect(); panics if line has no comma",
+      "failure_mode": "A line without a comma produces a single-element Vec; indexing [0] and [1] panics on the second use instead of returning a typed error",
+      "fix": "Use split_once(',') which returns Option<( &str, &str )>; handle None with a MalformedLine error variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] is unchecked indexed access into a Vec; panics if line has no second comma-delimited field",
+      "failure_mode": "Same as line 16 — malformed CSV with only one field causes panic instead of typed error",
+      "fix": "Replace split+collect+indexing with split_once(',') and handle the Option<(name, value)> explicitly"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side-effecting I/O call inside a function that returns domain data",
+      "failure_mode": "Hidden logging side effect makes the function non-deterministic, non-testable, and couples data loading to the console; also prevents headless/embedded deployments",
+      "fix": "Remove println! from the data-loading function. If telemetry is needed, return a separate metadata struct or push logging to the shell layer that calls this function"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function signature returns Vec<Record> but performs I/O (fs::read_to_string), logging (println!), and parsing — mixing shell and core concerns with no error channel",
+      "failure_mode": "All three failure modes (I/O error, parse error, overflow) are represented only by panic; callers cannot distinguish or handle them",
+      "fix": "Change signature to pub fn load_budgets(path: &str) -> Result<Vec<Record>, LoadError> where LoadError is a domain enum with I/O, Parse, and Overflow variants"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_discipline",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Every line allocates a new Vec<String> with .collect(), cloning each trimmed part into owned Strings even though only two fields are needed",
+      "failure_mode": "For large files this creates O(n) heap allocations per line; memory pressure increases with file size and GC (Drop) overhead accumulates",
+      "fix": "Use split_once(',') to get (&str, &str) references, then .trim() on each; only allocate String for the name field via .to_string() or Cow"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to measure load_budgets throughput or allocation profile",
+    "no profiler data (perf/ flamegraph) for this function's hot path",
+    "no allocation evidence (e.g., `dhat` or `allocations` crate output) showing heap pressure for typical input sizes",
+    "no second-ring evidence: function performs I/O but signature gives no signal — no budget or cap mechanism visible",
+    "no command evidence: no cargo test, cargo fmt, or cargo clippy output was produced"
+  ],
+  "residual_risk": "Static review only; no commands run. The function has nine Holzman-critical violations (5 BLOCKER, 4 MAJOR) including unwrap panics, lossy casts, unchecked indexing, unnecessary allocations, and hidden I/O/logging side effects. All failure modes are panic-only with no typed error channel. The function must be rewritten to return Result and use split_once with checked arithmetic before any implementation or further review."
+}

@@ -1,0 +1,16 @@
+Review complete. Found 7 findings across the task crate:
+
+**3 BLOCKERs:**
+- `BudgetWorkflow` uses `String` + `bool` fields instead of typed enums/typestates — all illegal states are representable
+- `mark_sent` returns no error — cannot reject invalid state transitions
+- `id` is a raw `String` with no domain validation or newtype
+
+**3 MAJORs:**
+- All struct fields are `pub` and mutable — no invariant enforcement
+- `.to_string()` in `mark_sent` causes unnecessary allocation
+- `sent_at_epoch_ms` (Option<u64>) is decoupled from `is_sent` bool — inconsistent state
+
+**1 MINOR:**
+- Raw `u64` epoch milliseconds without checked arithmetic guards
+
+Missing evidence: no benchmarks, no profiler data, no allocation audit, no formal spec, no test suite, no command evidence.

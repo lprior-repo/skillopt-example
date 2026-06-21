@@ -1,0 +1,20 @@
+Now let me read the remaining references and write the review.
+Now I have all references. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/631d84de9339a7d2/review_invalid_state_sensor_typestate/review-output.json`.
+
+**8 findings, all BLOCKER severity:**
+
+| # | Rule | File:Line | Core Issue |
+|---|------|-----------|------------|
+| 1 | `typestate_enum_machine` | `src/lib.rs:1` | `status: String` + bools instead of enum state machine |
+| 2 | `status_string` | `src/lib.rs:3` | `pub status: String` — any string accepted, mark_sent allocates |
+| 3 | `bool_lifecycle` | `src/lib.rs:4` | `is_validated`/`is_sent` booleans allow contradictory combinations |
+| 4 | `option_invalid_state_combinations` | `src/lib.rs:6` | `Option<u64>` separate from lifecycle booleans enables impossible states |
+| 5 | `newtype_domain_id` | `src/lib.rs:2` | `id: String` raw primitive, no validation at boundary |
+| 6 | `parse_boundary` | `src/lib.rs:1` | No smart constructor or parse boundary — illegal states directly representable |
+| 7 | `mark_sent_allows_duplicate_transition` | `src/lib.rs:9` | No Result return, no pre-condition check, silent duplicate calls |
+| 8 | `no_benchmark_or_profiler_evidence` | `src/lib.rs:1` | String allocation on hot path unmeasured |
+
+**5 missing evidence items:** benchmarks, profiler, allocation analysis, cargo commands, second-ring evidence.
+
+**Residual risk:** Fundamental type model violation — requires enum typestate redesign, newtype for id, private fields, smart constructor, and Result-based transitions. Not patch-repairable.

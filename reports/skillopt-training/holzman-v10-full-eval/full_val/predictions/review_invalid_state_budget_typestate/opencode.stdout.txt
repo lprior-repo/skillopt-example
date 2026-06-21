@@ -1,0 +1,18 @@
+Now I have full context. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/d794e21935e98088/review_invalid_state_budget_typestate/review-output.json`.
+
+**Summary of 9 findings (7 BLOCKER, 2 MINOR):**
+
+| # | Rule | File:Line | Core violation |
+|---|------|-----------|---------------|
+| 1 | status-string-must-be-enum | `src/lib.rs:3` | `status: String` allows any arbitrary value |
+| 2 | lifecycle-booleans-must-be-typestate | `src/lib.rs:4` | `is_validated: bool` + `is_sent: bool` enable invalid combinations |
+| 3 | option-lifecycle-data-in-variant | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` leaked outside state machine |
+| 4 | id-must-be-newtype | `src/lib.rs:2` | `id: String` with no domain validation |
+| 5 | no-smart-constructor | `src/lib.rs:1` | No validation at construction, all public fields |
+| 6 | mark_sent-violates-state-machine | `src/lib.rs:9` | Blindly overwrites state without transition checks |
+| 7 | no-typed-error-taxonomy | `src/lib.rs:9` | No `Result`, no `BudgetError` enum |
+| 8 | missing-benchmark-evidence | `src/lib.rs:1` | No benchmarks |
+| 9 | missing-command-evidence | `src/lib.rs:1` | No fmt/check/clippy/test evidence |
+
+**Residual risk:** The entire `BudgetWorkflow` struct is an illegal-state soup — no valid construction path, no lifecycle enforcement, no typed errors. Requires full rewrite with enums, typestates, newtypes, and smart constructors.

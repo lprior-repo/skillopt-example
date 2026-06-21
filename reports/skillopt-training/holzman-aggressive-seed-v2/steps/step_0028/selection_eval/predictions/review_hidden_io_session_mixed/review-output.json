@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permissions, ENOMEM).",
+      "failure_mode": "untrusted or missing file path causes uncontrolled process abort instead of returning a typed I/O error the caller can handle.",
+      "fix": "Return Result<Vec<Record>, std::io::Error> (or a domain error type) and propagate with ? or map_err."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the Vec by index without checking its length. A blank line or a line with no comma yields parts.len() == 1, so parts[0] is safe but parts[1] will panic; more critically the index pattern itself is forbidden by the skill.",
+      "failure_mode": "A malformed line (empty, whitespace-only, or missing delimiter) causes a panic at runtime instead of returning a parse error.",
+      "fix": "Use parts.get(0) and parts.get(1) with proper None/error handling, or use split_once to extract fields deterministically."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0].clone() — unchecked indexing into a Vec built from split(). If the line is empty, parts[0] is a valid empty string, but the pattern is still a Holzman violation.",
+      "failure_mode": "Same class of malformed-line panic as line 16; also wastes an allocation via clone when get().map(|s| s.to_string()) would suffice.",
+      "fix": "Use split_once and .map(|(name, _rest)| name.to_string()) to avoid both the index and the Vec allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input, empty second field, or if parts[1] itself panics due to out-of-bounds.",
+      "failure_mode": "A single non-numeric value in the second column crashes the entire load_sessions call instead of returning a typed parse error for that record.",
+      "fix": "Use parts.get(1).ok_or(ParseError::MissingField)?.parse::<u32>().map_err(ParseError::BadNumber) with the function returning Result<Vec<Record>, RecordError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_as_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".unwrap() as u16 performs a lossy widening-to-narrowing cast. Values > 65535 silently truncate.",
+      "failure_mode": "A valid u32 in the 65536–4294967295 range wraps to an incorrect u16 value, silently corrupting data without any error signal.",
+      "fix": "Use u16::try_from(parsed_u32).map_err(ParseError::OutOfRange) instead of as u16."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_io_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds console I/O inside a pure data-parsing function. The functional core must be side-effect-free and deterministic.",
+      "failure_mode": "The core calculation layer is polluted with I/O, making it untestable without capturing stdout, and produces non-deterministic observable behavior across runs.",
+      "fix": "Remove the println! from the core parser. If logging is needed, push it to the imperative shell layer that calls the pure parser, or return a summary struct with a count that the shell layer logs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_not_split_collect",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() builds an intermediate Vec<String> just to grab two fields. The skill mandates split_once for first-delimiter extraction.",
+      "failure_mode": "Unnecessary heap allocation per line increases memory pressure and GC pressure (for FFI consumers). Also defeats the bounded-allocation principle since each line allocates a new Vec.",
+      "fix": "Use line.split_once(',') to get (name, rest) directly, then parse rest.trim() for the numeric field. No intermediate Vec needed."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_try_reserve_for_bounded_vec",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no try_reserve or bounded allocation handling. The function grows an unbounded Vec from an unbounded file.",
+      "failure_mode": "A very large input file can cause OOM without a graceful error, violating the bounded-allocation rule. The function contract has no upper bound.",
+      "fix": "Return Result<Vec<Record>, AllocError> or use a max-records parameter, pre-allocate with try_reserve, and handle the Allocation error case."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_arithmetic_required",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No checked arithmetic or capacity computation is used. Line counts or record-size estimates used for pre-allocation must use checked_add/checked_mul.",
+      "failure_mode": "Integer overflow in capacity estimation could cause try_reserve to panic or allocate too little, leading to OOM on the next push.",
+      "fix": "Use checked_add and checked_mul for any capacity calculations, propagating errors as Allocation errors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unreachable_in_production",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "The function signature returns Vec<Record> directly. Any error from fs::read_to_string, parse, or indexing cannot be represented in the return type, forcing unwrap/panic paths.",
+      "failure_mode": "The return type encodes an impossible invariant (that no line can ever fail), making the function structurally unsafe.",
+      "fix": "Change the return type to Result<Vec<Record>, RecordError> where RecordError is an enum covering IoError, ParseError, and OutOfRange variants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or latency",
+    "no profiler evidence for allocation hot spots in the parser path",
+    "no allocation audit showing try_reserve usage or capacity analysis",
+    "no second-ring evidence (assembly or perf data) for the parsing hot path",
+    "no command-evidence gate results (cargo fmt, cargo clippy, cargo test not run in this review pass)"
+  ],
+  "residual_risk": "The crate contains multiple BLOCKER-class violations: unwrap on I/O and parse, unchecked indexing, lossy as cast, split+collect instead of split_once, I/O side effects in the functional core, and no bounded allocation. All unwrap/panic paths must be replaced with typed Result returns before this code can advance. No commands were run; residual risk includes unverified compilation and test status."
+}

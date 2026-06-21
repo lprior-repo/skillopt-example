@@ -1,0 +1,25 @@
+Now I have a clear picture of the issues. Let me analyze and repair:
+
+**Issues found in `src/lib.rs`:**
+1. `summarize_metrics` returns `Result<String, ...>` but tests expect `Result<Summary, ...>` 
+2. Missing `render_summary` function (imported in tests)
+3. `unwrap()` on line 24
+4. Unchecked indexing `parts[1]` on line 24
+5. Unchecked arithmetic `total += value` on line 25
+6. Unchecked division on line 35
+7. No `Empty` error check
+8. No `Overflow` error detection
+All 6 tests pass. Now let me write the output.
+Repair complete. All 6 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Issue | Fix |
+|---|---|
+| Return type `Result<String, ...>` | Changed to `Result<Summary, ...>` to match tests |
+| `unwrap()` on value parse | Replaced with `map_err(\|_\| SummaryError::Invalid)` |
+| Unchecked `parts[1]` indexing | Replaced `split`+`collect`+indexing with `split_once` |
+| Unchecked `total += value` | Replaced with `checked_add` returning `Overflow` |
+| Unchecked `total / count` | Safe: guarded by `count == 0` check returning `Empty` |
+| No `Empty` error handling | Added empty-input and zero-result checks |
+| No `render_summary` function | Added pure formatting function |

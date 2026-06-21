@@ -1,0 +1,84 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TelemetryWorkflow has no typestate enum or explicit state transitions. Any combination of fields is representable, including logically impossible ones.",
+      "failure_mode": "External code can construct a TelemetryWorkflow with status='pending' and is_sent=true, or is_validated=false and is_sent=true, causing silent data corruption downstream when callers assume a valid lifecycle.",
+      "fix": "Replace TelemetryWorkflow with a typestate enum like enum TelemetryState { Pending { id: TelemetryId } } or derive newtypes + transitions so each variant owns only the fields valid in that state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-replacement",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String. String permits any value including 'sent', 'SENT', '', null-equivalents, and typos, with no compile-time enforcement of valid lifecycle states.",
+      "failure_mode": "Callers can set item.status = 'garbage' or compare with wrong casing. The 'sent'.to_string() allocation in mark_sent is repeated on every call instead of referencing a static enum discriminant.",
+      "fix": "Replace pub status: String with a pub status: TelemetryStatus enum { Pending, Validating, Sent }. mark_sent sets status = TelemetryStatus::Sent without allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-replacement",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool encode lifecycle as independent flags. This permits invalid combinations (is_sent=true, is_validated=false) and provides no ordering guarantee.",
+      "failure_mode": "A telemetry item can be marked sent without being validated. Adding a third lifecycle flag later multiplies impossible states combinatorially. Callers must manually check multiple booleans instead of pattern matching on a state machine.",
+      "fix": "Replace both booleans with a single typestate enum that encodes the full lifecycle as variants (e.g., Pending, Validated, Sent). Each variant owns only the fields valid in that stage."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combo",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is independent of is_sent: bool. The pair permits (is_sent=true, sent_at_epoch_ms=None) and (is_sent=false, sent_at_epoch_ms=Some(...)), both logically impossible.",
+      "failure_mode": "Downstream code reading sent_at_epoch_ms must handle None even when is_sent is true, or must trust is_sent and unwrap. Either path is a bug surface: silent None or a panic.",
+      "fix": "Move sent_at_epoch_ms: u64 (non-optional) into the Sent variant of the typestate enum. Only the Sent state carries a timestamp; other variants carry no timestamp field at all."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no type-level constraints. Any string, including empty, malformed, or externally untrusted, passes through with no validation at the boundary.",
+      "failure_mode": "TelemetryWorkflow can be constructed with id=\"\" or id containing arbitrary bytes. Equality checks are substring-vulnerable (e.g., id=\"abc\" matches prefix of id=\"abc123\"). No domain invariants are enforced on the ID.",
+      "fix": "Introduce a newtype `pub struct TelemetryId(String)` with a smart constructor `fn from_str(s: &str) -> Result<TelemetryId, ParseError>` that validates non-empty and rejects hostile content at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw String and bool primitives cross the parse boundary without fallible smart constructors. External code can directly construct TelemetryWorkflow with any String value and any bool combination, so callers can construct invalid domain states directly.",
+      "failure_mode": "No parsing or validation occurs before the domain. A shell layer or external caller can pass a malformed id, set status to an arbitrary string, and leave booleans in inconsistent combinations. The domain core receives and trusts invalid state.",
+      "fix": "Replace pub fields with a private struct and a factory: `fn new(id: TelemetryId) -> Result<TelemetryWorkflow, TelemetryError>` that constructs the Pending variant. All mutations go through typed transition functions (e.g., `validate()`, `mark_sent()`) that return Result and advance the typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-shell-separation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates domain struct fields (status and is_sent) directly. This is an imperative action that belongs in the shell layer, not in the core domain type.",
+      "failure_mode": "The core domain leaks imperative mutation semantics. The function has no return type conveying success/failure, making it impossible for callers to handle errors (e.g., transitioning from an invalid prior state). It mixes Data layer mutation with Action layer behavior.",
+      "fix": "Move mark_sent to the shell layer. The core should expose a pure transition function or a typestate method that returns the next state variant (e.g., `fn mark_sent(self) -> Result<TelemetryWorkflow, TransitionError>`). The shell handles side effects, persistence, and metrics around the transition."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation or throughput",
+    "no profiler data showing hot path or allocation profile",
+    "no allocation evidence for String::to_string() in mark_sent (repeated heap allocation on every call)",
+    "no second-ring evidence for any performance or correctness claim",
+    "no command evidence that cargo fmt --check, cargo check, or cargo clippy passed"
+  ],
+  "residual_risk": "Static review only. No commands were executed (no cargo fmt/check/clippy/test). The struct has seven Holzman/Functional Rust blockers: no typestate, raw String status, independent lifecycle booleans, Option-invalid-state combinations with bool, raw String ID without newtype, no parse boundary with fallible smart constructors, and shell leakage in the core. Without typestate enforcement, any caller can construct logically impossible TelemetryWorkflow states, making downstream telemetry processing unsafe by construction."
+}

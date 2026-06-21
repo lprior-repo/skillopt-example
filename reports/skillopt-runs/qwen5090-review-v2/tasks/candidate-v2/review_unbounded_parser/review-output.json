@@ -1,0 +1,120 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/review-output-contract.md",
+    "references/nasa-jpl-standards.md",
+    "references/runtime-performance-architecture.md",
+    "references/latency-throughput-playbook.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "parse::<u32>().unwrap() panics on any non-numeric input line. unwrap() is a forbidden construct in production-reachable code per Power of Ten Rule 1 and the zero_forbidden_constructs rule.",
+      "failure_mode": "Any malformed line in the input causes an unrecoverable process panic. An attacker or corrupted input file can trivially abort the program by including a single non-numeric line.",
+      "fix": "Replace unwrap() with proper error propagation. Return Result<Vec<u32>, ParseError> and use map_err() to convert ParseIntError into a typed application error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function iterates over all input lines with no fixed upper bound or mathematical termination proof. Every iteration performs heap allocation via collect::<Vec<u32>>(). This violates Power of Ten Rule 2 (fixed loop bounds).",
+      "failure_mode": "An attacker sends input with billions of lines. The iterator consumes unbounded CPU and memory, eventually causing OOM. No static bound exists for the loop count.",
+      "fix": "Add a maximum input size check before processing (e.g., input.len() <= MAX_INPUT_BYTES). Return a typed error when exceeded. Consider accepting a pre-bounded slice or using ArrayVec with a const capacity."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_no_post_init_alloc",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "collect() into Vec<u32> performs unbounded heap allocation driven entirely by untrusted input size. Every element requires a heap allocation of the Vec's internal buffer plus potential reallocations as it grows.",
+      "failure_mode": "Uncontrolled heap growth from external input enables OOM denial-of-service. Each reallocation triggers allocator lock contention and potential page faults, degrading tail latency for all concurrent workloads.",
+      "fix": "Accept a caller-owned output buffer (e.g., out: &mut Vec<u32>) or use ArrayVec<u32, N> with a compile-time bound. Validate input size before allocation. Use try_reserve if Vec is unavoidable, with graceful error on allocation failure."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function signature returns Vec<u32> with no Result or Option wrapper. There is no way to communicate parse failures, empty input, or resource errors to the caller without panicking.",
+      "failure_mode": "Callers cannot distinguish between valid empty output (no scores), partial parse (some scores ok, some failed), and complete failure. The only error path is panic, violating the checked returns rule.",
+      "fix": "Signature should be fn parse_scores(input: &str) -> Result<Vec<u32>, ScoreParseError>. Define a custom enum error type that distinguishes IoError, ParseIntError, and InputTooLarge variants."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "parse::<u32>() returns Result<u32, ParseIntError>. The unwrap() call converts a recoverable parse error into an unconditional panic. This is a panic path in production-reachable code.",
+      "failure_mode": "Non-numeric text (e.g., \"abc\", \"3.14\", \"\", whitespace-only, negative numbers) each trigger different ParseIntError variants, all collapsing to panic. No caller can recover from these errors.",
+      "fix": "Use .map_err(|e| ScoreParseError::InvalidLine { line_index, raw: line.to_string(), source: e }) to convert parse errors into typed errors that preserve context about which line and which value failed."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "try_reserve_untrusted_growth",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function accepts arbitrary &str input with no declared maximum size, no checked arithmetic on byte counts, and no try_reserve call. This is untrusted-input growth without bounds.",
+      "failure_mode": "A single 1GB string input will attempt to allocate a Vec that may need 4GB+ of heap (Vec growth factor of ~1.5). No graceful allocation failure handling exists.",
+      "fix": "Add input.len() check against a MAX_INPUT constant before processing. If using Vec, call try_reserve() after counting expected items, and return a typed ResourceExhausted error on allocation failure."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "benchmark_proof",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [dev-dependencies] section with criterion or similar benchmarking framework. No [[bench]] targets defined. No benchmark binary exists.",
+      "failure_mode": "No empirical evidence for latency, throughput, allocation count, or memory behavior. Performance claims cannot be evaluated or regression-guarded. The function may be fast for small inputs but degrade catastrophically for large ones with no way to measure.",
+      "fix": "Add criterion as a dev-dependency. Create benches/scores.rs with benchmarks for: empty input, single valid line, 100 lines, 10K lines, malformed input, and near-max input size."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero_warnings",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [package.edition] is set (defaults to 2021 but should be explicit). No rust-toolchain.toml exists for pinned nightly. No lint configuration or deny directives.",
+      "failure_mode": "Without pinned toolchain, CI or different dev environments may use different Rust versions with different lint behavior. Missing explicit edition is fragile against future Cargo defaults.",
+      "fix": "Add rust-toolchain.toml with pinned nightly date. Add explicit edition = \"2021\" in Cargo.toml. Add [lints] section with deny directives for unsafe_code, unwrap_used, expect_used, panic, todo, unimplemented, indexing_slicing."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No #[must_use] attribute on the function. The return value (Vec<u32>) can be silently ignored by callers with no compiler warning.",
+      "failure_mode": "A caller writes parse_scores(input); with no consequence. The parsed scores are silently dropped, potentially hiding a logic error where results should have been used.",
+      "fix": "Add #[must_use = \"parsed scores must be consumed\"] attribute to the function signature."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_simple_control_flow",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The iterator chain (lines -> map -> collect) is a single-expression closure that hides error handling logic. The trim() call discards leading/trailing whitespace without indicating if the line was entirely whitespace (which parse::<u32>() will reject).",
+      "failure_mode": "A line of only whitespace (e.g., \"   \") passes through trim() producing \"\", which parse::<u32>() rejects. The error message from unwrap will reference the empty string after trim, not the original line, making debugging harder.",
+      "fix": "Use a named function or explicit for-loop with line-by-line processing that preserves the original line text in error context. Consider an iterator adaptor that tracks line indices and original text."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_no_post_init_alloc",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "No benchmark, profiler, or allocation-budget evidence exists to justify Vec<u32> heap allocation as the correct data structure. The allocation budget and regression guard are entirely absent.",
+      "failure_mode": "Without benchmark evidence, the choice of Vec<u32> is a guess. It may be suboptimal for streaming single-item consumers, for bounded-output scenarios, or for cache behavior. No regression threshold exists to catch future performance regressions.",
+      "fix": "Before accepting Vec<u32> as the return type, run criterion benchmarks measuring allocations (via alloc_count or similar) for typical workloads. Compare against ArrayVec, caller-owned buffer, and streaming iterator designs."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists: no dev-dependencies, no bench targets, no criterion or iai-callgrind",
+    "no profiler evidence: no flamegraph, perf stat, or DHAT/heaptrack data for allocation behavior",
+    "no assembly/IR evidence: no cargo asm or cargo llvm-ir inspection of the parse path",
+    "no test coverage: no tests directory, no test targets, no behavior verification",
+    "no rust-toolchain.toml: no pinned nightly toolchain for reproducible builds",
+    "no second-ring evidence: no Crux, SAW, or Hax analysis of the parsing invariants"
+  ],
+  "residual_risk": "Static review only; no commands were run. The crate contains fundamental Holzman violations: unwrap() panic path on untrusted input, unbounded heap allocation from unbounded input, no error type, no bounds checking, and zero test/benchmark coverage. These are not residual risks — they are active blockers that must be repaired before any acceptance. The function as written cannot be deployed in any safety-critical, mission-critical, or even production context without risk of arbitrary denial-of-service via crafted input."
+}

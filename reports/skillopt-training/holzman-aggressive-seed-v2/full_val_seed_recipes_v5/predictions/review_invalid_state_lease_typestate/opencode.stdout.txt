@@ -1,0 +1,20 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote valid JSON to the required output path.
+
+**Summary of 8 findings (7 BLOCKER, 1 MINOR):**
+
+1. **typestate_state_machine** (BLOCKER) -- `LeaseWorkflow` models lifecycle with raw `String`/`bool`/`Option` instead of an enum typestate. Illegal combinations are representable.
+
+2. **parse_boundary** (BLOCKER) -- All `pub` fields, no smart constructor. Callers construct invalid states directly.
+
+3. **invalid_state_transition** (BLOCKER) -- `mark_sent` unconditionally overwrites state with no precondition checks. Allows double-sending and sending without validation.
+
+4. **no_domain_error_taxonomy** (BLOCKER) -- No `Result`/error enum. All errors must be representable via typed domain errors.
+
+5. **functional_core_imperative_shell** (BLOCKER) -- Data is not inert/valid-by-construction. Fields are freely mutable from any call site.
+
+6. **no_tests** (BLOCKER) -- No behavioral contract enforced.
+
+7. **no_benchmark** (BLOCKER) -- No performance evidence.
+
+8. **id_newtype** (MINOR) -- Bare `String` for id instead of typed newtype.

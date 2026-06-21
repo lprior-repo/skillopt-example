@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses raw lifecycle booleans and strings instead of an explicit typestate enum. No state machine is modeled; any combination of is_validated, is_sent, and status values is representable, including logically impossible ones.",
+      "failure_mode": "Callers can construct a PacketWorkflow with is_validated=false, is_sent=true, status=\"queued\", creating an inconsistent state that has no recovery path and silently propagates through the system.",
+      "fix": "Replace status, is_validated, and is_sent with a single PacketState enum (e.g., enum PacketState { New, Validated, Sent { sent_at: u64 } }) and require callers to construct via the enum variants, making illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String field that accepts any string value. The mark_sent function writes \"sent\".to_string(), but there is no enum or validation constraining which strings are valid at any point in the lifecycle.",
+      "failure_mode": "A caller can set status to \"sent\", \"SENT\", \"deleted\", \"\", or any garbage value. Downstream logic comparing status == \"sent\" is brittle and will silently fail on case mismatches or typos.",
+      "fix": "Replace `pub status: String` with a `PacketStatus` enum with explicit variants (e.g., New, Validated, Sent). Use the enum everywhere instead of string comparison."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that encode workflow state in a flat boolean lattice. They cannot express mutually exclusive states, required ordering (validate before send), or the lifecycle data carried by each state.",
+      "failure_mode": "A PacketWorkflow can be both is_validated=false and is_sent=true simultaneously, or both booleans can be false (orphaned). No transition function enforces validate→send ordering.",
+      "fix": "Collapse both booleans into a single typestate enum. Encode lifecycle data (e.g., sent_at_epoch_ms) inside the enum variant that owns it, not as a separate Option field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> and is_sent: bool are redundant and can disagree. is_sent=true with sent_at_epoch_ms=None represents a packet reported as sent but without the sent timestamp. is_sent=false with sent_at_epoch_ms=Some(u64) represents an unsent packet with a timestamp.",
+      "failure_mode": "Downstream consumers of sent_at_epoch_ms cannot trust it reflects actual sent state. Time-based queries or TTL logic will produce incorrect results for these inconsistent states.",
+      "fix": "Move sent_at_epoch_ms inside the typestate enum as data carried by the Sent variant: `Sent { sent_at_epoch_ms: u64 }`. Remove the separate Option<u64> field and the is_sent bool."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive domain identifier. Any string is accepted as a valid packet ID. There is no newtype, no validation on format/length, and no domain invariants enforced.",
+      "failure_mode": "An empty string, whitespace-only string, or overly long string is accepted as a valid packet ID. This can cause collisions, index-out-of-bounds, or database constraint violations downstream.",
+      "fix": "Create a `PacketId` newtype struct with a private String field and a smart constructor that validates length/format, returning a typed error. Replace `pub id: String` with `pub id: PacketId`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String, bool, Option<u64>) cross the parse boundary into domain code without fallible smart constructors. PacketWorkflow is a public struct with public fields, so callers can construct invalid domain states directly from raw input. No parse boundary exists.",
+      "failure_mode": "External callers and shell code bypass all domain validation by instantiating PacketWorkflow fields directly. Invalid states produced at the boundary propagate into pure core logic, violating the data/calculations/actions split.",
+      "fix": "Make PacketWorkflow fields private. Provide a single fallible constructor (e.g., `fn try_new(id: impl Into<String>, ...) -> Result<PacketWorkflow, ParseError>`) or, better, replace the struct with a typestate enum and smart constructors that validate and parse at the boundary."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation or throughput",
+    "no profiler evidence for hot-path analysis of PacketWorkflow usage",
+    "no allocation budget or try_reserve evidence for PacketWorkflow construction paths",
+    "no second-ring evidence (assembly, SBOM, or release provenance) for any performance claims",
+    "no command evidence: cargo fmt, cargo check, cargo clippy, and cargo test were not run"
+  ],
+  "residual_risk": "Static review only. The struct is entirely untyped for its domain state (status is a String, lifecycle is two bools, IDs are raw Strings), making every caller a potential source of invalid states. No commands were executed to verify compilation, lint, or test status. The code compiles with raw primitives as public fields, which is a BLOCK_GLOBAL prerequisite: the typestate, parse boundary, and newtype fixes must be applied before any further delivery."
+}

@@ -1,0 +1,11 @@
+Now I can see the violations clearly. The source has `unwrap()`, no empty check, no max_items enforcement, and no `try_reserve`. Let me fix it.
+All 4 tests pass. Let me verify fmt is clean, then write the output.
+Repair complete. Summary of changes to `src/lib.rs:9-28`:
+
+- **Removed `unwrap()`** → replaced with `map_err(|_| ParseError::Invalid)?`
+- **Removed `.collect()` iterator** → replaced with explicit `for` loop for bounded enforcement
+- **Added empty input gate** → `input.is_empty()` returns `ParseError::Empty`
+- **Added `try_reserve`** → `Vec::new()` + `try_reserve(max_items)` with `ParseError::Allocation`
+- **Added max_items enforcement** → `values.len() >= max_items` before each push → `ParseError::TooMany`
+
+All 4 behavior tests pass, `cargo fmt --check` clean, output JSON written.

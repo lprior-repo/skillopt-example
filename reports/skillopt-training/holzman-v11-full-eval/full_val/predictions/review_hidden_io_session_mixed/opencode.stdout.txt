@@ -1,0 +1,11 @@
+Now I have full context. The crate has numerous Holzman Rust violations. Let me write the review output.
+Review complete. Wrote `review-output.json` with **13 findings** (12 BLOCKER, 2 WARNING) and **6 missing evidence items**.
+
+Key violations:
+- **`unwrap()` panic surfaces** on `fs::read_to_string` (line 9) and `.parse()` (line 19)
+- **Hidden I/O** — `fs::read_to_string` and `println!` fused into parsing logic (lines 9, 16)
+- **Unchecked indexing** — `parts[0]`, `parts[1]` panic on malformed input (lines 16, 18)
+- **Lossy cast** — `u32 as u16` silently truncates values > 65535 (line 19)
+- **No bounded allocation** — no `try_reserve` or domain cap (line 10)
+- **No parse boundary** — raw primitives accepted, no smart constructors (line 8)
+- **No typed error taxonomy** — function returns `Vec<Record>` with no `Result`

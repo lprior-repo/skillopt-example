@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written 10 findings to `/tmp/opencode/holzman-skillopt-train/c058b4f44d5828f5/review_hidden_io_sensor_mixed/review-output.json`.
+
+**Summary of violations found in `src/lib.rs`:**
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | no_unwrap_in_production | 9 | `fs::read_to_string().unwrap()` panics on I/O failure |
+| 2 | BLOCKER | no_unchecked_indexing | 16 | `parts[0]`, `parts[1]` panics on malformed CSV |
+| 3 | BLOCKER | no_lossy_cast | 19 | `as u16` silently truncates u32 values > 65535 |
+| 4 | BLOCKER | no_hidden_io_in_logic | 16 | `println!` fused into data-loading logic |
+| 5 | BLOCKER | parse_boundary_no_smart_constructor | 19 | Raw primitives cross boundary into Record without validation |
+| 6 | BLOCKER | shell_leverage | 1 | File I/O, parsing, and domain construction fused in one function |
+| 7 | BLOCKER | no_typed_error_taxonomy | 8 | No Result return type; all errors panic |
+| 8 | BLOCKER | no_allocation_bounds | 8 | Unbounded Vec allocation from untrusted file |
+| 9 | BLOCKER | no_split_once_for_two_field | 12 | `split().collect()` allocates intermediate Vec for 2-field records |
+| 10 | BLOCKER | status_string_in_record | 4 | `name: String` raw primitive instead of SensorName newtype |
+
+All 6 Holzman absolute laws violated: unwrap, unchecked indexing, lossy cast, hidden I/O, no smart constructor, shell boundary breach. No tests, no benchmarks, no error types exist. Residual risk is critical — code must be rejected.

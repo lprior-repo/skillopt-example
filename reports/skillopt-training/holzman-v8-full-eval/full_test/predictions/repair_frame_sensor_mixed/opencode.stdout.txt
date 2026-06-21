@@ -1,0 +1,7 @@
+Now I have a clear picture. The `encode_frame` function ignores `max_payload` — test `rejects_limit` expects it to reject when `payload.len() > max_payload`. Also, the `as u32` is a lossy conversion flagged by clippy.
+Repaired. Two issues fixed in `src/lib.rs`:
+
+1. **Missing `max_payload` enforcement** — `encode_frame` now rejects payloads exceeding `max_payload` with `FrameError::PayloadTooLarge` (fixing the `rejects_limit` test).
+2. **Lossy `as u32` conversion** — replaced `payload.len() as u32` with `u32::try_from(payload.len())` to avoid silent truncation for large payloads, mapping overflow to `FrameError::Overflow`.
+
+All gates pass: `cargo fmt`, `cargo test` (2/2), and strict clippy (zero warnings).

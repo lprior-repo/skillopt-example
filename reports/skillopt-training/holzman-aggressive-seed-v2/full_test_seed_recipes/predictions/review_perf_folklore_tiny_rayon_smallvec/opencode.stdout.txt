@@ -1,0 +1,6 @@
+Review complete. Written to `review-output.json` with 4 findings:
+
+1. **BLOCKER - cargo_cult_rayon**: TODO comments instruct using Rayon/SmallVec with unfounded "will be faster" claims — anti-pattern per Holzman Performance Discipline.
+2. **MAJOR - unnecessary_heap_allocation_fixed_size**: Returns `Vec<&'static str>` for a known-4-element fixed input — forces heap allocation where `['static str; 4]` would stack-allocate.
+3. **MAJOR - missing_benchmark_evidence**: Performance claims without any benchmark, workload, or command evidence.
+4. **MINOR - missing_second_ring_evidence**: No profiling confirming this is a hot path.

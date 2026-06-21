@@ -1,0 +1,26 @@
+{
+  "batch_size": 1,
+  "failure_summary": [
+    {
+      "failure_type": "missing_try_reserve",
+      "count": 1,
+      "description": "Agent used Vec::with_capacity instead of try_reserve for bounded allocation."
+    }
+  ],
+  "patch": {
+    "reasoning": "The agent failed to use try_reserve despite previous instructions. The current skill text is verbose and repetitive, which may cause agents to miss the specific instruction. I will consolidate the allocation and arithmetic rules into a single, high-impact block that explicitly forbids with_capacity and mandates try_reserve with error handling, removing the ambiguity that led to the failure.",
+    "edits": [
+      {
+        "op": "replace",
+        "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+        "content": "- **Allocation:** NEVER use `Vec::with_capacity`. For any `Vec` with known or bounded capacity, use `Vec::new()` followed by `try_reserve` and handle the `Allocation` error. Compute capacity using `checked_add`/`checked_mul`."
+      },
+      {
+        "op": "replace",
+        "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+        "content": "- **Arithmetic:** ALL integer arithmetic involving totals, counts, capacity, or indices MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. NEVER use `+`, `-`, `*`, `/`, or `as` for these operations. Division MUST use `checked_div` with error propagation. Use `T::try_from(value)` for conversions, never `as`."
+      }
+    ]
+  },
+  "source_type": "failure"
+}

@@ -1,0 +1,14 @@
+Identified issues in `src/lib.rs`:
+1. No `max_payload` check (test `rejects_limit` fails)
+2. `as u32` lossy cast (line 10)
+3. No `try_reserve` for bounded allocation
+4. No overflow handling for frame size arithmetic
+
+Fixing now:
+All 2 tests pass. Writing the output:
+Repair complete. All 2 tests pass. Changes made to `src/lib.rs`:
+
+- **`max_payload` enforcement**: Returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload`
+- **Lossy cast removed**: `payload.len() as u32` → `u32::try_from(payload.len())` with `FrameError::Overflow`
+- **Bounded allocation**: Uses `try_reserve(capacity)` with `Allocation` error handling
+- **Checked arithmetic**: `header.checked_add(payload.len())` with `Overflow` error

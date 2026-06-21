@@ -1,0 +1,7 @@
+Repaired. All 4 tests pass. Changes to `src/lib.rs`:
+
+- **Removed** `unwrap()` — parse failures now return `ParseError::Invalid` via `map_err`
+- **Added** empty-input check — returns `ParseError::Empty` before processing
+- **Added** `max_items` enforcement — returns `ParseError::TooMany` before exceeding the limit
+- **Added** `try_reserve(max_items)` — allocation failure returns `ParseError::Allocation`
+- **Added** empty-trimmed-segment rejection — prevents silent skip of malformed input

@@ -1,0 +1,13 @@
+Now I understand the issues. The production code has multiple violations:
+1. `unwrap()` on parse - must return `ParseError::Invalid`
+2. No empty input check - must return `ParseError::Empty`
+3. No `max_items` cap enforcement - must return `ParseError::TooMany`
+All 4 tests pass. Now writing the required output JSON.
+Repair complete. Changes made to `src/lib.rs:9-14`:
+
+- **Removed `unwrap()`** on `parse::<u16>()` - now returns `ParseError::Invalid` via `map_err`
+- **Added empty-input guard** - returns `ParseError::Empty` for blank/whitespace-only input
+- **Added `max_items` cap enforcement** - returns `ParseError::TooMany` when result would exceed the limit
+- **Pre-allocated with bounded capacity** via `Vec::with_capacity(max_items)`
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses raw `String` for `status` and separate `bool` flags (`is_validated`, `is_sent`) instead of an enum or typestate. Any combination of these fields is constructible, including `status=\"sent\"` with `is_sent=false`, or `is_validated=true` with `is_sent=true` before any transition logic.",
+      "failure_mode": "Downstream code must manually validate field consistency at every access site. Invalid state machines allow transitions that should be impossible (e.g., marking sent without validation, or double-marking).",
+      "fix": "Replace `status: String` with `status: LedgerStatus` enum (e.g., `Pending`, `Validated`, `Sent`). Replace `is_validated: bool` and `is_sent: bool` with a typestate enum or encode lifecycle as enum variants. The struct should only hold `sent_at_epoch_ms: Option<u64>` as an extra field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status` is a `String` — a primitive type carrying no domain semantics. Callers can set it to any arbitrary value (\"sent\", \"SENT\", \"\", \"foobar\").",
+      "failure_mode": "Stringly-typed status allows typos, case mismatches, and invalid lifecycle values to silently propagate. Pattern matching is impossible without string comparison.",
+      "fix": "Replace `status: String` with a `LedgerStatus` enum: `enum LedgerStatus { Pending, Validated, Sent }`. All status values become compiler-enforced."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` and `is_sent: bool` are separate boolean lifecycle flags. These create a 4-state combinatorial space (00, 01, 10, 11) where only 2-3 are valid, but the compiler cannot distinguish valid from invalid combinations.",
+      "failure_mode": "Code that checks `if is_sent { ... }` cannot prove the item was also validated. Code checking `if is_validated && !is_sent` is fragile and must be repeated at every use site.",
+      "fix": "Replace both booleans with a single `LedgerLifecycle` enum: `enum LedgerLifecycle { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`. This makes invalid states unrepresentable."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes `LedgerWorkflow` by value and mutates fields directly (`item.status = ...; item.is_sent = ...`). This is imperative mutation in what should be a pure domain transition function that returns a new state.",
+      "failure_mode": "Mutating the struct in place bypasses any invariants that a transition function should enforce. If the struct had proper typestates, `mark_sent` should be `fn mark_sent(state: Validated) -> Sent` with no mutation.",
+      "fix": "Define typed constructors: `LedgerWorkflow::pending(id) -> LedgerWorkflow`, `LedgerWorkflow::validate(item) -> Result<LedgerWorkflow, Error>`, `LedgerWorkflow::sent(item, epoch_ms) -> Result<LedgerWorkflow, Error>`. Each returns a new instance with proper typestate."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_without_try_reserve",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`\"sent\".to_string()` allocates a new `String` every time `mark_sent` is called, even though the status value is always the same literal. Combined with the `String` field type, this means every transition allocates.",
+      "failure_mode": "Repeated allocation of identical status strings causes unnecessary heap pressure in hot paths. An enum-based status would be zero-copy and copyable.",
+      "fix": "Replace `String` status with an enum. If a string representation is needed at the boundary, derive it via `Display` or an explicit serialization method."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "public_fields_no_encapsulation",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of `LedgerWorkflow` are `pub`. External code can set any field to any value, including `is_validated = true` on an invalid item, without going through a domain constructor.",
+      "failure_mode": "Callers can bypass all domain invariants by directly mutating fields. This defeats the purpose of any type-level guarantees.",
+      "fix": "Make all fields `pub(crate)` or private. Provide public constructors (`::new()`, `::validate()`, `::mark_sent()`) that enforce invariants at construction time."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "sent_at_epoch_ms_should_be_newtype",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` uses a raw `u64` for a domain concept (epoch milliseconds). This allows arbitrary u64 values and mixes time-unit concerns with the type.",
+      "failure_mode": "Callers can pass raw millisecond values without domain validation. Comparing or formatting timestamps requires manual interpretation at every use site.",
+      "fix": "Introduce a `SentAtEpochMs(u64)` newtype or `SentAt(Instant)` type. Use it in the struct: `sent_at: Option<SentAt>`."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent allocation cost", "no allocation analysis for repeated to_string() calls", "no profiler data for hot-path status transitions", "no second-ring evidence (property tests, fuzzing, or invariant checks for ledger state machine)"],
+  "residual_risk": "The current struct represents an invalid state machine where illegal states are fully representable. Without enum-based status and typestate lifecycle, no amount of runtime checking can guarantee correctness. The code is functionally correct for the trivial two-line `mark_sent` but architecturally non-compliant with Holzman Rust domain modeling principles."
+}

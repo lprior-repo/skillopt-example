@@ -1,0 +1,13 @@
+Now I have full context. The production code has multiple Holzman violations: `unwrap()`, no empty check, no max_items enforcement, and no error propagation. Let me fix it.
+All 4 tests pass. Let me write the required output.
+Repair complete. Here's a summary of the fixes applied to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse → panic | `.map_err(\|_\| ParseError::Invalid)?` |
+| No empty-input check | `input.trim().is_empty()` → `ParseError::Empty` |
+| No `max_items` enforcement | `split(',').count() > max_items` → `ParseError::TooMany` |
+| `.split() + .map() + .unwrap()` forbidden pattern | Iterative `for` loop with `?` error propagation |
+| No empty-field handling | Each trimmed part checked for blank |
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

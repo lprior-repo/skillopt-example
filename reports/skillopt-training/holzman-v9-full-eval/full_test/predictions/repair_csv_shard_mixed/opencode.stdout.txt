@@ -1,0 +1,7 @@
+Repair complete. The original `parse_shards` had three Holzman law violations:
+
+1. **`unwrap()` panic surface** on `parse::<u16>()` -- replaced with `.map_err(|_| ParseError::Invalid)`
+2. **No empty input check** -- added early `trimmed.is_empty()` guard returning `ParseError::Empty`
+3. **No `max_items` enforcement** -- rewrote collection as `try_fold` with per-item cap check returning `ParseError::TooMany`
+
+All 4 behavior tests pass. `repair-output.json` written.

@@ -1,0 +1,80 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses primitive `String` for `status` and `bool` flags (`is_validated`, `is_sent`) instead of enums/typestates. Any arbitrary string is a valid status, and booleans allow illegal states (e.g., `is_sent=true` with status not \"sent\", `is_sent=true` with `is_validated=false`.",
+      "failure_mode": "Invalid workflow states are constructible and undetectable at compile time. Callers can create BudgetWorkflow with `status=\"invalid\"` and `is_sent=true`, or `is_sent=true` and `sent_at_epoch_ms=None`, and there is no runtime guard preventing these.",
+      "fix": "Replace `status: String` with an enum `BudgetStatus { Draft, Validated, Sent }`. Replace `is_validated: bool` and `is_sent: bool` with a typestate enum or encode the lifecycle in the type. Use a constructor that enforces: only Sent budgets have `sent_at_epoch_ms` set."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enforcement",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The workflow lifecycle (Draft -> Validated -> Sent) is represented by two independent boolean flags and a string, rather than being enforced by the type system. No invariant links `is_sent` to `status == \"sent\"`.",
+      "failure_mode": "A BudgetWorkflow can exist in states like {status:\"sent\", is_sent:false} or {status:\"draft\", is_sent:true}, causing undefined behavior in downstream consumers that check only one of these fields.",
+      "fix": "Use a single `BudgetStatus` enum with ordered variants. Remove `is_sent` and `is_validated` entirely. Use the enum variant to encode the lifecycle stage. If timing data is needed only for Sent, use an enum like `BudgetLifecycle { Draft, Validated { validated_at: u64 }, Sent { sent_at: u64 } }`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "consistent_state_update",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` sets `status` and `is_sent` but does NOT set `sent_at_epoch_ms`. After calling `mark_sent`, the budget has `is_sent=true` but `sent_at_epoch_ms=None`, an inconsistent state.",
+      "failure_mode": "Downstream consumers that check `is_sent` will find the budget sent, but querying `sent_at_epoch_ms` returns None, breaking audit trails, SLA tracking, or any logic that depends on the sent timestamp.",
+      "fix": "Either set `sent_at_epoch_ms` inside `mark_sent` (passing the timestamp as a parameter or injecting a clock abstraction), or remove `mark_sent` and require the caller to construct the final state through a validated constructor that enforces `sent_at_epoch_ms` is Some."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `BudgetWorkflow` are `pub`, allowing external code to set any field to any value without going through a constructor or workflow method. This bypasses all invariants.",
+      "failure_mode": "Any crate caller can do `budget.is_sent = true; budget.status = \"anything\";` creating illegal states that `mark_sent` would otherwise attempt to enforce.",
+      "fix": "Make all fields private (`pub` access removed). Provide a private constructor or a builder that enforces invariants. The `mark_sent` function should be the only path to the Sent state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain constraints. There is no `BudgetId` newtype to enforce ID format rules (e.g., UUID, numeric range, non-empty).",
+      "failure_mode": "Empty strings, null-like values, or malformed IDs can flow through the system undetected. Cross-referencing between budgets is error-prone since any String can be used as an ID.",
+      "fix": "Create `pub struct BudgetId(String)` with a fallible constructor that validates the ID format. Use `BudgetId` as the field type. Document the ID format invariant in the constructor."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` is a pure function (takes owned value, returns owned value), which is good for the functional core. However, it performs `.to_string()` allocation on every call even when setting the same literal \"sent\".",
+      "failure_mode": "Unnecessary heap allocation on every transition. While not a correctness issue, this violates the performance discipline of avoiding allocations in hot paths.",
+      "fix": "If using an enum type for status, no allocation is needed. If keeping String, use `Cow<'static, str>` or accept `&str` and use `stringify!` / `'static` string literals where appropriate."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for `mark_sent` or the BudgetWorkflow lifecycle. There is no measured evidence for performance claims.",
+      "failure_mode": "Performance characteristics of the budget workflow transitions are unknown. If this function is called in hot paths (e.g., per-request), allocations from `.to_string()` could accumulate.",
+      "fix": "Add a simple criterion or micro-benchmark for `mark_sent` to establish a performance baseline."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `[dev-dependencies]` for benchmarks or testing infrastructure is present. The crate has no test files, no benchmark harness, and no CI evidence.",
+      "failure_mode": "No behavioral tests exist to verify that the BudgetWorkflow typestate invariants hold. No CI gate prevents regressing the invariants.",
+      "fix": "Add a `tests/` directory with behavior tests covering: (1) invalid initial states are rejected, (2) valid transitions only, (3) `mark_sent` sets all required fields consistently."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent or BudgetWorkflow lifecycle transitions", "no behavior tests exist for typestate invariants", "no command evidence (cargo test, cargo fmt, cargo clippy) was produced"],
+  "residual_risk": "The crate has no type-enforced invariants on the BudgetWorkflow lifecycle. All fields are public primitives, making illegal states fully representable and undetectable. The mark_sent function creates inconsistent state by not setting sent_at_epoch_ms. Without enum-based typestates and a validated constructor, any consumer can construct invalid BudgetWorkflow instances. The absence of tests and benchmarks means no behavioral evidence exists that the domain model works as intended."
+}

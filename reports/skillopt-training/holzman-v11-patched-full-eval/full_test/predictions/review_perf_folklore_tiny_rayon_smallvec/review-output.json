@@ -1,0 +1,60 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "functional-core-performance.md", "hardening-checklist.md", "review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-rayon-overhead",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims Rayon will be faster for processing exactly 4 bytes. Rayon dispatch overhead (task scheduling, thread pool coordination) dwarfs the work of classifying 4 elements, making parallelism strictly slower for this input size.",
+      "failure_mode": "Adding Rayon will introduce thread-pool scheduling, work-stealing, and result-joining overhead that makes classify_four measurably slower than the simple sequential iteration already in place.",
+      "fix": "Never use Rayon for fewer than ~1000 elements without benchmark evidence. Remove the Rayon TODO entirely for fixed-4 input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-smallvec-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims SmallVec will be faster. SmallVec requires importing a crate dependency, and for a 4-element result SmallVec's inline storage matches Vec's first allocation. The crate dependency and type complexity provide no speed benefit over returning Vec for this size, and the output type should be fixed-size anyway.",
+      "failure_mode": "SmallVec introduces a dependency without measurable benefit. If tests or callers expect Vec, switching to SmallVec breaks API compatibility. For 4 known elements, the correct fix is a fixed-size array return type, not SmallVec.",
+      "fix": "Remove the SmallVec TODO. Change the return type to [\\u{2605}static str; 4] to eliminate all heap allocation for the known-4-element output."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unbounded-alloc-tiny-input",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function takes a fixed [u8; 4] (16 bytes on stack) and returns Vec (heap allocation + dynamic size). For a known 4-element output, heap allocation is unnecessary overhead. Every call allocates a new Vec, does 4 allocations for string slices, and frees on drop.",
+      "failure_mode": "Caller pays heap allocation cost for every invocation of a function that processes exactly 4 items. In hot paths this generates allocator pressure and GC pressure for predictable tiny outputs.",
+      "fix": "Change return type to [\\u{2605}static str; 4] so the output is stack-allocated and zero-allocation. Fill the array with a simple loop."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-benchmark-baseline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO makes a performance claim ('it will be faster') without any benchmark, baseline measurement, target hardware specification, or workload definition. SKILL.md requires measured evidence before any performance optimization.",
+      "failure_mode": "Developers will introduce Rayon and SmallVec based on folklore reasoning, not evidence, likely degrading performance while adding dependencies and complexity.",
+      "fix": "Remove the TODO. If performance tuning is genuinely needed, write a criterion benchmark with a measured baseline of the current sequential .collect() implementation before proposing any change."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "alloc-collect-tiny",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Iterator .collect() allocates a Vec on the heap for exactly 4 elements. The map iterator produces exactly 4 items, so the allocator must allocate a heap buffer and then 4 string-slice references. This is a predictable, avoidable allocation pattern.",
+      "failure_mode": "Each call to classify_four performs a heap allocation (Vec buffer) plus 4 reference copies. In a tight loop or hot path this creates unnecessary allocator traffic and cache misses compared to stack allocation.",
+      "fix": "Replace .collect() with a fixed array assignment: let mut out = [\"even\"; 4]; then fill by index, returning out. Or use a caller-owned buffer parameter."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four baseline performance",
+    "no workload definition for the performance claim in the TODO comment",
+    "no target hardware or noise/variance measurements referenced",
+    "no regression threshold defined for any proposed optimization",
+    "no allocation profiler output (e.g., heaptrack, dhat) for classify_four",
+    "no second-ring evidence showing that [u8; 4] input size is representative of real workloads"
+  ],
+  "residual_risk": "The code is functionally correct but makes unmeasured performance folklore claims via the TODO. No production Holzman law violations are present (no unsafe, unwrap, panic, unchecked access). The primary risk is developers acting on the folklore TODO and introducing Rayon/SmallVec which will worsen performance for 4-element inputs. Removing the TODO and switching to a fixed array return type resolves all findings."
+}

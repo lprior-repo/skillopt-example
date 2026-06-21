@@ -1,0 +1,21 @@
+Now I have the full picture. The source has multiple Holzman violations and doesn't match the test contract. Let me fix it.
+
+**Issues found:**
+1. `unwrap()` on parse (line 24) - banned
+2. Unchecked `parts[1]` indexing (line 24) - banned
+3. Unchecked `total += value` (line 25) - banned
+4. Unchecked `total / count` (line 35) - banned
+5. `split`+`collect`+indexing instead of `split_once`
+6. Tests expect `Result<Summary, SummaryError>`, not `Result<String, SummaryError>`
+7. `render_summary` function is missing
+All 6 tests pass. Now writing the required output.
+Repair complete. All 6 behavior tests pass. Summary of changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` (matching test contract) instead of `Result<String, SummaryError>`
+- **Added `render_summary`**: New function that formats a `Summary` into the output string (satisfies test import)
+- **Removed `unwrap()`**: Replaced with `map_err(|_| SummaryError::Invalid)` on parse
+- **Removed unchecked indexing `parts[1]`**: Replaced with `split_once(',')` 
+- **Removed unchecked arithmetic `total += value`**: Replaced with `checked_add` + overflow error
+- **Removed unchecked division `total / count`**: Replaced with `checked_div`
+- **Removed lossy `as` casts**: Used `try_into()` for u64→u32 conversion
+- **Added empty input detection**: Returns `SummaryError::Empty`

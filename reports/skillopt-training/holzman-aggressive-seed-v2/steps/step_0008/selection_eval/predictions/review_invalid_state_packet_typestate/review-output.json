@@ -1,0 +1,126 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/review-output-contract.md",
+    "references/functional-core-performance.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses `status: String` + `is_validated: bool` + `is_sent: bool` as separate fields, allowing inconsistent/illegal states (e.g., is_sent=true with status='pending', or is_sent=true with is_validated=false). The struct name itself indicates this is an invalid-state pattern.",
+      "failure_mode": "Any caller can construct a PacketWorkflow with contradictory fields, violating domain invariants. A packet can be 'sent' before it is 'validated', or have a status string that contradicts the boolean sent/validated flags.",
+      "fix": "Replace `status: String`, `is_validated: bool`, and `is_sent: bool` with a single typed enum typestate (e.g., `PacketState { Unvalidated, Validated, Sent }`) that makes illegal state combinations unrepresentable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enums",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a boolean lifecycle flag. Holzman Rust requires replacing bool flags with typed enums or typestates for domain concepts that have state transitions.",
+      "failure_mode": "Boolean flags provide no ordering guarantee, no compile-time enforcement of transition rules, and no way to express that a packet must be validated before it can be sent.",
+      "fix": "Replace `is_validated: bool` with a variant of a `PacketState` enum or a dedicated `ValidationStatus` enum (e.g., `NotValidated | Validated`). Eliminate `is_sent: bool` entirely by folding sent-ness into the same typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enums",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is a boolean lifecycle flag. Same violation as `is_validated`.",
+      "failure_mode": "Boolean flags allow the packet to be marked as sent without any ordering check against validation, and the boolean alone carries no semantic meaning.",
+      "fix": "Remove `is_sent: bool` and fold it into the typestate enum (e.g., `PacketState::Sent`). The transition to Sent should be the only path that sets the sent lifecycle marker."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_primitive_domain_api_with_newtype",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` is a primitive domain concept. Status has domain rules (transitions, valid values) that a free-form String cannot enforce.",
+      "failure_mode": "Any string value is acceptable ('pending', 'sent', 'xyz', \"\"), making validation a runtime burden rather than a compile-time guarantee.",
+      "fix": "Replace `status: String` with a newtype enum `PacketStatus { Pending, Validated, Sent }` or fold it into a unified `PacketState` typestate that enforces the full lifecycle."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_mark_sent_mutates",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes `mut item: PacketWorkflow` and mutates it in place. It returns the mutated struct but does not enforce any preconditions (e.g., must be validated before sending). It is not a pure function and does not express failure modes.",
+      "failure_mode": "Any caller can call `mark_sent` on an invalid/unvalidated packet. No precondition checking, no Result type, no typestate transition enforcement. The function silently accepts illegal state transitions.",
+      "fix": "Change the signature to `fn mark_sent(item: PacketWorkflow) -> Result<PacketWorkflow, TransitionError>` (or use typestate types in the signature) and enforce that only a validated packet can transition to sent. Alternatively, encode the state in the type so that `mark_sent` only accepts a validated typestate."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_allocation_in_core",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`item.status = \"sent\".to_string()` performs an unnecessary heap allocation. The string literal is already `&'static str`.",
+      "failure_mode": "Wastes heap allocation on every call to `mark_sent`. In a hot path this is a measurable performance degradation.",
+      "fix": "Store `status` as `PacketStatus` enum or use `Cow<'static, str>` / `&'static str` if the domain allows. No allocation needed for a known literal."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_fallible_constructor",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No `impl PacketWorkflow` with a fallible constructor. The struct fields are all `pub` and directly constructible, allowing creation of invalid states at any call site.",
+      "failure_mode": "Every caller can bypass all domain invariants by directly constructing `PacketWorkflow { id: ..., status: ..., ... }`.",
+      "fix": "Make fields private, provide `impl PacketWorkflow { fn new(...) -> Self { ... } }` or a fallible `try_new` that validates initial state, and only expose domain-safe builders."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for `mark_sent` or any performance claim about PacketWorkflow.",
+      "failure_mode": "Cannot verify that the implementation meets any stated performance requirements. Allocation patterns, struct size, and transition cost are unmeasured.",
+      "fix": "Add a `benches/` directory with a benchmark for `mark_sent` measuring allocation count (via `criterion` or `divan`), throughput, and struct size."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_behavior_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests exist for `PacketWorkflow` or `mark_sent`. No behavior contract is verified.",
+      "failure_mode": "No evidence that the API works as intended, no mutation-testing coverage, no regression guard for future changes.",
+      "fix": "Add tests covering: valid lifecycle transitions, rejected invalid transitions, struct invariants, and `mark_sent` behavior."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_profiler_data",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, cachegrind, perf) for any hot path involving PacketWorkflow.",
+      "failure_mode": "Cannot identify bottlenecks or verify that refactoring improves performance.",
+      "fix": "Run `cargo flamegraph` or `perf record` on representative workloads to produce profiling evidence."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No allocation analysis (e.g., `tracing` with allocator tracking, `dhat`, or `cargo-bench` allocation counters) for PacketWorkflow operations.",
+      "failure_mode": "Hidden allocations from `to_string()` and `String` field are unmeasured and may cause unexpected heap pressure.",
+      "fix": "Run allocation profiling with `dhat` or `cargo bench -- --save-baseline` to measure allocations per operation."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No `cargo fmt`, `cargo clippy`, or `cargo test` command evidence available for this review.",
+      "failure_mode": "Cannot verify formatting compliance, lint-free code, or test pass status.",
+      "fix": "Run `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` and include output."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or PacketWorkflow operations",
+    "no profiler data (flamegraph/perf) for hot paths",
+    "no allocation analysis (dhat/tracing) for PacketWorkflow",
+    "no behavior tests for lifecycle transitions",
+    "no cargo fmt/clippy/test command evidence"
+  ],
+  "residual_risk": "The crate has 5 BLOCKER violations all centered on making illegal states representable — the struct exposes primitive fields (String status, bool flags) that permit contradictory lifecycle states, and mark_sent performs mutation without precondition enforcement. Static review only; no commands run. The functional core is essentially absent — data is mutable and untyped, and the single function bypasses all domain invariants."
+}

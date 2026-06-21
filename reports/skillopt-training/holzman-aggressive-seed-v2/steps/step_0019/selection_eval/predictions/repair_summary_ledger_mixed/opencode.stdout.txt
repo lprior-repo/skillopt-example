@@ -1,0 +1,16 @@
+Now I have the full picture. The source has multiple Holzman violations and a mismatched API vs tests. Let me repair it.
+All 6 tests pass. Writing the output JSON.
+Repair complete. Here's a summary of what was fixed in `src/lib.rs`:
+
+**API mismatch fixed:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, SummaryError>`) to match the test contract
+- Added missing `render_summary(Summary) -> String` function
+
+**Holzman violations removed:**
+- `parts[1].parse().unwrap()` → `split_once(',')` + `.ok_or(Invalid)` + `.map_err(Invalid)` — no unchecked indexing, no panic
+- `total += value` → `checked_add` with `Err(Overflow)` — no unchecked arithmetic
+- `count += 1` → `checked_add` with `Err(Overflow)` — no unchecked arithmetic
+- `total / count as u64` → guard for `count == 0` returning `Err(Empty)` before division
+- `split(',')` + `collect` → `split_once(',')` per Holzman parsing rule
+
+**Result:** 6/6 tests pass, all forbidden constructs eliminated.

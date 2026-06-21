@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings: 10 issues identified**
+
+| Severity | Count | Key Issues |
+|----------|-------|------------|
+| BLOCKER | 5 | `unwrap()` on I/O (line 9), `unwrap()` on parse (line 19), lossy `as u16` cast (line 19), unchecked indexing (line 16), `println!` side-effect in parsing path (line 16) |
+| MAJOR | 3 | Unnecessary `collect()` of all CSV fields (line 12), no capacity hint (line 8), I/O + parsing + side-effects in single API without error types (line 8) |
+| MINOR | 1 | `String` name without value-object newtype guard (line 3) |
+| INFO | 1 | No benchmark/profiler/allocation evidence |
+
+**Missing evidence**: No benchmarks, profiler data, allocation tracking, command evidence, or second-ring review.
+
+**Residual risk**: High — multiple panic paths on any malformed input, missing file, or out-of-range value. The function needs a full rewrite per Holzman Rust: typed errors, checked conversions, `split_once` over `collect`, pure core parsing, and shell-layer I/O.

@@ -1,0 +1,15 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**6 BLOCKER findings** in `src/lib.rs:1-13`:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `typestate-state-machine` | 1 | No explicit state machine; any method/order allowed |
+| 2 | `status-string` | 3 | `status: String` accepts any value including invalid states |
+| 3 | `bool-lifecycle` | 4 | `is_validated` + `is_sent` booleans create combinatorial invalid states |
+| 4 | `option-invalid-state-combination` | 6 | `Option<u64>` and `is_sent` are two independent sources of truth |
+| 5 | `newtype-domain-id` | 2 | `id: String` has no domain constraints or validation |
+| 6 | `parse_boundary` | 1 | Raw primitives cross parse boundary without fallible smart constructors |
+
+**5 missing evidence items**: no benchmarks, no profiler data, no allocation analysis, no cargo command evidence, no second-ring evidence.

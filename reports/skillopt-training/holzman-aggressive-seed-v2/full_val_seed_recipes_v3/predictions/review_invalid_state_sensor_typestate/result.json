@@ -1,0 +1,35 @@
+{
+  "id": "review_invalid_state_sensor_typestate",
+  "hard": 0,
+  "soft": 0.8333333333333334,
+  "task_type": "review",
+  "task_description": "Review review_invalid_state_sensor for Holzman + functional-core Rust violations.",
+  "fail_reason": "parse/boundary",
+  "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/8e1ee204bb91ca03/review_invalid_state_sensor_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/8e1ee204bb91ca03/review_invalid_state_sensor_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/8e1ee204bb91ca03/review_invalid_state_sensor_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/8e1ee204bb91ca03/review_invalid_state_sensor_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+  "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make_illegal_states_unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"SensorWorkflow combines status:String, is_validated:bool, is_sent:bool, and sent_at_epoch_ms:Option<u64>. Any combination of these fields is constructible, including impossible states like status=\\\"sent\\\" with is_sent=false, or is_validated=false with status=\\\"validated\\\".\",\n      \"failure_mode\": \"Downstream code must re-validate every field combination at runtime. A bug that sets status=\\\"sent\\\" without setting is_sent=true (or vice versa) produces silent data corruption rather than a compile-time error.\",\n      \"fix\": \"Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single enum typestate (e.g., enum SensorState { Unvalidated, Validated, Sent { sent_at: u64 } }). Make the fields private or remove them. Use a smart constructor or From impl to create only valid states.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"domain_newtype_id\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"id is a bare String with no domain constraints. Any string (empty, duplicate, malformed) is accepted as a valid sensor ID.\",\n      \"failure_mode\": \"Duplicate IDs, empty IDs, or collision-prone string IDs cause silent data corruption in lookups, deduplication, or persistence. No compile-time guarantee of uniqueness or format.\",\n      \"fix\": \"Introduce a `SensorId` newtype wrapping a non-empty string (e.g., a heap-allocated String with a private constructor, or a fixed-length byte array). Provide a fallible `try_from` constructor that rejects empty/whitespace-only IDs.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"mark_sent mutates the struct in place and returns it by value, rather than producing an immutable new state. This is a procedural mutation pattern that mixes state transition logic with the domain model.\",\n      \"failure_mode\": \"Callers may assume idempotency or miss that the original binding is unchanged. The function name implies a side effect but returns the modified struct, creating ambiguity about ownership and mutation semantics.\",\n      \"fix\": \"Change to a pure function that takes SensorWorkflow and returns a new SensorWorkflow (or SensorState transition result). If using an enum typestate, the transition function should return the next typestate variant directly, e.g., `fn transition_to_sent(state: SensorWorkflow) -> Result<SensorWorkflow, TransitionError>`.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for any stated performance claim\",\n    \"no profiler evidence (flamegraph, cachegrind, or perf) for the domain model\",\n    \"no allocation analysis (e.g., tracing allocator stats) for SensorWorkflow lifetime and copy patterns\",\n    \"no second-ring evidence (Kani, Miri, or property tests) verifying typestate invariants\",\n    \"no command-level evidence (no test binary, no test module in crate)\"\n  ],\n  \"residual_risk\": \"Static review only; no commands run. The struct permits illegal state combinations at compile time, which is a correctness hazard. Enum/typestate refactoring and newtype for ID would eliminate the primary risk.\"\n}\n",
+  "n_turns": 1,
+  "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/full_val_seed_recipes_v3/predictions/review_invalid_state_sensor_typestate",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/8e1ee204bb91ca03/review_invalid_state_sensor_typestate",
+  "grade": {
+    "hard": 0.0,
+    "soft": 0.8333333333333334,
+    "failures": [
+      [
+        "parse",
+        "boundary"
+      ]
+    ],
+    "json_valid": true,
+    "matched_groups": 5,
+    "total_groups": 6,
+    "missing_groups": [
+      [
+        "parse",
+        "boundary"
+      ]
+    ],
+    "execution_errors": [],
+    "mutation_errors": []
+  }
+}

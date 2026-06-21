@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings in `src/lib.rs`:**
+
+| # | Severity | Rule | Line | Core Issue |
+|---|----------|------|------|------------|
+| 1 | **BLOCKER** | make_illegal_states_unrepresentable | 2 | `status: String` — any arbitrary string is constructible |
+| 2 | **BLOCKER** | make_illegal_states_unrepresentable | 4 | `is_validated: bool` + `is_sent: bool` — independent flags allow inconsistent states (e.g., sent but not validated) |
+| 3 | **BLOCKER** | make_illegal_states_unrepresentable | 1 | `id: String` — no newtype, no domain validation |
+| 4 | **BLOCKER** | make_illegal_states_unrepresentable | 9 | `mark_sent` accepts any state — no invariant checks, allows double-send and sending unvalidated items |
+| 5 | **MAJOR** | primitive_obsession | 6 | `sent_at_epoch_ms: Option<u64>` — raw u64, no domain unit encoding |
+| 6 | **MAJOR** | primitive_obsession | 2 | All fields public — any caller can construct impossible states directly |
+| 7 | **MINOR** | missing_benchmark_evidence | 1 | No benchmarks or allocation analysis |
+| 8 | **MINOR** | missing_command_evidence | 1 | No tests, no clippy/fmt evidence |
+
+**Residual risk:** The type system encodes zero domain invariants. Illegal states (sent-but-not-validated, double-sent, arbitrary status strings) are trivially constructible via public fields. Requires a full typestate refactor.

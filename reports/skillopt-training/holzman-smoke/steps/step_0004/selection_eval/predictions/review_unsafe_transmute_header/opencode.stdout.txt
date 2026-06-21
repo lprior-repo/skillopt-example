@@ -1,0 +1,16 @@
+Now I have all the information needed. The task crate is a single-file library (`src/lib.rs`) with clear Holzman violations. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings (all BLOCKER):**
+
+1. **`unsafe` in production** — `transmute` is forbidden by Holzman contract
+2. **Unchecked indexing** — `input[0..3]` panics on short slices instead of returning typed error
+3. **Endianness dependency** — `transmute` silently assumes platform endianness; big-endian hosts produce wrong values
+4. **No error channel** — returns `u32` directly; caller cannot distinguish valid vs truncated input
+5. **Missing newtype** — raw `u32` leaks parsing invariant; illegal states are representable
+6. **No benchmark** — no performance evidence for this potential hot-path function
+7. **No allocation audit** — replacement must prove zero heap allocation
+
+**Missing evidence:** benchmarks, profiler data, allocation audit, cross-endianness tests.
+
+**Residual risk:** All fixes are mechanical — replace `transmute` with `u32::from_le_bytes`, add `TryFrom<&[u8]>` with typed errors, introduce `HeaderLen` newtype.

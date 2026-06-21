@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review findings.
+Review complete. Written to `review-output.json`.
+
+**14 findings (12 BLOCKER, 2 WARNING)** across 10 rules:
+
+**Core violations:**
+- `BudgetWorkflow` exposes all fields as `pub` primitives (String, bool) — illegal states are fully representable (lines 1-7)
+- Status, validation, and sent flags are independent fields instead of a typestate enum — contradictory states like `is_sent=true, status="draft"` are constructible
+- `id: String` is primitive obsession — no domain newtype
+- `sent_at_epoch_ms: Option<u64>` lacks a dedicated timestamp type
+- `mark_sent` is infallible, bypasses preconditions, and cannot express error taxonomy (line 9)
+- No functional core boundary — data bag + mutable free function pattern
+
+**Missing evidence:**
+- No benchmarks, profiler, allocation tracking, command evidence, or second-ring verification data

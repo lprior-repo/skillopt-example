@@ -1,0 +1,18 @@
+Now I understand the issues. The source has multiple Holzman violations and API mismatches with tests:
+- Returns `Result<String>` but tests expect `Result<Summary>`
+- Missing `render_summary` function
+- `unwrap()` on parse, unchecked indexing `parts[1]`, unchecked arithmetic
+- Uses `split`+`collect`+indexing instead of `split_once`
+All 6 tests pass. Now writing the output JSON.
+Repair complete. All 6 tests pass.
+
+**Changes to `src/lib.rs`:**
+
+1. **Return type**: `Result<String, SummaryError>` → `Result<Summary, SummaryError>` to match test contract
+2. **Parsing**: Replaced `split(',')` + `collect` + `parts[1]` with `split_once(',')` — no Vec allocation, no unchecked indexing
+3. **Parse error**: `.unwrap()` → `.map_err(|_| SummaryError::Invalid)` — no panic on invalid input
+4. **Accumulation**: `total += value` → `total.checked_add(value).ok_or(Overflow)` — no unchecked arithmetic
+5. **Division**: `total / count` → `total.checked_div(count)` — no division-by-zero or unchecked div
+6. **Empty handling**: Added early `input.is_empty()` check → `Err(Empty)`
+7. **Row limit**: Enforced during iteration via `count > max_rows as u32`
+8. **Added `render_summary`**: Pure formatting function taking `Summary` → `String`

@@ -1,0 +1,94 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String instead of a typed enum. Per Holzman, 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.' Any arbitrary string value is constructible, making illegal statuses representable.",
+      "failure_mode": "status can hold any string (e.g. \"sent\", \"deleted\", \"\", \"SENT\") at runtime. Callers cannot rely on the compiler to enforce valid ledger lifecycle transitions; validation is deferred to manual string comparison.",
+      "fix": "Replace `pub status: String` with `pub status: LedgerStatus` where `LedgerStatus` is an enum with exactly the valid variants (e.g. `Pending`, `Validated`, `Sent`). All construction must go through constructors that produce only valid variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a raw bool flag. Per Holzman, 'Replace bool lifecycle flags' with enums or typestates. A bool cannot encode which phase the ledger is in, nor prevent invalid transitions (e.g. marking sent without validating).",
+      "failure_mode": "is_validated can be false while is_sent is true, representing an illegal state (sent ledger that was never validated). The bool provides no compile-time guarantee about the relationship between validation and sending.",
+      "fix": "Replace both `is_validated: bool` and `is_sent: bool` with a single typestate enum (e.g. `LedgerPhase: Pending, Validated, Sent`) or a typestate pattern with separate structs (`LedgerPending`, `LedgerValidated`, `LedgerSent`). The type system then makes illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a raw bool flag alongside is_validated and status String, creating three fields that redundantly and unsafely encode the same lifecycle dimension.",
+      "failure_mode": "The three fields (status String, is_validated bool, is_sent bool) can disagree — e.g. status=\"pending\", is_validated=true, is_sent=false is internally contradictory. No invariant ties them together. This is the classic 'primitive obsession' anti-pattern.",
+      "fix": "Collapse all three into a single typestate enum or typestate struct hierarchy. Remove status, is_validated, and is_sent entirely in favor of one compiler-enforced lifecycle representation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes a plain LedgerWorkflow and mutates status/is_sent without any pre-condition checks. The function allows transitioning directly to 'sent' without requiring validation first.",
+      "failure_mode": "An unvalidated, unverified ledger can be marked sent with zero guards. The imperative shell is mutating domain state without verifying the functional core's invariants. This is a direct violation of functional-core/imperative-shell discipline where the core must reject illegal transitions by construction.",
+      "fix": "Redefine mark_sent to accept a validated typestate (e.g. `fn mark_sent(item: LedgerValidated) -> LedgerSent`). The type signature itself enforces the pre-condition. The shell layer handles any fallible conversion before calling the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-immutable-data",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow has all public fields and is mutated in-place via `mut item` parameter. Per Holzman, 'Data is inert and valid by construction. Calculations are pure and deterministic.'",
+      "failure_mode": "Any caller can mutate any field to any value at any time. The struct has no encapsulation, no invariants, and no immutability guarantees. This undermines the functional core — data is not valid by construction and not inert.",
+      "fix": "Make the struct fields private, replace with an enum or typestate structs, and provide pure transformation functions that return new values rather than mutating in place. Or use `#[derive(Clone)]` and return a new instance."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-performance",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent creates a new String allocation via `\"sent\".to_string()` for every call, even though the status is a fixed literal. This allocates on the heap for a value that never changes.",
+      "failure_mode": "Unnecessary heap allocation on every transition call. For a hot path in a ledger system, this adds per-operation heap pressure (allocation + deallocation) and cache misses. The status should be stored as an enum variant or a &'static str.",
+      "fix": "Use a `LedgerStatus` enum instead of String so no allocation is needed. If a String representation is needed at boundaries, format it at the display layer, not stored in the core struct."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain typing. Per Holzman, 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates' and 'Replace primitive domain APIs with newtypes when the value has domain rules.'",
+      "failure_mode": "Any String can be used as an id — empty strings, unformatted strings, or ids from another domain can be passed interchangeably. There is no compile-time distinction between a LedgerWorkflow id and any other String.",
+      "fix": "Introduce a newtype `pub struct LedgerId(String)` or `pub struct LedgerId(&'static str)` with a constructor that validates the id format at the boundary. Use `LedgerId` as the field type."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> that encodes lifecycle state as an Option. Per Holzman reference: 'Replace ... Option lifecycle fields with enums or typestates.'",
+      "failure_mode": "sent_at_epoch_ms can be Some(0) (epoch zero) or Some(any value) independently of is_sent, creating inconsistent state. The Option pattern cannot enforce that sent_at_epoch_ms is only populated when the ledger is actually sent.",
+      "fix": "Move sent_at_epoch_ms into the `LedgerSent` typestate variant specifically, so the timestamp only exists when the ledger is in the sent state. E.g. `enum LedgerPhase { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "holzman-review-completeness",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler data, or allocation evidence exist for the LedgerWorkflow type or mark_sent function.",
+      "failure_mode": "Performance claims (if any) about the ledger system are unverified. The to_string() allocation on every call could become a bottleneck under high throughput.",
+      "fix": "Add a benchmark comparing enum-based status vs String-based status, measuring allocation counts and throughput."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or LedgerWorkflow lifecycle performance",
+    "no profiler data for allocation patterns in the ledger transition path",
+    "no allocation evidence — to_string() creates per-call heap allocations that are unmeasured",
+    "no command evidence (no cargo fmt/test/clippy runs reported)"
+  ],
+  "residual_risk": "Static review only with no commands run. The code has fundamental typestate violations — status is a String, lifecycle is encoded as two independent bools, and mark_sent has no pre-condition enforcement. Illegal states (e.g. sent but not validated) are directly constructible. The architecture must be restructured to use enum/typed states before any further implementation work."
+}

@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_budget_typestate/review-output.json`.
+
+**9 findings** across the crate:
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | `src/lib.rs:1` |
+| 2 | BLOCKER | no_primitive_status | `src/lib.rs:3` |
+| 3 | BLOCKER | no_bool_lifecycle_flags | `src/lib.rs:5` |
+| 4 | BLOCKER | functional_core_imperative_shell | `src/lib.rs:9` |
+| 5 | BLOCKER | typed_domain_errors | `src/lib.rs:9` |
+| 6 | MINOR | no_benchmark_evidence | `src/lib.rs:1` |
+| 7 | MINOR | no_profiler_evidence | `src/lib.rs:1` |
+| 8 | MINOR | no_allocation_evidence | `src/lib.rs:10` |
+| 9 | MINOR | no_command_evidence | `src/lib.rs:1` |
+
+**Root cause:** The struct uses `pub` fields with `String` status and independent `bool` lifecycle flags, making every illegal state constructible and mutable. The fix is to collapse these into a single typed `BudgetState` enum with variants (Draft, Validated, Sent) and return `Result` from transition methods.

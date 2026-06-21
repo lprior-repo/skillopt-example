@@ -1,0 +1,17 @@
+Now I have a clear picture. The production code has multiple violations:
+
+1. `unwrap()` on every parse (panic surface)
+2. No empty-input check
+3. No `max_items` cap enforcement
+4. No `try_reserve` for bounded allocation
+5. No typed error on parse failure
+
+Let me fix `src/lib.rs`:
+All 4 tests pass. Now writing the required output:
+Repair complete. All 4 behavior tests pass. Summary of changes to `src/lib.rs`:
+
+- **Removed `unwrap()`** — replaced with `map_err(|_| ParseError::Invalid)` for typed error propagation
+- **Added empty-input check** — returns `ParseError::Empty` when input is empty
+- **Added `try_reserve`** — bounded allocation with fallible `ParseError::Allocation` on OOM
+- **Added `max_items` cap enforcement** — returns `ParseError::TooMany` when items exceed the cap
+- **Added empty-trimmed-field guard** — treats empty/whitespace-only CSV fields as `ParseError::Invalid`

@@ -1,0 +1,5 @@
+   Compiling repair_csv_u16 v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v5/tasks/baseline/repair_csv_u16)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/repair_csv_u16-e6c116f007e5e868)
+     Running tests/behavior.rs (target/debug/deps/behavior-0f0454af6cad879f)
+   Doc-tests repair_csv_u16

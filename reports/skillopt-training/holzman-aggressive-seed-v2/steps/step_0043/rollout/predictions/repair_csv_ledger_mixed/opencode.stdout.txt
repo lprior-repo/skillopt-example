@@ -1,0 +1,11 @@
+Now I have a clear picture. The production code has multiple Holzman violations: `.unwrap()` on parse, no empty check, no max_items enforcement, no allocation handling. Let me fix it.
+All 4 tests pass. Let me write the required output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Removed `.unwrap()`** on `parse::<u16>()` — replaced with `.map_err(|_| ParseError::Invalid)`
+2. **Added empty input check** — returns `Err(ParseError::Empty)` for `""`
+3. **Added max_items enforcement** — counts entries via `split(',').count()`, returns `Err(ParseError::TooMany)` if exceeded
+4. **Added allocation handling** — `try_reserve(count)` with `ParseError::Allocation` fallback
+5. **Added empty token check** — returns `Err(ParseError::Empty)` for whitespace-only entries
+
+All 4 behavior tests pass. No tests or Cargo.toml edited.

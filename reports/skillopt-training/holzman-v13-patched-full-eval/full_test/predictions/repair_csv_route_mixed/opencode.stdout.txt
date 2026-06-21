@@ -1,0 +1,9 @@
+Now I have the full picture. The current `parse_routes` uses `.unwrap()`, ignores empty input, and doesn't enforce `max_items`. Let me repair it.
+All 4 tests pass. Now writing the required output file.
+Repaired. Summary of changes to `src/lib.rs`:
+
+- **Removed `.unwrap()`** — replaced with `.map_err(|_| ParseError::Invalid)` on parse
+- **Added empty-input check** — returns `ParseError::Empty` before any allocation
+- **Added max_items enforcement** — checks `values.len() >= max_items` before each push, returns `ParseError::TooMany`
+- **Added bounded allocation** — `Vec::new()` + `try_reserve(max_items).map_err(|_| ParseError::Allocation)?`
+- **All 4 behavior tests pass** without modification

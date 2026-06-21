@@ -1,0 +1,10 @@
+Now let me read the review-output-contract reference:
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings** across the task crate, all stemming from the same root cause:
+
+- **5 BLOCKERs** — `LedgerWorkflow` uses `status: String` + `is_validated: bool` + `is_sent: bool` plus `pub` fields. This makes illegal states (contradictory flags, empty status strings, arbitrary strings) constructible at will. `mark_sent` has no pre-condition checks on the current state.
+- **2 WARNINGs** — No benchmark, profiler, allocation, or command evidence exists.
+
+The fix is structural: replace `String` status and `bool` flags with a `LedgerStatus` enum typestate (`Pending` / `Validated` / `Sent { sent_at_epoch_ms: u64 }`), add a `LedgerId` newtype, make `mark_sent` return `Result` with typed transition errors, and enforce encapsulation.

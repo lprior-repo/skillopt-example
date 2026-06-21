@@ -1,0 +1,9 @@
+Issues in production code: `unwrap()` on parse, no `Empty`/`Invalid`/`TooMany` error handling, `max_items` unused.
+All 4 tests pass. Writing the output.
+Repair complete. All 4 tests pass.
+
+**Changes made to `src/lib.rs`:**
+- Removed `unwrap()` on `parse::<u16>()` — now returns `Err(ParseError::Invalid)`
+- Added empty-input detection — returns `Err(ParseError::Empty)`
+- Added `max_items` enforcement — returns `Err(ParseError::TooMany)` when count exceeds limit
+- Handles empty fields from commas (e.g. `"1,"`) as `ParseError::Empty`

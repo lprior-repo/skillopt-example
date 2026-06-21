@@ -1,0 +1,15 @@
+Now I have a clear picture. The source has multiple Holzman violations and the tests expect a different API shape. Let me fix the source.
+Repair complete. All 6 behavior tests pass, strict clippy gate passes, formatting is clean.
+
+**Changes made to `src/lib.rs`:**
+
+1. **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` (matches test contract)
+2. **Empty input check**: Returns `Err(SummaryError::Empty)` for empty input
+3. **Replaced `split(',').collect()` with `split_once(',')`**: No intermediate Vec allocation; uses `let (_name, value_str) = line.split_once(',').ok_or(...)` 
+4. **Removed `unwrap()`**: Value parsing now uses `.map_err(|_| SummaryError::Invalid)?`
+5. **Removed unchecked indexing `parts[1]`**: Eliminated by `split_once` pattern
+6. **Replaced `count += 1`** with `count.checked_add(1).ok_or(SummaryError::Overflow)?`
+7. **Replaced `total += value`** with `total.checked_add(value).ok_or(SummaryError::Overflow)?`
+8. **Replaced lossy `count as u32`/`count as u64`** with `u64::try_from(count)` and `u32::try_from(count)`
+9. **Replaced unchecked `total / count`** with `total.checked_div(count_u64)`
+10. **Added `render_summary` function**: Extracts formatting from the core logic into a pure presentation function (Functional Core / Imperative Shell)

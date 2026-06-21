@@ -1,0 +1,9 @@
+Now I understand the task. The current `encode_frame` is missing: payload size check against `max_payload`, checked capacity arithmetic, `try_from` for length conversion, and `try_reserve`. Let me apply the frame/packet encoder repair pattern.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added payload size gate** — `payload.len() > max_payload` returns `FrameError::PayloadTooLarge`
+2. **Checked capacity arithmetic** — `4usize.checked_add(payload.len())` for frame capacity
+3. **Checked length conversion** — `u32::try_from(payload.len())` instead of lossy `as u32`
+4. **Bounded allocation** — `Vec::new()` + `try_reserve(capacity)` instead of implicit allocation
+
+Both behavior tests pass (`encodes`, `rejects_limit`). Format is clean. Output written to `repair-output.json`.

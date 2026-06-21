@@ -1,0 +1,15 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**6 findings across the crate:**
+
+| # | Severity | Rule | Line | Summary |
+|---|----------|------|------|---------|
+| 1 | BLOCKER | make-illegal-states-unrepresentable | 1 | `bool` flags + `String` status allow impossible states (e.g., `status="draft"` + `is_sent=true`) |
+| 2 | BLOCKER | no-primitive-obsession | 2 | `id` and `status` are raw `String`, no domain newtypes |
+| 3 | BLOCKER | public-fields-mutable | 1 | All `pub` fields bypass any transition guards |
+| 4 | BLOCKER | functional-core-transition-guards | 9 | `mark_sent` accepts any state, no validation check, no `sent_at_epoch_ms` set |
+| 5 | MINOR | functional-core-data-inert | 1 | Free-function mutation instead of typed transitions |
+| 6 | MINOR | sent_at_epoch_ms-inconsistency | 6 | `mark_sent` sets `is_sent=true` but leaves timestamp as `None` |
+
+**5 missing evidence items** (no benchmarks, profiler, allocation analysis, second-ring evidence, or command evidence).

@@ -1,0 +1,19 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mSkill "holzman-rust"
+[0m
+[0m$ [0mls /tmp/opencode/holzman-skillopt-train/ca88fdbcb6eb19f9/review_invalid_state_route_typestate/.skill/holzman-rust/references/
+functional-core-performance.md
+hardening-checklist.md
+review-output-contract.md
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m
+[0m$ [0mfind /tmp/opencode/holzman-skillopt-train/ca88fdbcb6eb19f9/review_invalid_state_route_typestate -type f -not -path '*/\.*' -not -path '*/node_modules/*' | sort
+/tmp/opencode/holzman-skillopt-train/ca88fdbcb6eb19f9/review_invalid_state_route_typestate/Cargo.toml
+/tmp/opencode/holzman-skillopt-train/ca88fdbcb6eb19f9/review_invalid_state_route_typestate/src/lib.rs
+[0m
+[0m→ [0mRead src/lib.rs

@@ -1,0 +1,15 @@
+Now let me read the references:
+Now I have full context. Let me analyze the issues and fix them.
+
+**Current bugs:**
+1. No `payload.len() > max_payload` check (test `rejects_limit` expects `PayloadTooLarge`)
+2. Lossy `as u32` cast on `payload.len()` (needs `u32::try_from`)
+3. Per SKILL.md frame encoder pattern: must contain `checked_add` and `try_reserve`
+Now let me write the required output JSON:
+Repair complete. Three issues fixed in `src/lib.rs`:
+
+1. **Missing payload length check** — Added `payload.len() > max_payload` guard returning `PayloadTooLarge` (test `rejects_limit`)
+2. **Lossy `as u32` cast** — Replaced with `u32::try_from(payload.len()).map_err(...)` (Holzman law: no lossy conversions)
+3. **Missing checked arithmetic + fallible reserve** — Added `checked_add` for capacity and `try_reserve` for allocation (SKILL.md frame encoder pattern)
+
+All gates pass: `cargo fmt`, `cargo check`, strict clippy, `cargo test` (2/2), forbidden assertion scan.

@@ -1,0 +1,15 @@
+Now I have the full picture. Writing the review output.
+Review complete. Written 8 findings to `review-output.json`:
+
+| # | Severity | Rule | File:Line |
+|---|---|---|---|
+| 1 | BLOCKER | no_unwrap_or_panic | `src/lib.rs:9` — `fs::read_to_string(...).unwrap()` |
+| 2 | BLOCKER | no_hidden_io | `src/lib.rs:16` — `println!` in data pipeline |
+| 3 | BLOCKER | no_unchecked_indexing | `src/lib.rs:16` — `parts[0]` without bounds guard |
+| 4 | BLOCKER | no_unwrap_or_panic | `src/lib.rs:19` — `.parse::<u32>().unwrap()` |
+| 5 | BLOCKER | no_lossy_casts | `src/lib.rs:19` — `as u16` silent truncation |
+| 6 | BLOCKER | parse_boundary_validation | `src/lib.rs:3` — `pub name: String` raw primitive |
+| 7 | BLOCKER | bounded_allocation | `src/lib.rs:8` — no `try_reserve`, no domain cap |
+| 8 | BLOCKER | functional_core_shell | `src/lib.rs:8` — I/O/parsing/domain fused in one function |
+
+All 8 findings include `severity`, `rule`, `file`, `line`, `problem`, `failure_mode`, and `fix`. JSON validated successfully.

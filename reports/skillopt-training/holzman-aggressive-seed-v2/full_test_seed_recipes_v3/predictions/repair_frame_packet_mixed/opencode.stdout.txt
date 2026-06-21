@@ -1,0 +1,11 @@
+Issues found in `src/lib.rs`:
+1. Lossy `as u32` cast instead of `u32::try_from`
+2. `max_payload` parameter ignored — no `PayloadTooLarge` check
+3. No `try_reserve` for bounded allocation
+Repair complete. Three fixes applied to `src/lib.rs`:
+
+1. **`max_payload` enforcement** — added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge`
+2. **Lossy `as u32` cast** — replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+3. **Bounded allocation** — added `try_reserve(capacity)` with checked capacity computation via `checked_add`
+
+All gates pass: `cargo fmt`, `cargo test` (2/2), `cargo clippy` (strict), `cargo check --all-targets`.

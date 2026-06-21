@@ -1,0 +1,12 @@
+Now I have all the information needed. The source file is small but contains multiple Holzman v9 violations.
+Review complete. Written valid JSON to `review-output.json` with 9 findings (7 BLOCKER, 2 WARNING).
+
+Key violations found in `src/lib.rs`:
+
+- **Lines 1-7**: The entire `LedgerWorkflow` struct violates multiple Holzman v9 laws — raw `String` id/status, bool-based lifecycle flags, and free-floating optional data make all illegal states representable at compile time
+- **Line 3**: `status: String` instead of a domain enum (any arbitrary string is valid)
+- **Lines 4-6**: `is_validated`/`is_sent`/`sent_at_epoch_ms` as separate fields instead of a typestate enum — the `{is_validated=false, is_sent=true}` combination is type-level valid but logically impossible
+- **Line 9-12**: `mark_sent` mutates domain state in-place with no validation that the ledger is in a permissible pre-state, silently allowing sent→non-validated transitions
+- **Lines 9-10**: `\"sent\".to_string()` allocates unnecessarily on every call
+
+Missing evidence: no benchmarks, no profiler data, no allocation evidence, no second-ring verification (proptest/Kani/Miri), no command-truth evidence.

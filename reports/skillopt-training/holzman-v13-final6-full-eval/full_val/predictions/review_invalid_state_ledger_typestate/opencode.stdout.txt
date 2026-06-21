@@ -1,0 +1,22 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json` with 9 findings and 5 missing-evidence entries.
+
+Key findings:
+
+1. **BLOCKER — No typestate enum**: `LedgerWorkflow` has no typestate machine; lifecycle is untracked by the type system, allowing any transition sequence including double-sent and reverse transitions.
+
+2. **BLOCKER — `status: String`**: Arbitrary string values are valid, with no closed enum to enforce domain states.
+
+3. **BLOCKER — Independent booleans**: `is_validated` and `is_sent` as separate booleans cannot express mutual exclusion or ordering — both can be true, or inconsistent with status.
+
+4. **BLOCKER — Option invalid-state combinations**: `sent_at_epoch_ms: Option<u64>` is decoupled from `is_sent`, permitting sent=true with None timestamp.
+
+5. **BLOCKER — `id: String`**: Raw primitive ID with no validation or newtype wrapping.
+
+6. **BLOCKER — parse_boundary**: No smart constructor; callers construct invalid domain states directly with raw primitives.
+
+7. **BLOCKER — `mark_sent` has no transition guards**: Blindly overwrites status and sets `is_sent=true` regardless of current state.
+
+8. **WARNING — No benchmark/profiler/allocation evidence**: No measured evidence for any performance claim.
+
+9. **WARNING — No command evidence**: No CI gate, tests, or benchmark targets defined.

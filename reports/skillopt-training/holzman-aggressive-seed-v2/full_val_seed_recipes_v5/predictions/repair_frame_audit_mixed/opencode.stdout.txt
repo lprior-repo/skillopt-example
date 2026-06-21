@@ -1,0 +1,11 @@
+Issues in `src/lib.rs`:
+1. `payload.len() as u32` — lossy `as` cast (Holzman violation)
+2. No `max_payload` enforcement (test `rejects_limit` expects `PayloadTooLarge`)
+3. No `try_reserve` for allocation safety
+Repaired. Three Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` cast** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)` 
+2. **Missing `max_payload` enforcement** — added early return with `FrameError::PayloadTooLarge`
+3. **No allocation safety** — added `try_reserve` with `checked_add` capacity computation
+
+Both tests pass: `encodes` and `rejects_limit`. Output written to `repair-output.json`.

@@ -1,0 +1,11 @@
+Review complete. Written to `review-output.json` with 6 findings (4 BLOCKER, 2 MAJOR):
+
+**BLOCKERs:**
+- `src/lib.rs:1` - Uses `String`/`bool` primitives instead of domain enums/typestates; illegal states fully representable
+- `src/lib.rs:2` - `id: String` has no newtype validation boundary
+- `src/lib.rs:9` - `mark_sent` is imperative mutation with no validation or typestate guard
+- `src/lib.rs:6` - `sent_at_epoch_ms: Option<u64>` has no newtype or timestamp validation
+
+**MAJOR:**
+- `src/lib.rs:1` - All struct fields are `pub`, allowing external mutation bypassing domain logic
+- `src/lib.rs:3` - `status: String` accepts arbitrary values with no closed enum enforcement

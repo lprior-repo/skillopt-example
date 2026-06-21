@@ -1,0 +1,7 @@
+Now I have all the information. Let me write the review output.
+Review complete. Written to `review-output.json` with:
+
+- **5 BLOCKER findings**: All centered on the core typestate violation — `LedgerWorkflow` uses `String` + `bool` flags instead of an enum/typestate, making illegal states representable and unenforceable by the compiler.
+- **1 MINOR finding**: Unnecessary `.to_string()` allocation in `mark_sent`.
+- **Missing evidence**: No benchmark, profiler, allocation tracking, or state-machine tests.
+- **Residual risk**: Structural typestate issues; downstream consumers inherit an uninvariant type.

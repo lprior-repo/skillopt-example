@@ -1,0 +1,103 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O errors (missing file, permission denied, truncated file)",
+      "failure_mode": "untrusted or missing filesystem input aborts the entire process instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> (or a domain error enum) and propagate with ? or map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value and on overflow beyond u32 range",
+      "failure_mode": "malformed CSV data (non-numeric second field) causes a panic instead of returning a typed ParseError",
+      "fix": "use .trim().parse::<u32>().map_err(...) and propagate the error through a Result return type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy widening-to-narrowing cast. Values > 65535 silently truncate to u16 range",
+      "failure_mode": "integer overflow silently corrupts the stored value (e.g. 70000u32 becomes 4464u16), violating data integrity with no error signal",
+      "fix": "use u16::try_from(value).map_err(...) to detect and reject out-of-range values with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(..).collect() builds an intermediate Vec for a two-field record. Holzman requires split_once for single-separator extraction",
+      "failure_mode": "unnecessary heap allocation per line, and the Vec length is never validated so out-of-bounds access follows",
+      "fix": "replace with line.split_once(',').ok_or(…) to extract name and value fields without intermediate allocation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked indexed access into a heap-allocated Vec of unknown length",
+      "failure_mode": "empty or single-element lines cause a panic at runtime (index out of bounds)",
+      "fix": "use split_once and .ok_or(...) to require exactly two fields at compile-protected sites"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] is unchecked indexed access into a Vec of unknown length",
+      "failure_mode": "lines with only one comma-separated field panic at runtime on index out of bounds",
+      "fix": "use the second binding from split_once(_, ',') instead of index-1 access"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_batchs is an I/O function (fs::read_to_string, println!) that returns a plain Vec with no error type, violating the imperative shell boundary",
+      "failure_mode": "side effects (filesystem reads, console writes) are mixed into the function signature with no way for callers to handle failures or distinguish core from shell",
+      "fix": "return Result<Vec<Record>, AppError>, remove println! (logging belongs in the shell), and let the caller decide I/O policy"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side-effecting log call in a data-loading function",
+      "failure_mode": "pollutes stdout with implementation details, breaks testability, and couples the pure-seeming data structure to a concrete logging mechanism",
+      "fix": "remove println! entirely or push it into a shell-layer wrapper that decides logging policy"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No try_reserve or capacity pre-allocation on the result Vec. The function grows a Vec from unknown line counts with no bounded allocation handling",
+      "failure_mode": "unbounded allocation on large files with no graceful handling of AllocationError; repeated reallocations degrade performance",
+      "fix": "use Vec::with_capacity hint or try_reserve with AllocationError handling if the caller can supply a line count estimate"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists to measure the hot path of load_batchs. The intermediate Vec allocation and per-line String allocations have no measured alternative",
+      "failure_mode": "unverified performance claim; switching to split_once + string slices (borrowed) could be faster but is unmeasured",
+      "fix": "add a criterion or minicomp benchmark for load_batchs before and after applying split_once + borrowed slices"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_batchs performance",
+    "no profiler data for allocation hotspots in the batch loader",
+    "no allocation analysis (try_reserve or capacity budget) evidence",
+    "no command-level evidence (cargo fmt / cargo clippy / cargo test) was run"
+  ],
+  "residual_risk": "static review only; no commands run. The function has 8 BLOCKER-level violations covering panic-unsafe unwrap calls, unchecked indexing, lossy as casts, missing Result propagation, split_once violations, and I/O in a data-loading path. All must be fixed before delivery."
+}

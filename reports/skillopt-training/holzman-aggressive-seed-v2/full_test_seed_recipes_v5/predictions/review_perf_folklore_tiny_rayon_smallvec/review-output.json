@@ -1,0 +1,50 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_cargo_cult_rayon_smallvec",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO explicitly says 'use Rayon and SmallVec because it will be faster' for a 4-element input. Rayon and SmallVec are cargo-culted here with no workload, allocation-budget, or benchmark evidence.",
+      "failure_mode": "Rayon overhead (thread pool dispatch, task splitting) dominates any benefit on 4 elements; SmallVec is unnecessary when the max size is a known compile-time constant of 4 and SmallVec is not a dependency.",
+      "fix": "Remove Rayon/SmallVec TODO. For a [u8; 4] input, return a fixed array like [&'static str; 4] or a plain Vec only if a benchmark proves heap allocation is acceptable. Add SmallVec only if dependency is declared and measured distribution shows small sizes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny_input_heap_allocation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function takes [u8; 4] and returns Vec<&'static str>, forcing a heap allocation for exactly 4 elements. No caller-owned buffer or fixed-size return type.",
+      "failure_mode": "Every call allocates a new Vec on the heap (allocator lock, metadata, deallocation) for 4 pointer-sized items that fit in a stack array. This is slower than a fixed-return for tiny fixed inputs.",
+      "fix": "Return [Option<&'static str>; 4] or an enum type, or a caller-provided output buffer. If Vec is required, measure that the allocation is justified before shipping."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_todos_in_production",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production code contains a TODO directing cargo-culted optimization (Rayon + SmallVec). This is a directive, not a design decision.",
+      "failure_mode": "Next developer follows the TODO, introducing Rayon and SmallVec without evidence, violating the performance discipline gate.",
+      "fix": "Remove the TODO. Replace with a code comment documenting why the current shape was chosen, or delete if no justification exists."
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test files exist in the crate. No behavior contract is verified.",
+      "failure_mode": "No assurance that the function produces correct output for any input; regression risk is unbounded.",
+      "fix": "Add at least one test exercising even/odd classification for known byte values."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim (Rayon + SmallVec faster)",
+    "no profiler data collected to verify allocation patterns",
+    "no allocation audit (e.g., cargo-alloc-trace, #[global_allocator] leak check, or alloc_count measurement)",
+    "no second-ring review or black-hat review evidence",
+    "no command evidence (cargo test, cargo fmt, cargo clippy) was run or reported"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate contains a performance TODO that actively encourages cargo-culted parallelism and allocation on a 4-element input. Without benchmarks or profiler evidence, the performance claim is unverified and the heap allocation is almost certainly suboptimal."
+}

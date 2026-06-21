@@ -1,0 +1,16 @@
+[
+  {
+    "op": "replace",
+    "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the f",
+    "content_preview": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`. **Always** use `try_from` for primitive conversions, `checked_*` for arithmetic on sizes/count",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "## Repair Mode Specifics\n- When building a Vec from known/parseable input length, use `try_reserve` (or `try_from` for capacity) to handle allocation failures gracefully. Do not use `Vec::with_capacit",
+    "content_preview": "## Repair Mode Specifics\n- **Never edit test files.** Tests define the behavior contract. If tests fail, fix production code to match, or report that tests are incorrect (but do not modify them).\n- **",
+    "status": "applied_replace",
+    "index": 2
+  }
+]

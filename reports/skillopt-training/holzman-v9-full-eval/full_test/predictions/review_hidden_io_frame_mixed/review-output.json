@@ -1,0 +1,121 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "fs::read_to_string(path).unwrap()",
+      "problem": "unwrap() on file I/O panics when the file is missing, unreadable, or not valid UTF-8",
+      "failure_mode": "untrusted or missing file path aborts the entire process instead of returning a typed I/O error",
+      "fix": "Return a typed error type (e.g. Result<Vec<Record>, Error>) and propagate with ? or map_err to distinguish Io, Utf8, and related failures"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "construct": "parts[0]",
+      "problem": "Unchecked indexing into a dynamically-sized Vec created from split(',') on arbitrary input",
+      "failure_mode": "A line with zero commas (no delimiter) produces a single-element Vec; indexing parts[0] succeeds but parts[1] at line 19 panics with index out of bounds",
+      "fix": "Use split_once(',') and match on Option<(&str, &str)> to exhaustively handle the zero-delimiter case, returning a typed Invalid error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "construct": "parts[1]",
+      "problem": "Unchecked indexing into a dynamically-sized Vec created from split(',') on arbitrary input",
+      "failure_mode": "Any line with fewer than two comma-separated fields (empty lines, header rows, whitespace-only lines) causes a bounds panic",
+      "fix": "Use split_once(',') and match on the Option; destructure to (_name, value_str) and parse only value_str"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "construct": "parts[1].parse::<u32>().unwrap()",
+      "problem": "unwrap() on numeric parse panics on any non-numeric or out-of-range input",
+      "failure_mode": "A field containing 'abc', '3.14', or an empty string aborts the process instead of returning a typed Parse error",
+      "fix": "Use map_err to convert ParseIntError into a typed Error::Parse or Error::Invalid variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "construct": "parse::<u32>().unwrap() as u16",
+      "problem": "Lossy narrowing cast from u32 to u16 silently truncates values above 65535",
+      "failure_mode": "A valid integer like 70000 parses successfully as u32 then truncates to 54416, silently corrupting data without any error signal",
+      "fix": "Use u32::try_into().map_err(|_| Error::Overflow) to convert to u16 with explicit range checking"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "construct": "println!(\"loaded {}\", parts[0])",
+      "problem": "I/O (stdout write) embedded inside domain parsing logic that should be pure and deterministic",
+      "failure_mode": "Core logic has a side effect that makes it non-deterministic across environments (stdout redirected, TTY absent), mixes imperative shell concerns into the functional core, and produces observable output that varies by environment",
+      "fix": "Remove println! from load_frames; if logging is needed, pass a logging callback or return a metadata field in the typed error result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "raw_primitive_domain_state",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub name: String",
+      "problem": "Record stores a raw String for name with no validation, encoding, or domain semantics enforced by the type system",
+      "failure_mode": "Any code constructing Record with an empty, whitespace-only, or otherwise invalid name is accepted by the compiler; illegal name state is representable",
+      "fix": "Introduce a Name newtype with a smart constructor that validates non-empty content, or at minimum make name private and add a constructor that enforces invariants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unbounded_allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "construct": "pub fn load_frames(path: &str) -> Vec<Record>",
+      "problem": "Function accepts arbitrary file content with no domain cap before allocation; the returned Vec grows without bound",
+      "failure_mode": "An attacker or misconfigured system can supply a massive file, causing unbounded memory allocation and potential OOM kill",
+      "fix": "Add a domain cap constant, validate line count against it before allocation, use try_reserve with checked capacity arithmetic, and return a typed Allocation error on failure"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "fn load_frames(path: &str) -> Vec<Record>",
+      "problem": "No typed error type exists in the crate; function signature returns a bare Vec with no error channel for the many fallible operations it performs",
+      "failure_mode": "Every failure mode (I/O, parse, bounds, overflow, allocation) is handled via panic rather than returning structured, recoverable errors",
+      "fix": "Define an enum Error { Io(std::io::Error), Invalid(String), Parse, Overflow, Allocation } and change return type to Result<Vec<Record>, Error>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "collect_intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "construct": "let parts: Vec<String> = line.split(',').map(|part| part.trim().to_string()).collect();",
+      "problem": "Collects all split parts into owned Strings via intermediate Vec allocation when only two fields are needed",
+      "failure_mode": "Wastes heap allocation per line and creates String copies that could be &'str slices; the grammar expects exactly one comma so split_once is the idiomatic pattern",
+      "fix": "Use line.split_once(',') and match on Option<(&str, &str)> to extract (_name, value_str) as borrowed &str without any intermediate Vec or String allocation"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied parsing performance",
+    "no profiler evidence for allocation hot spots in load_frames",
+    "no allocation measurement (e.g. dropshot or custom counters) for per-line Vec<String> intermediate allocations",
+    "no second-ring evidence (assembly, MIR, or alloc counters) to confirm bounds-check removal or allocation elimination after split_once fix",
+    "no command evidence file or CI gate proving cargo check --all-targets --all-features passes",
+    "no test suite exists (no tests/, no #[cfg(test)] module, no dev-dependencies)",
+    "no behavior tests covering empty files, missing files, malformed lines, header rows, oversized values, and zero-comma input"
+  ],
+  "residual_risk": "This is a static-only review with no commands run (cargo check, clippy, cargo test were not executed per review constraints). All findings are drawn from source inspection against the absolute laws of the Holzman Rust candidate v9 skill. The crate as written violates 10 distinct rules including panic surfaces (unwrap on I/O and parse), unchecked indexing, lossy cast, hidden I/O in core logic, unbounded allocation, raw primitive domain state, and absent error taxonomy. Every finding is repairable without behavioral change to the happy path; all fixes convert panics to typed errors, eliminate intermediate allocations, remove side effects from pure logic, and add domain bounds. Full verification (cargo fmt --check, cargo check --all-targets --all-features, cargo clippy, cargo test) is required after repair to confirm zero regressions and strict lint compliance."
+}

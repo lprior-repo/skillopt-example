@@ -1,0 +1,11 @@
+Repair complete. All 4 behavior tests pass.
+
+**Changes made to `src/lib.rs`:**
+- Removed `unwrap()` — parse failures now return `ParseError::Invalid` via `map_err`
+- Added empty-input check — returns `ParseError::Empty` for empty/whitespace-only input
+- Added `max_items` enforcement — returns `ParseError::TooMany` when item count exceeds cap
+- Added `try_reserve(max_items)` — allocation failures return `ParseError::Allocation`
+
+**Commands run:** `cargo fmt` (passed), `cargo test` (4/4 passed)
+
+**Output:** `repair-output.json` written and validated at required path.

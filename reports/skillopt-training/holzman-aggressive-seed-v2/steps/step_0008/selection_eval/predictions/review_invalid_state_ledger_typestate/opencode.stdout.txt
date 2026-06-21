@@ -1,0 +1,16 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**5 BLOCKER findings:**
+
+1. **`src/lib.rs:1`** — `status: String` + `is_validated: bool` + `is_sent: bool` makes illegal states representable. Compiler cannot enforce lifecycle invariants. Fix: single enum typestate.
+
+2. **`src/lib.rs:1`** — All fields `pub`, so any caller can mutate fields directly, bypassing invariants. Fix: private fields + domain constructors.
+
+3. **`src/lib.rs:2`** — `id: String` and `sent_at_epoch_ms: Option<u64>` are primitive obsession, no domain semantics or unit safety. Fix: `LedgerId` and `TimestampMs` newtypes.
+
+4. **`src/lib.rs:9`** — `mark_sent` enforces no preconditions; does not check validated-before-sent or reject already-sent. Fix: typestate-gated transition method.
+
+5. **`src/lib.rs:2`** — Owned `String` for id causes unnecessary allocations. Fix: newtype wrapper with domain validation.
+
+**Residual risk:** The typestate violation is structural and cannot be tested away — it must be encoded in types.

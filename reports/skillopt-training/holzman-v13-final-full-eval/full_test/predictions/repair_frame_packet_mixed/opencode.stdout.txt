@@ -1,0 +1,9 @@
+Now I understand the issues. The current `encode_frame` has: lossy `as u32` conversion, no `max_payload` check, no `checked_add`, no `try_reserve`. Per the skill's mandatory repair patterns for frame/packet encoders, I need all four steps.
+Repaired. The `encode_frame` function now satisfies all Holzman requirements:
+
+- **Line 9**: `payload.len() > max_payload` guard → `PayloadTooLarge`
+- **Line 12-14**: `checked_add(4)` for capacity → `Overflow`
+- **Line 15**: `u32::try_from(payload.len())` replaces lossy `as u32` → `Overflow`
+- **Line 17-18**: `try_reserve(capacity)` replaces unbounded allocation → `Allocation`
+
+Both tests pass, clippy is clean, JSON output written.

@@ -1,0 +1,91 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses a free-form `status: String` field and separate `is_validated: bool` / `is_sent: bool` flags to track lifecycle state. Any string value is valid, and all flag combinations (e.g., is_sent=true with status=\"pending\") are representable.",
+      "failure_mode": "Invalid or inconsistent state is constructable at compile time. Downstream code cannot rely on `status` or the boolean flags for correctness, leading to silent logic errors or branches that should be impossible.",
+      "fix": "Replace `status: String`, `is_validated: bool`, and `is_sent: bool` with a single `ShardStatus` enum (e.g., `enum ShardStatus { Pending, Validated, Sent { sent_at: u64 } }`). Make `id` a newtyped `ShardId` rather than a bare `String`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_push_logic_into_pure_deterministic_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the struct in place (`mut item`) and changes both `status` and `is_sent` as side effects, rather than returning a pure transformation from one validated state to another.",
+      "failure_mode": "The function has hidden mutation and no precondition checks — it will accept a `ShardWorkflow` in any state and mutate it, making the transition non-deterministic from a type perspective and untestable in isolation without shared-mutable access.",
+      "fix": "Make `mark_sent` a pure function that takes a validated `ShardWorkflow` (or `ShardStatus::Validated`) and returns a new `ShardWorkflow` with `ShardStatus::Sent { sent_at: ... }`. No in-place mutation. Precondition is enforced by the type system."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession_parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a bare primitive with no domain invariants. Any arbitrary string is accepted as a shard ID.",
+      "failure_mode": "Invalid shard IDs (empty, wrong format, duplicated) cannot be rejected at construction time. Invalid IDs propagate into calculations and cause silent errors.",
+      "fix": "Introduce `pub struct ShardId(String)` with a `fn new(s: &str) -> Result<ShardId, ShardError>` constructor that validates format at the boundary. Use `ShardId` everywhere the ID is needed."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` returns `ShardWorkflow` directly with no error type. If validation is required before marking sent, there is no mechanism to express failure.",
+      "failure_mode": "Caller cannot distinguish between a valid transition and an invalid one; the function either succeeds silently or panics/behaves incorrectly.",
+      "fix": "Return `Result<ShardWorkflow, ShardError>` where `ShardError` is a domain enum (e.g., `enum ShardError { AlreadySent, NotValidated }`). The typestate enum on construction would make the `NotValidated` case impossible, but the `AlreadySent` case remains representable."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unwrap_expect_panic_in_production",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`item.status = \"sent\".to_string()` allocates a new `String` every call with no allocation error handling. While `to_string()` on a string literal cannot panic, the unbounded allocation pattern is a risk in resource-constrained contexts.",
+      "failure_mode": "Under memory pressure, repeated allocations without `try_reserve` or bounded-buffer patterns can cause OOM or degraded performance without a controlled failure path.",
+      "fix": "If the struct owns `status`, replace `String` with an enum discriminant. If allocation is unavoidable, use `try_reserve`-style pre-allocation or return `Result` with an `Allocation` error."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "performance_evidence_for_allocation_choices",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark, profiler, or allocation evidence exists for `mark_sent` or the `ShardWorkflow` lifecycle.",
+      "failure_mode": "Cannot verify whether the allocation-heavy `String`-backed status is a hotspot or whether replacing it with an enum would measurably improve throughput.",
+      "fix": "Add a micro-benchmark for `mark_sent` with `criterion` or similar, measuring allocation count and time. Replace `status: String` with an enum if benchmarks confirm it is beneficial, or retain if negligible."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_pure_by_convention",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `ShardWorkflow` are `pub`, allowing external code to construct invalid states directly and mutate fields without going through constructors.",
+      "failure_mode": "External code can set `is_sent=true` without setting `sent_at_epoch_ms`, or set `status` to any value, bypassing all domain invariants.",
+      "fix": "Make fields private (`id`, `status`, `is_validated`, `is_sent`, `sent_at_epoch_ms`) and provide constructors that enforce invariants. Or better yet, make the typestate enum the sole source of truth."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "second_ring_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring validation or command-level evidence for the shard workflow lifecycle.",
+      "failure_mode": "No defensive layer exists to catch invalid state transitions that could slip through if the core types were ever extended or misused.",
+      "fix": "Add behavioral tests or integration tests that exercise all state transitions, including invalid ones, to confirm the typestate prevents them at compile time."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for `mark_sent` allocation and throughput",
+    "no profiler data for `ShardWorkflow` memory footprint",
+    "no allocation audit (try_reserve or bounded capacity analysis)",
+    "no command-level evidence (no cargo test, cargo bench, or cargo clippy run)",
+    "no second-ring validation or integration test evidence",
+    "no formal typestate model or TLA+ spec for shard lifecycle transitions"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has no tests, no benchmarks, and no formal verification. The core domain model is primitive-heavy with no typestate enforcement, making illegal states representable at compile time. A reviewer or implementer should address the BLOCKER findings before any further delivery."
+}

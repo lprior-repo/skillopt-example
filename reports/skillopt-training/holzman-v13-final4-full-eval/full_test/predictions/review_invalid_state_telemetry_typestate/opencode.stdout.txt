@@ -1,0 +1,15 @@
+Now I have all the context needed. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**6 BLOCKER findings** — all typestate/domain-contract violations:
+
+| # | Rule | Line | Core issue |
+|---|------|------|-----------|
+| 1 | `typestate-state-machine` | 1 | No state machine; `mark_sent` callable from any state |
+| 2 | `status-string-to-enum` | 3 | `pub status: String` accepts arbitrary values |
+| 3 | `bool-lifecycle-to-typestate` | 4 | Two booleans (`is_validated`, `is_sent`) allow impossible combinations |
+| 4 | `option-invalid-state-combinations` | 6 | `Option<u64>` sentinel allows `is_sent=true, sent_at_epoch_ms=None` |
+| 5 | `newtype-domain-ids` | 2 | `id: String` — no validation, no domain semantics |
+| 6 | `parse-boundary` | 9 | Raw primitives cross boundary with no fallible smart constructor |
+
+**4 missing evidence items**: no benchmark, profiler, allocation analysis, or second-ring evidence.

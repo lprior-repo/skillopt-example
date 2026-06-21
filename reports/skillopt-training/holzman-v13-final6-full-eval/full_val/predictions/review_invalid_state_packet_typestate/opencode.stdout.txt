@@ -1,0 +1,15 @@
+Now I have all references and source. Let me write the review.
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/review_invalid_state_packet_typestate/review-output.json`.
+
+**6 BLOCKER findings** across `src/lib.rs`:
+
+| # | Rule | Line | Core Issue |
+|---|------|------|------------|
+| 1 | `typestate_state_machine` | 1 | No typestate enum; lifecycle encoded as flat booleans + string |
+| 2 | `status_string` | 3 | `status: String` accepts any value, no enum constraining valid states |
+| 3 | `bool_lifecycle` | 4 | `is_validated` + `is_sent` are independent bools, can be inconsistent |
+| 4 | `option_invalid_state_combinations` | 6 | `Option<u64>` and `bool` disagree; redundant and contradictory states |
+| 5 | `newtype_domain_ids` | 2 | `id: String` raw primitive, no validation or newtype |
+| 6 | `parse_boundary` | 1 | Public fields with public struct allow invalid domain states from any caller |
+
+**5 missing evidence** items flagged (benchmarks, profiler, allocation, second-ring, command evidence).

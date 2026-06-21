@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review JSON.
+Finding 4 is missing "split_once" keyword per the SKILL.md requirement. Let me fix it.
+Review complete. Written to `review-output.json` with 11 findings (10 BLOCKER, 1 WARNING) covering:
+
+- **Hidden I/O** (lines 9, 16): `fs::read_to_string` and `println!` leak into parsing logic
+- **Unwrap/panic surfaces** (lines 9, 19): two `unwrap()` calls on fallible operations
+- **Unchecked index access** (line 16): `parts[0]` and `parts[1]` without bounds checking
+- **Lossy cast** (line 19): `as u16` truncates values silently
+- **Parse boundary** (line 3): `Record` exposes raw primitives with no smart constructor
+- **Shell leakage** (line 8): I/O, logging, allocation, parsing, and domain construction fused
+- **Bounded allocation** (line 8): no `try_reserve`, no domain cap
+- **Typed error taxonomy**: absent entirely
+- **Missing benchmark/profiler evidence**: no performance claims backed
+
+Residual risk: blocked — all absolute laws violated.

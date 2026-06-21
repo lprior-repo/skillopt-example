@@ -1,0 +1,67 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [".skill/holzman-rust/SKILL.md", ".skill/holzman-rust/references/functional-core-performance.md", ".skill/holzman-rust/references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "EventWorkflow.status is a bare String. Any string value is representable, including \"sent\", \"invalid\", \"sent\", \"\", \"foobar\". The domain requires a closed set of lifecycle states (e.g. pending, validated, sent, failed). Primitive strings allow illegal states at compile time.",
+      "failure_mode": "A downstream consumer may branch on status string comparisons, receiving unexpected values. Serialization, display, and persistence layers all encode the ambiguity. No compiler guarantee that status is a valid lifecycle stage.",
+      "fix": "Replace `pub status: String` with a non-exhaustive enum: `pub enum EventStatus { Pending, Validated, Sent, Failed }`. Use a fallible constructor at parse boundaries if parsing from external data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` and `is_sent: bool` are independent boolean flags. They do not encode mutual exclusivity or ordering. All four combinations (false/false, true/false, false/true, true/true) are representable, but only some are domain-valid. For example, is_sent=true with is_validated=false is an illegal transition.",
+      "failure_mode": "The struct can exist in a state where the event was sent but never validated, or validated and then un-sent (both bools true). No type-level enforcement of the correct lifecycle ordering: pending -> validated -> sent.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single `status: EventStatus` enum (see finding above). The enum encodes both identity and ordering. If additional flags are needed, they should be separate typed fields, not bools."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_precondition_validation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` unconditionally sets status to \"sent\" and is_sent to true without checking any preconditions. It does not verify that the event was validated, does not check the current status, and does not return a Result. It silently overwrites whatever state the event was in.",
+      "failure_mode": "An event that was never validated (is_validated=false) can be marked as sent. An already-sent event can be re-marked as sent. The function ignores the current status entirely, enabling illegal state transitions with no feedback to the caller.",
+      "fix": "Change `mark_sent` to `pub fn mark_sent(item: EventWorkflow) -> Result<EventWorkflow, TransitionError>` that checks `item.status` (or `item.is_validated`) before transitioning, returns a typed error on invalid transitions, and takes `item` by value (not `mut item`) to prevent in-place mutation without error handling."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "invariant_violation_sent_at_epoch",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` exists but `mark_sent` never sets it. When `is_sent` becomes `true`, `sent_at_epoch_ms` remains `None`, violating the implicit invariant that a sent event should have a timestamp. The struct can hold `is_sent=true, sent_at_epoch_ms=None` permanently.",
+      "failure_mode": "Downstream consumers that read sent_at_epoch_ms after a successful mark_sent call get None and must handle the absence, leading to either silent bugs or repeated Option-checking in every consumer. The invariant \"sent implies timestamp\" is not enforced by the type system or the code.",
+      "fix": "Either remove `sent_at_epoch_ms: Option<u64>` and replace with `sent_at_epoch_ms: u64` (non-optional, always set), or ensure `mark_sent` accepts and stores the epoch timestamp. Make the timestamp a required part of the sent transition, not an optional field that the transition function ignores."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_domain_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`EventWorkflow` is a plain struct with all public fields and no private invariants. There are no constructors, no private fields, and no methods that enforce domain rules. Any code in the crate can set any field to any value, bypassing all lifecycle rules.",
+      "failure_mode": "External code can create `EventWorkflow { id: \"x\", status: \"anything\", is_validated: false, is_sent: false, sent_at_epoch_ms: None }` with no validation. No constructor enforces that id is non-empty, status is valid, or that the state combination is legal. The type offers zero compile-time guarantees.",
+      "fix": "Make all fields `pub(crate)` or private. Provide a fallible constructor `EventWorkflow::new(id: String, status: EventStatus, ...) -> Result<Self, ValidationError>` that validates invariants. Or use `newtype`/opaque struct pattern where only the crate can construct instances."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, no `benches/` directory, no allocation or profiler evidence. The crate contains a small hot-path struct and function but provides zero performance evidence. If this is a hot path (event processing pipeline), allocation patterns (String for id, .to_string() for status) are unmeasured.",
+      "failure_mode": "Unknown whether the `String` ownership and `.to_string()` allocation in `mark_sent` cause measurable performance issues under load. No baseline for regression testing.",
+      "fix": "Add a simple benchmark in `benches/` measuring `mark_sent` allocation count and latency. Use criterion or similar. Profile with `cargo-flamegraph` or `perf` if this is a hot path."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent hot path",
+    "no profiler evidence for allocation patterns",
+    "no allocation audit for String copies in EventWorkflow",
+    "no command evidence for cargo check, clippy, or test gates"
+  ],
+  "residual_risk": "The EventWorkflow type admits illegal states at compile time (any String for status, any bool combination of is_validated/is_sent, sent without timestamp). mark_sent performs zero validation and silently overwrites state. This is a textbook violation of make-illegal-states-unrepresentable. Without enum-based typestates and a fallible transition function, downstream code cannot rely on the struct invariants. All state combinations are legal structurally, but only a subset are semantically valid. This risk is unmitigated and blocks safe integration."
+}

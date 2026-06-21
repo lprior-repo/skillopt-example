@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/a43de62345088b1e/debug/deps/repair_summary_audit_mixed-a213b173662a8204)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/a43de62345088b1e/debug/deps/behavior-1477278663968303)
+   Doc-tests repair_summary_audit_mixed

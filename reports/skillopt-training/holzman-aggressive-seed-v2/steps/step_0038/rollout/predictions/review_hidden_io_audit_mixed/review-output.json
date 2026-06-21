@@ -1,0 +1,94 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error",
+      "failure_mode": "Missing or unreadable audit file aborts the entire program instead of returning a typed I/O error",
+      "fix": "Return Result<Vec<Record>, IoError> (or a domain error enum) and propagate the I/O error with ? or explicit map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on invalid digit input or out-of-range values",
+      "failure_mode": "Malformed CSV value aborts the entire audit load instead of returning a typed parse error for the offending record",
+      "fix": "Use map_err or ? to propagate ParseIntError, and return a Result<Vec<Record>, ParseError> (or domain error enum)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy as cast: .unwrap() as u16 silently truncates values > 65535",
+      "failure_mode": "A valid u32 value in [65536..max] silently wraps to an incorrect u16, corrupting audit data with no error signal",
+      "fix": "Use u16::try_from(parsed_u32) and return an error when the value exceeds u16::MAX, or parse directly to u16 if the domain guarantees it"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Unchecked indexing parts[0] without bounds check",
+      "failure_mode": "A line with zero fields causes a panic via index-out-of-bounds",
+      "fix": "Use get(0).ok_or(...) or split_once(',') to safely extract the first field"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Unchecked indexing parts[1] without bounds check",
+      "failure_mode": "A line with only one comma-separated field causes a panic via index-out-of-bounds",
+      "fix": "Use split_once(',') for first-separator extraction per SKILL.md line 11, then parse the second part safely with get/map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() inside load_audits — hidden I/O side effect in data-parsing function",
+      "failure_mode": "The core/parsing layer has observable side effects, preventing deterministic testing and introducing logging coupling",
+      "fix": "Remove println!; if logging is needed, pass a logger sink or return a record that carries metadata, keeping the core pure"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_audits mixes file I/O (fs::read_to_string) with parsing and validation in a single function returning Vec",
+      "failure_mode": "Cannot test parsing logic in isolation; I/O errors, parse errors, and validation errors are all lost into a Vec or panic",
+      "fix": "Split into a shell function that reads bytes and delegates to a pure core function parse_records(&[u8]) -> Result<Vec<Record>, RecordError>"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation_discipline",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collects all split parts into Vec<String> — cargo-cult heap allocation for a known 2-field record",
+      "failure_mode": "Unnecessary heap allocation per line increases memory pressure and GC pressure; prevents zero-copy parsing",
+      "fix": "Use split_once(',') to get two &str fragments, trim each, and parse directly without collecting into Vec<String>"
+    },
+    {
+      "severity": "INFO",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark exists for load_audits throughput or latency claims",
+      "failure_mode": "Unmeasured performance — the function allocates Vec<String> per line and clones String per record, but no evidence proves this is acceptable or optimal",
+      "fix": "Add a criterion or divan benchmark measuring lines-per-second and peak memory across representative file sizes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_audits throughput or latency",
+    "no profiler data (perf, flamegraph) for allocation hot spots in the parsing loop",
+    "no allocation profiling (e.g., heaptrack, valgrind --massif) evidence for Vec<String> per-line overhead",
+    "no second-ring evidence (cargo-flamegraph, alloc-sampler, or similar) validating that the functional core is measurable as pure"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has 5 BLOCKER violations (unwrap on I/O, unwrap on parse, lossy as cast, 2x unchecked indexing, println! side effect) and 3 WARNING/INFO items (mixed I/O+parsing, cargo-cult Vec allocation, missing benchmarks). Fixing the BLOCKERs requires converting load_audits to return Result, using split_once + get for parsing, replacing as with try_from, and removing println!"
+}

@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 BLOCKER findings**, all centered on the same root cause:
+
+1. **`status: String`** (line 3) — free-form string, any UTF-8 is constructable
+2. **`is_validated: bool`** (line 4) — primitive flag, no invariant enforcement
+3. **`is_sent: bool`** (line 5) — primitive flag, duplicates `status`, can diverge
+4. **`mark_sent`** (line 9) — blind transition, no validation check, violates lifecycle invariant
+5. **`id: String`** (line 2) — no domain newtype, empty/malformed IDs allowed
+6. **Owned Strings in data struct** (line 1) — not borrow-friendly, mixed pure data with imperative mutation
+7. **Duplicated state** — `status` + `is_sent` encode overlapping lifecycle information
+
+**4 missing evidence items**: no benchmarks, profiler, allocation analysis, or command evidence.
+
+**Residual risk**: Illegal state combinations are fully constructable — `Sent` without `Validated`, empty status, divergent `is_sent`/`status`. No type-level enforcement exists. A typestate enum rewrite with fallible transitions is required.

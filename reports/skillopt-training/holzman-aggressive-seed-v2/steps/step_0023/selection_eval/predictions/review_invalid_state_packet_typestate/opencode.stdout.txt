@@ -1,0 +1,12 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 findings (4 BLOCKER, 2 MAJOR, 2 MINOR)** across `src/lib.rs`
+
+The core issue: `PacketWorkflow` makes illegal states fully representable. It uses `String status`, `bool is_validated`, `bool is_sent`, and `Option<u64> sent_at_epoch_ms` — four independent fields with no type-level relationship. A caller can construct any arbitrary combination (e.g. `is_sent=true` with `status="pending"`, or `is_validated=false` with `sent_at_epoch_ms=Some(1234)`).
+
+Key violations:
+- **Type discipline** — lifecycle flags are raw bools/strings/Options instead of a typestate enum
+- **Core/shell boundary** — `mark_sent` mutates fields directly with no invariant enforcement
+- **No newtype for `id`** — raw `String` allows any invalid value
+- **Missing evidence** — no benchmarks, profiler data, or allocation analysis

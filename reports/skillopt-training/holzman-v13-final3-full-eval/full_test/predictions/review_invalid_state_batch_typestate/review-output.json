@@ -1,0 +1,76 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has no typestate enum; lifecycle is encoded as mutable booleans and a string that any caller can mutate to illegal combinations",
+      "failure_mode": "callers can set is_validated=true and is_sent=true without proper ordering, or set is_sent=true while status=queued, producing unreachable domain states",
+      "fix": "replace status, is_validated, is_sent, and sent_at_epoch_ms with a single BatchState enum where each variant owns its lifecycle data (e.g., BatchState::Sent { sent_at_epoch_ms: u64 }) and mark_sent returns the new state variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any string value including typos, empty strings, and values that do not correspond to valid lifecycle states",
+      "failure_mode": "a caller can set status to \"queued\", \"QUEUED\", \"\", or \"sent\" inconsistently with is_sent/is_validated booleans, making state reasoning impossible",
+      "fix": "replace String with a sealed BatchStatus enum with explicit variants (Queued, Validated, Sent) and implement Display for any serialization needs"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that can be set in any combination independent of status",
+      "failure_mode": "is_validated=true and is_sent=false with status=sent is a reachable but impossible domain state; is_validated=false and is_sent=true bypasses validation entirely",
+      "fix": "fold both booleans into a single typestate enum that enforces valid transitions and makes invalid combinations unrepresentable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate field from the lifecycle booleans, so sent_at_epoch_ms can be Some(...) while is_sent=false, or None while is_sent=true",
+      "failure_mode": "sent_at_epoch_ms is decoupled from the actual sent state, producing inconsistent records where metadata contradicts the boolean lifecycle flags",
+      "fix": "move sent_at_epoch_ms into the BatchState::Sent variant so it exists only when the batch is in the sent state, making the association enforced by the type system"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive that carries no domain constraints; any string is accepted as a valid batch ID",
+      "failure_mode": "empty strings, whitespace, duplicate IDs, or malformed identifiers are indistinguishable from valid batch IDs at the type level, enabling bugs that propagate through the system",
+      "fix": "introduce a newtype BatchId(String or Vec<u8>) with a smart constructor that validates the ID format and returns a typed error on invalid input"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly",
+      "failure_mode": "no constructor or parse layer exists to validate id, status, or lifecycle fields at the boundary; every caller bypasses domain invariants by instantiating BatchWorkflow fields directly",
+      "fix": "add a BatchWorkflow::parse or BatchWorkflow::new that takes raw primitives, validates them with fallible smart constructors, and returns Result<BatchWorkflow, ParseError>; make all struct fields private and expose only the validated typestate through the parse layer"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition performance claim",
+    "no profiler evidence for allocation behavior of mark_sent (String::to_string on line 10)",
+    "no allocation evidence for BatchWorkflow construction or cloning in hot paths",
+    "no second-ring evidence tying any performance or safety claim to actual benchmark output",
+    "no command-truth evidence (no test binary, no clippy, no fmt check run)",
+    "no benchmark/baseline for stated or implied performance characteristics"
+  ],
+  "residual_risk": "strict static review only; no commands executed. All struct fields are public with no typestate enforcement, no smart constructors, no parse boundary, and no typed error taxonomy. A caller can construct any illegal state combination (invalid status strings, contradictory boolean pairs, orphaned epoch timestamps) without any compile-time or runtime guard. The mark_sent function on line 9 performs unchecked string mutation to status without any transition validation."
+}

@@ -1,0 +1,121 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_panics",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing file, permission denied, or I/O error",
+      "failure_mode": "untrusted or absent file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, PacketError::Io> and use .map_err(|e| PacketError::Io(e))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are raw index accesses into a Vec with no length guard",
+      "failure_mode": "malformed CSV line with fewer than 2 fields panics at runtime via index out of bounds",
+      "fix": "use get(0) and get(1) with .ok_or(PacketError::Malformed) or restructure with split_once"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() - both the index and the unwrap are unchecked",
+      "failure_mode": "line missing second field panics on index; non-numeric second field panics on parse",
+      "fix": "use split_once(',') with .ok_or(PacketError::Malformed), then parse value with .map_err(|_| PacketError::InvalidValue)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 is a lossy down-cast from u32 to u16",
+      "failure_mode": "values in range 65536..=4294967295 silently truncate to u16 range, producing incorrect domain data with no error",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| PacketError::ValueOutOfBounds) to catch out-of-range conversions"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds side-effect I/O inside data-processing map closure",
+      "failure_mode": "parsing logic leaks logging side effects, making the function non-deterministic, untestable, and violating Data/Calculations/Actions separation",
+      "fix": "remove println entirely; if diagnostic logging is needed, isolate it in a shell-layer action function that calls a pure parsing core"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets fuses file I/O (fs::read_to_string), parsing, logging (println), allocation, and domain construction into one function",
+      "failure_mode": "no pure parsing core exists; shell and core are inseparable, preventing reuse, testing, and verification of the parsing logic independently of I/O",
+      "fix": "extract a pure fn parse_packet(line: &str) -> Result<Record, PacketError> and have load_packets call it after reading the file with proper error propagation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no Result type; all failures are expressed as panics",
+      "failure_mode": "any error (I/O, malformed input, parse failure, range overflow) collapses to panic instead of returning structured typed errors that callers can handle",
+      "fix": "define enum PacketError { Io(io::Error), Malformed, InvalidValue, ValueOutOfBounds, Allocation } and change signature to -> Result<Vec<Record>, PacketError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation_try_reserve",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "text.lines().map(...).collect() allocates an unbounded Vec with no capacity cap or try_reserve",
+      "failure_mode": "large or unbounded input file causes unbounded heap allocation, enabling OOM attacks with no domain limit",
+      "fix": "accept a max_packets: usize parameter, call out.try_reserve(max_packets).map_err(|_| PacketError::Allocation)?, and reject lines exceeding the cap with a TooMany error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "raw String primitives from CSV split cross the parse boundary into domain Record without fallible smart constructors; name is accepted as a free-form String with no validation",
+      "failure_mode": "invalid or empty record names (e.g. whitespace-only, zero-length) are accepted as valid domain values, violating data validity by construction",
+      "fix": "create a parse_boundary function: fn parse_name(raw: &str) -> Result<String, PacketError> that trims and rejects empty strings, and use split_once(',') instead of split/collect"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() builds a full Vec<String> from every line just to extract two fields",
+      "failure_mode": "unnecessary allocation per line; each CSV line allocates a Vec plus N String copies before discarding them",
+      "fix": "use line.split_once(',').ok_or(PacketError::Malformed)? to get (_name, value_str) directly, then parse value_str.trim() without intermediate collection"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_type_raw_primitive",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is a raw String with no constraints encoded in the type",
+      "failure_mode": "any caller can construct Record with empty, null, or otherwise invalid names; the domain invariant on name is not enforced at the type level",
+      "fix": "introduce a newtype struct RecordName(String) with a smart constructor fn try_from_name(raw: &str) -> Result<RecordName, PacketError> and use it in Record"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied parsing-throughput performance claim",
+    "no profiler evidence (flame graph, perf profile) identifying the hot path or allocation hotspots",
+    "no allocation audit (e.g. dlmalloc stats, jemalloc profiling) showing per-record allocation count",
+    "no second-ring evidence (Valgrind massif, cachegrind) for memory traffic or cache behavior",
+    "no command-truth evidence: no recorded baseline and new-number benchmark run",
+    "no clippy/gate command evidence for strict source linting"
+  ],
+  "residual_risk": "Review is static-only with no commands run. The crate has 11 BLOCKER findings covering panic surfaces (unwrap on I/O, parse, and indexing), lossy casts, hidden I/O, shell-core fusion, missing typed error taxonomy, unbounded allocation, intermediate allocations, raw-primitive domain types, and missing parse-boundary validation. All are independently reproducible defects that will panic or misbehave on untrusted input. Without the mandatory gate commands (cargo fmt --check, cargo check, cargo clippy, cargo test), residual risk includes undiscovered clippy warnings and compilation failures."
+}

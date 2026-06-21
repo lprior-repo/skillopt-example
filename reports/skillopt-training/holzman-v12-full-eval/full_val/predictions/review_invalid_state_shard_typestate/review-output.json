@@ -1,0 +1,85 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "enum_typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "ShardWorkflow uses a flat struct with independent booleans instead of a typed state machine with enforced transitions",
+      "failure_mode": "Callers can construct ShardWorkflow with is_validated=false, is_sent=true, status=\"pending\" — an impossible state the domain model should never permit",
+      "fix": "Replace the struct fields with a ShardState enum (e.g. Pending, Validated, Sent) that encodes valid transitions; constructors return Result<ShardWorkflow, StateError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "pub status: String stores lifecycle status as a free-form string instead of a closed enum",
+      "failure_mode": "Any arbitrary string is accepted (\"sent\", \"SENT\", \"sent \", \"deleted\", \"\"); callers cannot exhaustively match; the domain loses all state-machine guarantees",
+      "fix": "Replace `status: String` with `status: ShardStatus` enum; derive From for known conversions; match exhaustively at call sites"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "pub is_validated: bool and pub is_sent: bool encode lifecycle flags as independent booleans",
+      "failure_mode": "Two independent booleans create 16 reachable states; only 4 are valid (not-validated/not-sent, not-validated/sent, validated/not-sent, validated/sent), but the domain likely intends a linear progression (pending → validated → sent) — the remaining 12 states are silently reachable",
+      "fix": "Replace both booleans with a single ShardState enum whose variants carry only the data needed for that stage (e.g. Sent { sent_at_epoch_ms: u64 }); callers must pattern-match variants exhaustively"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "pub is_sent: bool and pub sent_at_epoch_ms: Option<u64> are independent fields — Option can be Some while is_sent is false, or is_sent true while Option is None",
+      "failure_mode": "is_sent=true with sent_at_epoch_ms=None loses the sent timestamp; is_sent=false with sent_at_epoch_ms=Some(…) claims a sent time without the flag; both are domain-invalid but constructible with no validation",
+      "fix": "Embed sent_at_epoch_ms inside the Sent variant of the ShardState enum so the timestamp and the sent flag are co-located and co-enforced"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "pub id: String is a raw primitive exposed as a public field with no domain invariants",
+      "failure_mode": "Any string including empty, whitespace-only, or malformed IDs is accepted; callers cannot distinguish a valid shard ID from a random string at the type level",
+      "fix": "Define `pub struct ShardId(String)` or better `pub struct ShardId(Uuid)` with a smart constructor `ShardId::parse(s) -> Result<Self, IdError>`; make the field private behind a getter"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates ShardWorkflow fields directly and is exposed as a pure-looking function that performs hidden mutation on the domain type",
+      "failure_mode": "The function signature suggests a pure transformation (takes ShardWorkflow, returns ShardWorkflow) but sets mutable fields internally, violating the functional core principle that domain types are immutable by construction; callers may pass already-sent items and double-set state",
+      "fix": "Replace with `fn transition_to_sent(item: ShardWorkflow) -> Result<ShardWorkflow, TransitionError>` that inspects the current state enum variant and returns an error if the item is already sent"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow fields are pub and constructible with raw primitives — no smart constructor or fallible parse exists, so raw primitives cross the parse boundary directly into domain code",
+      "failure_mode": "External callers can construct ShardWorkflow { id: \"\", status: \"\", is_validated: false, is_sent: false, sent_at_epoch_ms: None } via a struct literal with zero validation, violating parse-don't-validate",
+      "fix": "Add `impl ShardWorkflow` with a `parse` or `try_new` method that accepts primitives, validates each field with fallible smart constructors, and returns Result<ShardWorkflow, ParseError>; make all struct fields private"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists — mark_sent has no measured performance baseline",
+    "no profiler data exists for the hot path or struct size/alignment analysis",
+    "no allocation evidence — the struct contains two heap allocations (String id, String status) with no budget or cap",
+    "no second-ring evidence for any performance or zero-allocation claims",
+    "no command-truth evidence: no cargo fmt/check/clippy/test output was produced",
+    "no stress-test or state-space enumeration evidence proving all invalid states are identified"
+  ],
+  "residual_risk": "Struct-level review only. No commands were run. The crate uses raw-primitive domain types with no typestate enforcement, no parse boundary, and no validation — invalid states are trivially constructible. No benchmarks, profilers, or allocation budgets exist. The functional core / imperative shell boundary is violated: mark_sent mutates domain fields. All 7 findings are BLOCKERs that must be resolved before any delivery."
+}

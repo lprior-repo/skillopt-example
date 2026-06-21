@@ -1,0 +1,28 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/ceeae498a7390a78/repair_frame_audit_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/ceeae498a7390a78/repair_frame_audit_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/ceeae498a7390a78/repair_frame_audit_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/tmp/opencode/holzman-skillopt-train/ceeae498a7390a78/repair_frame_audit_mixed/Cargo.toml",
+    "/tmp/opencode/holzman-skillopt-train/ceeae498a7390a78/repair_frame_audit_mixed/src/lib.rs",
+    "/tmp/opencode/holzman-skillopt-train/ceeae498a7390a78/repair_frame_audit_mixed/tests/behavior.rs"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No unsafe, unwrap, expect, panic, todo, unimplemented, unreachable in production code",
+    "No lossy 'as' conversions - replaced with u32::try_from",
+    "No unchecked indexing - used get/checked patterns where applicable",
+    "Checked arithmetic for capacity (checked_add with Overflow error)",
+    "try_reserve used for Vec with known bounded capacity instead of with_capacity",
+    "max_payload enforced before encoding - smallest change to satisfy tests",
+    "Functional core: encode_frame is pure deterministic logic, no I/O side effects",
+    "Tests untouched - behavior contract preserved"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All production unsafe/unwrap/expect/panic/lossy-as removed. Payload limit enforced. Checked arithmetic and allocation handling in place. Both behavior tests pass."
+}

@@ -1,0 +1,18 @@
+Now I have the full crate. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings, 4 missing evidence items.**
+
+The core issue: `LeaseWorkflow` is a primitive-typed data bag — `status: String` + `is_validated: bool` + `is_sent: bool` — which allows any illegal combination of flags (e.g., `is_sent=true` with `status="pending"`). No constructor, all fields public, no typestate enum. This is a textbook violation of "make illegal states unrepresentable."
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | 1 |
+| 2 | BLOCKER | type_discipline_primitive_obsession (id) | 2 |
+| 3 | BLOCKER | type_discipline_primitive_obsession (status) | 3 |
+| 4 | BLOCKER | functional_core_imperative_shell (mark_sent) | 9 |
+| 5 | BLOCKER | functional_core_imperative_shell (to_string alloc) | 10 |
+| 6 | MAJOR | data_valid_by_construction (all pub) | 1 |
+| 7 | MAJOR | no_hidden_side_effects (.to_string() panics) | 10 |
+
+**Recommended fix:** Replace `status: String` + bool flags with a `LeaseStage` enum typestate (`Pending`, `Validated`, `Sent`). Private fields, fallible constructor, pure `Result<LeaseStage, TransitionError>` transitions in the core.

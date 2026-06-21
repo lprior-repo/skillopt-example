@@ -1,0 +1,10 @@
+I see the issues. The code has a lossy `as` cast, no payload-bounds check, and no bounded allocation. Let me fix it.
+Repaired. Three Holzman law violations fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `payload.len() as u32` (lossy cast) | `u32::try_from(payload.len())` → `Overflow` |
+| No `max_payload` guard (unchecked access) | `payload.len() > max_payload` → `PayloadTooLarge` |
+| Unbounded allocation | `try_reserve` with `checked_add` capacity → `Allocation`/`Overflow` |
+
+All gates passed: `cargo fmt`, `cargo test` (2/2), clippy strict (-D unsafe/arithmetic_side_effects/as_conversions/indexing_slicing/unwrap/expect/panic). Output written to `repair-output.json`.

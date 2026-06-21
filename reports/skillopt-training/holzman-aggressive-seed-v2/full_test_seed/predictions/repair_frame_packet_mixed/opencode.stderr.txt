@@ -1,0 +1,65 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead tests
+[0m→ [0mRead tests/behavior.rs
+[0m
+[0m← [0mEdit src/lib.rs
+Index: /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/repair_frame_packet_mixed/src/lib.rs
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/repair_frame_packet_mixed/src/lib.rs
++++ /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/repair_frame_packet_mixed/src/lib.rs
+@@ -5,10 +5,14 @@
+     Overflow,
+ }
+ 
+ pub fn encode_frame(payload: &[u8], max_payload: usize) -> Result<Vec<u8>, FrameError> {
++    if payload.len() > max_payload {
++        return Err(FrameError::PayloadTooLarge);
++    }
++    let len = u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?;
+     let mut out = Vec::new();
+-    let len = payload.len() as u32;
++    out.try_reserve(4 + payload.len()).map_err(|_| FrameError::Allocation)?;
+     out.extend_from_slice(&len.to_be_bytes());
+     out.extend_from_slice(payload);
+     Ok(out)
+ }
+
+[0m
+[0m$ [0mcargo fmt
+(no output)
+[0m
+[0m$ [0mcargo test
+Compiling repair_frame_packet_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/repair_frame_packet_mixed)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/eb77455373e26657/debug/deps/repair_frame_packet_mixed-bfe833f1aaa16f8e)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/eb77455373e26657/debug/deps/behavior-1ff16a5cbd601335)
+   Doc-tests repair_frame_packet_mixed
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test rejects_limit ... ok
+test encodes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[0m
+[0m← [0mWrite repair-output.json
+Wrote file successfully.
+[0m

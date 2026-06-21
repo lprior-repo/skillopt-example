@@ -1,0 +1,9 @@
+{
+  "n": 10,
+  "hard": 0.9,
+  "soft": 0.9800000000000001,
+  "passed": 9,
+  "failed": [
+    "repair_summary_event_mixed"
+  ]
+}

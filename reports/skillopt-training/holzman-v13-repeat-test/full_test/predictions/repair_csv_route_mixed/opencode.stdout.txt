@@ -1,0 +1,12 @@
+Now I'll fix the production source. The issues are: `unwrap()` on parse, no empty check, `max_items` ignored, no fallible error handling, no `try_reserve`.
+Repaired. Summary of changes to `src/lib.rs`:
+
+| Issue | Fix |
+|---|---|
+| `.unwrap()` on parse | `map_err(|_| ParseError::Invalid)?` |
+| No empty check | Early `Err(ParseError::Empty)` on `input.is_empty()` |
+| `max_items` ignored | Enforced before each `push`, returns `Err(ParseError::TooMany)` |
+| No allocation discipline | `try_reserve(max_items)` with fallible `map_err` |
+| Empty trailing fields (e.g. `"1,2,"`) | Treated as `Err(ParseError::Invalid)` |
+
+All 4 behavior tests pass, strict clippy clean, no Holzman laws violated.

@@ -1,0 +1,7 @@
+Repair complete. All 4 tests pass. Key fixes to `src/lib.rs`:
+
+1. **Removed `.unwrap()`** - replaced with `.map_err(|_| ParseError::Invalid)?`
+2. **Added empty input check** - returns `ParseError::Empty` before iteration
+3. **Enforced `max_items`** - checks `values.len() >= max_items` before each push, returns `ParseError::TooMany`
+4. **Removed `collect()` + unwrap** - uses safe explicit loop with `?` propagation
+5. **Skipped `Allocation` variant** - not needed; Vec grows dynamically with bounded count via max_items check

@@ -1,0 +1,18 @@
+Now I have the full picture. The production code has multiple Holzman law violations: `.unwrap()`, no empty check, no `max_items` cap, no `try_reserve`. Let me repair it.
+All 4 tests pass. Running remaining gates.
+All gates pass. Writing the required output JSON.
+Repair complete. Here's the summary:
+
+**Changes made to `src/lib.rs`:**
+- Removed `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)?` for parse errors
+- Added empty-input check → `Err(ParseError::Empty)`
+- Added `max_items` cap check before each push → `Err(ParseError::TooMany)`
+- Added `try_reserve(max_items)` for bounded allocation → `Err(ParseError::Allocation)`
+- Changed from `collect()` to iterative `for` loop to enforce the `max_items` cap mid-stream
+
+**All gates passed:**
+- `cargo fmt` — clean
+- `cargo test` — 4/4 passed
+- `cargo clippy` (strict deny rules) — clean
+- `cargo check` — clean
+- No Holzman violations in production source

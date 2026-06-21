@@ -1,0 +1,16 @@
+[
+  {
+    "op": "replace",
+    "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` fo",
+    "content_preview": "- **Arithmetic & Allocation:** ALL integer arithmetic involving totals, counts, capacity, or indices MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. NEVER use `+`, `-`, `*`, `/`, ",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "## Verification\n\nFor real repositories, use the strongest repo gate. For isolated eval crates, obey the prompt-scoped gate and do not self-expand into audit/deny/vet/geiger/machete/hack/mutants/bench/",
+    "content_preview": "## Verification\n\nFor real repositories, use the strongest repo gate. For isolated eval crates, obey the prompt-scoped gate and do not self-expand into audit/deny/vet/geiger/machete/hack/mutants/bench/",
+    "status": "applied_replace",
+    "index": 2
+  }
+]

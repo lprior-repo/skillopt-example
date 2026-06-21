@@ -1,0 +1,14 @@
+Now I see the issues. The production code has:
+1. Lossy `as u32` conversion (line 10)
+2. No `payload.len() > max_payload` check
+3. Missing `checked_add` and `try_reserve` (required by skill for frame/packet encoders)
+
+Let me fix it:
+Repair complete. Changes to `src/lib.rs`:
+
+- **Line 9-11**: Added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge` (test `rejects_limit` requires this)
+- **Line 12-14**: Replaced `payload.len() as u32` with `4usize.checked_add(payload.len())` for checked capacity arithmetic
+- **Line 15**: Replaced lossy `as u32` with `u32::try_from(payload.len()).map_err(...)` for safe conversion
+- **Line 16-18**: Replaced implicit allocation with `Vec::new()` + `try_reserve(capacity)` for bounded allocation
+
+All 2 tests pass, zero clippy warnings.

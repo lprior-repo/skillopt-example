@@ -1,0 +1,17 @@
+Now I have a clear picture. The code has multiple Holzman violations: `unwrap()`, unchecked indexing, unchecked arithmetic, lossy casts, unchecked division, wrong `split` pattern, missing `render_summary`, and wrong return type. Let me fix it.
+All 6 tests pass. Now writing the required output.
+Repair complete. Here's the summary of changes to `src/lib.rs`:
+
+**Violations fixed:**
+- `unwrap()` on `.parse()` → `.map_err(|_| SummaryError::Invalid)`
+- Unchecked indexing `parts[1]` → `split_once(',')` with destructuring
+- Unchecked `total += value` → `total.checked_add(value).ok_or(...)`
+- Unchecked `count += 1` → `count.checked_add(1).ok_or(...)`
+- Lossy `count as u32` / `count as u64` → `u32::try_from(count)` / `u64::try_from(count)`
+- Unchecked `total / count` → `total.checked_div(count_u64)`
+- `split(',').map().collect()` → `split_once(',')` (mandatory repair pattern)
+- Added missing `Empty` check for empty input
+- Changed return type from `Result<String, SummaryError>` to `Result<Summary, SummaryError>`
+- Added missing `render_summary(Summary) -> String` function
+
+**Results:** 6/6 tests pass, `cargo fmt` clean.

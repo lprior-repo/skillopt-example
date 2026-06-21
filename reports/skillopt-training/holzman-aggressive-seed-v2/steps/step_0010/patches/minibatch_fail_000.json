@@ -1,0 +1,56 @@
+{
+  "batch_size": 4,
+  "failure_summary": [
+    {
+      "failure_type": "missing_checked_arithmetic",
+      "count": 5,
+      "description": "Agents fail to use checked_add/checked_mul/checked_div for accumulators, capacity math, and summary calculations."
+    },
+    {
+      "failure_type": "missing_try_reserve",
+      "count": 4,
+      "description": "Agents consistently use Vec::with_capacity instead of try_reserve for bounded allocations."
+    },
+    {
+      "failure_type": "missing_split_once",
+      "count": 4,
+      "description": "Agents use manual indexing or split/collect instead of split_once for first-delimiter parsing."
+    },
+    {
+      "failure_type": "missing_try_from",
+      "count": 2,
+      "description": "Agents use lossy as casts instead of try_from for width conversions."
+    },
+    {
+      "failure_type": "false_command_claims",
+      "count": 1,
+      "description": "Agents claim cargo commands passed when they failed or did not run."
+    }
+  ],
+  "patch": {
+    "reasoning": "The recurring failures are specific API omissions: checked arithmetic on all accumulators/capacity, try_reserve for bounded Vecs, split_once for parsing, and try_from for casts. The skill needs to explicitly mandate these in the Core Contract and Repair Mode checklists, and forbid the unsafe alternatives. We also need to reinforce that command claims must match actual output.",
+    "edits": [
+      {
+        "op": "replace",
+        "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+        "content": "- **Allocation:** For `Vec` with known/bounded capacity, compute capacity with `checked_add`/`checked_mul` (never unchecked `+`/`*`). Call `try_reserve` (not `Vec::with_capacity`) before pushing/extending, and map allocation failure to a typed error. Never use `Vec::with_capacity` for bounded allocations."
+      },
+      {
+        "op": "replace",
+        "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+        "content": "- **Arithmetic:** Use `checked_add`/`checked_mul` for all accumulators, sizes, totals, and capacity calculations. Use `checked_div` for division (with non-zero check). Use `try_from` for all width casts (e.g., `usize` to `u32`). Never use `as` for width changes or unchecked `+`/`*`/`/` for totals."
+      },
+      {
+        "op": "replace",
+        "target": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.",
+        "content": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks. For fixed-field parsing, prefer `split_once` or `get` over manual slicing."
+      },
+      {
+        "op": "replace",
+        "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+        "content": "Before reporting a repair as done, check the source for these recurring misses:\n- `Vec::with_capacity` without `try_reserve` (always use `try_reserve` for bounded capacity).\n- Unchecked `+`/`*` in capacity/length/summary math (use `checked_add`/`checked_mul`).\n- Integer `/` where `checked_div` is required (always use `checked_div` with non-zero check).\n- `as` width casts instead of `try_from` (always use `try_from` for width conversions).\n- Unchecked `parts[i]` indexing instead of `split_once`/`get`.\n- Production tests or manifests changed unnecessarily.\n- Command claims that do not match actual `cargo fmt`/`cargo test`/`cargo clippy` output."
+      }
+    ]
+  },
+  "source_type": "failure"
+}

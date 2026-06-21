@@ -1,0 +1,84 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "RouteWorkflow has no state machine — any combination of status string, booleans, and optional timestamp is representable, including impossible states like status='invalid' with is_sent=true.",
+      "failure_mode": "Callers can construct or mutate RouteWorkflow into logically impossible states (e.g., sent without validation, validated without being sent), breaking business invariants silently.",
+      "fix": "Replace the struct with a typed state machine enum such as `enum RouteState { Draft { id: RouteId }, Validated { id: RouteId }, Sent { id: RouteId, sent_at: Instant } }` with transitions enforced by method signatures, making illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a plain String. Any string value ('draft', 'SENT', '', null-bytes, 'sent_pending') is valid, and 'mark_sent' just overwrites it with string concatenation rather than a typed transition.",
+      "failure_mode": "Typos, case mismatches, or malicious input create unhandled status values. Pattern matching on status strings is fragile and incomplete — every caller must handle every possible string, and new states require editing every match site.",
+      "fix": "Replace `status: String` with a domain enum `enum RouteStatus { Draft, Validated, Sent }`. The enum exhaustiveness in match arms guarantees no unhandled states compile in."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are independent bools that can be in any combination (both true, both false, only one true). This encodes a lifecycle as flat flags instead of a directed state graph.",
+      "failure_mode": "A route can be both validated and not-sent, or sent and not-validated simultaneously. 'mark_sent' only touches is_sent and status, never validates is_validated — so a route can transit to 'sent' without ever being validated.",
+      "fix": "Replace bools with typestate transitions. Encode lifecycle in enum variants or separate typestate structs so that 'sent' requires prior 'validated' as a compile-time constraint, e.g., `fn mark_sent(self: ValidatedRoute) -> SentRoute`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> outside the struct's state machine. When mark_sent sets is_sent=true, sent_at_epoch_ms remains None — a route can be marked sent with no timestamp. Conversely, a draft route could have sent_at_epoch_ms=Some set by a caller.",
+      "failure_mode": "The Option decouples timestamp from the sent event. Post-sent routes have no guaranteed timestamp (business data loss), and pre-sent routes can carry stale/tampered timestamps. No invariant enforces sent_at_epoch_ms=Some iff is_sent=true.",
+      "fix": "Move the timestamp into the Sent variant: `Sent { id: RouteId, sent_at_epoch_ms: u64 }`. The timestamp becomes required and owned by the variant that needs it, eliminating the None/true inconsistency."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain validation, format enforcement, or uniqueness guarantee. Any empty string, whitespace, or malformed UUID can serve as a route ID.",
+      "failure_mode": "Routes can be created with empty or malformed IDs, causing lookup collisions, silent dedup failures, or data integrity corruption. String IDs cannot enforce format invariants (e.g., UUID v4 regex, prefix conventions).",
+      "fix": "Replace `id: String` with `id: RouteId` where `RouteId` is a newtype wrapping validated string data, constructed via a fallible smart constructor that parses and rejects invalid formats."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "RouteWorkflow exposes raw primitives (String, bool, Option<u64>) in its public struct. There is no parse boundary — callers can construct RouteWorkflow directly with any values, bypassing all invariants. No smart constructor, no validation, no fallible factory exists.",
+      "failure_mode": "Every caller becomes responsible for validating id format, status transitions, boolean consistency, and timestamp ordering. Missing validation at any call site creates invalid domain states that propagate silently through the system.",
+      "fix": "Make all fields private. Provide a fallible smart constructor `RouteWorkflow::new(id: &str) -> Result<RouteWorkflow, RouteError>` that validates the ID and initializes to a known valid state (Draft). All state transitions go through typed methods on the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_invalid_transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any RouteWorkflow regardless of current state and unconditionally sets status='sent' and is_sent=true without checking is_validated or setting sent_at_epoch_ms. This allows unsent→sent, validated→sent, and even sent→sent transitions.",
+      "failure_mode": "A draft (unvalidated) route can be directly marked as sent, bypassing the validation step. The sent_at_epoch_ms timestamp is never populated, creating routes that are 'sent' but lack the required timestamp. No transition is rejected or tracked.",
+      "fix": "Change the function signature to enforce preconditions: `fn mark_sent(validated: ValidatedRoute) -> Result<SentRoute, TransitionError>` where ValidatedRoute is a distinct type guaranteeing prior validation, and the returned SentRoute includes the timestamp."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for RouteWorkflow lifecycle operations",
+    "no profiler evidence for mark_sent hot path analysis",
+    "no allocation analysis — RouteWorkflow owns two heap allocations (id String, status String) per instance with no capacity bounds",
+    "no command evidence — no cargo check, clippy, or test commands were run",
+    "no second-ring evidence for any performance or zero-cost claims"
+  ],
+  "residual_risk": "Typestate and domain-model violations are structural — the struct permits every illegal combination of status, lifecycle booleans, and timestamp. Without a full refactor to an enum-based state machine with typed transitions and smart constructors, any code consuming RouteWorkflow inherits the same invalid-state risk. Static review only; no commands executed."
+}

@@ -1,0 +1,14 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Key findings:**
+
+1. **BLOCKER** — `ShardWorkflow` uses `String` for `status` and `bool` for `is_validated`/`is_sent` instead of enums/typestates. All illegal state combinations (sent without validated, sent without timestamp) are constructible. Fix: replace with typed enum `ShardStatus` and typestate transitions.
+
+2. **BLOCKER** — `mark_sent` (line 9) takes/returns the same type, does not enforce preconditions (must be validated first), and does not set `sent_at_epoch_ms`. Any caller can produce an inconsistent sent shard. Fix: typestate transitions returning `Result` so invalid transitions are typed errors.
+
+3. **MINOR** — `id: String` should be a `ShardId` newtype for API clarity.
+
+4. **MINOR** — `String::to_string` allocation on every `mark_sent` call with no benchmark evidence.
+
+5. **INFO** — No tests exist in the crate.

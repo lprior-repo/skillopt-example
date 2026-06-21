@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow struct allows invariant-violating states: status can be 'sent' while is_sent is false, or status can be 'pending' while is_sent is true. sent_at_epoch_ms can be None while is_sent is true. is_validated is a bare bool with no enforcement that validated shards are frozen.",
+      "failure_mode": "Any caller can mutate shard fields into contradictory states (e.g. is_sent=true with status='pending'), breaking downstream logic that assumes sent shards have status='sent' and a non-null sent_at_epoch_ms. This enables silent data corruption in the shard workflow pipeline.",
+      "fix": "Replace status/is_sent/is_validated with a single typed enum or typestate. Use newtype or enum for status (e.g. enum ShardStatus { Pending, Validated, Sent { sent_at: u64 } }) so sent-at and status are coupled in the same variant. Remove pub fields; use constructors that enforce invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields_enforcement",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of ShardWorkflow are pub, allowing external code to mutate any field without invariant checks. This directly enables creating invalid states that the struct cannot prevent.",
+      "failure_mode": "External callers can set item.is_sent = false while item.status = \"sent\", or set is_validated = true and then modify the shard. No constructor or accessor enforces domain invariants.",
+      "fix": "Make all fields private. Provide a sealed constructor or builder that enforces invariants. Replace with an enum or typestate so valid states are the only constructable ones."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "use_enum_not_string_for_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String, allowing any arbitrary string value (e.g. 'SENT', 'sent!', '') instead of a well-defined set of states. mark_sent on line 10 writes a magic string literal 'sent' which is error-prone.",
+      "failure_mode": "Typos, case mismatches, or injection into status break state-matching logic. The magic string 'sent' on line 10 is not compile-time checked against any enum variant.",
+      "fix": "Replace String status with an enum: enum ShardStatus { Pending, Validated, Sent { sent_at: u64 } }. mark_sent returns the Sent variant with the epoch_ms baked in."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "use_typestate_not_bools",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are bare bools that don't capture the directional lifecycle. A shard can be both is_validated=true and is_sent=true, or neither, with no enforcement of valid transitions.",
+      "failure_mode": "No compile-time or runtime enforcement of valid state transitions (pending -> validated -> sent). Bool flags are independent and can be set in any order or combination, enabling states like validated-but-unsent or unsent-but-marked-sent.",
+      "fix": "Replace bool flags with a typestate enum or a single enum capturing the full lifecycle: enum ShardStatus { Pending, Validated, Sent { sent_at: u64 } }. Transition functions return the next enum variant."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "couple_sent_at_with_sent",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> independent of is_sent. A shard can be is_sent=true with sent_at_epoch_ms=None, or is_sent=false with sent_at_epoch_ms=Some(123).",
+      "failure_mode": "Downstream code expecting sent_at_epoch_ms to be populated for sent shards will encounter None, causing panics on unwrap() or incorrect behavior on Some/None branches.",
+      "fix": "Bake sent_at into the Sent variant of the status enum: enum ShardStatus { Pending, Validated, Sent { sent_at: u64 } }. Remove is_sent and sent_at_epoch_ms as separate fields."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "mark_sent_does_not_set_epoch",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent sets status='sent' and is_sent=true but does NOT set sent_at_epoch_ms. The field remains None or its previous value, violating the invariant that sent shards record their send time.",
+      "failure_mode": "Sent shards lack temporal metadata, breaking audit trails, retry deadlines, and SLA tracking that depend on sent_at_epoch_ms being set at send time.",
+      "fix": "mark_sent must accept epoch_ms as a parameter (or derive it from a clock abstraction) and store it in the Sent variant. Signature: pub fn mark_sent(item: ShardWorkflow, sent_at: u64) -> ShardStatus::Sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_domain_types",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The domain model uses primitive types (String, bool) instead of domain newtypes/enums. This pushes all validation into imperative shell code rather than making illegal states unrepresentable at the type level.",
+      "failure_mode": "Every caller must independently validate shard invariants. No compiler enforcement means bugs accumulate in shell code rather than being caught at compile time.",
+      "fix": "Define domain types: enum ShardStatus { Pending, Validated, Sent { sent_at: u64 } }. ShardWorkflow owns only the status type and id. All transitions go through pure functions that return the new status."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "to_string_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() performs an unnecessary heap allocation. With an enum status, no allocation is needed for state transitions.",
+      "failure_mode": "Unnecessary allocation on every mark_sent call. While not a correctness bug, it violates the performance discipline of avoiding allocations in pure pipelines.",
+      "fix": "Replace with enum assignment: item.status = ShardStatus::Sent { sent_at }. No heap allocation needed."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or ShardWorkflow lifecycle transitions",
+    "no profiler data for allocation patterns in shard processing",
+    "no allocation audit confirming try_reserve or checked arithmetic (not applicable to this tiny crate but missing by default)",
+    "no second-ring evidence (e.g. Miri, Kani, or property tests) for state transition invariants",
+    "no command evidence (cargo fmt, cargo test, cargo clippy) was run or claimed"
+  ],
+  "residual_risk": "Static review only. The core issue is architectural: invalid states are representable by construction. Without enum/typestate refactoring and behavioral tests, the crate cannot be delivered. No commands were executed."
+}

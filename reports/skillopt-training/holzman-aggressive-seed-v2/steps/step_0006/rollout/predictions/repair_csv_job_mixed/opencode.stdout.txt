@@ -1,0 +1,18 @@
+Now I have the full picture. Let me fix the production source to satisfy all tests and Holzman constraints.
+
+**Issues in current `parse_jobs`:**
+1. `unwrap()` on parse results (line 12) — violates "no unwrap" rule
+2. `max_items` parameter is ignored — should enforce the limit
+3. No empty-input handling — should return `ParseError::Empty`
+4. No `too_many` enforcement — should return `ParseError::TooMany`
+All 4 tests pass. Now writing the required output.
+Repair complete. All 4 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Issue | Fix |
+|---|---|
+| `unwrap()` on parse | Replaced with `.map_err(\|_\| ParseError::Invalid)` |
+| `max_items` ignored | Pre-count items; return `ParseError::TooMany` if exceeded |
+| No empty check | Return `ParseError::Empty` for whitespace-only input |
+| No invalid handling | `parse` errors mapped to `ParseError::Invalid` |

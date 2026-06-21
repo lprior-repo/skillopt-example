@@ -1,0 +1,49 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/a8a405f178c1e304/repair_summary_shard_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/a8a405f178c1e304/repair_summary_shard_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/a8a405f178c1e304/repair_summary_shard_mixed/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/a8a405f178c1e304/repair_summary_shard_mixed/.skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test --workspace --all-features",
+      "status": "passed"
+    },
+    {
+      "command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock",
+      "status": "passed"
+    },
+    {
+      "command": "rg -n forbidden constructs check",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/assert/unreachable",
+    "No unchecked indexing (replaced parts[1] with split_once)",
+    "No unchecked arithmetic (checked_add for total and count)",
+    "No lossy as conversions (u64::try_from, u32::try_from)",
+    "No unchecked division (checked_div with error)",
+    "Empty input returns Err(SummaryError::Empty)",
+    "Invalid line format returns Err(SummaryError::Invalid)",
+    "Overflow returns Err(SummaryError::Overflow)",
+    "TooMany returns Err(SummaryError::TooMany)",
+    "Functional Core: summarize_metrics is pure, render_summary handles formatting",
+    "Parse boundary: split_once validates comma grammar once at boundary",
+    "Tests unchanged (behavior contract preserved)",
+    "Cargo.toml unchanged",
+    "All 6 behavior tests pass",
+    "Clippy strict lint passes with all disallowed lints denied"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All forbidden constructs removed, all tests pass, all strict clippy gates clean."
+}

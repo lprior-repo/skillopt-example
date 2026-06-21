@@ -1,0 +1,38 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md",
+    "Cargo.toml",
+    "src/lib.rs",
+    "tests/behavior.rs"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "no unwrap in production source",
+    "empty input returns ParseError::Empty",
+    "invalid tokens return ParseError::Invalid via map_err",
+    "max_items enforced with ParseError::TooMany",
+    "try_reserve with ParseError::Allocation on allocation failure",
+    "no unsafe, panic, expect, todo, unimplemented, unreachable, assert in production",
+    "no lossy as conversions",
+    "no unchecked indexing",
+    "functional core: parse_tokens is pure deterministic",
+    "error taxonomy matches test contract exactly"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all forbidden constructs removed, all tests pass, typed error taxonomy fully exercised"
+}

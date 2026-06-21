@@ -1,0 +1,17 @@
+Now I understand the issues. The current code has:
+1. `.unwrap()` panic on parse failure
+2. `.collect()` without max_items enforcement
+3. No empty input check
+4. No `try_reserve`
+5. Ignores `max_items` parameter
+All 4 tests pass. Let me verify the final source and write the output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Removed**: `input.split(',').map(...).unwrap().collect()` — panicked on any parse failure, ignored `max_items`, allocated all tokens unconditionally
+- **Added**: `input.is_empty()` check → `ParseError::Empty`
+- **Added**: `Vec::new()` + `try_reserve(max_items)` → `ParseError::Allocation` on reserve failure
+- **Added**: Per-item loop with `values.len() >= max_items` → `ParseError::TooMany`
+- **Added**: `trimmed.parse().map_err(|_| ParseError::Invalid)` for safe per-token parsing
+- **Added**: Empty-trimmed field rejection → `ParseError::Invalid`
+
+All 4 behavior tests pass. No tests or Cargo.toml modified.

@@ -1,0 +1,18 @@
+Now I have the full picture. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 12 findings (8 BLOCKER, 4 MAJOR), 5 missing evidence items.**
+
+Key violations in `src/lib.rs`:
+
+| Line | Issue | Severity |
+|------|-------|----------|
+| 9 | `fs::read_to_string().unwrap()` — I/O panic | BLOCKER |
+| 16 | `parts[0]`/`parts[1]` — unchecked indexing | BLOCKER |
+| 16 | `println!()` — hidden I/O side effect in core | BLOCKER |
+| 19 | `.parse().unwrap()` — parse panic | BLOCKER |
+| 19 | `as u16` — lossy cast, silent truncation | BLOCKER |
+| 8 | I/O + parsing mixed in single function | BLOCKER |
+| 3 | Raw `String`/`u16`, no domain invariants | BLOCKER |
+| 12 | `Vec<String>` allocation per line, no `try_reserve` | MAJOR |
+| — | No benchmark/profiler/allocation/command evidence | MAJOR |

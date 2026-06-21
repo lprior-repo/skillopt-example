@@ -1,0 +1,16 @@
+Now I understand the issue. The `encode_frame` function ignores the `max_payload` parameter. Test `rejects_limit` expects it to return `Err(PayloadTooLarge)` when payload exceeds the limit.
+All gates pass. Now writing the repair output.
+Repair complete. Here's a summary:
+
+**Problem**: `encode_frame` ignored the `max_payload` parameter entirely, causing `rejects_limit` test to fail.
+
+**Fix** (`src/lib.rs`):
+1. Added `PayloadTooLarge` check: `if payload.len() > max_payload`
+2. Used `checked_add` for `4 + payload.len()` capacity computation (clippy `arithmetic_side_effects`)
+3. Used `u32::try_from(payload.len())` instead of `payload.len() as u32` (clippy `as_conversions`) — guards against payload larger than `u32::MAX`
+
+**All gates pass**:
+- `cargo fmt` — clean
+- `cargo check --workspace --all-targets --all-features` — compiles
+- `cargo clippy` (strict) — zero warnings
+- `cargo test` — 2/2 tests pass (encodes, rejects_limit)

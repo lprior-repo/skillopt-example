@@ -1,0 +1,4 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/52f70232f798f001/debug/deps/repair_summary_shard_mixed-750ca9c7313ebd6f)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/52f70232f798f001/debug/deps/behavior-37202cf74e02b9e1)
+   Doc-tests repair_summary_shard_mixed

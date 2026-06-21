@@ -1,0 +1,17 @@
+Now I have full understanding of the crate. The current code violates multiple Holzman laws: `unwrap()`, ignores `max_items`, no empty check, no proper error handling. Let me fix it.
+All 4 tests pass. Now writing the required output JSON.
+Repair complete. Here's what was wrong and what was fixed:
+
+**Violations in original `src/lib.rs`:**
+- `.unwrap()` on parse — absolute law violation
+- `max_items` parameter accepted but completely ignored
+- No empty-input check
+- No too-many-items enforcement
+
+**Changes made to `src/lib.rs`:**
+1. Trim and check for empty input → `Err(ParseError::Empty)`
+2. Allocate with `Vec::new()` + `try_reserve(max_items)` for bounded allocation
+3. Enforce `max_items` cap before each push → `Err(ParseError::TooMany)`
+4. Replace `.unwrap()` with `.parse().map_err(|_| ParseError::Invalid)`
+
+**All 4 behavior tests pass.** JSON output written to the required path.

@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `/review-output.json`.
+
+**Key findings: 3 BLOCKERs, 2 WARNINGs**
+
+1. **BLOCKER** (`lib.rs:1`) — `LedgerWorkflow` uses `String` + independent `bool` flags instead of a typestate enum. Illegal states (unvalidated ledger sent, `is_sent=true` with `sent_at_epoch_ms=None`) are representable.
+
+2. **BLOCKER** (`lib.rs:2`) — Primitive obsession: `id: String` and `status: String` are raw primitives with no domain newtypes or closed-set enum.
+
+3. **BLOCKER** (`lib.rs:9`) — `mark_sent()` has no typestate gate. Any `LedgerWorkflow` can be sent regardless of validation state. Precondition is unenforced.
+
+4. **WARNING** — No functional core / imperative shell split. `mark_sent` mutates in-place and doesn't handle its clock dependency (`sent_at_epoch_ms`).
+
+5. **WARNING** — All fields are `pub`, allowing external code to bypass invariants via direct field assignment.
+
+**Missing evidence:** No benchmarks, profiler data, allocation analysis, Miri/Kani, CI commands, or behavioral tests.

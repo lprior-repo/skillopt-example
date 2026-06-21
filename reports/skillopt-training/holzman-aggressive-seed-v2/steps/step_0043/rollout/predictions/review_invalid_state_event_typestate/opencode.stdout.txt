@@ -1,0 +1,12 @@
+Review complete. Written to `review-output.json`.
+
+**6 findings: 5 BLOCKER, 1 WARNING**
+
+The crate violates core Holzman Rust / Functional Rust principles:
+
+1. **`status: String`** (line 3) — Primitive obsession. Any string is representable; no closed set of lifecycle states. Should be an `EventStatus` enum.
+2. **`is_validated: bool` / `is_sent: bool`** (lines 4-5) — Independent booleans encode no ordering or mutual exclusivity. All 4 combinations are structurally valid but only some are semantically valid. Replace with enum typestate.
+3. **`mark_sent` no preconditions** (line 9) — Unconditionally overwrites state without checking if the event was validated. Returns `EventWorkflow` directly, not `Result`. Enables sending unvalidated events.
+4. **`sent_at_epoch_ms: Option<u64>` invariant** (line 6) — `mark_sent` sets `is_sent = true` but never populates the timestamp. The invariant "sent implies timestamp" is permanently broken.
+5. **No constructors, all public fields** (line 1) — Zero type-level invariants. Any code can construct illegal states. No opaque struct, no fallible constructor.
+6. **No benchmark/profiler evidence** — No `benches/`, no allocation audits, no command evidence for cargo gates.

@@ -1,0 +1,25 @@
+Now let me read the references and run an initial test to see the failures:
+Now I have a clear picture. The current implementation has multiple Holzman violations and wrong signatures:
+
+1. Returns `String` instead of `Summary` (tests expect `Result<Summary, SummaryError>`)
+2. No `render_summary` function
+3. `unwrap()` on parse
+4. Unchecked `+=` (overflow)
+5. Unchecked `/` (division by zero)
+6. `split()`+`collect()`+indexing instead of `split_once`+`get`
+7. No empty-input or invalid-format checks
+All 6 tests pass. Let me fix the unused variable warning:
+Clean build, all 6 tests pass, zero warnings. Let me write the output:
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `summarize_metrics` returned `Result<String>` | Changed to `Result<Summary>` (typed domain result) |
+| No `render_summary` function | Added `render_summary(Summary) -> String` |
+| `parts[1].parse().unwrap()` | `split_once(',')` + `get`-style parsing + `map_err` |
+| `total += value` (unchecked) | `checked_add` → `Err(Overflow)` |
+| `total / count` (div-by-zero) | `checked_div` → `Err(Invalid)` |
+| `split()`+`collect()`+indexing | `split_once` per Holzman parse-boundary rule |
+| No empty-input handling | `count == 0` → `Err(Empty)` |
+
+All 6 behavior tests pass, zero compiler warnings.

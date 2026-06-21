@@ -1,0 +1,17 @@
+Now I understand the crate. Tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. Current code has many Holzman violations. Let me fix it.
+All 6 tests pass. Writing the repair output.
+Repair complete. All 6 tests pass.
+
+**Violations fixed in `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `.map_err(\|_| SummaryError::Invalid)` |
+| Unchecked `parts[1]` indexing | `split_once(',')` pattern |
+| `total += value` (unchecked add) | `checked_add` + `Overflow` error |
+| `count += 1` (unchecked add) | `checked_add` + `Overflow` error |
+| `count as u32` (lossy cast) | `u32::try_from(count).map_err(Overflow)` |
+| `count as u64` (lossy cast) | `u64::try_from(count).map_err(Overflow)` |
+| `total / count` (unchecked div) | `checked_div` + `Invalid` error |
+| `Vec::with_capacity` + collect | Removed entirely, using `split_once` |
+| Returns `String` from core | Returns `Summary` struct; added `render_summary` for formatting |

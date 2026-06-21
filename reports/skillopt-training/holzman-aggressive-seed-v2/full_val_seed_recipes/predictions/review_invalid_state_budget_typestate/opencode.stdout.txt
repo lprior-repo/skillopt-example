@@ -1,0 +1,8 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Found 11 findings across the task crate:
+
+- **3 BLOCKERs**: illegal states representable (String status + bool lifecycle flags), primitive ID (no newtype), `mark_sent` lacks typestate enforcement
+- **4 MAJOR**: public mutability on all fields, primitive string enum, lifecycle booleans without correlation, ignored fallibility in transitions
+- **3 MINOR**: no typed error taxonomy, no benchmark evidence, no behavior tests
+
+All findings written to `review-output.json`.

@@ -1,0 +1,6 @@
+Repair complete. Two fixes applied to `src/lib.rs:8-21`:
+
+1. **Payload guard** — added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge`
+2. **Checked arithmetic + allocation discipline** — replaced `payload.len() as u32` (lossy cast) with `u32::try_from()`, added `checked_add` for capacity, and `try_reserve` for allocation
+
+Both behavior tests pass. `repair-output.json` written.

@@ -1,0 +1,17 @@
+Now I have all the information needed. The crate has significant Holzman Rust violations. Let me write the review output.
+Review complete. Wrote `review-output.json` with 8 BLOCKER findings and 2 WARNING findings:
+
+| # | Rule | Location | Issue |
+|---|------|----------|-------|
+| 1 | zero_forbidden_constructs | `src/lib.rs:9` | `unwrap()` on `fs::read_to_string` I/O |
+| 2 | zero_forbidden_constructs | `src/lib.rs:19` | `unwrap()` on `parse::<u32>()` |
+| 3 | zero_forbidden_constructs | `src/lib.rs:19` | Lossy `as u16` cast on u32 |
+| 4 | no_unchecked_indexing | `src/lib.rs:16` | `parts[0]` unchecked indexing |
+| 5 | no_unchecked_indexing | `src/lib.rs:19` | `parts[1]` unchecked indexing |
+| 6 | functional_core_imperative_shell | `src/lib.rs:16` | `println!` side effect in core |
+| 7 | typed_domain_errors | `src/lib.rs:8` | Returns `Vec` instead of `Result` |
+| 8 | checked_conversions | `src/lib.rs:19` | `parse::<u32>()` + `as u16` combo |
+
+Plus 2 WARNINGs: unbounded allocation (no `try_reserve`/`split_once`) and ignored `println!` return value.
+
+5 missing evidence items flagged (no benchmarks, profiler, allocation audit, or CI command evidence).

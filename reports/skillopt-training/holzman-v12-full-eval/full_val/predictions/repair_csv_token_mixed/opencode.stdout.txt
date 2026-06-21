@@ -1,0 +1,15 @@
+I'll start by reading the skill bundle, references, and understanding the task crate structure.
+Now let me explore the task crate structure and read the references.
+I've read the skill, references, Cargo.toml, source, and tests. The current `parse_tokens` has three Holzman violations: `.unwrap()` (panic surface), no empty check, and no `max_items` enforcement. Let me fix it now.
+All 4 tests pass. Let me verify the final source and write the output JSON.
+Repair complete. Here's what was done:
+
+**Violations found and fixed in `src/lib.rs`:**
+
+1. `.unwrap()` on parse → replaced with `.map_err(|_| ParseError::Invalid)?` (no-panic law)
+2. No empty input check → added `input.trim().is_empty()` guard returning `ParseError::Empty`
+3. `max_items` ignored → enforced with `values.len() >= max_items` check returning `ParseError::TooMany`
+4. No bounded allocation → added `try_reserve(max_items)` returning `ParseError::Allocation`
+5. `collect()` unbounded → replaced with explicit `for` loop respecting `max_items` cap
+
+**Result:** 4/4 behavior tests pass, zero Holzman absolute law violations remain.

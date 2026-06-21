@@ -1,0 +1,15 @@
+Review complete. Written to `review-output.json` with 7 findings and 5 missing evidence items.
+
+**Summary of violations found:**
+
+| # | Severity | Rule | File:Line | Issue |
+|---|----------|------|-----------|-------|
+| 1 | BLOCKER | typestate_enums | src/lib.rs:3 | `status: String` allows arbitrary values instead of a total enum |
+| 2 | BLOCKER | no_bool_lifecycle_flags | src/lib.rs:4 | `is_validated: bool` is a partial lifecycle flag |
+| 3 | BLOCKER | no_bool_lifecycle_flags | src/lib.rs:5 | `is_sent: bool` is redundant and inconsistent with status |
+| 4 | BLOCKER | functional_core_enforces_invariants | src/lib.rs:9 | `mark_sent` has no preconditions — allows invalid transitions |
+| 5 | BLOCKER | make_illegal_states_unrepresentable | src/lib.rs:1 | All `pub` fields allow external construction of invalid states |
+| 6 | MAJOR | domain_newtypes | src/lib.rs:2 | `id: String` has no domain validation |
+| 7 | MINOR | allocation_handling | src/lib.rs:10 | `.to_string()` without allocation-failure handling |
+
+The core issue: the struct uses primitives (String, bool) to encode a state machine, making illegal states fully representable and unguarded.

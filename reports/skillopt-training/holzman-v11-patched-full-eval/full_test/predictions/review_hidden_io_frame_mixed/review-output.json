@@ -1,0 +1,101 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing or unreadable file",
+      "failure_mode": "untrusted or absent file path aborts the entire process instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, IoError> and use ? on fs::read_to_string"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or missing second field",
+      "failure_mode": "malformed CSV line panics instead of returning a typed ParseError",
+      "fix": "use .map_err(|e| ParseError::InvalidValue(e.to_string())) on parse and return Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] access Vec indices without bounds checking",
+      "failure_mode": "empty or short lines panic via IndexOut ofBounds instead of returning a typed error",
+      "fix": "use parts.get(0) and parts.get(1) with .ok_or(ParseError::Invalid) or restructure with split_once"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast from u32 that silently truncates values above 65535",
+      "failure_mode": "out-of-range values wrap silently producing incorrect domain data",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow) instead of as u16"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames fuses file I/O (fs::read_to_string), logging (println), parsing, and domain construction into one function",
+      "failure_mode": "side-effectful I/O and stdout mutation contaminate pure domain logic; core cannot be tested or reused without triggering real filesystem access",
+      "fix": "split into shell fn load_frames(path) -> Result<Vec<Record>, IoError> { parse_records(&fs::read_to_string(path)?); } and pure fn parse_records(text: &str) -> Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) emits side-effectful stdout inside data-loading logic",
+      "failure_mode": "hidden I/O pollutes output, breaks deterministic testing, and leaks implementation details into the domain layer",
+      "fix": "remove println entirely; if instrumentation is needed, pass a callback or return metadata separately from the domain records"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "raw String name and u16 value fields are constructed directly from parsed primitives with no smart constructor or boundary validation",
+      "failure_mode": "raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly",
+      "fix": "introduce a ParseError enum (Empty, Invalid, Overflow) and a smart constructor Record::new(name: &str, value_str: &str) -> Result<Record, ParseError> that validates and builds"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_mandatory",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates an intermediate Vec<String> instead of using mandated split_once for one-separator grammar",
+      "failure_mode": "unnecessary heap allocation per line; split_once is mandatory for single-separator CSV grammars per Holzman rules",
+      "fix": "use let (name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)?; and parse value_str directly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typestate_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String for name with no newtype, enum, or domain constraint",
+      "failure_mode": "empty strings, whitespace-only names, or reserved names cannot be rejected at the type level",
+      "fix": "introduce Name newtype with a smart constructor that validates non-empty and bounded length"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_frames throughput or memory",
+    "no profiler data showing allocation hotspots in the split/collect path",
+    "no allocation audit for Vec<String> intermediate per line",
+    "no second-ring review or command-truth evidence",
+    "no command evidence (cargo fmt --check, cargo clippy, cargo test) was run",
+    "no workload description or regression threshold for performance claims"
+  ],
+  "residual_risk": "This is a static review only with no commands executed. The crate contains 9 blockers: unwrap on I/O and parse, unchecked indexing, lossy as-cast, hidden println I/O, fused shell/core boundaries, missing split_once, absent typed error taxonomy, missing smart constructor/parse boundary, and raw String without newtype. Every absolute law violation is unmitigated. The code will panic on any malformed input, missing file, or value over 65535."
+}

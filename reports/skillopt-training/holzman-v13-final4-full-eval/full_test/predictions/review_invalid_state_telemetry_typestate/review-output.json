@@ -1,0 +1,74 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    "src/lib.rs"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TelemetryWorkflow has no state machine enforcing valid lifecycle transitions. mark_sent can be called regardless of whether the item was validated or previously sent, allowing arbitrary state mutations.",
+      "failure_mode": "telemetry can be marked sent without ever being validated, producing invalid end-state telemetry that corrupts downstream consumers",
+      "fix": "Replace status/is_validated/is_sent with a typestate enum (e.g. enum TelemetryState { Unvalidated, Validated, Sent { sent_at_epoch_ms: u64 } }) and make mark_sent accept only the Validated variant, returning Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-to-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status field is pub String instead of a domain enum. Any caller can assign arbitrary string values like \"sent\", \"deleted\", or \"\", bypassing domain invariants. mark_sent hardcodes .to_string() for mutation.",
+      "failure_mode": "invalid status values propagate through the system; comparison of status requires string equality checks which are fragile and error-prone; domain intent is lost",
+      "fix": "Replace pub status: String with pub status: TelemetryStatus (enum { Pending, Validated, Sent }) and remove the separate is_sent bool. The enum variant itself encodes the lifecycle stage."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-to-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are separate lifecycle booleans that can reach invalid combinations: is_validated=false and is_sent=true. The hardening checklist requires lifecycle booleans to be replaced with typestate.",
+      "failure_mode": "telemetry marked as sent without validation; callers must check two booleans independently instead of relying on a single type-enforced state, making invalid states representable",
+      "fix": "Remove both bool fields. Replace with a single TelemetryState enum where each variant captures exactly the valid combination of lifecycle data. Use the Sent variant to carry sent_at_epoch_ms."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a bare Option field that allows sentinel-value invalid states: is_sent=true but sent_at_epoch_ms=None means the item is marked sent with no timestamp. Optional lifecycle data should live in the enum variant that owns it.",
+      "failure_mode": "sent telemetry with no timestamp breaks downstream consumers that expect a timestamp whenever is_sent is true; the None/Some sentinel is indistinguishable from 'not yet set'",
+      "fix": "Move sent_at_epoch_ms into the TelemetryState::Sent { sent_at_epoch_ms: u64 } variant. The Option becomes implicit — only the Sent variant holds it, and it is a concrete u64 with no None possibility."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain semantics. Any caller can construct a TelemetryWorkflow with an empty string, arbitrary bytes, or invalid ID format. IDs carrying rules should be newtyped.",
+      "failure_mode": "empty or malformed telemetry IDs enter the system; downstream lookups or deduplication fail; no validation invariant is enforced at construction",
+      "fix": "Replace with id: TelemetryId where TelemetryId is a newtype wrapping a validated representation (e.g. struct TelemetryId(String) with a smart constructor that rejects empty/whitespace IDs, or use a UUID-based newtype)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "Raw String, bool, and Option<u64> values cross the parse boundary without fallible smart constructors. Any caller in any crate can construct TelemetryWorkflow { id: \"\".to_string(), status: \"\".to_string(), is_validated: false, is_sent: true, sent_at_epoch_ms: None } directly. The parse boundary requires that external primitives be parsed once into trusted domain types before core logic consumes them.",
+      "failure_mode": "invalid domain states are constructed at every call site; mark_sent operates on potentially-invalid state; no single validation point exists for telemetry lifecycle data",
+      "fix": "Add a TelemetryWorkflow::try_new(...) -> Result<Self, TelemetryError> smart constructor that validates id is non-empty, status is a known enum variant, and lifecycle invariants hold (e.g. is_sent implies sent_at_epoch_ms is Some). Replace all direct struct literal construction with the fallible constructor."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or latency",
+    "no profiler data shows whether TelemetryWorkflow is in any hot path",
+    "no allocation analysis — String fields cause heap allocations on every TelemetryWorkflow instance; no evidence that allocation cost is bounded or acceptable",
+    "no second-ring evidence (assembly, benchmark, or profiler) for any performance claim about this module"
+  ],
+  "residual_risk": "Type-level invariants are absent: any caller can construct and mutate TelemetryWorkflow into logically impossible states. Without an enum-based typestate machine, the only enforcement is doc comments and developer discipline. Static review only — no commands were run."
+}

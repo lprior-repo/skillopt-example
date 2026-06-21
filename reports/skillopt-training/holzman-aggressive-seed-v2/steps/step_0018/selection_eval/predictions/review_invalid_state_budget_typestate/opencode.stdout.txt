@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with 11 findings:
+
+**BLOCKER (4):**
+- `status: String` — illegal states representable, should be enum
+- `is_validated: bool` + `is_sent: bool` — independent flags allow impossible state combinations
+- All fields `pub` — no encapsulation, no constructor, any caller can set arbitrary values
+- No typestate pattern — compiler cannot enforce valid lifecycle transitions
+
+**MAJOR (3):**
+- `"sent".to_string()` — heap allocation in pure core function
+- No fallible constructor — no enforcement point for domain invariants
+- `sent_at_epoch_ms: Option<u64>` — no validation, independent of `is_sent` flag
+
+**MINOR (4):**
+- Missing benchmark, profiler, and allocation evidence
+- Missing command/CI evidence for automated gates
+
+**Residual risk:** High — the struct is a plain data bag with no compile-time domain invariants, allocation in the pure core, and no evidence chain.

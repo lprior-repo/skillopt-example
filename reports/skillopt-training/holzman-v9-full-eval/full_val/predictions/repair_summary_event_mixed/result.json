@@ -1,0 +1,39 @@
+{
+  "id": "repair_summary_event_mixed",
+  "hard": 0,
+  "soft": 0.988888888888889,
+  "task_type": "repair",
+  "task_description": "Repair repair_summary_event while preserving tests and Holzman + functional-core constraints.",
+  "fail_reason": "u32::try_from/try_from",
+  "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/b75537242ecc7986/repair_summary_event_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/b75537242ecc7986/repair_summary_event_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/b75537242ecc7986/repair_summary_event_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/b75537242ecc7986/repair_summary_event_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+  "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \"SKILL.md\",\n    \"references/hardening-checklist.md\",\n    \"references/functional-core-performance.md\",\n    \"references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\n    \"src/lib.rs\"\n  ],\n  \"commands\": [\n    {\"command\": \"cargo fmt\", \"status\": \"passed\"},\n    {\"command\": \"cargo test\", \"status\": \"passed\"}\n  ],\n  \"rules_satisfied\": [\n    \"No production unsafe\",\n    \"No unwrap/expect/panic/todo/unimplemented/unreachable/assert in production source\",\n    \"No unchecked arithmetic: checked_add and checked_div used throughout\",\n    \"No lossy as conversions: u64::from(count_u32) used for widening cast\",\n    \"No unchecked indexing: split_once replaces parts[i]\",\n    \"No ignored fallible results: all Results propagated with ?\",\n    \"Bounded allocation: try_reserve(max_rows) before Vec growth\",\n    \"Functional core: pure domain logic separated from rendering shell\",\n    \"Typed errors: SummaryError enum with Empty/Invalid/TooMany/Overflow\",\n    \"Hostile input parsed once at boundary: split_once + parse with map_err\",\n    \"Tests unchanged: behavior contract preserved\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"None. All Holzman absolute laws satisfied. Single-pass parse eliminates double-validation dead code. Checked arithmetic covers all addition and division. try_reserve bounds allocation. No unsafe, FFI, raw pointers, or panic surfaces remain.\"\n}\n",
+  "n_turns": 1,
+  "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-v9-full-eval/full_val/predictions/repair_summary_event_mixed",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/b75537242ecc7986/repair_summary_event_mixed",
+  "grade": {
+    "hard": 0.0,
+    "soft": 0.988888888888889,
+    "failures": [
+      [
+        "u32::try_from",
+        "try_from"
+      ]
+    ],
+    "json_valid": true,
+    "fmt_passed": true,
+    "clippy_passed": true,
+    "tests_passed": true,
+    "protected_changed": [],
+    "forbidden_matches": [],
+    "matched_groups": 8,
+    "total_groups": 9,
+    "missing_groups": [
+      [
+        "u32::try_from",
+        "try_from"
+      ]
+    ],
+    "execution_errors": []
+  }
+}

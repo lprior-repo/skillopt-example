@@ -1,0 +1,16 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Valid JSON written to `review-output.json`.
+
+**11 findings**, all severity BLOCKER, across these violation categories:
+
+| Category | Count | Key Files/Lines |
+|---|---|---|
+| Forbidden constructs (`unwrap`, unchecked indexing) | 4 | `lib.rs:9`, `:18`, `:19` |
+| Functional Core / Imperative Shell violations | 2 | `lib.rs:8`, `:16` |
+| Resource bounds (unbounded alloc, no streaming) | 2 | `lib.rs:10`, `:12` |
+| Typed errors / domain types | 2 | `lib.rs:5`, `:8` |
+| Lossy conversion | 1 | `lib.rs:19` (`u32 as u16`) |
+
+**6 missing evidence** items: no benchmarks, no profiler data, no tests, no CI gate evidence.
+
+**Residual risk**: Full repair required — every hostile input path triggers panic or data corruption. No delivery gate can pass.

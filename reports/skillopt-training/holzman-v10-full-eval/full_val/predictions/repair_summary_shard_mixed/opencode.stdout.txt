@@ -1,0 +1,12 @@
+Repair complete. All 6 behavior tests pass, all strict lint gates clear.
+
+**Changes to `src/lib.rs`:**
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` (matching test contract)
+- **Added `render_summary`**: Pure formatting function for `Summary` → `String` (Functional Core/Imperative Shell separation)
+- **Removed `unwrap()`**: Parse errors now return `SummaryError::Invalid` via `map_err`
+- **Checked arithmetic**: `checked_add` for total/count, `checked_div` for average
+- **Checked conversions**: `u64::try_from(count)` and `u32::try_from(count)` replacing lossy `as` casts
+- **Checked access**: `split_once(',')` replacing unchecked `parts[1]` indexing
+- **Empty input handling**: Returns `Err(SummaryError::Empty)` for empty/all-whitespace input
+- **Invalid line handling**: Lines without comma separator return `Err(SummaryError::Invalid)`

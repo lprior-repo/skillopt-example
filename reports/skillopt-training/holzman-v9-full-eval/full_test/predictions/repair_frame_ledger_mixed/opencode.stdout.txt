@@ -1,0 +1,7 @@
+Now I see the issue. The current `encode_frame` ignores `max_payload` entirely, so the `rejects_limit` test will fail. Let me fix it.
+Both tests pass. Writing the required output.
+Repair complete. Both behavior tests pass.
+
+**Change made** (`src/lib.rs:8-14`):
+- Added `max_payload` enforcement: returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`
+- Replaced lossy `payload.len() as u32` with checked `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)`

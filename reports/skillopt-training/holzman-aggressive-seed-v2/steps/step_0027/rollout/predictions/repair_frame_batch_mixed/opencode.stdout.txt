@@ -1,0 +1,7 @@
+Repair complete. All changes in `src/lib.rs:8-20`:
+
+- Added `payload.len() > max_payload` guard → returns `PayloadTooLarge`
+- Replaced `payload.len() as u32` (lossy cast) with `try_into()` (checked)
+- Added `checked_add` for header+payload capacity math
+- Replaced `Vec::new()` + implicit grow with `try_reserve` + allocation-error mapping
+- Removed all Holzman-violating patterns; both `encodes` and `rejects_limit` tests pass

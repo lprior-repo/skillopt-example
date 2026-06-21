@@ -1,0 +1,8 @@
+Now I have all the information. Let me write the review output.
+Review complete. Written to `review-output.json` with 3 findings:
+
+1. **BLOCKER** - `SensorWorkflow` makes illegal states representable (status String + bools + Option can form contradictions)
+2. **BLOCKER** - `id` is a bare `String` with no domain newtype or constraints
+3. **MINOR** - `mark_sent` uses procedural mutation instead of pure state transition
+
+5 missing evidence items flagged (no benchmarks, profiler, allocation analysis, second-ring verification, or test commands).

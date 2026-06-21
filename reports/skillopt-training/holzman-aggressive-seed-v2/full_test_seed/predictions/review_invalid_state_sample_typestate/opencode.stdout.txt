@@ -1,0 +1,12 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings, 4 missing evidence items.**
+
+Key violations found:
+- **BLOCKER**: `status: String` makes illegal states representable — any arbitrary string is valid
+- **BLOCKER**: `is_validated: bool` and `is_sent: bool` are lifecycle flags that should be enums/typestates
+- **BLOCKER**: `mark_sent` has no validation gate — any workflow can be marked sent regardless of state
+- **BLOCKER**: All fields are `pub`, allowing uncontrolled mutation from any caller
+- **WARNING**: Unbounded `String` allocation in `mark_sent` without `try_reserve` pattern
+- **INFO**: No benchmarks, profiler, or allocation evidence exists

@@ -1,0 +1,14 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 10 findings and 6 missing evidence items.
+
+**BLOCKERs (4):**
+1. **typestate** (`src/lib.rs:1`) — `status: String` + `is_validated: bool` + `is_sent: bool` allows illegal state combinations
+2. **parse_boundary** (`src/lib.rs:2`) — raw `String`/`bool`/`Option` enter domain without smart constructor
+3. **forbidden_constructs** (`src/lib.rs:10`) — `.to_string()` allocation + inconsistent mutation in `mark_sent`
+4. **public_api** (`src/lib.rs:1`) — all fields `pub`, enabling any caller to construct invalid states
+
+**MAJOR (4):** missing benchmark, profiler, allocation evidence, and command/test evidence
+
+**MINOR (1):** `id` should be a typed newtype, not `String`
+
+**Residual risk:** The struct represents illegal states freely; mark_sent can leave struct inconsistent; no automated verification exists. Requires full refactor to enum-based typestate with fallible smart constructors.

@@ -1,0 +1,6 @@
+Repaired. All 4 behavior tests pass. Changes in `src/lib.rs`:
+
+- **Removed** `unwrap()` — parse errors now return `ParseError::Invalid`
+- **Added** empty-input check → `ParseError::Empty`
+- **Added** `max_items` cap check → `ParseError::TooMany`
+- **Added** `try_reserve` for bounded allocation → `ParseError::Allocation`

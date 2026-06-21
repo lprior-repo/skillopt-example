@@ -1,0 +1,4 @@
+[package]
+name = "review_perf_folklore_fixed_rayon_smallvec"
+version = "0.1.0"
+edition = "2021"

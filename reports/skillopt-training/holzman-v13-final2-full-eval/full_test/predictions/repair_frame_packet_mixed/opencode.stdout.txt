@@ -1,0 +1,8 @@
+Repaired `src/lib.rs:8-21`. Changes:
+
+1. **Payload size boundary check** — returns `PayloadTooLarge` when `payload.len() > max_payload` (satisfies `rejects_limit` test)
+2. **Checked capacity arithmetic** — `4usize.checked_add(payload.len())` replaces implicit allocation (no unchecked arithmetic)
+3. **Checked conversion** — `u32::try_from(payload.len())` replaces lossy `payload.len() as u32` (no lossy cast)
+4. **Fallible allocation** — `Vec::new()` + `try_reserve(capacity)` replaces unbounded implicit allocation (bounded resources)
+
+All gates passed: `cargo fmt`, `cargo test` (2/2), `cargo clippy -D warnings`.

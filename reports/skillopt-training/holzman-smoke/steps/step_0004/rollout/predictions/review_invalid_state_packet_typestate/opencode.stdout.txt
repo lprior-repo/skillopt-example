@@ -1,0 +1,14 @@
+Now I have all the references. Let me write the review output.
+Review complete. Written to `review-output.json` with:
+
+- **10 findings** (8 BLOCKER, 1 WARNING, 1 INFO)
+- **4 missing evidence** items
+- **Residual risk**: BLOCK_GLOBAL — the data model has three independent fields (`status: String`, `is_validated: bool`, `is_sent: bool`) encoding a single lifecycle dimension, creating combinatorial illegal states with no invariant enforcement
+
+Key violations:
+1. `status: String` instead of `PacketStatus` enum — allows arbitrary values
+2. `is_validated: bool` and `is_sent: bool` — bool lifecycle flags independent of status
+3. `sent_at_epoch_ms: Option<u64>` — Option lifecycle field decoupled from sent state
+4. All `pub` fields — no constructor, no invariant enforcement
+5. `mark_sent` — no validation that packet was validated before sending
+6. `id: String` — primitive obsession, no `PacketId` newtype

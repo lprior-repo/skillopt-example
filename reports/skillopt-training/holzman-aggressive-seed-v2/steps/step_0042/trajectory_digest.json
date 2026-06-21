@@ -1,0 +1,24 @@
+{
+  "step": 42,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 1,
+  "failure_patterns": [
+    {
+      "pattern": "missing_try_reserve: Agent failed to use try_reserve for Vec allocation with known capacity.",
+      "count": 1,
+      "task_ids": [
+        "repair_frame_route_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.8,
+  "score_after": 0.8,
+  "rejected_edits": [
+    {
+      "op": "replace",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded or known, unchecked `+`/`-`/`*` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Ensure all capacity/length calculations use checked arithmetic.",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded, unchecked `+`/`-`/`*` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore-performance-claim",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims Rayon and SmallVec will be faster without any benchmark, baseline, or measurement. Rayon introduces thread-pool and task-scheduling overhead that dwarfs any benefit for 4-element inputs. SmallVec adds heap-allocation complexity for a known-4-element case where a fixed-size array is superior.",
+      "failure_mode": "Adding Rayon on 4 elements will measurably degrade latency (5-100x slower due to rayon-core dispatcher overhead). SmallVec adds indirection and potential heap allocation that a stack-allocated [T; 4] avoids entirely.",
+      "fix": "Replace Vec with [\\&'static str; 4] and compute directly with a for-loop or fixed array initializer. Remove the TODO. Measure only if a genuine bottleneck is proven."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unbounded-allocation-tiny-input",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns Vec<&'static str> for a fixed-size [u8; 4] input. Every call heap-allocates a Vec regardless of whether the caller needs ownership or mutability.",
+      "failure_mode": "Caller cannot use the result in a zero-allocation context. Hot-path callers that invoke classify_four repeatedly incur unavoidable heap allocations, defeating zero-cost-abstraction guarantees and increasing GC/allocator pressure.",
+      "fix": "Return [\\&'static str; 4] so the output is stack-allocated with zero heap cost. Example: let mut out = [\"even\"; 4]; for i in 0..4 { out[i] = if bytes[i] & 1 == 0 { \"even\" } else { \"odd\" }; }; out"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for classify_four or any performance claim. The TODO asserts Rayon+SmallVec would be faster with zero evidence.",
+      "failure_mode": "Optimizations based on folklore rather than measurement routinely regress performance. Without a baseline command, baseline number, and regression threshold, no performance claim is auditable.",
+      "fix": "Remove the TODO. If classification performance matters, write a criterion benchmark with a fixed workload description, then compare [\\&'static str; 4] against Vec, then Rayon only if the workload justifies it (it won't for 4 elements)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "todo-in-production-source",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production source contains a TODO directive that advocates for anti-patterns (Rayon on tiny data). While not a panic macro, it encodes a bad architectural decision into the codebase as an open obligation.",
+      "failure_mode": "Future developers or automated tools may follow the TODO and introduce Rayon/SmallVec, degrading performance and violating Holzman's no-folklore-optimization rule.",
+      "fix": "Remove the TODO. Replace the implementation with the correct stack-allocated fix. If Rayon/SmallVec investigation is genuinely needed, move it to a bench module with measured comparison."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "iterator-idiom-vs-explicit-loop",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Uses .iter().map().collect() for a fixed-size 4-element transform. While idiomatic, the iterator pipeline allocates via collect::<Vec<_>>() and creates an intermediate iterator state machine.",
+      "failure_mode": "Minor overhead: iterator state machine, drop glue for Vec, and heap allocation. For a function on 4 bytes these are real but small costs that matter only when the function is in a tight hot path.",
+      "fix": "Use an explicit indexed loop writing to a [\\&'static str; 4] with checked bounds (0..4 is provably safe for [u8; 4]). This eliminates all allocation and iterator overhead."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four or any performance claim in the crate",
+    "no profiler evidence showing classify_four is a bottleneck",
+    "no allocation analysis (e.g., alloc counter or flamegraph) for the function",
+    "no second-ring evidence (assembly) for zero-cost or bounds-check removal claims",
+    "no command evidence for cargo fmt, cargo check, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "Static review only; no commands run. The TODO on line 2 encodes a folklore performance claim that will mislead future changes. The function returns Vec for fixed-size input causing unnecessary heap allocation. Replacing with [\\&'static str; 4] eliminates all allocation. Rayon on 4 elements is provably slower due to dispatcher overhead. SmallVec on known-4-element data is an unnecessary abstraction. Without benchmark infrastructure, no performance claim is verifiable."
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "op": "replace",
+    "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the f",
+    "content_preview": "- **Parsing:** Use `split_once` for first-delimiter extraction, `get` for indexed access, and `try_from` for width conversions. Never use `split` + `collect` + indexing when `split_once` suffices.\n- *",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "## Review Mode\n\nFindings must be independently gradable: severity, rule, file, line, problem, concrete failure mode, and smallest compliant fix. Flag missing evidence as a finding. Review outputs requ",
+    "content_preview": "## Review Mode\n\nFindings must be independently gradable: severity, rule, file, line, problem, concrete failure mode, and smallest compliant fix. Flag missing evidence as a finding. Review outputs requ",
+    "status": "applied_replace",
+    "index": 2
+  },
+  {
+    "op": "replace",
+    "target": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smalles",
+    "content_preview": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smalles",
+    "status": "applied_replace",
+    "index": 3
+  },
+  {
+    "op": "replace",
+    "target": "## Performance Discipline\n\nDo not cargo-cult Rayon, SmallVec, Cow, zero-copy, manual loops, or iterator chains. Use them because the workload, lifetime, allocation budget, or benchmark supports them. ",
+    "content_preview": "## Performance Discipline\n\nDo not cargo-cult Rayon, SmallVec, Cow, zero-copy, manual loops, or iterator chains. Use them because the workload, lifetime, allocation budget, or benchmark supports them. ",
+    "status": "applied_replace",
+    "index": 4
+  }
+]

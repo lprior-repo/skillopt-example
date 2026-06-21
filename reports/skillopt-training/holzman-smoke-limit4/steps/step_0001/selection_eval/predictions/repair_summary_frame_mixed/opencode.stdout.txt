@@ -1,0 +1,12 @@
+Now I have the full picture. The production code has multiple violations: wrong return type, missing `render_summary`, `unwrap`, unchecked indexing, unchecked arithmetic, no empty/invalid/overflow handling. Let me repair it.
+All 6 tests pass. Now writing the required output.
+Repaired. All 6 behavior tests pass. Changes in `src/lib.rs`:
+
+- **Return type**: `Result<String, SummaryError>` → `Result<Summary, SummaryError>` to match test contract
+- **Added `render_summary`**: formats `Summary` into display string
+- **Removed `unwrap()`**: replaced with `.map_err(|_| SummaryError::Invalid)?` on parse
+- **Removed unchecked indexing**: added `parts.len() < 2` guard before accessing `parts[1]`
+- **Removed unchecked arithmetic**: `total += value` → `checked_add` with overflow error
+- **Added empty detection**: returns `Err(Empty)` when no lines parsed
+- **Removed division-by-zero risk**: count checked before division
+- **Moved TooMany check**: into per-row loop for early exit

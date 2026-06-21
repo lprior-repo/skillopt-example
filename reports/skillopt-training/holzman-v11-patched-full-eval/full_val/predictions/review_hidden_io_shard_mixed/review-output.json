@@ -1,0 +1,116 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/hardening-checklist.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-hidden-io-pure-logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() is hidden I/O inside the data-loading function that should be pure calculation; shell leakage of logging into the core.",
+      "failure_mode": "Caller cannot suppress diagnostic output; side effect is baked into data processing; violates Functional Core / Imperative Shell.",
+      "fix": "Remove println! from load_shards entirely. Logging belongs in the imperative shell layer that calls the pure domain function."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing or unreadable file.",
+      "failure_mode": "Untrusted filesystem input aborts the process with a panic instead of returning a typed error the caller can recover from.",
+      "fix": "Return a Result<Record, LoadError> (or Result<Vec<Record>, LoadError>). Replace unwrap() with ? or map_err(|e| LoadError::Io(e))."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value.",
+      "failure_mode": "Malformed CSV input in the second column aborts the process with a panic instead of returning a typed ParseError.",
+      "fix": "Replace with .parse::<u16>().map_err(|_| RecordError::InvalidValue)? for direct fallible parse into the target type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unchecked-indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] unchecked index access on a Vec built from split.",
+      "failure_mode": "Empty line or line with fewer than 2 comma-separated fields panics via IndexOutofBounds.",
+      "fix": "Use split_once(',') to get exactly two fields. Let Ok/Err propagate instead of indexing."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unchecked-indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] unchecked index access on a Vec built from split.",
+      "failure_mode": "Line with only one field panics via IndexOutOfBounds before the parse attempt.",
+      "fix": "Use split_once(',') and destructure into (_name, value_str) with ok_or for shape validation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lossy-cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 cast after parse::<u32>() silently truncates values outside u16 range.",
+      "failure_mode": "A value like 65536 parses as u32 successfully then silently wraps to 0 in u16, silently corrupting domain data.",
+      "fix": "Parse directly into u16 via .parse::<u16>() and use .map_err() for fallible conversion. No cast needed."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split-once-for-one-separator",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a Vec of all parts instead of using split_once for a two-field CSV grammar.",
+      "failure_mode": "Unbounded intermediate allocation per line; extra splits wasted on trailing fields; shape is not validated at parse time.",
+      "fix": "Replace with let (name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)? to parse hostile input once with exact shape."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed-error-taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards returns Vec<Record> with no error type; all failures manifest as panic via unwrap.",
+      "failure_mode": "No caller distinguishes between IO failure, parse failure, invalid shape, or domain violation — every failure is a process abort.",
+      "fix": "Change signature to load_shards(path: &str) -> Result<Vec<Record>, LoadError> and define an enum: enum LoadError { Io(std::io::Error), Invalid(usize, ParseError), Allocation }. Return Result for every fallible step."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "bounded-allocation-try-reserve",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "text.lines().map(...).collect() has no capacity bound; unbounded heap allocation from untrusted file size.",
+      "failure_mode": "A large or adversarial input file allocates arbitrary heap memory, enabling DoS without any cap.",
+      "fix": "Add a max_items parameter. After validation call values.try_reserve(max_items).map_err(|_| LoadError::Allocation)? before the collect loop. Enforce count <= max_items inside the map."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no-shell-leakage",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards fuses file I/O (fs::read_to_string), domain construction (Record), logging (println!), and collection (Vec::collect) in one function.",
+      "failure_mode": "Pure domain logic is not unit-testable in isolation; I/O side effects are baked into calculation; impossible to mock or override behavior.",
+      "fix": "Split into two functions: (1) parse_record(line: &str) -> Result<Record, ParseError> as pure domain logic, and (2) load_shards(path: &str) -> Result<Vec<Record>, LoadError> as the shell layer handling I/O, with println! outside both."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "raw string from filesystem crosses the parse boundary directly into Record construction without a fallible smart constructor — callers can build invalid domain states via the split-and-index path.",
+      "failure_mode": "No validation gate exists between hostile external input and the domain type; malformed data silently reaches the domain layer.",
+      "fix": "Write a private smart constructor: fn new(name: String, value: u16) -> Result<Record, RecordError> with validation. Call it from parse_record after split_once and fallible u16 parse."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "domain-newtype",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is pub String — a raw primitive that carries no domain invariants.",
+      "failure_mode": "Any code can mutate or construct a name without validation; illegal name states (empty, null bytes, oversized) are representable.",
+      "fix": "Add a non-empty name newtype: pub struct RecordName(String) with a smart constructor that validates non-empty and returns Result<RecordName, RecordError>. Replace name field accordingly."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for load_shards throughput or allocation profile", "no profiler data (flamegraph, perf) to identify the measured bottleneck", "no allocation tracing (e.g., dhat, alloc counters) to bound heap usage under adversarial input", "no command-truth evidence (cargo fmt --check, cargo clippy, cargo test) in the review"],
+  "residual_risk": "Static review only — no commands were executed. All 12 findings are independently gradable from source. The function has 5 panic surfaces (2x unwrap, 2x indexing, 1x lossy cast), unbounded allocation, hidden I/O, and no typed error taxonomy. Without the prescribed fixes the code violates multiple absolute laws of Holzman Rust v11."
+}

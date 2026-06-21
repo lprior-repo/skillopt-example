@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a free-form `String` — any value (\"sent\", \"\", \"invalid\", \"xyz\") is constructable. No enum or newtype enforces the valid state machine.",
+      "failure_mode": "A caller can set `status` to an arbitrary string, breaking protocol invariants and making state transitions unenforceable. `mark_sent` compares nothing — the packet is sent regardless of prior state.",
+      "fix": "Replace `pub status: String` with an enum, e.g. `pub enum PacketStatus { Draft, Validated, Sent }` and remove `is_sent` (derive from status). Make the struct opaque or use a fallible constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a primitive boolean flag. It can coexist with `status == \"sent\"` or `is_sent == true`, creating contradictory/invalid state combinations.",
+      "failure_mode": "The system can represent packets that are simultaneously validated and not validated, or sent without being validated — no compiler or runtime enforcement prevents this.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typed state enum (`PacketStatus`) that encodes all valid state transitions. The enum variant itself is the proof of state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is redundant with `status` and represents a separate boolean field that can be inconsistent (e.g., `is_sent=true` but `status=\"draft\"`).",
+      "failure_mode": "Two independent booleans/strings create 2^2 * N possible values, most of which are illegal. No invariant enforcement exists.",
+      "fix": "Eliminate `is_sent` entirely. Derive \"sent\" status from the single `PacketStatus` enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` has no validation — it transitions to \"sent\" without checking whether `is_validated` is true. The task title explicitly says \"invalid_state\", implying the function should reject packets that are not validated.",
+      "failure_mode": "An unvalidated packet can be marked as sent, violating the core domain invariant. This is a silent logic error — the function always succeeds, returning `PacketWorkflow` with no error path.",
+      "fix": "Change return type to `Result<PacketWorkflow, SendError>` and return an error when the packet is not in a validated state. The error type should be a domain enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive. The domain has rules about packet IDs (format, length, uniqueness), but no newtype enforces them.",
+      "failure_mode": "Any caller can construct a `PacketWorkflow` with an empty, malformed, or duplicate ID. Validation is scattered and repeated rather than guaranteed by the type system.",
+      "fix": "Introduce `pub struct PacketId(String)` with a private constructor and a `new` method that validates the ID at the boundary."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_boundaries",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are `pub` — external code can mutate `status`, `is_validated`, and `is_sent` directly, bypassing any transition logic.",
+      "failure_mode": "Invariant violations occur at any access site. No single function or constructor controls the state machine.",
+      "fix": "Make all fields private. Provide only transition methods (e.g., `validate()`, `mark_sent()`) that enforce the state machine. Use a builder or fallible constructor for initial creation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`mark_sent` uses `\"sent\".to_string()` which heap-allocates on every call, even though the string is a fixed literal.",
+      "failure_mode": "Unnecessary per-call allocation. For a hot path, this adds GC pressure and degrades performance without benefit.",
+      "fix": "Use a `PacketStatus` enum variant (zero-cost) instead of a String. If a string is needed for display, derive it from the enum via `Display`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is a raw `Option<u64>`. There is no guarantee that `sent_at_epoch_ms` is `Some` exactly when the packet is in the \"sent\" state.",
+      "failure_mode": "A packet could have `sent_at_epoch_ms = Some(12345)` but `is_sent = false`, or vice versa. The timestamp is disconnected from the state enum.",
+      "fix": "Tie the timestamp into the `PacketStatus` enum, e.g. `PacketStatus::Sent { sent_at_epoch_ms: u64 }`, so the timestamp exists only in the sent variant."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes `PacketWorkflow` by value and returns `PacketWorkflow` — it is a pure function but does not return a `Result` for a fallible transition. It has no access to clocks or I/O but cannot record the actual timestamp either.",
+      "failure_mode": "The pure function cannot produce a meaningful `sent_at_epoch_ms` value. The imperative shell must patch the timestamp after calling this, creating a mutation window where the packet is \"sent\" but the timestamp is not yet set.",
+      "fix": "Have the pure core function return `Result<PacketWorkflow, SendError>`. The shell layer records the timestamp and applies the mutated packet."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for state-transition throughput",
+    "no profiler data for allocation patterns in mark_sent",
+    "no allocation evidence (no `try_reserve` or capacity analysis — though the struct is small, the `to_string()` allocation is unbounded)",
+    "no second-ring evidence (property tests, fuzzing, or mutation tests) for state-machine invariants",
+    "no command evidence (no `cargo test`, `cargo fmt`, or `cargo clippy` run)"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate represents illegal states freely — any boolean/String combination is constructable, mark_sent never rejects invalid transitions, and all fields are publicly mutable. This is a high-risk codebase for protocol violations and silent data corruption."
+}

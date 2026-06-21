@@ -1,0 +1,17 @@
+Now let me explore the task crate structure:
+I can see the issues:
+1. `max_payload` is never checked (test `rejects_limit` fails)
+2. `payload.len() as u32` is a lossy conversion (Holzman violation)
+3. No overflow/overflow checking
+
+Let me repair the source:
+`Vec::reserve` returns `()`, not `Result`. Need to use `try_reserve` instead.
+All 2 tests pass. Let me run the full verification gate:
+Now writing the repair output:
+Repair complete. All gates passed.
+
+**Changes to `src/lib.rs`** (3 fixes):
+
+1. **`max_payload` now enforced** — `payload.len() > max_payload` returns `Err(FrameError::PayloadTooLarge)` (was ignored entirely, causing `rejects_limit` test failure)
+2. **Lossy `as u32` removed** — replaced with `try_into().map_err(|_| FrameError::Overflow)` to reject payloads exceeding u32::MAX
+3. **Bounded allocation** — `checked_add` for total capacity + `try_reserve` mapping allocation failure to `FrameError::Allocation`

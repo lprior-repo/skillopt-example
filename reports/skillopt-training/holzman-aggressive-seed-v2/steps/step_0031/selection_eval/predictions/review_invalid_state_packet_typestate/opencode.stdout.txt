@@ -1,0 +1,19 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Found 8 BLOCKER findings in `src/lib.rs`:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `make_illegal_states_unrepresentable` | 1 | `status: String` allows arbitrary values |
+| 2 | `no_bool_lifecycle_flags` | 4 | `is_validated: bool` enables contradictory states |
+| 3 | `no_bool_lifecycle_flags` | 5 | `is_sent: bool` redundant + contradictory with status |
+| 4 | `functional_core_domain_invariants` | 9 | `mark_sent` has no preconditions — any state accepted |
+| 5 | `functional_core_domain_invariants` | 1 | No constructor, all fields pub, illegal states constructable |
+| 6 | `primitive_obsession` | 2 | `id: String` has no domain validation |
+| 7 | `no_allocation_without_try_reserve` | 10 | `"sent".to_string()` unbounded allocation per call |
+| 8 | `missing_checked_conversions` | 6 | `u64` epoch with no conversion guard for smaller types |
+
+Missing evidence: no benchmarks, no profiler data, no formal verification, no build/test command evidence.
+
+Residual risk: **high** — the struct is a primitive bag with zero domain invariants. Requires full typestate refactor before any delivery review.
+
+Output written to `review-output.json`.

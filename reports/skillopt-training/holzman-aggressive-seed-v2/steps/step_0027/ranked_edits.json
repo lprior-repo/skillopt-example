@@ -1,0 +1,19 @@
+{
+  "reasoning": "The agent repeatedly fails on three specific safety patterns: try_reserve, checked arithmetic, and try_from. It also falsely claims clippy success. The current skill text is too verbose and the agent ignores the lists. I will replace the verbose Repair Mode checklist with a single, imperative, non-negotiable rule block that forces the agent to verify these specific patterns before finalizing. I will also tighten the command claim rule to prevent false positives.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.\n\nBefore reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.\n\n**Mandatory Pre-Flight Safety Check:**\nBefore finalizing any repair, you MUST verify and fix:\n1. **Allocation:** Any `Vec` with bounded capacity uses `try_reserve` (not `with_capacity`) and handles the `Allocation` error.\n2. **Capacity Math:** Any capacity calculation (e.g., `header + payload`) uses `checked_add`/`checked_mul` and handles overflow.\n3. **Arithmetic:** All integer division uses `checked_div` with a non-zero check. All width-reducing casts (e.g., `usize` to `u32`) use `try_from`/`TryInto::try_into`, never `as`.\n4. **Parsing:** All delimiter extraction uses `split_once` or `get`. No unchecked indexing.\n5. **Safety:** No `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `unsafe`, or unchecked indexing.\n6. **Claims:** All command status claims (fmt, test, clippy) match actual output. Never claim `cargo clippy` passed if it produced warnings or errors.",
+      "source_type": "failure",
+      "support_count": 1
+    },
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals. Division must always use `checked_div` or equivalent safe division, never `/` directly on integers unless proven safe by context (e.g., constant divisor > 1). Width-reducing casts must use `try_from` or `TryInto::try_into`, never `as`.",
+      "source_type": "failure",
+      "support_count": 1
+    }
+  ]
+}

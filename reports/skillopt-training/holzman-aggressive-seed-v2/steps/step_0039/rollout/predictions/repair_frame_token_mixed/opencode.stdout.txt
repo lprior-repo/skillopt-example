@@ -1,0 +1,6 @@
+Repair complete. Two Holzman violations fixed in `src/lib.rs`:
+
+1. **Removed lossy `as` cast** (`payload.len() as u32`) — replaced with `u32::try_from(payload.len())` returning `FrameError::Overflow` on failure.
+2. **Added missing bounds check** — payload length is now validated against `max_payload`, returning `FrameError::PayloadTooLarge`.
+
+Both behavior tests pass. Output written to `repair-output.json`.

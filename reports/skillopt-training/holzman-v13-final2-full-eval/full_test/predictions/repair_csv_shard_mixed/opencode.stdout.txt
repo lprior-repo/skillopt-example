@@ -1,0 +1,12 @@
+Now I understand the issues. The current `parse_shards` has multiple violations: `unwrap()`, no empty check, no `max_items` enforcement, no `try_reserve`, no typed error propagation. Let me fix it.
+All 4 tests pass. Let me run the full strict verification gates.
+All gates pass. Let me verify the final source and write the required output.
+Repaired. Summary of changes to `src/lib.rs`:
+
+- Removed `unwrap()` panic surface — replaced with `map_err` → `ParseError::Invalid`
+- Added empty input check → `ParseError::Empty`
+- Enforced `max_items` cap before each push → `ParseError::TooMany`
+- Added `Vec::new()` + `try_reserve(max_items)` → `ParseError::Allocation` (mandatory repair pattern)
+- Bounded iteration via explicit `for` loop with pre-push cap check
+
+All 4 tests pass, `cargo fmt --check`, `cargo check`, and strict `cargo clippy` all pass clean.

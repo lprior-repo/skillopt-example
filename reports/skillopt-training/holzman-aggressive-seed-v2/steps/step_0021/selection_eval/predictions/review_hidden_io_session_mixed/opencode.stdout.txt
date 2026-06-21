@@ -1,0 +1,15 @@
+Now I have all the information needed. Let me analyze the crate against Holzman Rust rules and write the review output.
+Review complete. 8 findings written to `review-output.json`:
+
+**6 BLOCKERs:**
+- `src/lib.rs:9` — `unwrap()` on `fs::read_to_string` panics on I/O failure
+- `src/lib.rs:19` — `unwrap()` on `.parse()` panics on malformed numeric input
+- `src/lib.rs:19` — `as u16` lossy cast silently truncates values >65535
+- `src/lib.rs:12` — `split(',') + collect()` instead of `split_once` for two-field CSV
+- `src/lib.rs:19` — unchecked `parts[1]` indexing panics on lines with <2 fields
+- `src/lib.rs:16` — `println!` side effect inside pure-looking core function
+
+**1 WARNING:**
+- No benchmarks/profiler/allocation evidence for the load_sessions hot path
+
+**Missing evidence:** no benchmarks, profiler data, allocation audit, command-level evidence (fmt/check/clippy/test).

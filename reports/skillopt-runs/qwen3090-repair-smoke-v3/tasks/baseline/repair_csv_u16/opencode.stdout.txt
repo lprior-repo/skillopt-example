@@ -1,0 +1,2 @@
+The current code uses `.unwrap()` (forbidden), ignores `max_items`, and doesn't handle empty/invalid input. Let me fix it.
+All 4 behavior tests pass; wrote `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v3/tasks/baseline/repair_csv_u16/repair-output.json` with `cargo test` passed.

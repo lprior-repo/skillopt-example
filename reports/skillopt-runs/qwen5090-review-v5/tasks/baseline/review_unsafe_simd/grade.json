@@ -1,0 +1,24 @@
+{
+  "task_id": "review_unsafe_simd",
+  "kind": "review",
+  "bundle": "baseline",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/baseline/review_unsafe_simd",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen5090-review-v5/tasks/baseline/review_unsafe_simd",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": null,
+  "bundle_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+  "task_digest": "5de79329e3d0f390600e83c0a75d30c428dceabb33b7e785c8a9b8863c1ac10c",
+  "grade": {
+    "kind": "review",
+    "hard": 1.0,
+    "soft": 1.0,
+    "matched_groups": 5,
+    "total_groups": 5,
+    "missing_groups": [],
+    "json_valid": true,
+    "json_errors": [],
+    "mutation_errors": [],
+    "execution_errors": []
+  }
+}

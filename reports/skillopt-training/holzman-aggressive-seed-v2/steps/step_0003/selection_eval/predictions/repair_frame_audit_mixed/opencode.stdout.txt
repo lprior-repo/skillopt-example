@@ -1,0 +1,7 @@
+Done. Three Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** (`payload.len() as u32`) → `u32::try_from(payload.len())` mapping to `Overflow`
+2. **Missing max_payload enforcement** → early return `PayloadTooLarge` when `payload.len() > max_payload`
+3. **No allocation safety** → `try_reserve(total)` with `checked_add` for total capacity
+
+Both behavior tests pass.

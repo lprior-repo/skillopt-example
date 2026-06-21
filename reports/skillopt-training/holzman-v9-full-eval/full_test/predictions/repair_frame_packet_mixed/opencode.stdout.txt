@@ -1,0 +1,19 @@
+Now I have the full picture. The issues in `lib.rs`:
+
+1. **Lossy `as` conversion**: `payload.len() as u32` violates the absolute law
+2. **`max_payload` unused**: No check against the limit parameter
+3. **No bounded allocation**: Missing `try_reserve`
+
+Let me apply the fix:
+Both tests pass. Now writing the required output:
+Repair complete. Here's the summary:
+
+**3 Holzman law violations fixed in `src/lib.rs`:**
+
+| Violation | Before | After |
+|---|---|---|
+| Lossy `as` conversion | `payload.len() as u32` | `u32::try_from(payload.len())` |
+| Unused `max_payload` param | silently ignored | returns `PayloadTooLarge` when exceeded |
+| No bounded allocation | `Vec::new()` unbounded | `try_reserve(4 + payload.len())` with `checked_add` |
+
+**Commands:** `cargo fmt` → passed, `cargo test` → 2/2 passed. Output written to `repair-output.json`.

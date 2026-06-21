@@ -1,0 +1,23 @@
+[
+  {
+    "op": "insert_after",
+    "target": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fa",
+    "content_preview": "- **Review Allocation Check:** In review mode, explicitly flag any `Vec` construction that lacks `try_reserve` when capacity is bounded as a BLOCKER. Include \"missing bounded allocation handling\" in m",
+    "status": "applied_insert_after",
+    "index": 1
+  },
+  {
+    "op": "insert_after",
+    "target": "- **Review Allocation Check:** In review mode, explicitly flag any `Vec` construction that lacks `try_reserve` when capacity is bounded as a BLOCKER. Include \"missing bounded allocation handling\" in m",
+    "content_preview": "- **Review Parse Boundary Check:** In review mode, explicitly flag any parsing logic that lacks typed domain errors, `split_once`/`get` usage, or checked arithmetic as a BLOCKER. Include \"missing pars",
+    "status": "applied_insert_after",
+    "index": 2
+  },
+  {
+    "op": "replace",
+    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "content_preview": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "status": "applied_replace",
+    "index": 3
+  }
+]

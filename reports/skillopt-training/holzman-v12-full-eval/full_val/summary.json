@@ -1,0 +1,15 @@
+{
+  "candidate": "holzman-rust-candidate-v12",
+  "skill_sha256": "38fdb2ef3bfee20d7bdeefba2555900266b3e6a9ccfa30e0b50db302185ebae7",
+  "split": "val",
+  "n": 21,
+  "hard": 0.8095238095238095,
+  "soft": 0.9358465608465609,
+  "passed": 17,
+  "failed": [
+    "repair_summary_ledger_mixed",
+    "repair_summary_shard_mixed",
+    "review_hidden_io_shard_mixed",
+    "review_invalid_state_metric_typestate"
+  ]
+}

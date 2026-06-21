@@ -1,0 +1,2 @@
+Now I see the issues. The implementation uses `.unwrap()` and ignores `max_items`. Let me fix it.
+cargo test passed; repair-output.json written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/candidate-v4/repair_csv_u16/repair-output.json`

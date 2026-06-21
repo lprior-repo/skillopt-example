@@ -1,0 +1,17 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings across 4 BLOCKER and 4 WARNING severity:**
+
+**BLOCKERs:**
+- `src/lib.rs:9` — `unwrap()` on `fs::read_to_string` (I/O panics)
+- `src/lib.rs:19` — `unwrap()` on `.parse::<u32>()` (parse panics)
+- `src/lib.rs:19` — `as u16` lossy cast from u32 (silent truncation)
+- `src/lib.rs:16` — `parts[0]`/`parts[1]` unchecked indexing (bounds panic on short lines)
+
+**WARNINGs:**
+- `src/lib.rs:3` — no domain newtypes for Record fields
+- `src/lib.rs:12` — unnecessary `Vec<String>` allocation per line
+- `src/lib.rs:8` — `Vec<Record>` return with no error type
+
+**Missing evidence:** no benchmarks, profiler output, allocation analysis, second-ring tests, or command evidence.

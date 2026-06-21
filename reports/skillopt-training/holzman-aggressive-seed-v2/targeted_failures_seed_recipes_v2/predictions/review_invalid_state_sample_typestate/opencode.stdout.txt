@@ -1,0 +1,8 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json` with 7 findings:
+
+- **4 BLOCKERs**: `SampleWorkflow` uses `String` status + independent `bool` lifecycle flags, allowing illegal state combinations; `id` is a primitive `String` with no newtype; `mark_sent` has no validation gate and allocates a `String` unconditionally.
+- **2 MAJORs**: No validation on sent transition (is_validated not checked); struct is publicly constructable with inconsistent fields (no smart constructor).
+- **1 MINOR**: No benchmark/profiler/allocation evidence for the allocation in `mark_sent`.
+
+Missing evidence: no benchmarks, profiler data, allocation analysis, second-ring review, or command evidence.

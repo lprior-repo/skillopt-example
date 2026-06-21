@@ -1,0 +1,13 @@
+The current `parse_tokens` has multiple Holzman violations: `unwrap()` on parse, no empty check, no max_items enforcement, no invalid handling, no allocation safety. Let me fix it.
+Wait - the Holzman rules say to prefer `try_reserve` over `Vec::with_capacity`. Let me fix that.
+Repair complete. Here's a summary of what was fixed in `src/lib.rs`:
+
+| Violation (before) | Fix (after) |
+|---|---|
+| `.unwrap()` on `parse::<u16>()` | `.map_err(|_| ParseError::Invalid)?` |
+| No empty input check | Returns `Err(ParseError::Empty)` |
+| No max_items enforcement | Returns `Err(ParseError::TooMany)` |
+| No allocation safety | `try_reserve` with `ParseError::Allocation` |
+| `Vec::with_capacity` | `Vec::new()` + `try_reserve` per Holzman rules |
+
+All 4 behavior tests pass. No production source lint violations. Output written to `repair-output.json`.

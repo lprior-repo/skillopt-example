@@ -1,0 +1,9 @@
+Repaired `src/lib.rs`. Changes:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- **New function**: `render_summary(Summary) -> String` handles display formatting
+- **Parsing**: `split_once(',')` replaces `split + collect + [1]` indexing
+- **Arithmetic**: `checked_add`, `checked_div` replace `+=` and `/`
+- **Conversions**: `u64::try_from(max_rows)` and `u32::try_from(count)` replace `as` casts
+- **Error handling**: `Ok(SummaryError::Empty)` for empty input, `Invalid` for malformed lines, `TooMany` for row limit, `Overflow` for arithmetic overflow
+- **All 6 tests pass**, no forbidden patterns in production code

@@ -1,0 +1,103 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses raw String for status and separate bool flags (is_validated, is_sent) that allow inconsistent states. A lease could be is_sent=true while status != \"sent\", or is_validated=false while status=\"sent\", or any other combination the domain considers invalid.",
+      "failure_mode": "Domain invariants are not enforced by the type system. Callers can construct or mutate LeaseWorkflow into states that should be impossible, leading to silent data corruption or incorrect workflow transitions.",
+      "fix": "Replace status: String with a sealed enum LeaseStatus { Pending, Validated, Sent }. Replace is_sent: bool with a typestate or encode it into LeaseStatus. Replace is_validated: bool with an enum variant or transition gate. Provide a fallible constructor that accepts only legal initial states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enum_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle flag. Boolean flags encoding state-machine phases must be replaced with enums or typestates per the Functional Core Performance reference.",
+      "failure_mode": "Callers can set is_validated without changing status or is_sent, violating the intended workflow order. The boolean is independently mutable, allowing the system to reach states like validated-but-not-sent-sent or not-validated-but-sent.",
+      "fix": "Replace bool with LeaseStatus enum variants that encode the lifecycle. For example: enum LeaseStatus { Pending, Validated, Sent }. The transition from Validated to Sent is the only path where is_sent becomes true."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enum_typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a lifecycle flag. Boolean flags encoding state-machine phases must be replaced with enums or typestates.",
+      "failure_mode": "is_sent can be set independently of status and is_validated. mark_sent() sets both but there is no guard preventing calls on invalid-precondition leases.",
+      "fix": "Encode sent state into LeaseStatus::Sent variant. The type system enforces that you can only reach Sent after Validated."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a primitive domain field. Status should be a domain enum, not a free-form string.",
+      "failure_mode": "Callers can set status to any arbitrary string (\"SENT\", \"sent!\", \"\", null bytes, etc.) that the domain does not recognize. String equality checks in callers are brittle and error-prone.",
+      "fix": "Replace with enum LeaseStatus { Pending, Validated, Sent }. All status comparisons become exhaustive pattern matches enforced by the compiler."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_side_effects_in_domain_logic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent() mutates the struct in-place and does not check preconditions (e.g., is_validated must be true before sending). It blindly sets status and is_sent.",
+      "failure_mode": "An unsent, unvalidated lease can be marked as sent. The workflow state transition has no precondition checks, allowing illegal transitions that corrupt the lease lifecycle.",
+      "fix": "Replace mark_sent with a pure function that takes a validated lease and returns a new LeaseWorkflow in Sent status, or use a typestate so the compiler prevents calling send on a non-validated lease. Example: fn validate(lease: Lease) -> Result<ValidatedLease, LeaseError> and fn send(lease: ValidatedLease) -> SentLease."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain validation. Lease IDs typically have format constraints.",
+      "failure_mode": "Any arbitrary string is accepted as a lease ID. If the domain has ID format rules (e.g., UUID, hex, length bounds), they are not enforced at the type level.",
+      "fix": "Replace with a newtype LeaseId(String) that has a fallible constructor enforcing format rules. Use it at parse boundaries."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unsafe_constructs_in_production",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses .to_string() allocation on every call for a literal string. This is a hidden allocation in a pure-domain function that should be allocation-free.",
+      "failure_mode": "Every call to mark_sent performs a heap allocation for the status string. In a hot path, this is unnecessary and unmeasured.",
+      "fix": "If status is an enum, no allocation is needed. Use enum variants directly instead of String + .to_string()."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "structural_mutation_vs_pure_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates fields in-place (mut item). Per Functional Core discipline, the pure core should return new values, not mutate inputs.",
+      "failure_mode": "Inconsistent mutation style makes it harder to reason about data flow. In concurrent contexts, in-place mutation of shared data requires synchronization.",
+      "fix": "Take an immutable reference &LeaseWorkflow (or a typestate-owned value) and return a new LeaseWorkflow. The pure core returns data; the shell handles mutation."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for LeaseWorkflow or mark_sent performance claims.",
+      "failure_mode": "Performance characteristics are unmeasured. If this type is used in hot paths, allocation behavior and mutation overhead are unknown.",
+      "fix": "Add a criterion or micro-benchmark for LeaseWorkflow lifecycle operations."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No allocation profiling evidence for mark_sent. The .to_string() call on line 10 is unmeasured.",
+      "failure_mode": "Allocation patterns in the hot path are unknown. Profiler evidence would confirm whether this is a real performance concern.",
+      "fix": "Run with allocation profiler (e.g., criterion with measurement, or dhat) to measure heap allocations per call."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for LeaseWorkflow lifecycle operations",
+    "no allocation profiling evidence for mark_sent",
+    "no second-ring analysis of callers and integration points",
+    "no command-level verification (cargo test, cargo fmt, cargo clippy not run — static review only)"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has no tests, no benchmarks, and no CI. The type system currently enforces zero domain invariants — all lifecycle transitions are unchecked. Fixing the typestate/enum design (findings 1-4) would eliminate the primary failure modes. Without tests, the fix correctness is unverified."
+}

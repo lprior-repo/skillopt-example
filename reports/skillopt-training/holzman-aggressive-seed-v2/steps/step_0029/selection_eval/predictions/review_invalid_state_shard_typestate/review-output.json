@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_invalid_state_representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses pub status: String and pub is_validated: bool / is_sent: bool as separate fields, allowing illegal states such as status=\"pending\" with is_sent=true, or status=\"sent\" with is_validated=false. The type system cannot enforce the shard lifecycle invariant.",
+      "failure_mode": "Downstream code can observe a shard that is marked sent but never validated, or sent with an arbitrary status string. Data corruption or silent misrouting of unvalidated shards.",
+      "fix": "Replace status, is_validated, and is_sent with a single enum typestate: enum ShardState { New, Validated, Sent { sent_at_epoch_ms: u64 } }. Remove all three fields. Make the struct private and expose through fallible constructors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_no_preconditions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any ShardWorkflow and unconditionally sets status to \"sent\" and is_sent to true, with no check that the shard was validated first. Any caller can bypass validation.",
+      "failure_mode": "An unvalidated shard can be marked as sent, causing downstream consumers to process data that was never validated. The function has no precondition enforcement.",
+      "fix": "Replace mark_sent with an enum method on a typestate-gated type, e.g. impl ShardState::Validated { pub fn validate_and_mark_sent(self) -> ShardState::Sent { ... } }. The compiler enforces that only Validated shards can transition to Sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String field accepting any value. There is no validation, no domain enum, and no compile-time guarantee that status reflects a valid lifecycle phase.",
+      "failure_mode": "Typos, invalid strings, or tampered data silently corrupt shard state. Pattern matches on status cannot be exhaustive. Future developers cannot rely on the compiler to restrict valid values.",
+      "fix": "Replace pub status: String with a domain enum: pub status: ShardPhase where ShardPhase = { New, Validated, Sent }. Remove the separate is_sent flag and merge its semantics into the enum."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "boolean_blindness_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are separate bools that together encode a state machine. Their combinatorial space (4 combinations) includes impossible states, and the code has no invariant enforcement.",
+      "failure_mode": "A shard can simultaneously be validated=false and sent=true, or validated=true and sent=true with status=\"new\". No single function can reason about the full lifecycle without checking all three fields.",
+      "fix": "Collapse into a single enum: enum ShardState { New, Validated, Sent { sent_at_epoch_ms: Option<u64> } }. This makes all invalid states unrepresentable at the type level."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "exposed_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of ShardWorkflow are pub, allowing external code to mutate status, is_validated, is_sent, and sent_at_epoch_ms directly without any validation or domain logic.",
+      "failure_mode": "Direct field mutation bypasses all invariants. External code can set status to any string, flip is_sent without calling mark_sent, or leave sent_at_epoch_ms as None after marking sent.",
+      "fix": "Make all fields private (or remove them entirely in favor of an enum typestate). Provide constructors and lifecycle methods on the type that enforce invariants."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_imperative_shell_mixing",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a free function that mutates a struct in place and returns it, rather than a pure calculation that transforms a typed input into a typed output. The struct is I/O-adjacent (has epoch timestamp), but the function has no I/O boundary separation.",
+      "failure_mode": "The function cannot be unit-tested in isolation from side effects because it mutates and returns the same struct shape. Adding persistence or notification logic later will conflate core logic with shell behavior.",
+            "fix": "Define mark_sent as a pure function operating on a domain value: pub fn mark_sent(state: ShardState) -> ShardState. Keep I/O (persistence, notifications) in a separate shell function that calls this pure function."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_checked_id_conversion",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64>. If this value is computed from epoch timestamps (e.g., nanoseconds since epoch), converting from other time units to u64 without checked arithmetic risks overflow on 32-bit targets or future-proofing gaps.",
+    "failure_mode": "If timestamps are derived from i64 or nanosecond-scale counters, unchecked as-casts or additions can overflow, producing incorrect timestamps that silently corrupt audit trails.",
+     "fix": "When computing sent_at_epoch_ms, use chrono::Utc::now().timestamp_millis() or checked arithmetic. Document the time unit assumption and consider using a typed newtime::EpochMs(u64) value object."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or latency",
+    "no profiler evidence showing mark_sent is on any hot path",
+    "no allocation audit for the .to_string() call in mark_sent (line 10)",
+    "no second-ring evidence for zero-cost claims (none stated, but struct uses String)",
+    "no command evidence: cargo fmt, cargo check, cargo clippy were not run (static review only)"
+  ],
+  "residual_risk": "Static review only - no commands were run. The structural issues (typestate, boolean blindness, exposed fields) are architectural blockers that require code repair, not just review. Without a typestate enum, the compiler cannot prevent illegal shard states. The mark_sent free function remains a precondition-bypass vector."
+}

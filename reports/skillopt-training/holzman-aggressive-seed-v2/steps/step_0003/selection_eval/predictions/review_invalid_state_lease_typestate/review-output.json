@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses raw String for status and bool flags for is_validated/is_sent, allowing invalid state combinations (e.g. status=\"sent\" with is_sent=false, or is_sent=true with sent_at_epoch_ms=None). No typestate or enum constrains the lifecycle.",
+      "failure_mode": "The struct can represent inconsistent lifecycle states that violate domain invariants. Callers cannot rely on status reflecting is_sent, and sent_at_epoch_ms may be None for a 'sent' lease.",
+      "fix": "Replace status: String with a sealed LeaseStatus enum (e.g. Pending, Validated, Sent) and replace is_validated/is_sent bools with typestate or derive them from the enum. Remove sent_at_epoch_ms or make it mandatory when status=Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no validation or newtype wrapping. Any string, including empty or malformed values, is accepted without boundary validation into the core.",
+      "failure_mode": "Core logic receives an invalid lease id that should have been rejected at the parse boundary, propagating bad data through the system.",
+      "fix": "Create a LeaseId newtype with a fallible constructor that rejects empty/malformed ids. Use LeaseId in LeaseWorkflow instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates the struct in place and returns it, rather than being a pure function that constructs a new valid state from a well-typed input. No validation of preconditions (e.g. must be validated before sent).",
+      "failure_mode": "mark_sent can be called on any LeaseWorkflow regardless of current state, allowing transition from invalid states (e.g. unsanctioned status values, unvalidated items) into 'sent'.",
+      "fix": "Make mark_sent a pure function that takes a typed, validated input (e.g. LeaseWorkflow<LeaseStatus::Validated>) and returns LeaseWorkflow<LeaseStatus::Sent> with sent_at_epoch_ms populated. Use typestates or enum-based transitions to enforce allowed state changes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_repeatedly_validate_primitives",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String means every consumer must validate the string value to know the lease state. The core repeatedly validates primitives instead of accepting trusted domain types.",
+      "failure_mode": "Every branch of logic must re-check string equality for status, risking typos, case mismatches, and missed validations. Inconsistent branches can produce divergent behavior.",
+      "fix": "Replace status: String with a sealed LeaseStatus enum. Pattern-match on the enum instead of string comparison. Remove is_validated and is_sent as redundant boolean fields."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_booleans_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are boolean lifecycle flags that should be a single enum or typestate. Two independent bools create 4 possible states, only some of which are valid.",
+      "failure_mode": "Invalid combinations like is_validated=true, is_sent=false (validating but not sending) or is_validated=false, is_sent=true (sending without validation) are constructable and have no domain meaning.",
+      "fix": "Replace is_validated and is_sent with a single LeaseStatus enum that enumerates valid lifecycle states: Pending, Validated, Sent. sent_at_epoch_ms becomes a field on the Sent variant only."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "data_valid_by_construction",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> allows None in all states. It should only be Some when the lease is in the Sent state, and None otherwise.",
+      "failure_mode": "A Sent lease can have sent_at_epoch_ms=None, making it impossible to determine when the lease was actually sent. Audit/logic relying on sent_at_epoch_ms will fail on valid structs.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of a LeaseStatus enum or use a typestate that only allows setting the timestamp when transitioning to Sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "pub_fields_encapsulate_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LeaseWorkflow are pub, allowing external code to mutate fields directly and bypass any invariants that mark_sent might enforce.",
+      "failure_mode": "External code can set item.status=\"sent\" directly without calling mark_sent, skip sent_at_epoch_ms, and create an invalid struct without the function's logic running.",
+      "fix": "Make all fields private. Provide a sealed constructor (e.g. LeaseWorkflow::new) that enforces invariants, and expose only state-transition methods."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "cow_or_newtype_for_string_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is owned and heap-allocated. For an identifier, a newtype like LeaseId should be used, and the underlying storage should consider borrowed references or smaller representations.",
+      "failure_mode": "Every LeaseWorkflow carries a heap allocation for the id, even when only borrowed references are needed. No validation or semantic type for the id.",
+      "fix": "Replace String with a LeaseId newtype. Use &str or Cow<'_, str> at parse boundaries when lifetimes allow."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim",
+    "no profiler data for allocation patterns",
+    "no allocation audit for Vec/String ownership in LeaseWorkflow",
+    "no second-ring review (black-hat or formal) artifact present",
+    "no command-level execution evidence (no cargo test, cargo clippy, or cargo fmt output)"
+  ],
+  "residual_risk": "The LeaseWorkflow struct permits a combinatorial explosion of invalid states (invalid status strings, bool flag mismatches, missing sent timestamps, unchecked ids). Without typestates or enum-based lifecycle enforcement, any caller can construct an invalid LeaseWorkflow. Static review only; no commands run. The code shape requires a typestate/enum refactor before it can be trusted."
+}

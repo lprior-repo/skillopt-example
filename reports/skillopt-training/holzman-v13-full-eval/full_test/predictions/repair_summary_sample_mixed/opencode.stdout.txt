@@ -1,0 +1,16 @@
+Now I have full context. The production code has multiple Holzman violations: unchecked indexing (`parts[1]`), `.unwrap()`, unchecked arithmetic (`+=`, `/`), lossy casts (`as u32`, `as u64`), uses `split(',')` with `collect()` instead of `split_once(',')`, returns `String` instead of `Summary`, and is missing `render_summary`. Let me fix it.
+Repair complete. All 6 tests pass, all Holzman laws satisfied.
+
+**Violations removed:**
+- `parts[1]` unchecked indexing → `split_once(',')` with `_name, value_str`
+- `.unwrap()` → `.map_err(|_| SummaryError::Invalid)`
+- `total += value` unchecked add → `total.checked_add(...)`
+- `count += 1` unchecked add → `count.checked_add(...)`
+- `total / count` unchecked div → `total.checked_div(...)`
+- `count as u32` / `count as u64` lossy casts → `u32::try_from` / `u64::try_from`
+- `split(',').map(...).collect()` allocation → `split_once(',')` zero-allocation
+- Empty input not rejected → early `is_empty()` guard
+
+**Architectural fixes:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (pure calculation)
+- `render_summary` handles formatting (shell/I/O boundary)

@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/hardening-checklist.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses ad-hoc booleans and strings for lifecycle instead of an explicit typestate enum with enforced transitions",
+      "failure_mode": "Any combination of is_validated/is_sent/status is permitted; callers can set is_sent=true with status=\"new\" or leave is_validated=false while marking sent, creating illegal states directly",
+      "fix": "Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single LedgerState enum (e.g. Pending, Validated, Sent) where each variant owns its associated data; mark_sent should accept LedgerState and return the next valid variant or a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String allowing arbitrary values instead of a bounded enum of valid ledger states",
+      "failure_mode": "Callers can construct LedgerWorkflow with status=\"bogus\" or status=\"\" and the core logic has no way to reject it; mark_sent blindly overwrites status to \"sent\" without validating prior state",
+      "fix": "Replace pub status: String with pub status: LedgerStatus where LedgerStatus is a #[derive(Copy,Clone,Debug,Eq,PartialOrd,Ord)] enum with exactly the valid states (e.g. Pending, Validated, Sent); remove mark_sent's mutable string assignment"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are lifecycle booleans that allow contradictory states independently",
+      "failure_mode": "A caller can set is_validated=true and is_sent=true simultaneously, or is_validated=false and is_sent=true, which violates the ledger lifecycle invariant that validation must precede sending",
+      "fix": "Fold is_validated and is_sent into a single typestate enum; the enum variants encode valid transitions so contradictory combinations are impossible at compile time"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate optional field from the lifecycle booleans, allowing sent_at_epoch_ms to be Some with is_sent=false, or None with is_sent=true",
+      "failure_mode": "The sent timestamp can exist without the sent flag and vice versa; no invariant ties the timestamp to the Sent state variant, so illegal combinations are representable",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the LedgerState enum (e.g. Sent { sent_at_epoch_ms: u64 }) so the timestamp is only present when the state is Sent"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive domain identifier with no structural guarantee of uniqueness or format",
+      "failure_mode": "Callers can pass empty strings, unparseable strings, or duplicate IDs; the domain cannot enforce idempotency or uniqueness without runtime checks and string comparisons everywhere",
+      "fix": "Replace with pub id: LedgerId where LedgerId is a newtype wrapping a validated string (e.g. struct LedgerId(String) with a smart constructor that returns a typed ParseError on empty/invalid input)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts raw primitive fields (String status, bool flags) that cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly and the function silently mutates internal state with .to_string()",
+      "failure_mode": "The parse boundary is violated because the function signature exposes mutable String fields and bools instead of consuming a parsed LedgerState; callers bypass all invariants by constructing LedgerWorkflow via struct literal with arbitrary status strings and boolean combinations",
+      "fix": "Replace mark_sent(item: LedgerWorkflow) -> LedgerWorkflow with mark_sent(state: LedgerState) -> Result<LedgerState, LedgerError>; remove the LedgerWorkflow struct entirely and route all external input through fallible smart constructors at the boundary"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition",
+    "no profiler evidence for hot-path analysis of state transitions",
+    "no allocation evidence (mark_sent calls .to_string() allocating a new String on every call)",
+    "no second-ring evidence for any performance or correctness claims",
+    "no command evidence that cargo fmt/check/clippy/test were run"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has no typestate enforcement at all — all lifecycle invariants are unenforced at compile time. Six BLOCKER findings for missing typestate, raw primitives, and parse boundary violations. Missing benchmark/profiler/allocation/command evidence."
+}

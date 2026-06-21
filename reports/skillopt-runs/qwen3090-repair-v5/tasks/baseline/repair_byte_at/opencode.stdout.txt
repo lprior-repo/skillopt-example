@@ -1,0 +1,3 @@
+Now I see the issue. `input[index]` panics on out-of-bounds instead of returning `None` as the test expects. Let me run the tests to confirm, then fix.
+The fix is straightforward: replace unchecked indexing `input[index]` with safe `.get(index)`.
+repair-output.json written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-v5/tasks/baseline/repair_byte_at/repair-output.json` and cargo test passed (2/2).

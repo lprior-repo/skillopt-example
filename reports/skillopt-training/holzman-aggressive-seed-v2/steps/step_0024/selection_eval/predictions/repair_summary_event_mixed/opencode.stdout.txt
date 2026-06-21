@@ -1,0 +1,16 @@
+Now I have full picture of the issues. The current code has multiple Holzman violations: `unwrap()`, unchecked indexing `parts[1]`, unchecked `+=`, unchecked division `/`, lossy `as` cast, wrong return type (returns `String` but tests expect `Summary`), and missing `render_summary` function.
+All 6 tests pass. Writing the repair output.
+Wait - I need to re-check the Holzman repair checklist: "No... `as` for casts." The `count as u32` is a lossy cast. Let me fix this.
+All 6 tests pass. Let me verify the final source and update the output JSON.
+Repair complete. All 6 behavior tests pass. Here's a summary of changes to `src/lib.rs`:
+
+**Violations fixed:**
+- `parts[1].parse::<u64>().unwrap()` → `split_once(',')` with `get` via `ok_or(Invalid)` and `map_err` for parse failures
+- `total += value` (unchecked) → `checked_add` with `Overflow` error
+- `total / count as u64` (unchecked division + lossy cast) → `total / count` with `count > 0` guard, `count` is now `u64`
+- `count as u32` (lossy cast) → removed; `Summary.count` changed from `u32` to `u64`
+- Removed `Vec::with_capacity` / `collect` allocation pattern → direct iteration with `split_once`
+
+**New function:** `render_summary(Summary) -> String` to match test contract.
+
+**Struct change:** `Summary.count: u32` → `u64` to eliminate lossy `as` cast.

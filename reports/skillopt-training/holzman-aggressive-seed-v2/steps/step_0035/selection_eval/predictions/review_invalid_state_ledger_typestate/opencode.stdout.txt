@@ -1,0 +1,18 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings, 4 missing evidence items, residual risk noted.**
+
+Key violations in `src/lib.rs`:
+
+| Line | Severity | Rule | Problem |
+|------|----------|------|---------|
+| 3 | BLOCKER | make-illegal-states-unrepresentable | `status: String` allows arbitrary values |
+| 4 | BLOCKER | make-illegal-states-unrepresentable | `is_validated: bool` creates untrackable 4-state machine with invalid combinations |
+| 2 | BLOCKER | make-illegal-states-unrepresentable | `id: String` has no validation (empty/malformed accepted) |
+| 9 | BLOCKER | functional-core-imperative-shell | `mark_sent` mutates in-place, no precondition check, forces `.to_string()` allocation |
+| 10 | BLOCKER | no-unnecessary-allocation | `"sent".to_string()` allocates per transition on hot path |
+| 9 | BLOCKER | typed-domain-errors | No `Result` return — invalid transitions silently produce invalid states |
+| 1 | WARNING | performance-benchmark-evidence | No benchmarks for any operation |
+
+Core issue: the typestate pattern is absent — booleans and strings make illegal states trivially representable, and `mark_sent` has no preconditions or error types.

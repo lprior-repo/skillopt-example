@@ -1,0 +1,108 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-must-be-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String; any string value including \"\", \"sent\", \"garbage\", or \"deleted\" is representable",
+      "failure_mode": "Caller sets status to an arbitrary string that bypasses domain invariants; no state machine enforces valid transitions",
+      "fix": "Replace with an enum: enum SampleStatus { Pending, Validated, Sent }. Remove is_sent and is_validated booleans."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lifecycle-booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle boolean that allows inconsistent states (both false, both true, or sent without validated)",
+      "failure_mode": "SampleWorkflow can be both not-validated and sent simultaneously, or neither validated nor sent but not in a proper initial state. No transition ordering is enforced.",
+      "fix": "Encode lifecycle as typestate transitions in the Status enum variants: enum SampleStatus { Pending, Validated, Sent { sent_at: Instant } }. Remove is_validated field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lifecycle-booleans",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a lifecycle boolean redundant with status:String but independently mutable, allowing desync",
+      "failure_mode": "Caller can set is_sent=true while status=\"pending\", creating contradictory internal state that no invariant checks catch at compile time",
+      "fix": "Remove is_sent. Let the Status enum variant carry sent-related data. If sent_at is needed, store it in the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional-lifecycle-data-in-variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a bare optional lifecycle field; it can be None while is_sent=true or status=\"sent\", or Some while not sent",
+      "failure_mode": "Option is a dumb container that doesn't enforce semantic coupling. sent_at_epoch_ms can be Some(123) on a Pending workflow, or None on a Sent workflow.",
+      "fix": "Move sent timestamp into the enum variant that owns it: Sent { sent_at_epoch_ms: u64 }. Remove the bare Option field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "id-must-be-newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive; no domain semantics, no uniqueness guarantee, no format validation",
+      "failure_mode": "Empty string, whitespace-only, or non-ASCII IDs are accepted with no validation. id can be confused with other string fields at call sites.",
+      "fix": "Introduce a newtype: pub struct SampleId(String). Provide a smart constructor that rejects empty/whitespace IDs and returns a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are pub with no smart constructor; every combination of values is constructible and no invariant is enforced at construction time",
+      "failure_mode": "A caller can instantiate SampleWorkflow with status=\"\", is_validated=true, is_sent=false, sent_at_epoch_ms=None — an invalid state with no compile-time or runtime protection",
+      "fix": "Make all fields private. Provide a smart constructor `SampleWorkflow::new(id: SampleId) -> Result<SampleWorkflow, NewError>` that sets valid initial state. Remove pub visibility from all fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark-sent-bypasses-typestate",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent directly mutates status and booleans, bypassing any typestate transition logic. It can be called on any SampleWorkflow regardless of prior state",
+      "failure_mode": "A workflow can be marked sent without ever being validated. mark_sent can be called multiple times. There is no pre-condition check or transition guard.",
+      "fix": "Replace with a method on the typestate enum: impl SampleStatus { fn transition_to_sent(self, now: u64) -> Result<SampleStatus, TransitionError> }. Callers must hold a validated state to reach Sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no-smart-constructors",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No smart constructor exists for SampleWorkflow; fields are directly assignable via pub visibility",
+      "failure_mode": "Validation cannot happen at construction time. Hostile inputs (empty id, invalid status strings) pass through unchecked.",
+      "fix": "Private fields + pub fn new(id: SampleId) -> Result<Self, CreationError> with validation logic inside."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-typed-error-taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns SampleWorkflow with no error type; all state mutations are infallible by construction",
+      "failure_mode": "If a transition should fail (e.g., not in Validated state), there is no error type to return. The API pretends every transition always succeeds.",
+      "fix": "Return Result<SampleWorkflow, TransitionError> where TransitionError::NotValidated, TransitionError::AlreadySent, etc."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists. The module has no performance claims documented, but no baseline measurement is available for any future optimization.",
+      "failure_mode": "Future refactors (typestate enums, smart constructors) introduce indirection without knowing the cost baseline.",
+      "fix": "Add a criterion or minitrace benchmark for mark_sent on a representative SampleWorkflow before making changes."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark for mark_sent or SampleWorkflow construction",
+    "no profiler data showing allocation patterns for String fields",
+    "no command output from cargo clippy or cargo test",
+    "no allocation/Vec evidence for to_string() on status field in mark_sent (allocates every call)"
+  ],
+  "residual_risk": "The struct permits arbitrary invalid states at compile time. All six fields are pub, making the typestate model completely unenforceable. mark_sent is an infallible free function that mutates state without guards. Every String field allocates on construction and on every mark_sent call. This is the sample pattern the review task is named after — invalid state is trivially representable."
+}

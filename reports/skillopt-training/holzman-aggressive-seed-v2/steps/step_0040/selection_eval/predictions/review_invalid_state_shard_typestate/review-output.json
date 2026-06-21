@@ -1,0 +1,70 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses raw String for status and separate bools for is_validated/is_sent instead of typed enums/typestates. This allows illegal states like status=\"sent\" with is_validated=false, status=\"pending\" with is_sent=true, or any arbitrary string value.",
+      "failure_mode": "Data integrity violation: downstream consumers cannot trust the status field or the boolean flags. A shard can appear sent without being validated, or carry a status string that does not correspond to any real workflow state.",
+      "fix": "Replace status: String with an enum (e.g. enum ShardStatus { Pending, Validated, Sent }) and replace is_validated: bool and is_sent: bool with a single status enum or a typestate struct (ShardWorkflowValidated / ShardWorkflowSent). Make all fields private and construct via fallible constructors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of ShardWorkflow are pub, exposing the internal representation and allowing external code to mutate fields directly without any invariant checking.",
+      "failure_mode": "External code can set item.is_sent = true without going through mark_sent(), or set status to an invalid string, bypassing all validation and creating illegal states at any call site.",
+      "fix": "Make all fields private (pub(crate) at most) and provide constructors, accessors, and state-transition methods only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_side_effect_transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no precondition checks. It unconditionally overwrites status and is_sent without verifying the shard was validated or that it was not already sent. The function accepts a by-value ShardWorkflow but returns the same type, losing any typestate guarantee.",
+      "failure_mode": "A shard that was never validated can be marked sent. A shard already sent can be 're-sent'. No idempotency guard, no error return, no typed enforcement of the valid state transition (pending->validated->sent).",
+      "fix": "Use a typestate pattern: have separate types (ShardWorkflowValidated) with a mark_sent method that returns a new ShardWorkflowSent type. Or at minimum, return Result<ShardWorkflow, ShardError> and check current status before transitioning."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "redundant_state_fields",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status (String), is_validated (bool), and is_sent (bool) encode overlapping state. Three fields for one concept create inevitable inconsistency and make it impossible to enforce a clean state machine.",
+      "failure_mode": "State desynchronization: is_sent=true and status=\"pending\" can coexist, or is_validated=true with status=\"pending\". Any code checking only one field may make incorrect decisions.",
+      "fix": "Collapse into a single enum ShardStatus { Pending, Validated, Sent } that encodes all three dimensions. Remove is_validated and is_sent entirely."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_error_type",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns ShardWorkflow directly with no error type. Even if preconditions existed, there is no way to communicate failure (e.g., already sent, not validated).",
+      "failure_mode": "Silent misbehavior: callers cannot distinguish success from attempted invalid transition. The function may silently do nothing useful or produce an inconsistent state.",
+      "fix": "Define a ShardError enum (AlreadySent, NotValidated) and change the signature to fn mark_sent(item: ShardWorkflowValidated) -> Result<ShardWorkflow, ShardError>."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "sent_at_epoch_ms_unused",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms field exists but is never written to or read in mark_sent(). The timestamp for when a shard was sent is recorded nowhere, making auditability impossible.",
+      "failure_mode": "Lost audit trail: no record of when a shard was sent, preventing debugging, compliance checks, or replay analysis.",
+      "fix": "Set sent_at_epoch_ms = current_time_ms() in mark_sent() and make mark_sent return the updated ShardWorkflow. Add a current_time source abstraction (e.g., FnMut() -> u64) for testability."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent performance",
+    "no profiler or allocation evidence for ShardWorkflow size or mark_sent allocation pattern",
+    "no second-ring test or behavior test validating state transition invariants",
+    "no command evidence (no cargo test, cargo clippy, or cargo bench runs available)"
+  ],
+  "residual_risk": "Static review only with no commands run. The entire domain model is structurally non-compliant with Holzman Rust: no typestate enforcement, no error types, redundant state fields, and pub fields enabling illegal states at any call site. A complete typestate redesign is required before this module is acceptable for delivery."
+}

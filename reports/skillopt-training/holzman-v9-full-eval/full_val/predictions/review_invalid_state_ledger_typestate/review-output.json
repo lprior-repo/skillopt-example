@@ -1,0 +1,100 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-state-must-be-enums",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a free-form String on LedgerWorkflow instead of a domain enum. Any string value (including \"\", \"DELETED\", \"CANCELLED\") is representable at the type level, making illegal states representable.",
+      "failure_mode": "Callers can construct LedgerWorkflow with status=\"foo\" or status=\"\" at compile time; downstream match arms cannot be exhaustive, so a runtime panic or fallthrough becomes reachable when a new status is expected but not handled.",
+      "fix": "Replace `status: String` with `status: LedgerStatus` where `LedgerStatus` is an enum (e.g., `LedgerStatus { pending, validated, sent }`) and remove `is_sent`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-must-be-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated (bool) encodes a lifecycle phase but is a raw boolean. The combination { is_validated=false, is_sent=true } is a logically impossible yet type-level-valid state (a sent-but-not-validated ledger).",
+      "failure_mode": "A caller can set is_sent=true independently of is_validated, producing an invalid lifecycle state that the type system cannot prevent. Any invariant assuming 'sent implies validated' must be enforced at runtime instead of compile time.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typestate enum that encodes the lifecycle machine (e.g., `LedgerState { pending, validated, sent }`) so transitions are the only way to change state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional-lifecycle-data-must-be-variant-owned",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a free-floating optional on the struct, not owned by the lifecycle variant that requires it. A sent ledger could exist with Option::None, and a non-sent ledger could carry a stale timestamp.",
+      "failure_mode": "Business logic reading sent_at_epoch_ms on a non-sent item gets a stale or meaningless timestamp; logic assuming sent items always have a timestamp must add runtime checks that can panic or misbehave.",
+      "fix": "Move the timestamp into the typestate enum variant: `LedgerState::sent(sent_at_epoch_ms: u64)` (non-optional, since only the sent variant owns it). Remove `sent_at_epoch_ms` from the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "id-must-be-newtyped",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String. Any arbitrary string (empty, whitespace, 1GB payload) is a valid id at the type level. No domain meaning, validation, or bounded representation.",
+      "failure_mode": "Empty string or excessively long input passes as a valid id at compile time. Downstream code (DB keys, log correlation, serialization) must re-validate on every use, and empty ids can silently cause lookup failures or data corruption.",
+      "fix": "Replace `id: String` with a newtype `LedgerId(String)` that has a smart constructor validating non-empty input and returning a typed error. Apply a domain cap on max length in the constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "timestamp-must-be-newtyped",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms uses raw u64 with no domain meaning. Zero, overflow values, and future timestamps are valid at the type level.",
+      "failure_mode": "A zero or wildly incorrect epoch_ms value propagates silently into logging, audit trails, or downstream time-window queries, causing incorrect ordering or missed events.",
+      "fix": "Replace `u64` with a `TimestampMs(u64)` newtype. In the typestate variant, enforce non-zero / monotonic constraint at construction, or document the invariant and assert in tests."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent-mutates-domain-directly",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes the entire struct by value and mutates fields in place instead of returning a new state or using a typestate transition API. The function has no validation that the ledger is in a state that permits transitioning to sent.",
+      "failure_mode": "Any caller can mark a pending ledger as sent without validation (e.g., without checking is_validated first). The function silently overwrites status and sets is_sent even if is_validated is false, violating the domain invariant that sent implies validated.",
+      "fix": "Replace `mark_sent` with a transition method or function on the typestate enum: e.g., `fn transition_to_sent(self, ts: TimestampMs) -> LedgerState` that enforces valid transitions at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-smart-constructor-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow is a public struct with all pub fields and no smart constructor. Callers can construct arbitrary illegal states at compile time: `{ id: \"\", status: \"xyz\", is_validated: false, is_sent: true, sent_at_epoch_ms: None }`.",
+      "failure_mode": "Entirely arbitrary illegal states are constructible at every call site in the codebase. There is no single entry point for validation, making it impossible to guarantee domain invariants without auditing every construction site.",
+      "fix": "Make struct fields private (or replace with typestate enum entirely), provide a `LedgerWorkflow::new(id: LedgerId) -> Result<Self, Error>` smart constructor, and remove all direct field assignment."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark module or benchmark evidence exists for mark_sent or any performance-relevant path. While the function is trivially small, the crate has no `[dev-dependencies.criterion]` or similar.",
+      "failure_mode": "If mark_sent is called in a hot path at scale, its allocation behavior (`.to_string()` on line 10, struct cloning) is unmeasured. Future changes could introduce regressions with no baseline.",
+      "fix": "Add a `benches/` module with criterion or similar, at minimum benchmarking mark_sent allocation count and time. For this trivial function, the fix is acknowledging the measurement gap and monitoring if the function moves to a hot path."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`\"sent\".to_string()` allocates a new String on every call. The hardcoded string \"sent\" could be a &'static str.",
+      "failure_mode": "In a hot path, repeated allocation of a constant string increases heap pressure and GC cost (for FFI consumers). Unnecessary allocations compound under high throughput.",
+      "fix": "Replace `\"sent\".to_string()` with a static enum variant that does not allocate, or store the display string as `&'static str` on the enum."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark module exists for mark_sent or any code path",
+    "no profiler data exists to confirm allocation hot spots",
+    "no allocation evidence (alloc-count, heap usage) for mark_sent",
+    "no second-ring evidence (proptest, Kani state-machine model, Miri UB scan)",
+    "no command-truth evidence (no verification commands run against this crate)"
+  ],
+  "residual_risk": "Static review only. The struct is fundamentally a typestate violation — all illegal state combinations are representable at compile time. No commands were run (cargo check/clippy/test not executed per review-mode rules). The entire domain model should be replaced with an enum-based typestate machine before any production use. The `id: String` and `sent_at_epoch_ms: u64` raw primitives also violate newtype requirements. Marking a ledger as sent without validating prerequisites is a silent data-integrity bug."
+}

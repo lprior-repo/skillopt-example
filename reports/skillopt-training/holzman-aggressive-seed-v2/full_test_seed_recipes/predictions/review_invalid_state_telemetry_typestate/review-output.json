@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TelemetryWorkflow uses status: String, is_validated: bool, and is_sent: bool as independent fields. Any combination is constructible, including illegal states such as status=\"pending\" with is_sent=true, or is_sent=false with sent_at_epoch_ms=Some(…), or status=\"sent\" without a timestamp.",
+      "failure_mode": "Invalid lifecycle states can be constructed and passed through the system undetected. Consumers of TelemetryWorkflow must redundantly check multiple fields to determine actual state, and there is no compiler enforcement of valid transitions.",
+      "fix": "Replace status, is_validated, and is_sent with a single enum typestate (e.g., TelemetryState enum with Pending, Validated, Sent variants). Remove the redundant fields. Use a newtype for id instead of String if it has domain constraints."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_booleans_or_status_strings",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a primitive string used as a lifecycle flag. This allows arbitrary status values (\"sent\", \"SENT\", \"\", \"deleted\", …) that have no domain meaning and are not validated by the compiler.",
+      "failure_mode": "Typos or unexpected strings silently produce undefined behavior. No exhaustive match is possible on a String, so every consumer must handle unknown states.",
+      "fix": "Replace with an enum (e.g., enum TelemetryStatus { Pending, Validated, Sent }) and use exhaustive match at every consumer site."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_booleans_or_status_strings",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a separate lifecycle flag from is_sent: bool. These two booleans create 4 substates that should be a single enum, and their independence allows invalid combinations (validated+not_sent, not_validated+sent, etc.).",
+      "failure_mode": "A telemetry item can be marked is_sent=true even when is_validated=false, bypassing the validation gate. The lifecycle has no enforced ordering.",
+      "fix": "Collapse is_validated and is_sent into a single typestate enum with ordered variants (e.g., Pending, Validated, Sent). The enum representation itself enforces the transition order."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_missing_preconditions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not enforce any precondition. It accepts any TelemetryWorkflow regardless of validation state, and does not set sent_at_epoch_ms. It also mutates status as a raw String instead of transitioning through an enum.",
+      "failure_mode": "Unvalidated telemetry can be sent without check. The sent_at_epoch_ms field remains None even after marking as sent, producing inconsistent state. The function silently allows the illegal transition from any state to sent.",
+      "fix": "Replace mark_sent with a fallible method or constructor on the typestate enum that requires a validated state as input, sets the sent timestamp, and returns a typed error (or Result) if the precondition is not met. The enum typestate should make invalid transitions a compile error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TelemetryWorkflow is a mutable data struct with public mutable fields and a standalone function that mutates it. There is no functional core boundary — the data struct and the mutation function are tightly coupled with no pure calculation layer.",
+      "failure_mode": "All consumers must reason about mutation order and side effects. The struct is not valid-by-construction, so every access site needs runtime checks instead of compile-time guarantees.",
+      "fix": "Define immutable domain data types with a typestate enum. Put pure validation/transformation logic in a separate pure module. Shell functions (I/O, persistence) call the pure core and handle errors via a typed error taxonomy."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No domain error types are defined. mark_sent has no return type and cannot communicate failure. The crate has no error taxonomy for the domain.",
+      "failure_mode": "Callers cannot distinguish between failure modes (invalid state, validation failure, etc.). Errors are lost or must be communicated via panics.",
+      "fix": "Define a domain error enum (e.g., TelemetryError { InvalidState, ValidationFailed }) and have mark_sent return Result<TelemetryWorkflow, TelemetryError> with explicit error variants for each failure mode."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_id_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a bare String with no domain semantics. Any string value is accepted as a telemetry ID.",
+      "failure_mode": "Empty strings, whitespace, or malformed IDs are valid. No domain constraints are enforced at the type level.",
+      "fix": "Replace with a newtype: pub struct TelemetryId(String) with a fallible constructor that validates the ID format, or use a UUID/bytes-based ID if applicable."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_sent_timestamp_in_mark_sent",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent sets is_sent=true and status=\"sent\" but never populates sent_at_epoch_ms. After the function returns, the telemetry is marked sent without a timestamp.",
+      "failure_mode": "Downstream consumers (metrics, audit logs, retry logic) that depend on sent_at_epoch_ms will find None, leading to incorrect calculations or silent data loss.",
+      "fix": "Pass sent_at_epoch_ms as a parameter to mark_sent (injected timestamp), or accept a clock/time abstraction. Set the field atomically with the other state changes. In the typestate design, the Sent variant carries the timestamp."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_public_api_contract",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of TelemetryWorkflow are pub, allowing external code to set them arbitrarily and bypass the intended API. There are no private constructors or smart constructors.",
+      "failure_mode": "External callers can create TelemetryWorkflow instances with any field combination, reproducing the illegal state problem that mark_sent is supposed to address.",
+      "fix": "Make all fields private. Provide a fallible constructor (e.g., TelemetryWorkflow::new(id)) and transition methods (mark_validated, mark_sent) that return Result<T, Error>. Use the typestate pattern so the type at the type level encodes the allowed operations."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 0,
+      "problem": "No benchmarks, profiler data, allocation analysis, or command evidence exist for this crate. The crate contains no tests at all.",
+      "failure_mode": "No evidence exists that the implementation meets correctness, performance, or allocation requirements. Behavioral contract is unspecified.",
+      "fix": "Add behavior tests covering valid and invalid state transitions. Add benchmarks for mark_sent if performance is claimed. Document allocation profile for the struct and function."
+    }
+  ],
+  "missing_evidence": [
+    "no behavior tests for state transitions (valid and invalid)",
+    "no benchmark for mark_sent or any function",
+    "no profiler or allocation analysis",
+    "no command evidence (cargo test, cargo fmt, cargo clippy)",
+    "no second-ring review (proof plan, formal verification, or black-hat review)"
+  ],
+  "residual_risk": "High — the crate represents illegal states (e.g., unvalidated telemetry marked as sent), has no typestate enforcement, no error taxonomy, no tests, and no evidence. The entire lifecycle is modeled with independent primitive fields that can form inconsistent states. A complete typestate enum refactor is required before this code is safe to deploy."
+}

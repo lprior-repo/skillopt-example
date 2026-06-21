@@ -1,0 +1,14 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 10 findings (6 BLOCKER, 3 MAJOR, 1 MINOR)** across the single-file crate `src/lib.rs`:
+
+- **4 forbidden constructs**: `unwrap()` on I/O (line 9) and parse (line 19), lossy `as u16` cast (line 19), unchecked `parts[0]` indexing (line 16)
+- **1 hidden I/O side effect**: `println!` in data pipeline (line 16)
+- **1 functional core violation**: I/O, logging, and parsing mixed in `load_metrics` (line 8)
+- **1 type discipline gap**: bare `String` name, no domain constraints (line 3)
+- **1 bounded allocation gap**: `Vec<String>` per line without `try_reserve` (line 12)
+- **1 missing error domain**: all failures communicated via panic
+- **1 missing performance evidence**: no benchmark/profiler/allocation data
+
+The function as-written will panic on any malformed input, missing file, or out-of-range value. Not delivery-ready.

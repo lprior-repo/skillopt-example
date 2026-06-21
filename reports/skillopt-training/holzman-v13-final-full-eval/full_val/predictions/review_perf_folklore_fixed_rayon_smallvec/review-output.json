@@ -1,0 +1,76 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unmeasured_performance_claims",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims Rayon will be faster without any workload, baseline, hardware target, or benchmark evidence",
+      "failure_mode": "Rayon task creation and thread-scheduling overhead on a 4-byte input will be orders of magnitude slower than the sequential version; the claim is folklore not measurement",
+      "fix": "Remove the Rayon TODO. If performance optimization is needed, write a benchmark comparing sequential vs parallel on the actual workload distribution, measure p50/p95/p99 latency, and only adopt Rayon when data proves scaling justifies overhead"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_smallvec_folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims SmallVec will be faster for a fixed-size 4-element return; SmallVec introduces type complexity and its capacity tuning is unmeasured",
+      "failure_mode": "SmallVec adds a heap-overflow path, additional type parameters, and runtime capacity checks that make the code larger and potentially slower for the common case of 4 elements already fitting on the stack",
+      "fix": "Remove the SmallVec TODO. For a known-4-element result, return `[&'static str; 4]` directly — a fixed array has zero allocation overhead, no heap path, and is strictly simpler to reason about"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny_fixed_input_should_not_use_vec",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Function takes `[u8; 4]` and returns `Vec<&'static str>` — heap-allocates a 4-element Vec when the output size is statically known",
+      "failure_mode": "Every call to classify_four performs a heap allocation for 4 pointers + capacity metadata. On a hot path processing small fixed-size inputs this allocation dominates the actual work (bit-test and string dispatch)",
+      "fix": "Return `[&'static str; 4]` instead of `Vec<&'static str>`. Use a fixed array with inline initialization — zero allocation, zero heap, and the caller gets a known-size return with no drop cost"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_performance_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No benchmark, profiler, or allocation evidence exists for any performance claim about Rayon, SmallVec, or the current implementation",
+      "failure_mode": "Optimization decisions are made based on folklore rather than measured data. The actual bottleneck (allocation per call, or the function not being hot at all) is unknown, and changes may degrade performance",
+      "fix": "Write a criterion benchmark comparing: (a) current Vec return, (b) fixed-array return `[&'static str; 4]`, (c) Rayon-parallel if workload justifies it. Report operations/sec or latency with regression threshold. Do not adopt any change until benchmarks prove it"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_allocation_in_hot_path",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Hot path of a function accepting 4 bytes allocates on every call via `.collect()` into Vec",
+      "failure_mode": "Allocation per call increases tail latency, fragments the allocator, and prevents the function from being inlined into callers. For mission-critical or hot-path code this violates the Holzman allocation discipline: hot paths should have zero allocation",
+      "fix": "Replace `Vec<&'static str>` return with `[&'static str; 4]` and use fixed-size array initialization. If the caller needs a Vec, let them allocate once with the data they already have"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "todo_must_not_contain_production_optimization_claims",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "A TODO comment in production source contains two unmeasured optimization directives (Rayon, SmallVec) that would actively degrade this code if implemented",
+      "failure_mode": "A future implementer following the TODO will add Rayon and SmallVec dependencies, increasing compile time, binary size, and runtime cost for a workload that does not benefit from either",
+      "fix": "Remove the TODO entirely. If optimization work is warranted, replace with a tracked issue that references benchmark evidence, not folklore directives in source comments"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim about Rayon and SmallVec",
+    "no profiler data identifying the actual bottleneck in classify_four",
+    "no allocation tracing (e.g., `cargo +nightly asm` or allocator instrumentation) for the current Vec-based implementation",
+    "no second-ring evidence (assembly, cache-metrics, tail-latency) for any performance claim",
+    "no workload specification: input distribution, call frequency, and throughput targets are undefined",
+    "no baseline measurement to compare against"
+  ],
+  "residual_risk": "Static review only; no commands were run. The code compiles and has no panic surfaces or unchecked operations, but the architecture decision (Vec return for fixed-4 input + folklore optimization TODO) will cause measurable performance degradation if followed. The correct fix — returning `[&'static str; 4]` — eliminates all allocation and removes the need for both Rayon and SmallVec regardless of workload."
+}

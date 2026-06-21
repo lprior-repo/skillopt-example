@@ -1,0 +1,10 @@
+Repair complete. Four Holzman violations fixed in `src/lib.rs:8-22`:
+
+| Violation | Fix |
+|---|---|
+| `max_payload` never checked | Added `payload.len() > max_payload` guard → `FrameError::PayloadTooLarge` |
+| `payload.len() as u32` (lossy cast) | Replaced with `u32::try_from(...)` → `FrameError::Overflow` |
+| No bounded allocation | Added `try_reserve(capacity)` → `FrameError::Allocation` |
+| Unchecked capacity arithmetic | `checked_add(header_size, payload.len())` → `FrameError::Overflow` |
+
+All 2 behavior tests pass. `cargo fmt --check`, `cargo check --all-targets`, and `cargo test` all pass. JSON output written to `repair-output.json`.

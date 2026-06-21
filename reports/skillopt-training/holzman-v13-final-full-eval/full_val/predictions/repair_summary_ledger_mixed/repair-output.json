@@ -1,0 +1,40 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert",
+    "split_once used for CSV parsing (no split+collect)",
+    "checked_add used for total and count arithmetic",
+    "checked_div used for average computation",
+    "u64::try_from(count) used (no lossy as cast)",
+    "u32::try_from(count) used (no lossy as cast)",
+    "Empty input rejected with SummaryError::Empty",
+    "Invalid line format rejected with SummaryError::Invalid",
+    "Overflow rejected with SummaryError::Overflow",
+    "TooMany lines rejected with SummaryError::TooMany",
+    "Functional Core / Imperative Shell: pure parse+calc in summarize_metrics, render_summary for formatting",
+    "Bounded control flow: lines() iteration bounded by input length",
+    "No intermediate Vec allocation in parser path",
+    "No hidden I/O in core logic",
+    "All Result/Option errors propagated with ? (checked returns)",
+    "Summary struct uses typed domain values (u32 count, u64 total/average)",
+    "Parse boundary enforced: raw primitives parsed once with split_once + fallible parse",
+    "render_summary separates formatting from calculation",
+    "Functions within 25 logical lines",
+    "No let _ = on must-use values"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All 6 behavior tests pass. Source contains no prohibited patterns. Checked arithmetic, checked conversions, split_once parsing, bounded iteration, and functional separation all verified."
+}

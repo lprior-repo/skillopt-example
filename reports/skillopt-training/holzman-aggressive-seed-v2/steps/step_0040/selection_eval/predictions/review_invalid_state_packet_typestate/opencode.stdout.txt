@@ -1,0 +1,17 @@
+Now I have all the information. Let me write the review output.
+Review complete. Wrote `review-output.json` with 11 findings and 4 missing evidence items.
+
+**Summary of BLOCKER findings (8):**
+
+| # | Rule | File:Line | Issue |
+|---|------|-----------|-------|
+| 1 | make-illegal-states-unrepresentable | `lib.rs:1` | Two independent bools (`is_validated`, `is_sent`) allow all 4 combinations, including sent-but-not-validated |
+| 2 | no-primitive-domain-types | `lib.rs:3` | `status: String` instead of domain enum — any arbitrary string is valid |
+| 3 | no-primitive-domain-types | `lib.rs:2` | `id: String` with no newtype or validation constraints |
+| 4 | functional-core-immutable-data | `lib.rs:1` | All fields are `pub` mutable — any caller bypasses domain enforcement |
+| 5 | typed-error-handling | `lib.rs:9` | `mark_sent` returns `PacketWorkflow` directly, no `Result` type |
+| 6 | mark_sent-preconditions | `lib.rs:9` | No check that packet is validated before allowing sent transition |
+| 7 | duplicate-state-representation | `lib.rs:3` | `status: String` and `is_sent: bool` encode overlapping state independently |
+| 8 | no-unsanitized-boundary-data | `lib.rs:10` | Hardcoded `"sent".to_string()` allocates and bypasses domain enum |
+
+**Residual risk:** The crate compiles but structurally cannot enforce its domain invariants. A refactor to a typestate enum with private fields, fallible constructor, and `Result`-returning `mark_sent` would resolve all blockers.

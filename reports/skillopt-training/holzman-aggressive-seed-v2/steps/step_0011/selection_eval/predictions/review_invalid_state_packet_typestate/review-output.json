@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_states_not_blocked",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive boolean flag that allows the invalid state {is_validated=false, is_sent=true} -- a packet cannot be sent before it is validated.",
+      "failure_mode": "A caller can mark a packet as sent while is_validated is false, violating the domain invariant that only validated packets may be sent. The compiler cannot enforce ordering or mutual exclusion between these two booleans.",
+      "fix": "Replace is_validated and is_sent with a single typestate enum such as enum PacketLifecycle { Pending, Validated, Sent { sent_at_epoch_ms: u64 } } and make the PacketWorkflow struct carry this enum instead of two independent booleans."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_states_not_blocked",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary string values (e.g. \"sent\", \"deleted\", \"foobar\") that do not correspond to any valid lifecycle step. The mark_sent function only sets status to \"sent\" but never validates that the previous status was a valid predecessor.",
+      "failure_mode": "Callers can construct PacketWorkflow with status=\"foobar\" and bypass all domain state transitions. The type system cannot distinguish valid from invalid status strings, making illegal states representable at runtime.",
+      "fix": "Replace status: String with a sealed enum PacketStatus { Pending, Validated, Sent }. Use a fallible constructor or enum variants that encode the transition logic so invalid strings are unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_states_not_blocked",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is independent of the boolean is_sent. The invalid state {is_sent=false, sent_at_epoch_ms=Some(123)} is constructible, as is {is_sent=true, sent_at_epoch_ms=None}.",
+      "failure_mode": "The Option field allows a sent timestamp to exist without the packet being in a sent state, or vice versa. Any code reading sent_at_epoch_ms must defensively check is_sent first, creating a fragile implicit contract.",
+      "fix": "Tie sent_at_epoch_ms inside the Sent variant of the PacketLifecycle typestate enum so a timestamp can only exist when the packet is in the Sent state. Remove is_sent and sent_at_epoch_ms as separate fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs a state transition without any validation of preconditions. It unconditionally sets status to \"sent\" and is_sent to true regardless of whether is_validated is true.",
+      "failure_mode": "The function has no way to reject invalid transitions. It silently corrupts the domain invariant by allowing a non-validated packet to enter the sent state. This should return a Result or use an enum-based typestate where the transition is only possible from Validated.",
+      "fix": "Change mark_sent to accept a PacketLifecycle::Validated and return PacketLifecycle::Sent { sent_at_epoch_ms }. The compiler will reject all invalid transitions at compile time, and the function signature itself documents the precondition."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for the PacketWorkflow struct or mark_sent function. Performance claims (even trivial ones) require measured evidence per Holzman discipline.",
+      "failure_mode": "Without benchmarks, there is no evidence that the data shape or transition logic performs acceptably under real workload pressure. Future refactors could introduce regressions undetected.",
+      "fix": "Add a micro-benchmark (e.g., criterion or a simple timed loop) measuring PacketWorkflow construction and mark_sent execution."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_behavior_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module exists to verify the PacketWorkflow lifecycle invariants. There is no proof that valid transitions are accepted and invalid ones are rejected.",
+      "failure_mode": "Without behavior tests, regressions to the typestate transitions go undetected. The absence of tests also means there is no executable contract for future reviewers.",
+      "fix": "Add a tests/ module with tests covering: valid transition Pending->Validated->Sent, and compile-time or runtime rejection of invalid transitions like Pending->Sent."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for PacketWorkflow construction and mark_sent execution",
+    "no allocation profiling evidence for PacketWorkflow heap usage (3 String fields + Option)",
+    "no behavior tests verifying lifecycle transition invariants",
+    "no second-ring review (proof-plan or black-hat) evidence"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has zero production unsafe/unwrap/expect violations, but the fundamental type discipline problem (boolean flags and String status allowing illegal states) is a BLOCKER that must be resolved before delivery. The struct is trivially small so performance risk is low, but unmeasured."
+}

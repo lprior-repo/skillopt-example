@@ -1,0 +1,40 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/9c1bf01438745493/repair_csv_token_mixed/.skill/holzman-rust/SKILL.md",
+    "/home/lewis/.agents/skills/holzman-rust/SKILL.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/latency-throughput-playbook.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/runtime-performance-architecture.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/zero-cost-abstractions.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/simd-patterns.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/mechanical-empathy-toolchain.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo check --workspace --all-targets --all-features", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe",
+    "No production unwrap",
+    "No production expect",
+    "No production panic",
+    "No production todo/unimplemented/unreachable",
+    "No unchecked indexing",
+    "No unchecked arithmetic",
+    "No lossy as conversions",
+    "No ignored fallible results",
+    "Empty input returns ParseError::Empty",
+    "Invalid parse returns ParseError::Invalid",
+    "Exceeding max_items returns ParseError::TooMany",
+    "try_reserve for bounded Vec allocation",
+    "Tests unchanged - behavior contract preserved",
+    "All 4 behavior tests pass"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All Holzman Rust violations in production source have been eliminated. The only change was replacing unwrap+no-validation with proper error handling, bounds checks, and try_reserve allocation safety."
+}

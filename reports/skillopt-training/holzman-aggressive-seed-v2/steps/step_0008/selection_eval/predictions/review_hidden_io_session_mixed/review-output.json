@@ -1,0 +1,139 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permissions, etc.)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, io::Error> or a domain error type; use map_err to convert io::Error at the boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or missing field",
+      "failure_mode": "malformed CSV line (missing field or non-numeric value) crashes the program instead of returning a typed parse error",
+      "fix": "use .parse::<u32>().map_err(|e| ...) in a Result chain; return a domain ParseError with contextual field info"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy `as u16` cast truncates u32 values silently (e.g. 70000u32 becomes 4464u16)",
+      "failure_mode": "values outside u16::MAX range wrap silently, corrupting domain data without error",
+      "fix": "use u16::try_from(parsed_u32)? or check range with `if val > u16::MAX { return Err(...) }` before casting"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a Vec for every line when only two fields are needed",
+      "failure_mode": "unnecessary heap allocation per line; split also produces more parts than needed, increasing GC pressure",
+      "fix": "use line.split_once(',') to split into exactly two parts, then .map(|p| p.trim()) on each side; use .get() for indexed access"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] unchecked indexing into Vec produced by split/collect",
+      "failure_mode": "empty line or line with fewer than 2 commas causes IndexOutOfBounds panic",
+      "fix": "use split_once(',') and handle None case; use .get(0) and .get(1) with Option binding"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] unchecked indexing into Vec produced by split/collect",
+      "failure_mode": "line with only one comma or fewer fields causes IndexOutOfBounds panic",
+      "fix": "use split_once(',') and handle None; use .get(1) with Option binding"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() call inside load_sessions mixes I/O (stdout) into data-loading logic",
+      "failure_mode": "hidden side effect in a function that should be pure data loading; breaks testability and composability; logging leaks into the core",
+      "fix": "remove println! from load_sessions; return parsed records from a pure function; move any logging to the shell layer that calls load_sessions"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions performs I/O (fs::read_to_string) directly; no separation between shell and core",
+      "failure_mode": "cannot test parsing logic in isolation; I/O coupling prevents pure unit tests of the record-parsing behavior",
+      "fix": "split into (a) shell function that reads the file and returns String/Result<String>, and (b) pure core function parse_records(&str) -> Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record fields are pub, allowing external mutation and construction with invalid values",
+      "failure_mode": "callers can create Record with empty name or out-of-range value, bypassing all validation",
+      "fix": "make fields private; provide a constructor Record::new(name: String, value: u16) -> Result<Record, InvalidRecordError> or use type-level guards"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "no try_reserve or bounded allocation strategy for the output Vec",
+      "failure_mode": "unbounded growth from large files without capacity planning; repeated reallocations",
+      "fix": "use try_reserve on the Vec with a line-count estimate, or return Result and handle AllocationError"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": ".map(|part| part.trim().to_string()) allocates a String per field unnecessarily",
+      "failure_mode": "extra heap allocation per field; all allocations are lost after Record construction",
+      "fix": "use &str directly in Record (name: &str with lifetime) or use Cow<str>; at minimum avoid .to_string() before assigning into String field"
+    },
+    {
+      "severity": "MISSING_EVIDENCE",
+      "rule": "benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark exists to measure parse-throughput or allocation characteristics",
+      "failure_mode": "performance claims about this function are unsubstantiated; cannot validate allocation or speed properties",
+      "fix": "add criterion or custom benchmark measuring parse_records throughput and allocation count"
+    },
+    {
+      "severity": "MISSING_EVIDENCE",
+      "rule": "profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no profiler data (perf, flamegraph, or similar) to identify hot paths in parsing",
+      "failure_mode": "optimization efforts may target wrong code; allocation hotspots undetected",
+      "fix": "run perf record/flamegraph or cargo flamegraph on representative workload"
+    },
+    {
+      "severity": "MISSING_EVIDENCE",
+      "rule": "command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no evidence that cargo fmt, cargo test, or cargo clippy were run on this crate",
+      "failure_mode": "formatting, lint, and test gates unverified; code may have issues not caught by tooling",
+      "fix": "run cargo fmt, cargo clippy, and cargo test; capture and attach command output"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for parse-throughput or allocation measurements",
+    "no profiler data (perf/flamegraph) for hot-path analysis",
+    "no cargo fmt / cargo clippy / cargo test command evidence",
+    "no allocation tracing or second-ring evidence"
+  ],
+  "residual_risk": "Static review only; no commands run. 8 BLOCKER findings across forbidden constructs (unwrap, as, unchecked indexing), functional core violation (println! + I/O in core), and missing type safety. The code is non-deliverable in Holzman Rust until all unwrap/as/unchecked-index are replaced with typed error handling, I/O is separated from pure logic, and Record fields are made unrepresentable for illegal states."
+}

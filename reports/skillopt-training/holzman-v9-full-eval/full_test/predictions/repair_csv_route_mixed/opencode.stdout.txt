@@ -1,0 +1,18 @@
+Now I see the issues. The current `parse_routes` uses `unwrap()` (panic), ignores `max_items`, and has no empty-input check. Let me repair it.
+All 4 tests pass. Now let me write the required output JSON.
+Done. Here's what was repaired:
+
+**Violations found in `src/lib.rs`:**
+1. `unwrap()` on `parse::<u16>()` — panic surface on invalid input like `"nope"`
+2. No empty-input check — should return `ParseError::Empty`
+3. `max_items` parameter completely ignored — should return `ParseError::TooMany`
+4. No bounded allocation — used bare `Vec::with_capacity` via `.collect()`, no `try_reserve`
+
+**Fix applied** (smallest possible change):
+- Check `input.is_empty()` → `Err(ParseError::Empty)`
+- Use `Vec::new()` + `try_reserve(max_items)` → `Err(ParseError::Allocation)` on OOM
+- Iterate with `split(',')`, check trimmed emptiness → `Err(ParseError::Invalid)`
+- Parse with `map_err` → `Err(ParseError::Invalid)` instead of `unwrap()`
+- Check `checked_add(1)` against `max_items` → `Err(ParseError::TooMany)`
+
+**Result:** all 4 behavior tests pass, no absolute law violations remain.

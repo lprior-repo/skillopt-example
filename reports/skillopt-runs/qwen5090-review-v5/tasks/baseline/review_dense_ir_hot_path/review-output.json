@@ -1,0 +1,154 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/runtime-performance-architecture.md",
+    "references/nasa-jpl-standards.md",
+    "references/zero-cost-abstractions.md",
+    "references/latency-throughput-playbook.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "dense_runtime_ir",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Hot path function `route` receives `serde_json::Value` and `HashMap<String, serde_json::Value>` as parameters. This is the exact anti-pattern the dense IR architecture bans: runtime walks arbitrary JSON values, uses string keys for lookup, and performs repeated dynamic type inspection. The runtime should use numeric IDs and precompiled immutable IR artifacts.",
+      "failure_mode": "Every invocation pays O(n) string comparison, hash computation, and JSON value traversal. Under repeated evaluation the cost is linear in rule count with unpredictable branch behavior from JSON type inspection.",
+      "fix": "Replace with numeric OpId enum indexing into `Box<[CompiledRule]>` arrays. Accept `OpId` and precompiled immutable IR by reference. Decode input into a typed event at the boundary, not inside the hot path."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_no_post_init_alloc",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Line 4: `event.get(\"name\")?.as_str()?.to_string()` allocates a `String` on every hot-path invocation. The `to_string()` call copies the name out of the JSON payload into a heap-allocated `String`.",
+      "failure_mode": "Per-request heap allocation causes allocator contention, GC pressure, and unpredictable tail latency. Under high throughput this becomes the dominant bottleneck.",
+      "fix": "Accept `&str` or use a typed event with borrowed string. Use caller-owned buffer or `&str` slice to avoid allocation. The hot path should accept `&str` for the event name, not own it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs / allocation_budget",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "Line 7: `format!(\"route:{key}\")` allocates a `String` in the hot path. The `format!` macro is an allocation-heavy operation that should be absent from production-reachable code.",
+      "failure_mode": "Per-result heap allocation doubles the allocation pressure from line 4. String formatting also involves parsing the format string at runtime, adding branch and instruction cost.",
+      "fix": "Return a borrowed `&str` or write into a caller-owned buffer. If the output string is needed, use `const`-time composition or accept an output buffer parameter."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Line 5: `for (key, value) in rules` iterates over the HashMap without any static upper bound on iteration count. The `rules` parameter is an unbounded `HashMap<String, serde_json::Value>` with no max size declared.",
+      "failure_mode": "If `rules` is attacker-controlled or grows unbounded, the loop becomes an unbounded traversal. This violates Power of Ten Rule 2: every loop must have a static upper bound or mathematical termination proof.",
+      "fix": "Cap iteration at a static constant: `rules.iter().take(MAX_RULES)`. If `MAX_RULES` is exceeded, return a typed error rather than silently truncating."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_checked_results / power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Line 6: Chained `?.` on `value.get(\"enabled\")?.as_bool()?` silently returns `None` when the `enabled` field is missing or not a boolean. This hides malformed input without any error reporting, making the function fail-silent rather than fail-explicit.",
+      "failure_mode": "Silently dropping malformed rules makes debugging impossible and allows attacker-crafted rules (with missing `enabled` field) to pass through as disabled without any diagnostic.",
+      "fix": "Validate rule structure at the boundary (compilation/acceptance time). In the hot path, accept prevalidated compiled artifacts so malformed input cannot reach the function. Return `Result` with a typed error for invalid state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hashing_discipline / static_dispatch_hot_path",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The function uses `HashMap<String, serde_json::Value>` as the primary data structure. String-keyed HashMap lookups are O(n) for iteration and O(log n) amortized for lookup, with hash computation and string comparison overhead on every access. The hot path should use direct indexing into dense arrays by numeric ID.",
+      "failure_mode": "Hash computation + string comparison + pointer chasing for every rule lookup. Under load this dominates cache behavior with non-contiguous memory access patterns.",
+      "fix": "Use `Box<[CompiledRule]>` indexed by `OpId` (u32 newtype). Replace `HashMap<String, Value>` with `Vec<Option<CompiledRule>>` or `Vec<CompiledRule>` for direct numeric indexing."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "prove_slow_execute_fast / runtime_performance_architecture",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The entire function body is a runtime hot path that does what should be compile-time/acceptance-time work: parsing JSON structure, checking field presence, inspecting boolean values, and string comparison. Human/spec data (the rules config) is evaluated at runtime instead of being compiled to dense IR once and verified before acceptance.",
+      "failure_mode": "The runtime pays full parsing/inspection cost per invocation. This is the opposite of the dense IR architecture: prove slow (compile/verify rules once), execute fast (numeric ID lookup + bounded transition).",
+      "fix": "Move rule parsing, validation, and compilation to acceptance time. At runtime, accept precompiled `RuntimeIr` with numeric IDs and execute a bounded transition. The `route` function should be O(1) or O(log n) numeric lookup, not O(n) JSON traversal."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "Cargo.toml",
+      "line": 6,
+      "problem": "Dependency `serde_json = \"1\"` is a heavy JSON parsing library in a crate whose sole function is supposed to be a dense IR hot path. `serde_json::Value` is explicitly banned in hot paths per the runtime performance architecture reference. The dependency itself is acceptable for compilation-time work, but its presence signals the hot path uses JSON at runtime.",
+      "failure_mode": "The dependency pulls in allocation-heavy JSON parsing code. Even if only used for parameter types, the API contract commits to JSON-based interfaces that force runtime JSON handling.",
+      "fix": "Remove `serde_json` from dependencies. Replace `serde_json::Value` parameters with typed event structs or dense IR types. If JSON parsing is needed, confine it to the async shell/boundary layer, not the hot path."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required / zero_slippage_nightly_gate",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `rust-toolchain.toml` file exists in the crate. Without a pinned nightly toolchain, there is no deterministic compiler version, no allowlisted features, and no reproducible builds.",
+      "failure_mode": "Floating toolchain causes non-deterministic compilation, potential lint drift, and inability to use nightly-only features safely.",
+      "fix": "Add `rust-toolchain.toml` with pinned nightly date, minimal profile, and allowlisted features (portable_simd, try_blocks)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_zero_warnings / scope_aware_blocking",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `#![warn(...)]` or `#![forbid(...)]` lints in the crate root. No `rustfmt.toml` or formatting configuration. No clippy configuration. The crate lacks all baseline static analysis infrastructure.",
+      "failure_mode": "Without lint configuration, the crate has no enforcement of code quality rules, missing-unsafe-code warnings, or formatting discipline.",
+      "fix": "Add `#![warn(missing_docs, clippy::all, clippy::pedantic)]` and `#![forbid(unsafe_code)]` to `lib.rs`. Add workspace-level clippy and rustfmt configuration."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mechanical_empathy_order / benchmark_proof",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist. The crate has no `[dev-dependencies]` section with criterion or iai-callgrind. No benchmark binary target is defined in Cargo.toml. No performance evidence exists for any claim about the hot path.",
+      "failure_mode": "Without benchmarks, no performance claim can be validated. Optimization work cannot proceed without baseline measurement. Any performance rewrite is unverified.",
+      "fix": "Add criterion benchmark target with baseline workload: input distribution (rule count, event shape), latency target, and acceptance threshold. Benchmark the transition core against the simpler string-keyed approach."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mechanical_empathy_order / assembly_ir_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No assembly/IR evidence exists. No `cargo llvm-ir`, `cargo asm`, or `cargo bloat` evidence to verify the hot path shape. Without this evidence, claims about zero-cost abstractions or inlining are unproven.",
+      "failure_mode": "The compiler may not inline `route`, may not optimize away bounds checks, or may produce unpredictable branch patterns. Without IR inspection, the actual machine behavior is unknown.",
+      "fix": "After refactoring to dense IR, run `cargo llvm-ir --lib review_dense_ir_hot_path::route` to verify inlining and bounds-check removal. Run `cargo bloat --release --crates` to check binary size impact."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_short_functions / power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The function returns `Option<String>` which provides no information about why routing failed. Silent `None` return (via `?` chaining) hides all failure modes: missing name field, missing rules, disabled rules, malformed rule structure. No invariant is exposed through types.",
+      "failure_mode": "Callers cannot distinguish between 'no rule matched' and 'rules were malformed' or 'the event had no name'. This makes error recovery and debugging impossible.",
+      "fix": "Return `Result<RouteResult, RouteError>` with an enum of specific failure modes: `MissingName`, `RuleNotFound`, `MalformedRule`. Validate inputs at the boundary with typed constructors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "cache_first_layout",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The `HashMap<String, serde_json::Value>` parameter is a pointer-heavy, non-contiguous data structure. Iteration causes cache misses for every entry as values are scattered in heap allocation. `serde_json::Value` is a tagged union with heap-allocated content (strings, arrays, objects), making each value potentially many cache misses away.",
+      "failure_mode": "Sequential iteration over HashMap with `serde_json::Value` values produces O(n) cache misses, destroying prefetch and L1/L2 cache efficiency. Under load this dominates instruction throughput.",
+      "fix": "Replace with contiguous `Box<[CompiledRule]>` where each rule is a compact struct with numeric fields. Precompute enabled flags and target indices at compilation time. Use struct-of-arrays layout if scanning multiple rule fields."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmark target defined (criterion or iai-callgrind missing from dev-dependencies)",
+    "No baseline latency or throughput measurement for the hot path",
+    "No profiler evidence (perf stat, flamegraph, samply, cachegrind) showing actual bottleneck location",
+    "No assembly/IR inspection (cargo llvm-ir, cargo asm) for the hot path function",
+    "No rust-toolchain.toml with pinned nightly toolchain",
+    "No test targets in Cargo.toml - no test code exists",
+    "No CI gate configuration (.github/workflows/, .gitlab-ci.yml, or equivalent)",
+    "No coverage measurement (cargo llvm-cov or similar)",
+    "No dependency audit (cargo audit) or unsafe policy check (cargo geiger) evidence",
+    "No release profile configuration in Cargo.toml ([profile.release])",
+    "No allocation profiling (DHAT, heaptrack, bytehound) evidence",
+    "No second-ring tool evidence (Crux, SAW, Hax, or Kani)"
+  ],
+  "residual_risk": "CRITICAL: This crate is the canonical anti-pattern for the dense IR hot path architecture. The hot path function accepts runtime JSON (serde_json::Value) with string-keyed HashMap lookups, performs per-invocation heap allocations (to_string, format!), iterates over an unbounded collection, and silently fails (Option) without any typed error reporting. This is the opposite of prove-slow-execute-fast: the runtime does all the heavy JSON parsing and graph-walking that should happen at compilation/acceptance time. Without dense numeric IDs, precompiled IR, bounded transitions, and zero-allocation discipline, this function cannot serve as a hot path under any reasonable throughput or latency target. The entire crate must be refactored to accept precompiled numeric-ID-based IR, replace HashMap+serde_json with dense arrays, bound the iteration count statically, and eliminate all heap allocation from the transition function. No performance optimization is meaningful until this architectural inversion is corrected."
+}

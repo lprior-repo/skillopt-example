@@ -1,0 +1,72 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-enumerated-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has no enumerated state machine; status is a String and lifecycle is tracked by two independent bools, so any combination of values is representable including logically impossible ones like status=initialized, is_validated=true, is_sent=true.",
+      "failure_mode": "callers can construct or mutate BatchWorkflow into states that should never occur (e.g., sent-but-not-validated, or is_sent=true with status=failed), and no invariant can be enforced at the type level.",
+      "fix": "Define a `BatchStatus` enum with explicit variants (e.g., `Initialized`, `Validated`, `Sent`) and fold lifecycle data into the variants that own it; remove `is_validated` and `is_sent` bool fields entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is declared as `pub status: String` and mutated with a magic literal `\"sent\".to_string()` at line 10 instead of a type-safe enum variant.",
+      "failure_mode": "any string can be assigned to status, including typos, empty strings, or values outside the domain vocabulary; `mark_sent` cannot be validated against a closed set of states and callers cannot pattern-match on status.",
+      "fix": "Replace with `pub status: BatchStatus` where `BatchStatus` is an enum with the exact lifecycle states; update `mark_sent` to construct the `Sent` variant directly."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lifecycle-bools",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` and `is_sent: bool` on lines 4-5 encode lifecycle as independent booleans instead of a typestate transition.",
+      "failure_mode": "the four boolean combinations are all valid from the type system's perspective, so states like is_validated=false but is_sent=true are representable even though they violate domain invariants; no ordering constraint exists.",
+      "fix": "Remove both bool fields and replace them with an enum that encodes the directed transitions: `Initialized`, `Validated`, `Sent`. If data is needed on transitions, attach it to the variant that owns it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-option-invalid-state-combos",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` on line 6 allows the sent timestamp to be absent independently of whether `is_sent` is true, creating an invalid-state combination where is_sent=true but sent_at_epoch_ms=None.",
+      "failure_mode": "a batch can be marked sent without a timestamp, or have a timestamp without being sent; downstream code that assumes sent implies Some(timestamp) will get None and must handle it, defeating the type's intent.",
+      "fix": "Move the timestamp into the `Sent` enum variant, e.g., `Sent { sent_at_epoch_ms: u64 }`, so a valid timestamp is part of the same value that represents sent state and None is impossible."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` on line 2 is a raw primitive with no domain meaning; it accepts empty strings, arbitrary byte sequences, and can be confused with other string fields.",
+      "failure_mode": "invalid batch IDs (empty, malformed, non-unique) are accepted at the type level; callers cannot distinguish a batch ID from any other string, enabling silent logic bugs and preventing compile-time guarantees.",
+      "fix": "Define `pub struct BatchId(String)` with a smart constructor that validates the ID (e.g., non-empty, format check) and returns a typed error; use `BatchId` as the field type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary-violation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BatchWorkflow are pub and there is no smart constructor or factory; raw primitives (String, bool, Option) cross the parse boundary without validation, so callers can construct invalid domain states directly.",
+      "failure_mode": "no caller is forced to validate inputs at the boundary; any code can instantiate `BatchWorkflow { id: \"\" , status: \"\", is_validated: false, is_sent: true, sent_at_epoch_ms: None }` and the type system cannot prevent it.",
+      "fix": "Remove all pub fields, make the struct private, and provide a single `BatchWorkflow::new(id: BatchId, status: BatchStatus) -> Result<Self, BatchError>` smart constructor that validates at the boundary and returns typed errors."
+    }
+  ],
+  "missing_evidence": [
+    "no tests exist for BatchWorkflow or mark_sent",
+    "no benchmark exists for mark_sent or any performance claim",
+    "no clippy or fmt check evidence",
+    "no allocation profiling evidence for the .to_string() allocation in mark_sent"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental type-level invariants missing—every field is a raw primitive and the state machine is unenforced. Even if clippy passes, the domain model is unsound. A fix implementing enumerated BatchStatus, removing bool flags, using a BatchId newtype, and providing a private-struct smart constructor is required before any delivery gate."
+}

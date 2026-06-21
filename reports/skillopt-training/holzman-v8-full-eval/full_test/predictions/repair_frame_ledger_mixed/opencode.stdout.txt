@@ -1,0 +1,12 @@
+I see the issue. The `encode_frame` function accepts a `max_payload` parameter but never checks it against the payload length. The test `rejects_limit` expects it to return `Err(FrameError::PayloadTooLarge)` when the payload exceeds `max_payload`.
+Two clippy errors to fix. Need checked arithmetic for capacity and checked cast for the length.
+Repair complete. Two changes made to `src/lib.rs`:
+
+1. **Added payload length check** (line 9-11): Returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` — the missing invariant the original code ignored.
+
+2. **Replaced unchecked operations** with safe alternatives:
+   - `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)` — eliminates lossy cast
+   - `4 + payload.len()` → `header_len.checked_add(len)` — eliminates unchecked arithmetic
+   - `Vec::with_capacity(...)` — uses checked capacity with mapped errors
+
+Both `encodes` and `rejects_limit` tests pass, strict clippy gates are clean, and the output JSON is valid at the required path.

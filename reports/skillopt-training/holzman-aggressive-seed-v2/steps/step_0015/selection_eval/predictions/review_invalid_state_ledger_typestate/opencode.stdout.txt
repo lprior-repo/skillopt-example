@@ -1,0 +1,19 @@
+Now I have all the information. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 BLOCKER findings across the crate.**
+
+The `LedgerWorkflow` struct is an archetypal invalid state model:
+
+| Issue | Lines | Core Problem |
+|---|---|---|
+| `status: String` | 3, 10 | Magic string literals allow any value; typos compile silently |
+| `is_validated: bool` | 4 | Independent boolean creates illegal cross-field states |
+| `is_sent: bool` | 5 | Redundant with status; independently mutable |
+| `sent_at_epoch_ms: Option<u64>` | 6 | Decoupled from sent state; can be present on non-sent ledgers |
+| `id: String` | 2 | Primitive with no validation; empty/malformed IDs accepted |
+| `pub` all fields | 1-7 | External code constructs arbitrary invalid instances |
+| `mark_sent` mutates freely | 9-12 | No typestate gate — can skip validation entirely |
+| No constructor | 1 | No valid-by-construction guarantee |
+
+**Missing evidence:** no benchmarks, no profiler data, no allocation audit, no command evidence (cargo test/clippy/fmt).

@@ -1,0 +1,12 @@
+Review complete. Written to `review-output.json`.
+
+**Summary: 7 findings, 5 BLOCKERs, 2 MINORs**
+
+Key violations in `src/lib.rs`:
+- **`pub status: String`** (line 3) — any string value is legal, making illegal lease states fully representable
+- **`is_validated: bool` + `is_sent: bool`** (lines 4-5) — bool lifecycle flags instead of typestates/enums, compiler cannot enforce valid transitions
+- **`mark_sent`** (line 9) — unguarded mutation; any lease can be marked sent regardless of prior state
+- **All fields `pub`** (lines 2-6) — external code bypasses all domain constructors
+- **No functional core** — mutation pattern mixes imperative concerns into the core
+
+**Missing evidence:** benchmarks, profiler data, allocation audit, command evidence (no tests/clippy/bench run), formal verification.

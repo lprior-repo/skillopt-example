@@ -1,0 +1,19 @@
+{
+  "reasoning": "The primary failure mode is the omission of `try_from` for integer casts, which is a strict Holzman requirement. Previous edits tried to emphasize this but agents still default to `as`. I will make the `try_from` requirement explicit and mandatory in the Core Contract and Repair checklist. I will also reinforce `checked_div` and `try_reserve` to ensure they are not missed.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check and error handling), and `try_from` for ALL integer width changes or casts. Never use `as` for width changes or unchecked `+`/`-`/`*`/`/` for totals or counts.",
+      "source_type": "failure",
+      "support_count": 4
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded, unchecked `+`/`-`/`*` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Ensure all integer casts use `try_from` and all division uses `checked_div`.",
+      "source_type": "failure",
+      "support_count": 4
+    }
+  ]
+}

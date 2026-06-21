@@ -1,0 +1,18 @@
+I can see the issues clearly. The source needs:
+1. `summarize_metrics` returns `String` but tests expect `Summary`
+2. Missing `render_summary` function
+3. Uses `unwrap()`, unchecked arithmetic, lossy `as` casts, unchecked indexing
+4. Uses `collect` instead of `split_once`
+
+Let me write the corrected source:
+All 6 tests pass. Now I'll write the repair output.
+Repair complete. All 6 tests pass. Summary of changes to `src/lib.rs`:
+
+- **`summarize_metrics`** now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- **`render_summary`** added as the formatting function (functional core / imperative shell separation)
+- Replaced `parts[1].parse().unwrap()` with `split_once(',')` + `ok_or(Invalid)` + `map_err`
+- Replaced `total += value` with `checked_add`, `count += 1` with `checked_add`
+- Replaced `count as u32` with `u32::try_from(count).map_err(Overflow)`
+- Replaced `total / count` with `checked_div(count).ok_or(Invalid)`
+- Replaced `Vec::collect` + indexed access with `split_once`
+- Empty input early-rejected with `SummaryError::Empty`

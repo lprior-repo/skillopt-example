@@ -1,0 +1,13 @@
+Now I have full understanding. The current `src/lib.rs` has multiple Holzman violations: `unwrap()`, `split(',').collect()` pattern, no `try_reserve`, no empty check, no max_items enforcement. Let me check references then repair.
+Now I'll repair `src/lib.rs` following the Mandatory Repair Pattern for CSV/parser-to-Vec.
+All 4 tests pass, formatting is clean. Now writing the required output JSON.
+**Repair complete.** 
+
+Changes to `src/lib.rs`:
+- **Removed** `.unwrap()` panic surface on parse — replaced with `map_err(|_| ParseError::Invalid)`
+- **Removed** `.split(',').map(...).collect()` pattern — replaced with manual `for` loop iterating over split parts
+- **Replaced** implicit allocation with `Vec::new()` + `try_reserve(max_items)` with `ParseError::Allocation` on failure
+- **Added** empty input rejection (`ParseError::Empty`) before any allocation
+- **Added** `max_items` enforcement before each push (`ParseError::TooMany`)
+
+All 4 behavior tests pass, `cargo fmt --check` clean.

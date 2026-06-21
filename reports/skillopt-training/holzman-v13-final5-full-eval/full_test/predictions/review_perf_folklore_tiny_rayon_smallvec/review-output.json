@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-performance-claim-without-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims Rayon and SmallVec will be faster with zero workload, hardware, baseline, or measurement evidence",
+      "failure_mode": "Developer introduces parallel overhead and layout bloat for a 4-element input, degrading latency and throughput",
+      "fix": "Remove the folklore claim. Measure first. For [u8; 4] inputs Rayon parallel overhead alone exceeds serial execution time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-fixed-size-overhead",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Returns Vec<&'static str> for a fixed 4-element input, forcing heap allocation for trivially small output",
+      "failure_mode": "Every call allocates a heap Vec and four pointer entries for a result that fits in a stack array",
+      "fix": "Return [&'static str; 4] directly. Use [classify_byte(b) for b in *bytes] where classify_byte returns &'static str."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smallvec-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SmallVec suggestion is pointless for a known-size [u8; 4] — SmallVec's stack capacity advantage disappears when capacity is fixed at 4",
+      "failure_mode": "SmallVec adds compile-time generic parameter overhead and potential double-allocation fallback with no stack benefit over [T; 4]",
+      "fix": "Use [&'static str; 4] array return. SmallVec only helps when element count is variable and the common case is small."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "rayon-parallel-overhead",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Rayon on 4 elements is guaranteed slower — task creation, work-stealing, and result collection overhead dwarfs any parallelism benefit",
+      "failure_mode": "p95/p99 latency increases dramatically; throughput drops per-item due to thread-pool contention",
+      "fix": "Keep the serial iterator chain. For 4 elements there is no workload where Rayon scales positively."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-baseline",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, baseline measurement, or profiler evidence exists for any performance claim or optimization direction",
+      "failure_mode": "Optimizations are chosen by folklore rather than measured bottleneck; regressions go undetected",
+      "fix": "Write a micro-benchmark for classify_four on representative inputs before changing anything. Report ops/sec and p50/p95/p99 latency."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo check, clippy, or test compilation evidence; no benchmark commands run",
+      "failure_mode": "Code may have issues uncaught by absent gate commands; performance claims are unverified",
+      "fix": "Run cargo fmt --check, cargo check --workspace --all-targets, and cargo clippy with strict flags before any change."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim about Rayon/SmallVec speedup",
+    "no profiler data identifying actual hot path or allocation bottleneck",
+    "no allocation tracing (e.g., heaptrack, valgrind massif) showing Vec allocation cost vs array return",
+    "no second-ring evidence (assembly diff, cache-miss counters, cycle counts) for any optimization",
+    "no baseline measurement to compare against — the current function IS the baseline"
+  ],
+  "residual_risk": "Static review only; no commands run. The code compiles and contains no unsafe, unwrap, or unchecked arithmetic. The primary risk is a developer acting on the folklore TODO and introducing Rayon + SmallVec, which would measurably degrade performance on [u8; 4] inputs without any measurement justification."
+}

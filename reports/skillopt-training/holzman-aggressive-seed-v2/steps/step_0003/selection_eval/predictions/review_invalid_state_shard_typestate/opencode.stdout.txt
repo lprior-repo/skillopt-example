@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+- **5 BLOCKERs** — all centered on DDD violations:
+  1. `status: String` permits illegal states (line 2)
+  2. `is_sent: bool` duplicates status information, creating divergent truth sources (line 4)
+  3. No typestate model — unvalidated, validated, and sent are all the same struct (line 1)
+  4. `mark_sent` mutates in-place rather than transforming validated domain values (line 9)
+  5. Hardcoded `"sent"` string literal with no boundary validation (line 10)
+
+- **2 WARNINGs** — public fields allow unrestricted mutation; no tests exist
+
+- **Missing evidence** — no benchmarks, profiler data, allocation audit, or test output

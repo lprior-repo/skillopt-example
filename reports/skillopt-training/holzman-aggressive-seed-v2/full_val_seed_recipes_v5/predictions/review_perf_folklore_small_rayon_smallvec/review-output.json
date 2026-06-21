@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "performance_discipline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment declares intent to use Rayon and SmallVec for a 4-element fixed-size input. Rayon parallelism overhead on 4 items is orders of magnitude slower than sequential iteration. SmallVec is unnecessary when the output is a fixed count of 4 references (not heap-allocated small vectors).",
+      "failure_mode": "micro-benchmark would show Rayon spawn/coordination cost dwarfs the 4-element iteration; heap allocation through Vec + Rayon is strictly slower than a stack array return",
+      "fix": "Remove the TODO. Return `[&'static str; 4]` instead of `Vec<&'static str>`. Use a bounded manual loop or a fixed-size array pattern. No Rayon, no SmallVec, no Vec."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "holzman_rust",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returning `Vec<&'static str>` for a known fixed input size of 4 elements causes an unavoidable heap allocation. The input is `[u8; 4]` — a stack-sized fixed array. The output cardinality is exactly 4.",
+      "failure_mode": "every call allocates on the heap, triggering malloc/free overhead and defeating the purpose of a pure deterministic core on trivial data",
+      "fix": "Change the return type to `[&'static str; 4]` and use a `let mut out = [\"even\", \"even\", \"even\", \"even\"];` pattern with a checked-indexed or manual loop, or an iterator with `from_fn` into a fixed array."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Iterator chain with `.collect()` into Vec creates an intermediate heap allocation. For a fixed-size 4-element input, a manual bounded loop is clearer, avoids allocation, and is the Holzman-preferred shape.",
+      "failure_mode": "intermediate Vec allocation on every call; iterator chain adds no value for 4 elements over a simple loop",
+      "fix": "Replace iterator chain with a fixed loop writing into `[&'static str; 4]`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test files exist in the crate. There is no `tests/` directory and no `#[cfg(test)]` module. The function has no behavioral contract verification.",
+      "failure_mode": "any future refactor (e.g., returning fixed array, changing classification logic) has no regression guard",
+      "fix": "Add a `#[cfg(test)] mod tests` module with at least: all-even input, all-odd input, mixed input, and zero input."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No benchmarks exist for any stated or implied performance claim. The TODO comment references Rayon and SmallVec as performance optimizations, but no benchmark, profiler, or allocation evidence exists to support or refute either tool.",
+      "failure_mode": "uncritical adoption of Rayon/SmallVec without measurement leads to perf regressions",
+      "fix": "Add a criterion or custom benchmark comparing sequential fixed-array return vs. current Vec approach. Only add Rayon/SmallVec if the workload profile justifies them."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler data (flamegraph, perf, or similar) exists to validate the allocation or performance characteristics of this function.",
+      "failure_mode": "allocation hotspots remain unmeasured; optimization decisions are cargo-cult",
+      "fix": "Run `cargo flamegraph` or `cargo prof` on a representative workload to identify allocation hotspots."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation tracing (e.g., `tracing`, `dhat`, or custom allocator shim) exists to verify the heap allocation count and size of `classify_four`.",
+      "failure_mode": "heap allocation per call is assumed but not measured; fix cannot be validated",
+      "fix": "Add allocation tracing or use `#[global_allocator]` with a counting allocator to verify heap pressure."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring command evidence exists: no `cargo fmt`, `cargo clippy`, `cargo test`, or any CI command has been run. The review is purely static.",
+      "failure_mode": "code quality gates (formatting, linting, compilation) are unverified",
+      "fix": "Run `cargo fmt --check`, `cargo clippy`, and `cargo test` to verify the crate passes basic quality gates."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data (flamegraph/perf) exists",
+    "no allocation tracing exists",
+    "no second-ring command evidence (cargo fmt, cargo clippy, cargo test) exists",
+    "no test files exist in the crate"
+  ],
+  "residual_risk": "static review only; no commands run. The function has no tests, no benchmarks, and no command evidence. The dominant issue is cargo-cult Rayon/SmallVec intent on a 4-element fixed input that should return `[&'static str; 4]` via a bounded loop."
+}

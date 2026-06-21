@@ -1,0 +1,27 @@
+[
+  {
+    "candidate": "holzman-rust-candidate-v13-patched",
+    "skill_sha256": "4e2224b09b1b93bbc30f719e86902051705cdfa9055455d81eca39ebe723894e",
+    "split": "val",
+    "n": 21,
+    "hard": 0.9047619047619048,
+    "soft": 0.9804232804232804,
+    "passed": 19,
+    "failed": [
+      "repair_summary_event_mixed",
+      "repair_summary_route_mixed"
+    ]
+  },
+  {
+    "candidate": "holzman-rust-candidate-v13-patched",
+    "skill_sha256": "4e2224b09b1b93bbc30f719e86902051705cdfa9055455d81eca39ebe723894e",
+    "split": "test",
+    "n": 22,
+    "hard": 0.9545454545454546,
+    "soft": 0.9924242424242423,
+    "passed": 21,
+    "failed": [
+      "review_perf_folklore_tiny_rayon_smallvec"
+    ]
+  }
+]

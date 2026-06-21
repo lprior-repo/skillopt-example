@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_ledger_typestate/review-output.json`.
+
+**4 findings, 0 passed:**
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | `make_illegal_states_unrepresentable` | `src/lib.rs:1` |
+| 2 | BLOCKER | `functional_core_imperative_shell` | `src/lib.rs:9` |
+| 3 | BLOCKER | `no_pub_mutable_fields` | `src/lib.rs:2` |
+| 4 | MINOR | `primitive_obsession` | `src/lib.rs:2` |
+
+**Core issues:**
+- `LedgerWorkflow` uses `String` + `bool` fields to model state — every illegal combination is representable (e.g. `status="sent"` with `is_sent=false`). No typestate enforces valid transitions.
+- `mark_sent` mutates in place with no typed error return, no typestate guard, and no shell/core separation.
+- All fields are `pub` — any caller can bypass workflow logic entirely.
+- Missing: benchmarks, allocation analysis, profiler evidence, command evidence.

@@ -1,0 +1,14 @@
+Review complete. Written to `review-output.json`.
+
+**6 findings** across the task crate:
+
+| # | Severity | Rule | Key issue |
+|---|----------|------|-----------|
+| 1 | BLOCKER | type-discipline-typestates | `status: String` + `bool` flags instead of enums/typestates |
+| 2 | BLOCKER | type-discipline-newtypes | `id: String` has no domain newtype |
+| 3 | BLOCKER | type-discipline-typestates | `Option<u64>` for lifecycle event not tied to phase typestate |
+| 4 | BLOCKER | functional-core | `mark_sent` is a bare mutation with no validation or fallibility |
+| 5 | BLOCKER | zero_forbidden_constructs | `.to_string()` on literal creates unnecessary heap allocation |
+| 6 | WARNING | performance:allocation | No benchmark/profiler/allocation evidence |
+
+**Residual risk:** Static review only — all budget lifecycle states are representable and mutable without enforcement. Any caller can construct inconsistent states (e.g., `status="sent"` with `is_sent=false`).

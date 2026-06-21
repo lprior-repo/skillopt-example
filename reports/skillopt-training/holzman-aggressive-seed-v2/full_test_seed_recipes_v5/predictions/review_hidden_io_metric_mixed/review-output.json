@@ -1,0 +1,109 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() -- unwrap on fallible I/O in production code",
+      "failure_mode": "Any filesystem error (permission denied, missing file, symlink loop, ENOMEM) panics the thread instead of returning a typed I/O error",
+      "fix": "Return a Result<Vec<Record>, io::Error> (or typed error enum) and use the ? operator; do not unwrap file I/O"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() -- unwrap on fallible parse in production code",
+      "failure_mode": "Malformed CSV rows (non-numeric value, empty second field, extra whitespace that parse rejects) panic the thread instead of returning a typed parse error",
+      "fix": "Use parse().map_err(|_| ParseError::InvalidValue) or similar typed error; do not unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 on parsed u32 -- lossy cast that silently truncates values > 65535",
+      "failure_mode": "A valid u32 in range 65536..=4294967295 silently wraps to a wrong u16 value instead of being rejected as out of range",
+      "fix": "Use u16::try_from(value).map_err(|_| ParseError::OutOfRange) to reject values outside the u16 range explicitly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] -- unchecked indexing into Vec without bounds check",
+      "failure_mode": "A line with fewer than 1 comma-separated part panics via index-out-of-bounds instead of returning a typed parse error",
+      "fix": "Use split_once(',') and handle the None case with ok_or(ParseError::InvalidLine)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] -- unchecked indexing into Vec without bounds check",
+      "failure_mode": "A line with only one field (e.g. 'name,') panics via index-out-of-bounds instead of returning a typed parse error",
+      "fix": "Use split_once(',') to destructure exactly two fields; handle missing second field via ok_or"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) -- hidden stdout I/O side effect inside a data-loading function",
+      "failure_mode": "Side effects leak into the functional core; caller cannot suppress logging; output is interleaved with real stdout; function is not deterministic and not testable without capturing stdout",
+      "fix": "Remove println entirely. If caller needs logging, pass a logger callback or return a result that the imperative shell handles"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path) -- file I/O embedded directly in the function body",
+      "failure_mode": "I/O is mixed with parsing logic; the function cannot be unit-tested with in-memory data without mocking fs::read_to_string; violates pure-core / imperative-shell separation",
+      "fix": "Split into: (a) pure parse_metrics(lines: &[String]) -> Result<Vec<Record>, ParseError> and (b) load_metrics(path: &str) -> Result<Vec<Record>, Error> that reads the file and delegates to the pure function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses pub name: String and pub value: u16 -- raw primitives with no domain invariants enforced at the type level",
+      "failure_mode": "Any caller can construct a Record with an empty name, negative conceptually invalid value, or inconsistent state without going through a parse boundary",
+      "fix": "Make fields private, add a fallible constructor Record::new(name: &str, value_str: &str) -> Result<Self, ParseError> that validates name is non-empty and value is in range"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec<String> allocation via collect() on split with no try_reserve and no max_items cap",
+      "failure_mode": "Malicious or unbounded input files can cause unbounded heap allocation leading to OOM; the function has no upper bound on memory usage",
+      "fix": "Use split_once to avoid collecting all parts; if collecting is needed, call try_reserve(max_items).map_err(|_| Error::Allocation) before collecting"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_intermediate_collections",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "collect() into Vec<String> just to index [0] and [1] -- unnecessary intermediate allocation",
+      "failure_mode": "Wastes heap allocations for what is a simple two-field CSV line; each line allocates a Vec + String copies",
+      "fix": "Use line.split_once(',').ok_or(ParseError::Invalid) to get (name, value_str) directly without any intermediate allocation"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_metrics throughput or allocation profile",
+    "no profiler evidence (flamegraph, samply, perf) for hot path analysis",
+    "no allocation tracing (tracing-fluent, criterion allocation measurement, or valgrind massif) to quantify per-line heap cost",
+    "no second-ring evidence (assembly listing or MIR) to verify bounds-check elimination or vectorization on the iteration",
+    "no CLI harness or command evidence for end-to-end metrics loading performance",
+    "no tests exist for the crate -- no test files, no #[cfg(test)] module, no behavior tests"
+  ],
+  "residual_risk": "The function load_metrics is a single-file, single-function crate with six production-level blockers (unwrap, unwrap, as cast, unchecked indexing x2, hidden I/O println) and zero tests. The entire function body mixes I/O with parsing, has no error taxonomy, no bounded allocation, and no performance evidence. This crate would fail strict clippy (unwrap_used, indexing_slicing, as_conversions, panic_in_result_fn) and would fail Holzman delivery gates immediately. Repair requires splitting into a pure parse layer with typed errors, removing println, replacing all unwrap/indexing with checked alternatives, and adding a test suite before any performance claims."
+}

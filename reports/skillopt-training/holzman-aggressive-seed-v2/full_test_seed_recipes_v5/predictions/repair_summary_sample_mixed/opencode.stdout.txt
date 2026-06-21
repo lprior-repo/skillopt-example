@@ -1,0 +1,11 @@
+Now I have full picture. The code has multiple Holzman violations: `unwrap()`, unchecked `+=`, lossy `as` cast, integer division without `checked_div`, and `Vec::collect` instead of `split_once`. Also `summarize_metrics` must return `Summary` (not `String`) and `render_summary` is missing.
+All 6 tests pass. Writing the output file.
+**Repair complete.** All 6 behavior tests pass. Changes to `src/lib.rs`:
+
+- **`unwrap()`** → `map_err(|_| SummaryError::Invalid)` on value parse
+- **`total += value`** → `checked_add(value)` with `Overflow` error
+- **`count += 1`** → `checked_add(1)` with `Overflow` error
+- **`count as u32` / `total / count as u64`** → `u32::try_from(count)` + `checked_div(count_u64)`
+- **`Vec::collect` + `[1]` indexing** → `split_once(',')` + `ok_or(Invalid)`
+- **Early empty check** → returns `Empty` before any parsing
+- **Split concern** → `summarize_metrics` returns `Summary`; `render_summary` formats to `String`

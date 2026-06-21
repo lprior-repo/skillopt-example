@@ -1,0 +1,12 @@
+Repair complete. All gates pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Issue | Fix |
+|---|---|
+| `unwrap()` on parse | `.parse().map_err(\|_| ParseError::Invalid)?` |
+| No empty input guard | Early return `Err(ParseError::Empty)` |
+| `max_items` ignored | Enforced via `values.len() >= max_items` check before each push |
+| `.collect()` unbounded | `Vec::new()` + `try_reserve(max_items)` + bounded push loop |
+
+**Gates:** `cargo fmt` pass, `cargo check --all-targets` pass, `cargo clippy` (strict deny flags) pass, `cargo test` 4/4 pass, no assert/unreachable in production source.

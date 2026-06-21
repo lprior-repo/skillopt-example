@@ -1,0 +1,11 @@
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (10 findings, 7 BLOCKER, 3 MAJOR):**
+
+The crate has a textbook invalid-state-representable problem in `TelemetryWorkflow` (src/lib.rs:1):
+
+- **BLOCKER**: `status: String` + `is_validated: bool` + `is_sent: bool` as independent fields allow illegal combinations (e.g., unvalidated telemetry marked as sent). Needs a single typestate enum.
+- **BLOCKER**: `mark_sent` enforces no preconditions and doesn't set `sent_at_epoch_ms`.
+- **BLOCKER**: No functional core / imperative shell boundary — mutable struct with public fields and mutation function tightly coupled.
+- **BLOCKER**: No typed error taxonomy.
+- **MAJOR**: Missing id newtype, missing sent timestamp in mark_sent, missing public API contract (all fields pub), missing all evidence (tests, benchmarks, profiler).

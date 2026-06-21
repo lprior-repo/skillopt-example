@@ -1,0 +1,12 @@
+Review complete. Written to `review-output.json`.
+
+**Summary: 9 findings (6 BLOCKER, 3 WARNING), 5 missing evidence items.**
+
+Key issues in `src/lib.rs`:
+
+- **Line 9**: `fs::read_to_string().unwrap()` — panics on any I/O failure
+- **Lines 12-13**: Unchecked indexing `parts[0]` and `parts[1]` — panics on malformed/short lines
+- **Line 13**: `.parse::<u32>().unwrap()` — panics on non-numeric input
+- **Line 13**: `as u16` — silent truncation on values > 65535
+- **Line 12**: `println!()` — hidden I/O side effect in parsing logic
+- **Architecture**: I/O, parsing, logging, and type coercion all mixed in one function — violates functional core / imperative shell separation

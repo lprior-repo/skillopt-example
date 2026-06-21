@@ -1,0 +1,20 @@
+Now I have the full picture. The source has multiple Holzman violations: unchecked indexing, unwrap, unchecked arithmetic, lossy `as`, no checked division, wrong return type, and missing `render_summary`. Let me fix it.
+I used `unwrap` in the conversion - need to fix that since `unwrap` is banned. Let me use `From` instead.
+All 6 tests pass. Now writing the required output.
+Repair complete. All 6 tests pass. Here's what was fixed in `src/lib.rs`:
+
+**Banned constructs removed:**
+- `unwrap()` on parse → `map_err`
+- `parts[1]` unchecked indexing → `split_once`
+- `total += value` unchecked arithmetic → `checked_add`
+- `count += 1` unchecked arithmetic → `checked_add`
+- `total / count as u64` division + lossy cast → `checked_div` + `u64::from`
+- `count as u32` lossy cast → eliminated (count already `u32`)
+
+**Structural fixes:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (matching test contract)
+- Added `render_summary(Summary) -> String` (matching test contract)
+- Empty input → `Empty` error
+- Missing delimiter or bad parse → `Invalid` error
+- Overflow → `Overflow` error
+- Functional core separation: pure `Summary` from calculation, string rendering in shell

@@ -1,0 +1,25 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No lossy as conversion: payload.len() as u32 replaced with u32::try_from(payload.len())",
+    "No unused parameters: max_payload now enforced with PayloadTooLarge error",
+    "Bounded allocation: try_reserve with checked_add for capacity arithmetic",
+    "No unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert in production source",
+    "Typed error taxonomy: PayloadTooLarge, Allocation, Overflow all reachable",
+    "Functional core: encode_frame is pure deterministic function with no I/O",
+    "Hostile input validated before allocation: payload.len() checked against max_payload cap"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All three tests pass. No forbidden constructs remain. Allocation and overflow errors map to typed FrameError variants."
+}

@@ -1,0 +1,15 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/review_invalid_state_route_typestate/review-output.json`.
+
+**Summary: 9 findings (4 BLOCKER, 4 MAJOR, 1 MINOR)**
+
+Key violations in `src/lib.rs`:
+
+1. **No typestate enum** — `RouteWorkflow` uses `String status` + `bool` flags, allowing any contradictory combination (BLOCKER)
+2. **No parse boundary** — all fields `pub` with no smart constructor; any caller can build invalid states directly (BLOCKER)
+3. **mark_sent has no transition guards** — silently accepts any current state, enabling invalid paths like `sent -> sent` again (BLOCKER)
+4. **Orphaned `sent_at_epoch_ms`** — never populated by `mark_sent`, leaving inconsistent state (MAJOR)
+5. **No domain error types** — `mark_sent` returns `RouteWorkflow` with no `Result`, swallowing all failures (MAJOR)
+6. **In-place mutation** — `mark_sent` mutates input in-place instead of being a pure deterministic transition (MAJOR)
+
+All evidence gaps (no benchmarks, tests, clippy, or second-ring commands) reported as findings.

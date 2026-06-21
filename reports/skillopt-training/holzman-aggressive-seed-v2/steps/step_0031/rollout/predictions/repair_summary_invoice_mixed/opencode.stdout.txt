@@ -1,0 +1,16 @@
+Now I have the full picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function — neither exists. Multiple Holzman violations: `unwrap()`, unchecked indexing, unchecked arithmetic, no overflow check, no empty check.
+All 6 tests pass. Let me fix the unused variable warning:
+All 6 tests pass with zero warnings. Writing the output.
+Repair complete. All 6 tests pass. Here's what was fixed in `src/lib.rs`:
+
+**Behavior contract fixes:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- Added missing `render_summary(Summary) -> String` function
+
+**Holzman constraint fixes:**
+- **Removed `unwrap()`** on `.parse::<u64>()` → mapped to `SummaryError::Invalid`
+- **Removed unchecked indexing** `parts[1]` → replaced with `split_once(',')` + `ok_or(Invalid)`
+- **Removed unchecked `+=`** on total → replaced with `checked_add()` → `SummaryError::Overflow`
+- **Removed unchecked `/`** division → guarded by empty check + `checked_div()`
+- **Added empty input rejection** → returns `SummaryError::Empty`
+- **Added invalid line rejection** → lines without a comma return `SummaryError::Invalid`

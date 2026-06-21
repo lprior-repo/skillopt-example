@@ -1,0 +1,27 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap() - replaced with typed SummaryError::Invalid via map_err",
+    "No unchecked arithmetic - replaced += with checked_add, replaced / with checked_div",
+    "No unchecked indexing - replaced parts[1] with parts.get(1).ok_or(...)",
+    "No Vec<String> allocation - changed to Vec<&str> for borrowed slices",
+    "No missing error handling - added empty input check, invalid line check, overflow detection",
+    "Functional core / imperative shell - pure calculation in summarize_metrics, rendering separated into render_summary",
+    "Tests not edited - behavior contract preserved",
+    "Cargo.toml not edited - no dependency changes needed"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all banned constructs removed, all 6 behavior tests pass, checked arithmetic covers overflow and division"
+}

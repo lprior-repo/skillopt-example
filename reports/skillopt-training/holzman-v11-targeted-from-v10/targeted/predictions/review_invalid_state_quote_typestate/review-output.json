@@ -1,0 +1,136 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-must-be-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String, allowing any string value including invalid lifecycle states like 'invalid', '', or 'sent' set multiple times.",
+      "failure_mode": "Callers can construct a QuoteWorkflow with status=\"foobar\" or set status to arbitrary strings, making illegal states representable and bypassing lifecycle invariants.",
+      "fix": "Replace `status: String` with a domain enum `QuoteStatus { Draft, Validated, Sent }` and make all fields private with smart constructors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that can be set in any combination, violating the required state machine (Draft -> Validated -> Sent).",
+      "failure_mode": "A QuoteWorkflow can simultaneously have is_validated=true and is_sent=false while status=\"sent\", or be in a state where both booleans are false with status=\"sent\", producing inconsistent lifecycle representation.",
+      "fix": "Replace both booleans with a single typestate enum or a transition function that enforces valid transitions: Draft -> Validated -> Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combination",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate field from the lifecycle booleans, so sent_at_epoch_ms can be Some(...) while is_sent is false, or be None while is_sent is true.",
+      "failure_mode": "Optional lifecycle data is decoupled from the lifecycle state, producing inconsistent records where the timestamp claims sent but the flag says otherwise, or vice versa.",
+      "fix": "Move sent_at_epoch_ms into the enum variant that owns it, e.g. `Sent { sent_at_epoch_ms: u64 }`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain semantics, validation, or uniqueness guarantees.",
+      "failure_mode": "Any empty string, whitespace, or malformed string is accepted as a valid quote ID. No domain-level invariants on ID format or uniqueness are enforced at the type level.",
+      "fix": "Use a newtype `QuoteId(String)` with a smart constructor that validates the ID format and returns a typed error on invalid input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Raw primitive String for status crosses the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": "Any caller can pass arbitrary strings into QuoteWorkflow.status without validation, bypassing the parse boundary that should convert external input into trusted domain values.",
+      "fix": "Parse status at the boundary with a fallible smart constructor returning Result<QuoteStatus, ParseError>, and make the struct field private."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "public-mutable-fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of QuoteWorkflow are pub, allowing unrestricted mutation from any module.",
+      "failure_mode": "Any code in the crate can mutate id, status, is_validated, or is_sent arbitrarily, completely bypassing any domain invariants or lifecycle transitions.",
+      "fix": "Make all fields private and expose behavior through methods on QuoteWorkflow or a separate workflow service that enforces invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent-no-lifecycle-guards",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent unconditionally overwrites status and sets is_sent=true without checking the current state, allowing transition from any state directly to sent.",
+      "failure_mode": "A quote in Draft or any intermediate state can be marked sent without validation, violating the required workflow invariant that quotes must be validated before being sent.",
+      "fix": "Replace mark_sent with a fallible transition function like `fn validate(self) -> Result<QuoteWorkflow, QuoteError>` and `fn send(self) -> Result<QuoteWorkflow, QuoteError>` that check the current state before transitioning."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-type-driven-ddd",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The struct is a plain data bag with no domain behavior, no functional core, and no representation of the QuoteWorkflow domain language.",
+      "failure_mode": "The domain logic is absent from the type system entirely; callers must manually orchestrate lifecycle state without any type-level guarantees, leading to bug-prone imperative code.",
+      "fix": "Define a `QuoteWorkflow` enum with variants `Draft`, `Validated { id, ... }`, `Sent { id, sent_at_epoch_ms }` and implement lifecycle transitions as methods on each variant."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for mark_sent or any workflow transition.",
+      "failure_mode": "Performance characteristics of lifecycle transitions are unknown; any future optimization has no baseline to compare against.",
+      "fix": "Add a criterion benchmark for mark_sent and all lifecycle transitions with a defined workload."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence exists for the QuoteWorkflow struct layout, field access patterns, or hot paths.",
+      "failure_mode": "Struct layout inefficiencies, cache-line issues, or unnecessary copies in transitions are undetected.",
+      "fix": "Run cargo-flamegraph or similar profiler on representative workflow transitions and document findings."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs `.to_string()` allocation on line 10 without evidence that this allocation is necessary or bounded.",
+      "failure_mode": "Every call to mark_sent allocates a new String for status even when transitioning to the same literal, wasting heap memory.",
+      "fix": "Use an enum variant assignment instead of String allocation; no heap allocation is needed for a fixed set of lifecycle states."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-second-ring-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring evidence (assembly, API audit, SBOM) for the QuoteWorkflow struct or mark_sent function.",
+      "failure_mode": "Without second-ring evidence, claims about struct layout, API surface, or dependency footprint are unverified.",
+      "fix": "Generate second-ring evidence: review the compiled layout, audit public API surface, and document all transitive dependencies."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No verification gate evidence (cargo fmt, cargo clippy, cargo test) has been run against this crate.",
+      "failure_mode": "The crate may contain lint violations, compilation errors, or test failures that are undetected.",
+      "fix": "Run the full verification gate: cargo fmt --check, cargo check, cargo clippy, and cargo test."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or lifecycle transitions",
+    "no profiler evidence for QuoteWorkflow struct layout and hot paths",
+    "no allocation evidence for .to_string() on status field",
+    "no second-ring evidence (assembly/API audit/SBOM) for struct or functions",
+    "no verification gate evidence (fmt/clippy/test) has been run"
+  ],
+  "residual_risk": "The crate has 8 BLOCKER findings: raw String for status, independent lifecycle booleans, decoupled optional lifecycle data, untyped ID, missing parse boundary, public mutable fields, unconstrained mark_sent, and no type-driven DDD. These represent fundamental architectural violations that make illegal states directly representable. No commands were run during this static review. All lifecycle invariants are unenforced at the type level."
+}

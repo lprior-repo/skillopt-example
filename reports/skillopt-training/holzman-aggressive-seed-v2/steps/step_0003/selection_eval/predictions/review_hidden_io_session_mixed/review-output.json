@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap on I/O Result panics on missing file, permission error, or truncated read",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, std::io::Error> (or a typed domain error) and use ? to propagate the error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on ParseIntResult panics on non-numeric content",
+      "failure_mode": "malformed CSV data (e.g. 'alice,foo') panics instead of returning a typed ParseError",
+      "fix": "use .parse::<u16>().map_err(|e| ParseError(...)) and propagate via ?; parse directly to u16 to skip the width mismatch"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 — lossy width cast after parse",
+      "failure_mode": "values > 65535 silently truncate to u16 range; a '100000' string succeeds but corrupts data",
+      "fix": "parse directly to u16: parts[1].parse::<u16>().map_err(...) — no cast needed, out-of-range is a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() into Vec<String> to extract two fields — allocates intermediate collection",
+      "failure_mode": "wastes heap allocation for a fixed two-field parse; also masks the fact that only parts[0] and parts[1] are used",
+      "fix": "use split_once(',') to get (name, rest), trim name, then parse rest; no Vec allocation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — hidden I/O / side effect inside core parsing logic",
+      "failure_mode": "pure parsing function has observable side effects, making it untestable in isolation and coupling the core to the console",
+      "fix": "remove println! entirely; if logging is needed, push it to the imperative shell that calls this function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string), pure parsing, and console logging in one function",
+      "failure_mode": "cannot unit-test the parsing logic without mocking the filesystem or suppressing stdout",
+      "fix": "split into: (1) a pure fn parse_records(lines: impl IntoIterator<Item = &str>) -> Result<Vec<Record>, ParseError>; (2) a shell fn load_sessions(path: &str) -> Result<Vec<Record>, Error> that reads, logs, and calls (1)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_return_type",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function returns Vec<Record> directly instead of Result — any fallible operation inside must unwrap/panic",
+      "failure_mode": "design forces unwrap() usage; no way for callers to distinguish success from I/O, parse, or data errors",
+      "fix": "return Result<Vec<Record>, SessionError> where SessionError is an enum with I/O and Parse variants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accessed without bounds check — if line is empty or has no comma, split yields single element",
+      "failure_mode": "IndexOutOfBounds panic on blank lines or lines without a comma delimiter",
+      "fix": "use split_once(',') and match the Some((name, rest)) / None arms explicitly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accessed without bounds check — same indexing risk as line 16",
+      "failure_mode": "IndexOutOfBounds panic on lines with a comma but no second field (e.g. 'alice,')",
+      "fix": "use split_once(',') and extract rest from the Some arm; parse rest directly"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput",
+    "no profiler data (flamegraph/callgrind) for allocation hotspots",
+    "no allocation analysis (e.g. heaptrack, dhat-rs) showing Vec<String> churn per record",
+    "no second-ring review (proof-plan-reviewer or black-hat-reviewer) evidence",
+    "no command-level evidence: cargo fmt, cargo clippy, or cargo test have not been run"
+  ],
+  "residual_risk": "This crate is in a pre-repair state with 9 BLOCKER violations: unwrap() on I/O and parse (lines 9, 19), lossy as cast (line 19), hidden console I/O in core (line 16), unchecked indexing (lines 16, 19), over-collecting split output (lines 12-15), violated core/shell separation (line 8), and missing Result return type (line 8). All violations are fixable without behavioral change. No benchmark, profiler, or allocation evidence exists. Static review only — no commands run."
+}

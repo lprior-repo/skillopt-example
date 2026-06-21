@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "JobWorkflow uses status: String combined with is_validated: bool and is_sent: bool, allowing any combination of values including illegal states (e.g. status='sent' with is_sent=false, or status='pending' with is_sent=true and is_validated=true)",
+      "failure_mode": "Any caller can construct a JobWorkflow with contradictory lifecycle fields, breaking invariants and making reasoning about workflow correctness impossible",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single JobStatus enum (e.g. Pending, Validated, Sent) and derive is_sent/is_validated from the enum variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "When a struct combines status: String, lifecycle booleans, and optional timestamps, the lifecycle must be an enum/typestate state machine so transitions are enforced at the type level",
+      "failure_mode": "Without an enum/typestate, invalid state transitions cannot be caught at compile time; runtime checks are needed and error-prone",
+      "fix": "Define a JobStatus enum with explicit variants (e.g. Pending, Validated, Sent) and encode lifecycle transitions as methods that return Result<JobWorkflow, TransitionError> or consume self and produce the next state"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Raw primitives (String, bool, Option) enter the domain without a parse boundary/smart constructor. There is no fallible constructor enforcing domain invariants",
+      "failure_mode": "Callers can construct invalid states directly via JobWorkflow { id: String::from(\"bad\"), status: \"\", is_validated: false, is_sent: false, sent_at_epoch_ms: None } without any validation",
+      "fix": "Add a private constructor with a public fallible new() method (or try_new()) that validates id is non-empty, status matches a known enum set, and lifecycle booleans are consistent with the status"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes owned JobWorkflow and mutates it in place without any validation, error handling, or typestate enforcement. It accepts any status value and overwrites it to 'sent'",
+      "failure_mode": "A job with status='cancelled' can be overwritten to 'sent', silently allowing an invalid lifecycle transition",
+      "fix": "Make mark_sent a method on JobWorkflow that returns Result<JobWorkflow, TransitionError>; enforce that the current status is a transition-allowed predecessor (e.g. Validated) before allowing the transition to Sent; use the typestate enum instead of string comparison"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_raw_status_string",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "Setting status via string literal (\"sent\") instead of an enum variant or typed constant. This is unenforceable and error-prone to typo",
+      "failure_mode": "Typos in status strings ('sentt', 'Sent', 'SENT') silently create inconsistent state that mark_sent won't match, and consumers can't exhaustively match",
+      "fix": "Replace status: String with JobStatus enum; set via enum variant assignment (e.g. self.status = JobStatus::Sent)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unvalidated_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no newtype wrapping or domain constraints. Empty or malformed IDs cannot be rejected at construction time",
+      "failure_mode": "A JobWorkflow with an empty or invalid id can be created and processed, leading to ambiguous tracking and silent data corruption",
+      "fix": "Wrap id in a JobId newtype with a fallible constructor (e.g. JobId::try_from(String)) that rejects empty/whitespace-only values"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "performance_evidence_missing",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark, profiler, allocation tracking, or command evidence exists. mark_sent allocates via .to_string() on every call and creates a new String for status",
+      "failure_mode": "If mark_sent is called in a hot path, the redundant allocation per call is unmeasured and unbounded",
+      "fix": "Add a criterion or minimal benchmark for mark_sent; replace .to_string() with enum variant assignment; if status must be displayed, use Display trait on the enum"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_tracking_missing",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() performs a heap allocation. No allocation budget or audit exists",
+      "failure_mode": "Repeated calls cause unbounded heap allocations for a status that could be represented as a zero-cost enum variant",
+      "fix": "Replace String status with JobStatus enum; remove to_string() call entirely"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "command_evidence_missing",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No dev-dependencies for testing, no benchmark section, no clippy/toml verification configuration in Cargo.toml",
+      "failure_mode": "No automated quality gate exists to prevent regressions",
+      "fix": "Add [[bench]] section for criterion benchmarks, dev-dependencies for testing, and CI-compatible clippy configuration"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any performance claim",
+    "no profiler evidence (flamegraph, perf) for allocation patterns",
+    "no allocation tracking (e.g. alloc counter, jemalloc profiling)",
+    "no command evidence: cargo fmt, cargo clippy, cargo test, or cargo bench have not been run",
+    "no second-ring evidence (Kani, Miri, property tests) for state transition invariants"
+  ],
+  "residual_risk": "The crate has fundamental typestate and parse-boundary violations that make illegal states representable at the type level. Without enum-based JobStatus and fallible constructors, no amount of testing can guarantee lifecycle correctness. Static review only; no commands run. BLOCKER findings must be resolved before delivery."
+}

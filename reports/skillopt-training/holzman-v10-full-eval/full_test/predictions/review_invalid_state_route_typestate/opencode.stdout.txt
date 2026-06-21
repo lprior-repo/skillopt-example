@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with:
+
+- **8 findings** (6 BLOCKER, 2 WARNING/INFO)
+- **5 missing evidence** items
+- **Status**: `reviewed`
+
+Key violations found in the 13-line `src/lib.rs`:
+
+| Rule | Severity | Issue |
+|------|----------|-------|
+| `domain-model-status-string` | BLOCKER | `status: String` allows arbitrary values |
+| `typestate-lifecycle-booleans` | BLOCKER | `is_validated` + `is_sent` booleans are independent |
+| `typestate-invalid-state-combination` | BLOCKER | `is_sent` bool + `Option<u64>` creates 4 invalid combos |
+| `mark_sent-state-machine-gate` | BLOCKER | No state transition guard, any state → sent |
+| `domain-id-newtype` | BLOCKER | `id: String` with no validation newtype |
+| `public-fields-encapsulation` | WARNING | All fields pub, bypasses domain safety |
+| `epoch-ms-no-newtype` | WARNING | Raw `u64` timestamp with no unit wrapper |
+| `missing-benchmark-evidence` | INFO | No benchmark/profiler/allocation evidence |

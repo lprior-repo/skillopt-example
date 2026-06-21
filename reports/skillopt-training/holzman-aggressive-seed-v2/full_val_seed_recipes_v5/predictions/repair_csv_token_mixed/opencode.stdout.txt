@@ -1,0 +1,12 @@
+**Repair complete.** All 4 behavior tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| ParseError::Invalid)?` |
+| Empty input not rejected | Early `trimmed.is_empty()` check → `ParseError::Empty` |
+| `max_items` ignored | Enforced before push → `ParseError::TooMany` |
+| No allocation safety | `try_reserve(max_items)` → `ParseError::Allocation` |
+
+**Commands:** `cargo fmt` ✓, `cargo test` (4/4 passed) ✓

@@ -1,0 +1,36 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/aadf9deff28ab4ec/repair_csv_order_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/aadf9deff28ab4ec/repair_csv_order_mixed/Cargo.toml",
+    "/tmp/opencode/holzman-skillopt-train/aadf9deff28ab4ec/repair_csv_order_mixed/src/lib.rs",
+    "/tmp/opencode/holzman-skillopt-train/aadf9deff28ab4ec/repair_csv_order_mixed/tests/behavior.rs"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "No production unwrap/expect/panic/todo/unreachable",
+    "No unchecked indexing or lossy as conversions",
+    "Empty input returns Err(ParseError::Empty)",
+    "Invalid parse returns Err(ParseError::Invalid)",
+    "Exceeding max_items returns Err(ParseError::TooMany)",
+    "Checked capacity on Vec allocation",
+    "Smallest source change to satisfy all tests",
+    "Tests are the immutable behavior contract - not edited",
+    "Cargo.toml not edited",
+    "Pure deterministic core logic for parsing"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all production unwrap removed, all error paths mapped to typed ParseError variants, all 4 behavior tests pass"
+}

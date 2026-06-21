@@ -1,0 +1,18 @@
+Now I have the full picture. Let me repair `src/lib.rs` to satisfy all tests and Holzman constraints.
+All 4 tests pass. Now writing the repair output.
+Repair complete. Here's what was done:
+
+**Changes to `src/lib.rs`:**
+- Removed `unwrap()` — replaced with `map_err(|_| ParseError::Invalid)` for parse failures
+- Added empty-input check → returns `ParseError::Empty`
+- Added `max_items` enforcement before each push → returns `ParseError::TooMany`
+- Added `try_reserve(max_items)` → maps allocation failure to `ParseError::Allocation`
+- Converted iterator chain to a `for` loop for cleaner bounded-error handling
+
+**All 4 behavior tests pass:**
+- `parses_values` — `"1,2,3"` → `Ok(vec![1, 2, 3])`
+- `rejects_empty` — `""` → `Err(ParseError::Empty)`
+- `rejects_invalid` — `"1,nope"` → `Err(ParseError::Invalid)`
+- `rejects_too_many` — `"1,2,3"` with max 2 → `Err(ParseError::TooMany)`
+
+Output written to `repair-output.json`.

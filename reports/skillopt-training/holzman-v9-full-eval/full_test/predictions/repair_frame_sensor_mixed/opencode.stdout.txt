@@ -1,0 +1,7 @@
+Now I see the issues. The `encode_frame` ignores `max_payload`, uses a lossy `as u32` cast, and doesn't validate bounds. Let me fix it.
+Repaired. Two violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` cast** — `payload.len() as u32` replaced with `u32::try_from(payload.len())` returning `FrameError::Overflow`
+2. **Ignored `max_payload`** — added bounds check returning `FrameError::PayloadTooLarge` when payload exceeds limit
+
+All gates clean: `cargo fmt`, `cargo test` (2/2), `cargo clippy` (strict flags).

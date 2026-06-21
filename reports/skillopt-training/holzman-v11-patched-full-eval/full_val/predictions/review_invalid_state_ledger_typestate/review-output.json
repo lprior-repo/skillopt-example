@@ -1,0 +1,108 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/reviews/review-output-contract.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses no typestate enum to enforce lifecycle transitions; any code can call mark_sent on any instance regardless of prior state.",
+      "failure_mode": "A ledger can be marked sent without ever being validated or created, violating the intended state machine and allowing invalid business transitions.",
+      "fix": "Replace LedgerWorkflow with a typestate enum (e.g., enum Ledger { New { id, data }, Validated { id, data }, Sent { id, data, sent_at } }) so each transition is a function from one type to the next and invalid states are unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String field, allowing arbitrary values like \"sent\", \"sentt\", \"SENT\", \"\", or any future value not anticipated by the domain.",
+      "failure_mode": "Callers can set status to any string, bypassing business invariants; pattern matching on status becomes exhaustive but not correct, and typos silently produce invalid states.",
+      "fix": "Replace String with a non-exhaustive enum LedgerStatus { Pending, Validated, Sent } and make status a private field or remove it entirely in favor of a typestate enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lifecycle-bools",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are public booleans that can be in inconsistent combinations (e.g., is_sent=true, is_validated=false; both true; both false with status=\"sent\").",
+      "failure_mode": "Boolean flags create a 4-state space (2x2) but the domain only allows 3 valid transitions (new → validated → sent). Two of the four boolean combinations are invalid, and callers can set them independently to reach illegal states.",
+      "fix": "Eliminate both booleans and replace with a typestate enum where Sent variant owns the sent_at timestamp and Validated variant owns validation metadata. Each variant encodes exactly the data relevant to that state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> on the same struct that also has is_sent: bool, creating two independent sources of truth for whether the ledger was sent.",
+      "failure_mode": "is_sent=true with sent_at_epoch_ms=None is an inconsistent state (ledger is \"sent\" but has no timestamp); is_sent=false with Some(timestamp) is also inconsistent. The Option leaks lifecycle detail that should be owned by a Sent variant.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of a typestate enum. The Validated variant can hold validation metadata. The New variant holds nothing extra. This eliminates the Option and the inconsistency."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a plain String with no newtype wrapper, allowing any string (empty, whitespace, malformed UUIDs) as a ledger identifier.",
+      "failure_mode": "Domain functions cannot distinguish between a valid ledger ID and random strings; no validation is enforced at the type level, and invalid IDs propagate silently through the system.",
+      "fix": "Define a LedgerId newtype with a smart constructor that validates the format (e.g., non-empty, UUID pattern) and returns a typed error. Use LedgerId everywhere instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts a fully-constructed LedgerWorkflow directly, so raw primitives (String id, String status) cross the parse boundary without fallible smart constructors. There is no parse function that validates input at the boundary before domain construction.",
+      "failure_mode": "Callers can construct invalid LedgerWorkflow values with empty ids, invalid status strings, and inconsistent boolean flags without any validation, so the domain core receives hostile inputs instead of trusted values.",
+      "fix": "Write a smart constructor like fn LedgerWorkflow::new(id: &str, data: &str) -> Result<LedgerWorkflow, ParseError> that validates all inputs once at the boundary and returns trusted domain values. mark_sent should consume a New-state typestate value, not a raw struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-mutable-domain",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes `mut item: LedgerWorkflow` and mutates fields in place, violating Functional Core / Imperative Shell. Domain logic should be pure and return a new value rather than mutate in place.",
+      "failure_mode": "In-place mutation makes the function non-pure, prevents reasoning about state changes, and allows callers to hold both the old and new references with divergent state. It also makes typestate enforcement impossible.",
+      "fix": "Make mark_sent a pure transition function: fn validate(item: LedgerWorkflow) -> Result<ValidatedLedger, ValidationError> and fn mark_sent(item: ValidatedLedger) -> Result<SentLedger, SendError>. Each returns a new typed value."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, no baseline measurements, and no performance evidence exist for this crate. The mark_sent function does simple string assignment, but without measurement no performance claim can be validated.",
+      "failure_mode": "Performance claims (if any are made externally) are unsubstantiated. Future refactoring (e.g., typestate enums, smart constructors) could introduce overhead that goes undetected.",
+      "fix": "Add a criterion or similar benchmark for mark_sent and any domain transitions. Record baseline numbers, target hardware, variance, and regression thresholds."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module, no behavior tests, and no test evidence exists. The crate compiles a struct and a function with no verification.",
+      "failure_mode": "The mark_sent function has no tests proving it sets all three fields correctly, no tests for invalid state combinations, and no tests for the smart constructor. Silent correctness defects cannot be detected.",
+      "fix": "Add a tests module with tests for valid transitions, invalid state rejection by the typestate enum, smart constructor validation errors, and mark_sent returning the correct new typestate value."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "anemic-domain-model",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow is an anemic data bag with public fields and no domain methods. The only method (mark_sent) is a standalone free function that mutates in place.",
+      "failure_mode": "No invariants are encoded in the type system. Any function in any module can set any field to any value, violating domain rules. This makes the code fragile and impossible to reason about at the type level.",
+      "fix": "Use Functional Core / Imperative Shell: domain methods live on the type (or on typestate variants), all fields are private, and the type system enforces invariants. External code interacts through a shell layer that handles I/O and calls pure domain functions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any domain transition",
+    "no behavior tests exist for valid/invalid state transitions",
+    "no clippy or fmt evidence reported",
+    "no baseline performance numbers or target hardware documentation"
+  ],
+  "residual_risk": "The struct encodes no domain invariants. Any caller can construct and mutate LedgerWorkflow into illegal state combinations (is_sent without is_validated, arbitrary status strings, empty IDs). Typestate enforcement, smart constructors, typed error taxonomy, and behavior tests are all absent. The code is a mutable data bag with no functional core protection."
+}

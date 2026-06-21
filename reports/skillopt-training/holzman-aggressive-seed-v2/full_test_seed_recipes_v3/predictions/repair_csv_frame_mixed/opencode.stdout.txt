@@ -1,0 +1,9 @@
+Now I'll repair `src/lib.rs` following the CSV-to-Vec parser recipe from the skill.
+All 4 tests pass. Now writing the output.
+Repaired. All 4 tests pass. Changes to `src/lib.rs`:
+
+- Rejected empty input first (`ParseError::Empty`)
+- Used `Vec::new()` + `try_reserve(max_items)` for allocation-aware sizing
+- Enforced `max_items` before each push (`ParseError::TooMany`)
+- Replaced `.unwrap()` with `.map_err(|_| ParseError::Invalid)` for parse failures
+- Removed all Holzman-forbidden patterns (`unwrap`, unchecked operations)

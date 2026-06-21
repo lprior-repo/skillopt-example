@@ -1,0 +1,15 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written 14 findings to `review-output.json`:
+
+**7 BLOCKER violations:**
+- `unwrap()` on I/O (line 9) and parse (line 19) — process crash on untrusted input
+- Hidden I/O: `fs::read_to_string` (line 9) and `println!` (line 16) in the data pipeline
+- Unchecked indexing: `parts[0]` (line 16) and `parts[1]` (line 19) — OOB panic on malformed lines
+- Lossy cast: `as u16` (line 19) — silent truncation of values > 65535
+- Unbounded allocation: no domain cap on record count (line 8)
+- Functional core / shell violation: I/O, logging, parsing, and domain construction fused (line 8)
+- Raw primitive `String` for name with no constraints (line 4)
+
+**2 WARNING + 3 INFO:** Intermediate `Vec::collect` allocation, unnecessary `.clone()`, missing benchmarks, missing Cargo.toml bench config, and absent command evidence.
+
+**5 missing evidence items:** No benchmark, profiler, allocation, second-ring assembly, or clippy/fmt/test command evidence.

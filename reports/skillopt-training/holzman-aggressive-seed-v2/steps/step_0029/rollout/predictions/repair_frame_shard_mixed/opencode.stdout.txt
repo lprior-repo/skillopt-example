@@ -1,0 +1,14 @@
+Now let me explore the task crate structure and read the source files.
+Now I understand the issues. Let me fix the production source:
+
+1. Missing `max_payload` check (test `rejects_limit` fails)
+2. `payload.len() as u32` - lossy `as` conversion, forbidden by Holzman
+3. `len.to_be_bytes()` could overflow if len exceeds u32::MAX - need checked conversion
+All tests pass. Now writing the output JSON.
+Repair complete. Two changes made to `src/lib.rs`:
+
+1. **Added `max_payload` bounds check** — returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload`, satisfying the `rejects_limit` test.
+
+2. **Replaced lossy `as` conversion** (`payload.len() as u32`) with `u32::try_from(payload.len())` — eliminates the forbidden width-cast and returns `FrameError::Overflow` if the length exceeds `u32::MAX`.
+
+All 2 behavior tests pass. Output written to `repair-output.json`.

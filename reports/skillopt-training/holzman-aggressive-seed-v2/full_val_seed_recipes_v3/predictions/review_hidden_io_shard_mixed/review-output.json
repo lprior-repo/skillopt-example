@@ -1,0 +1,126 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_on_fallible",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure",
+      "failure_mode": "Missing file, permission error, or unreadable path aborts the entire program instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, io::Error> or a typed domain error and use ? to propagate"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_on_fallible",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() panics on non-numeric input",
+      "failure_mode": "Corrupted or malformed CSV data aborts the program instead of returning a typed parse error",
+      "fix": "Use .map_err(|_| ParseError::Invalid) or equivalent typed error and return Result<Vec<Record>, E>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy u32-to-u16 cast via `as u16` silently truncates values > 65535",
+      "failure_mode": "A u32 value in range 65536..=4294967295 silently wraps to a wrong u16, corrupting data with no error",
+      "fix": "Use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow) or parse directly as u16 with .map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the Vec by index without bounds check",
+      "failure_mode": "A line with fewer than one comma (or empty line) panics with index-out-of-bounds",
+      "fix": "Use split_once(',') and match on the two-option result, or use parts.get(0)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses the Vec by index without bounds check",
+      "failure_mode": "A line with exactly one comma but no second field panics with index-out-of-bounds",
+      "fix": "Use split_once(',') and match on the two-option result, or use parts.get(1)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is I/O side-effect inside the data-processing pipeline",
+      "failure_mode": "Pure computation is contaminated with logging; breaks determinism, makes testing harder, and leaks the imperative shell into the core",
+      "fix": "Remove println! from the map closure. If logging is needed, push log messages as data and flush them in the shell layer after the pure transformation completes"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_primitive_obssession",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses raw String for name instead of a typed newtype like RecordName",
+      "failure_mode": "Any string is accepted as a record name; domain invariants (e.g., non-empty, no whitespace) are not enforced at the type level",
+      "fix": "Define a newtype struct RecordName(String) with a fallible constructor that enforces invariants; use it in Record"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No try_reserve or allocation budget on the intermediate Vec<String> or final Vec<Record>",
+      "failure_mode": "Maliciously large input can exhaust heap memory before any validation occurs; allocation failure is unhandled",
+      "fix": "Estimate max lines, call try_reserve on the output Vec before collecting, and map allocation failure to a typed Allocation error"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_hidden_io_in_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string is a blocking I/O call directly in a pub function that appears to be a data-loading utility",
+      "failure_mode": "The function is not pure but also does not express its I/O nature in its return type; callers cannot distinguish I/O failures from data errors",
+      "fix": "Return Result<Vec<Record>, ShardsError> where ShardsError variants include Io(io::Error), Parse(ParseError), Overflow, and Empty"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "split_once_preference",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collecting all split parts into Vec<String> instead of using split_once for a two-field CSV",
+      "failure_mode": "Unnecessary heap allocations per line (each part gets a new String), higher memory pressure, and no benefit over split_once which yields two &str slices",
+      "fix": "Use `let (name_str, value_str) = line.split_once(',').ok_or(…)`, parse directly from the &str slices, and avoid Vec<String> allocation per line"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No custom error enum; errors are collapsed into panic via unwrap()",
+      "failure_mode": "Callers cannot programmatically distinguish between file-not-found, parse-invalid, overflow, and empty-input errors",
+      "fix": "Define an enum ShardsError { Io(io::Error), Invalid, Overflow, Empty } and return Result<Vec<Record>, ShardsError>"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark exists for load_shards performance claim or baseline",
+      "failure_mode": "Cannot verify whether this allocation-heavy implementation meets performance requirements",
+      "fix": "Add a criterion or similar benchmark measuring throughput and allocation for typical and adversarial inputs"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_shards throughput or allocation behavior",
+    "no profiler evidence (flamegraph/callopt) to identify hot paths",
+    "no allocation tracing (e.g., dhat, or --report-time) to verify allocation budget",
+    "no second-ring validation (Miri/UB checks) for unsafe or pointer behavior in the crate",
+    "no command-level CLI wrapper or entry-point evidence for end-to-end behavior"
+  ],
+  "residual_risk": "Static review only with no commands run. All unwrap() sites, unchecked indexing, lossy casts, and hidden I/O in the core are confirmed blockers that must be fixed before delivery. The function as written will panic on any malformed input, missing file, or value overflow. A full typed error taxonomy, split_once-based parsing, try_from conversions, removal of println! from the pipeline, and bounded allocation are required before the code meets Holzman Rust standards."
+}

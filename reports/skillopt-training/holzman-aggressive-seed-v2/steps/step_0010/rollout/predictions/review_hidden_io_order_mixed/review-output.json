@@ -1,0 +1,130 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure",
+      "failure_mode": "missing or unreadable file aborts the entire program instead of returning a typed error",
+      "fix": "change return type to Result<Vec<Record>, io::Error> or a domain error enum and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on invalid numeric input",
+      "failure_mode": "malformed CSV data (non-numeric value in second field) aborts the program instead of returning a parse error",
+      "fix": "return Result<Vec<Record>, ParseError> and use .map_err() on parse() to convert ParseIntError into a domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast from u32 to u16 with no range check",
+      "failure_mode": "values greater than 65535 silently truncate, producing incorrect data instead of an error",
+      "fix": "use u16::try_from(value) and propagate the error, or validate value <= u16::MAX before casting"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses Vec by index without bounds check",
+      "failure_mode": "empty or single-element lines cause a panic at runtime",
+      "fix": "use split_once(',') and handle the Some((name, rest)) / None cases explicitly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses Vec by index without bounds check",
+      "failure_mode": "lines with only one comma-separated field panic at runtime",
+      "fix": "use split_once(',') and destructure the tuple (name, value_str) so both fields are guaranteed when present"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_not_split_collect",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a full Vec for two-field extraction",
+      "failure_mode": "unnecessary heap allocation per line; the grammar is exactly two fields, making split_once sufficient",
+      "fix": "use split_once(',') to get (name_part, value_part) without collecting into a Vec"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() is an I/O side effect inside a data-processing closure",
+      "failure_mode": "purity is broken; the core parsing logic has observable side effects, making it untestable in isolation and coupling computation to the console",
+      "fix": "remove println! from the mapping closure; if logging is needed, push it to the shell layer outside the pure pipeline"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "load_orders performs fs::read_to_string (I/O) but is a public fn with no Result return type",
+      "failure_mode": "I/O is hidden inside a function that appears to be a pure computation; callers cannot handle file errors",
+      "fix": "return Result<Vec<Record>, E> from load_orders or split into a shell function (read file + log) and a pure core function (parse lines)"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_allocation_without_try_reserve",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_orders collects into Vec<Record> without any capacity reservation",
+      "failure_mode": "unbounded allocation on untrusted file size; no try_reserve or capacity hint",
+      "fix": "add try_reserve to the Vec with a bounded capacity computed from file metadata or a config limit, and handle AllocationError"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "domain_validation",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record has no validation by construction; name is a bare String, value is a bare u16",
+      "failure_mode": "illegal states (empty name, negative value) are representable and not rejected at construction",
+      "fix": "use a newtype for name (e.g. RecordName(String) with a fallible constructor that rejects empty strings) and validate value range at construction"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "no benchmark exists for load_orders throughput or allocation profile",
+      "failure_mode": "performance characteristics (allocations per line, parse latency) are unknown and unmeasured",
+      "fix": "add a criterion benchmark measuring lines-per-second and allocations-per-iteration"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "no profiler or allocation-tracing evidence (e.g. afl, heaptrack, or Rust allocator profiling) exists",
+      "failure_mode": "hot paths and allocation hotspots are unidentified",
+      "fix": "run profiler on representative input and report allocation profile"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no command evidence (cargo fmt, cargo clippy, cargo test) was produced for this review",
+      "failure_mode": "formatting, lint, and test gates cannot be verified from review alone",
+      "fix": "run cargo fmt --check, cargo clippy -- -D warnings, and cargo test; report outcomes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_orders throughput or allocation profile",
+    "no profiler or allocation-tracing evidence for the parsing hot path",
+    "no cargo fmt --check, cargo clippy -- -D warnings, or cargo test command evidence",
+    "no second-ring review or formal verification evidence"
+  ],
+  "residual_risk": "The crate has 8 blockers (unwrap, lossy cast, unchecked indexing, I/O in core, missing Result propagation), 2 major issues (allocation without try_reserve, no domain validation), and 3 minor issues (missing benchmarks, profiler, command evidence). Static review only; no commands run. All unwrap/panic paths on external input must be fixed before delivery. The function must be split into a shell layer (I/O + logging) and a pure core parser. All public APIs must return Result with typed domain errors."
+}

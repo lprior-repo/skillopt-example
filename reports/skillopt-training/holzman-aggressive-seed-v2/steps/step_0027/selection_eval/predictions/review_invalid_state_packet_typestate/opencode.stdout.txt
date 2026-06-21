@@ -1,0 +1,16 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Wrote `review-output.json` with 8 findings:
+
+**BLOCKERs (5):**
+- `make_illegal_states_unrepresentable` — `status: String` + `is_sent: bool` diverge, allowing impossible states (lib.rs:1)
+- `replace_status_string_with_enum` — `status: String` should be an enum (lib.rs:3)
+- `replace_bool_lifecycle_flags_with_enum` — `is_validated: bool` should be enum/typestate (lib.rs:4)
+- `replace_bool_lifecycle_flags_with_enum` — `is_sent: bool` redundant with status string (lib.rs:5)
+- `parse_at_boundaries_into_trusted_types` — `id: String` is a raw primitive, not a validated newtype (lib.rs:2)
+
+**MAJORs (3):**
+- `replace_option_lifecycle_fields_with_enum` — `sent_at_epoch_ms: Option<u64>` should be a typestate variant payload (lib.rs:6)
+- `functional_core_imperative_shell` — `mark_sent` enforces no preconditions (no validation check, allows double-send) (lib.rs:9)
+- `no_unchecked_allocation_in_output` — `"sent".to_string()` allocates every call unnecessarily (lib.rs:10)
+
+**Missing evidence:** No benchmarks, profiler data, allocation stats, Kani/Miri checks, or CI command evidence.

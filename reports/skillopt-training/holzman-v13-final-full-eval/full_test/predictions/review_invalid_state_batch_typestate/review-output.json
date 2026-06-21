@@ -1,0 +1,103 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has no typestate state machine; mark_sent mutates fields arbitrarily without enforcing valid transitions, allowing illegal state combinations (e.g. status=\"sent\" with is_sent=false, or is_validated=true with no corresponding lifecycle data).",
+      "failure_mode": "Callers can construct or mutate BatchWorkflow into any combination of fields, making illegal states fully representable and undetectable at compile time.",
+      "fix": "Replace struct fields with a typestate enum (e.g. enum BatchStatus { Pending, Validated, Sent }) and remove mark_sent mutator; transitions become constructor-only via enum variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a raw primitive for a lifecycle concept. Any string value is accepted (e.g. \"foo\", \"SENT\", \"\").",
+      "failure_mode": "Invalid status values silently pass; pattern matching on status becomes exhaustive-failure-prone if/else chains instead of compile-time guaranteed transitions.",
+      "fix": "Replace with an enum: pub enum BatchStatus { Pending, Validated, Sent } and use it in place of status: String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are lifecycle booleans that encode state as independent bits rather than enforced transitions.",
+      "failure_mode": "Four independent boolean-like states (validated+sent, validated+not_sent, not_validated+sent, not_validated+not_sent) include semantically invalid combinations that the type system cannot reject.",
+      "fix": "Collapse both booleans into a single typestate enum variant that owns the lifecycle data (see typestate_state_machine finding)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is optional lifecycle data stored outside the lifecycle state machine. It can be Some when status is not sent, or None when status is sent.",
+      "failure_mode": "sent_at_epoch_ms can be Some<u64> for a non-sent batch, or None for a sent batch, creating inconsistent lifecycle data that violates domain invariants.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typestate enum: Sent { sent_at_epoch_ms: u64 }, making the data owned by the variant that needs it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive domain identifier with no constraints, validation, or newtype protection.",
+      "failure_mode": "Any String (empty, whitespace, oversized, non-UTF8 surrogate) is accepted as a batch ID. No domain rules (length, format, uniqueness) are enforced at the type level.",
+      "fix": "Introduce a newtype: pub struct BatchId(String); with a smart constructor that validates constraints, or use a domain-specific ID type from the start."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String, bool, Option<u64>) cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly. The struct is public with all pub fields and there is no parse layer.",
+      "failure_mode": "External callers bypass all domain invariants by directly constructing BatchWorkflow with invalid field combinations, because no smart constructor or parse function validates inputs before they reach the domain.",
+      "fix": "Make all fields private, remove the no-arg constructor, and provide a single parse function that accepts DTO primitives, validates them with fallible smart constructors, and returns a BatchWorkflow (or domain error). Replace all field types with domain types (enum, newtype, typestate) in the parsed result."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns BatchWorkflow with no typed error. There is no validation of preconditions (e.g. must be validated before sent) and no error type for failure modes.",
+      "failure_mode": "mark_sent silently accepts invalid preconditions (e.g. marking a non-validated batch as sent) with no feedback to the caller; errors are invisible.",
+      "fix": "Return Result<BatchWorkflow, BatchError> with a typed error enum (e.g. BatchError::NotValidated, BatchError::AlreadySent) and validate preconditions before mutating state."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "public_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields on BatchWorkflow are pub, allowing external code to bypass mark_sent and any future validation logic by directly mutating fields.",
+      "failure_mode": "Callers can set item.status = \"\" or item.is_sent = true directly, completely bypassing the mark_sent function and any validation it might add.",
+      "fix": "Make all fields private (pub(crate) at minimum) and expose state through methods or derived views. Only the typestate enum variant should expose its data."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No canonical build or test commands have been executed. The crate does not even contain a test module, so cargo test cannot validate behavior.",
+      "failure_mode": "The code may not even compile under strict clippy gates (arithmetic_side_effects, as_conversions, etc.) and no behavior is verified.",
+      "fix": "Add at minimum: cargo fmt --check, cargo check --workspace --all-targets --all-features, and cargo clippy with strict warnings. Add tests that exercise the domain invariants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claims",
+    "no profiler data for hot path analysis",
+    "no allocation analysis (mark_sent performs .to_string() allocation on every call)",
+    "no second-ring evidence for any claim",
+    "no command evidence: cargo fmt/check/clippy/test were not executed",
+    "no benchmark/baseline for mark_sent allocation behavior"
+  ],
+  "residual_risk": "All findings are BLOCKER-level domain model violations. The struct makes every illegal state representable via public String/bool/Option fields with no typestate enforcement, no parse boundary, no error taxonomy, and no smart constructors. The code compiles as trivial Rust but violates every Holzman law regarding type-driven DDD, panic freedom, bounded invariants, and functional core architecture. Delivery is blocked until the struct is replaced with a typestate enum, parse boundary with fallible smart constructors, and typed error taxonomy."
+}

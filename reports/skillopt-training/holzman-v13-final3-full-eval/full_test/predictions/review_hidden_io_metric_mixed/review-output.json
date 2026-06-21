@@ -1,0 +1,98 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "claim-traceability.md", "functional-core-performance.md", "hardening-checklist.md", "review-output-contract.md", "stress-test-plan.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file is missing, unreadable, or invalid UTF-8",
+      "failure_mode": "untrusted file path aborts the entire process instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, MetricsError> and use .map_err(|e| MetricsError::Io(e))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are unchecked index accesses on a Vec that may have fewer than 2 elements",
+      "failure_mode": "malformed or short lines (e.g. empty file lines, single-field lines) panic with IndexOutOfBounds",
+      "fix": "use parts.get(0) and parts.get(1).ok_or(MetricsError::Invalid) instead of bracket indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() combines unchecked indexing with unwrap on fallible parse",
+      "failure_mode": "malformed CSV lines (missing second field or non-numeric value) panic instead of returning a typed parse/invalid error",
+      "fix": "use parts.get(1).ok_or(MetricsError::Invalid) then .map_err(|_| MetricsError::Parse) with bounded conversion"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 is a lossy cast: any u32 value above 65535 truncates silently",
+      "failure_mode": "invalid u16-range values silently wrap instead of returning a domain rejection error",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| MetricsError::OutOfRange) after parsing, never 'as'"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is side-effecting I/O embedded in data-parsing logic",
+      "failure_mode": "pure data loading leaks logging into the core, making the function non-deterministic, non-testable, and violating Data/Calculations/Actions separation",
+      "fix": "remove println entirely; if metrics are needed, push them to a logging/metrics call at the shell boundary outside the pure parsing closure"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_boundary",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "raw String primitives cross the parse boundary without fallible smart constructors; line.split(',').map(...).collect() allocates intermediate Vec instead of using split_once",
+      "failure_mode": "callers can construct invalid domain states (empty names, out-of-range values) because no smart constructor validates invariants at parse time",
+      "fix": "use line.split_once(',').ok_or(MetricsError::Invalid) to extract (_name, value_str), parse value_str with fallible typed conversion, and validate name is non-empty before constructing Record"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_type_raw_primitives",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses pub name: String and pub value: u16 — raw primitives expose domain invariants externally",
+      "failure_mode": "any caller can create Record with empty name, negative-adjacent values (if i16), or out-of-range u16 values, making illegal states representable",
+      "fix": "use newtypes like RecordName(String) with a smart constructor that rejects empty/whitespace, and keep value: u16 behind a constructor that validates 0..=65535 via try_from"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "shell_leakage_no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics fuses file I/O, CSV parsing, validation, and domain construction into one function returning Vec<Record> with no typed error type",
+      "failure_mode": "all failure modes (IO error, invalid CSV, parse failure, out-of-range value, empty input) collapse into panic, giving callers zero ability to handle any failure gracefully",
+      "fix": "return Result<Vec<Record>, MetricsError> with an enum { Io(io::Error), Invalid, Parse, OutOfRange, Allocation } and split shell (I/O) from pure parsing at a parse_boundary function"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No domain cap on maximum rows, no try_reserve, no bounded allocation — arbitrary file length drives unbounded heap allocation",
+      "failure_mode": "a sufficiently large file triggers OOM or allocation failure with no graceful degradation",
+      "fix": "validate a domain cap (max_rows: usize) first, allocate Vec::new(), call out.try_reserve(max_rows).map_err(|_| MetricsError::Allocation)?, enforce max before each push"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_metrics or any performance claim",
+      "failure_mode": "unknown allocation profile, unknown hot-path behavior, no baseline to validate improvements against",
+      "fix": "add criterion or similar benchmarks measuring allocations (via alloc_count or similar), throughput (records/sec), and tail latency with representative input distributions"
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for load_metrics allocation and throughput", "no profiler data for hot-path analysis", "no allocation budget or try_reserve usage in production source", "no second-ring evidence (no release provenance, no SIMD/zero-copy claims but also no measurable baseline)", "no command evidence: cargo fmt, cargo clippy, cargo test not run in review-only mode"],
+  "residual_risk": "Static review only — no commands executed. The crate contains 8 BLOCKER violations: unwrap on I/O (line 9), unchecked indexing (lines 16, 19), lossy cast as u16 (line 19), hidden I/O println (line 16), missing split_once parse boundary (line 12), raw primitive domain types (line 4), no typed error taxonomy with shell leakage (line 8), and unbounded allocation (line 10). All 8 blockers must be resolved before any delivery or landing approval."
+}

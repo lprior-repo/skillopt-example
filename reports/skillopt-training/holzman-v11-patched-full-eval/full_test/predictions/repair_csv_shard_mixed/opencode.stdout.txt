@@ -1,0 +1,19 @@
+Now I have a clear picture. The production code has multiple violations:
+- `unwrap()` on parse (line 12)
+- No empty input check
+- `max_items` parameter ignored (no `TooMany` enforcement)
+- No `try_reserve`
+All 4 tests pass. Let me also run clippy and verify no residual violations remain.
+Repair complete. All absolute law violations removed:
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `map_err(|_| ParseError::Invalid)?` |
+| No empty check | `input.is_empty()` → `Err(ParseError::Empty)` |
+| `max_items` ignored | `values.len() >= max_items` → `Err(ParseError::TooMany)` |
+| No `try_reserve` | `try_reserve(max_items).map_err(...)` |
+| Empty trimmed tokens | Rejected as `Invalid` |
+
+Commands: `cargo fmt`, `cargo test` (4/4 pass), `cargo fmt --check`, clippy strict lint — all passed.
+
+Output written to `repair-output.json`.

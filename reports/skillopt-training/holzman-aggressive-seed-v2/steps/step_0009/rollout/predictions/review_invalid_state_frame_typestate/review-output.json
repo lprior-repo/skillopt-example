@@ -1,0 +1,100 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String field. Any string value (\"sent\", \"\", \"SENT\", null-prefixed) is representable. The domain invariant — a frame has exactly one lifecycle phase — is not enforced by the type system.",
+      "failure_mode": "Callers can construct or mutate FrameWorkflow into an inconsistent state (e.g. status=\"draft\" with is_sent=true), making runtime checks fragile and tests unable to cover all illegal combinations.",
+      "fix": "Replace `pub status: String` with a sealed enum `pub status: FrameStatus` where `FrameStatus` variants are `Draft`, `Validated`, `Sent`. Remove `is_sent` entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-bool-lifecycle-flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bare bool. A bool can only express two states (true/false) with no domain semantics. It cannot encode the ordering invariant (must be validated before sent).",
+      "failure_mode": "A frame can be marked validated and then un-validated, or sent without being validated — both illegal. No compiler-enforced transition order exists.",
+      "fix": "Remove `is_validated: bool`. Encode validated as an intermediate typestate variant or derive it from the `FrameStatus` enum (e.g. `FrameStatus::Validated` implies validated)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-bool-lifecycle-flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a bare bool. It duplicates information already in `status: String` and creates the classic two-field inconsistency problem.",
+      "failure_mode": "is_sent and status can diverge (e.g. is_sent=true, status=\"draft\"). Every consumer must check both fields and risk missing one.",
+      "fix": "Remove `is_sent: bool`. Let `FrameStatus::Sent` alone answer whether the frame was sent. Derive `sent_at_epoch_ms` presence from the typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-pure-core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a mutating function that takes FrameWorkflow by value and mutates it in-place. It has no preconditions (cannot validate transition rules), no typed error return, and performs a heap allocation (\"sent\".to_string()).",
+      "failure_mode": "Without a typestate, mark_sent cannot prevent illegal transitions at compile time. The .to_string() allocates on every call even when the status was already \"sent\". No caller can distinguish a genuine send from a no-op re-send.",
+      "fix": "Replace with a fallible, typestate-gated function: `fn try_advance_to_sent(frame: FrameWorkflow) -> Result<FrameWorkflow, TransitionError>` that takes a typestate-bound input (e.g. `FrameValidated`) and returns `FrameSent`. Remove string mutation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-alloc-in-hot-path",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() performs an unconditional heap allocation on every call to mark_sent, even when the status is already \"sent\" or when a string is unnecessary.",
+      "failure_mode": "Unnecessary allocation on every call path degrades latency and defeats zero-cost abstraction promises. In a hot path (e.g. message processing), this adds GC pressure and tail-latency spikes.",
+      "fix": "Replace the String status with an enum (zero-cost, no allocation). If string representation is needed for display, implement Display on the enum and format only at the I/O boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-at-boundary-into-trusted-types",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "id is a raw String with no domain constraints. No newtype wraps it to enforce format rules (length, allowed characters) at construction time.",
+      "failure_mode": "Any caller can pass an empty, oversized, or malformed id into the core. Validation is scattered instead of enforced at the boundary.",
+      "fix": "Introduce `pub struct FrameId(String)` (or `NonEmptyString`) with a fallible constructor that validates format. Use `FrameId` in `FrameWorkflow`."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "public-mutable-fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of FrameWorkflow are public and directly mutable. No encapsulation, no invariant enforcement point.",
+      "failure_mode": "Any module in the crate can mutate any field without going through a typed transition, breaking invariants.",
+      "fix": "Make fields private and expose access via methods or builder pattern. Or better: make FrameWorkflow an opaque type where construction only happens via fallible constructors."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The crate has zero tests. No behavior contract exists for mark_sent or FrameWorkflow lifecycle.",
+      "failure_mode": "No regression protection. Any future change to the type or function is untested by definition.",
+      "fix": "Add behavior tests covering: valid transition (draft→sent), rejected invalid transition (sent→sent), and typestate construction."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for mark_sent or FrameWorkflow. No allocation or latency evidence is available.",
+      "failure_mode": "Cannot verify that the zero-cost claim holds. The .to_string() allocation on the hot path is unmeasured.",
+      "fix": "Add a criterion or divan benchmark for mark_sent measuring allocations (Allocation::Bytes) and latency across warm/cold paths."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or FrameWorkflow operations",
+    "no profiler data (flamegraph/crates-flame) for allocation hot paths",
+    "no allocation audit (e.g. alloc_counter or miri leak check)",
+    "no second-ring evidence (no assembly or dropshot for bounds-check removal claims)",
+    "no command evidence (cargo fmt/check/clippy/test not run)",
+    "no behavior test suite exists for lifecycle transitions"
+  ],
+  "residual_risk": "The crate is a typestate anti-pattern: three independent boolean/string fields encode a lifecycle that should be a single enum or typestate. No tests, no benchmarks, no error taxonomy. Every field is public and mutable. This is a BLOCKER for delivery — the entire struct must be restructured with an enum typestate before any further work. Without typestate, no amount of clippy linting or micro-optimization can prevent illegal states."
+}

@@ -1,0 +1,18 @@
+Now I see the issues. The production code has `.unwrap()`, ignores `max_items`, ignores empty input, ignores parse errors, and uses unbounded `.collect()`. Tests require typed errors for Empty, Invalid, TooMany, and Allocation.
+All 4 tests pass. Now running strict lint gates.
+No violations found. Now writing the required JSON output.
+Repair complete. Here's what was fixed in `src/lib.rs:9`:
+
+**Violations removed:**
+- `.unwrap()` on parse - replaced with `.map_err(|_| ParseError::Invalid)` 
+- Ignored `max_items` parameter - now enforced with `TooMany` error
+- Ignored empty input - returns `Err(ParseError::Empty)`
+- Unbounded `.split(',').collect()` - replaced with bounded loop using `try_reserve`
+
+**Changes made (smallest possible):**
+- Added empty-input check → `ParseError::Empty`
+- Added `try_reserve(max_items)` → `ParseError::Allocation` on failure
+- Added pre-push count check (`count >= max_items`) → `ParseError::TooMany`
+- Added `.map_err` on parse → `ParseError::Invalid`
+
+**Gates:** All 4 tests pass, zero clippy warnings, zero formatting drift.

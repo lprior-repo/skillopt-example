@@ -1,0 +1,7 @@
+Now I have all the information needed. Writing the review output.
+Review complete. Written 8 findings (7 BLOCKER, 1 WARNING) to `review-output.json`:
+
+- **6 typestate findings** (per SKILL.md §43): enum/state machine, status/String, bool/lifecycle, Option invalid-state combos, newtype/domain IDs, parse boundary
+- **2 additional findings**: missing benchmark evidence, hidden mutation at boundary
+- All illegal states (e.g., `is_sent=true` + `is_validated=false`) are representable in the current `MetricWorkflow` struct
+- No verification commands were run (static review only)

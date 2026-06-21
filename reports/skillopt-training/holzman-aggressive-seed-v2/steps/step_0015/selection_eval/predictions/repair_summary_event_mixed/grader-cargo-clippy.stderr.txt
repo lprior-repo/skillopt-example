@@ -1,0 +1,29 @@
+    Checking repair_summary_event_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/cba623fea4b70c22/repair_summary_event_mixed)
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:34:9
+   |
+34 |         count += 1;
+   |         ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+   = note: requested on the command line with `-D clippy::arithmetic-side-effects`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:41:8
+   |
+41 |     if count as usize > max_rows {
+   |        ^^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:45:19
+   |
+45 |     let average = total / u64::from(count);
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+
+error: could not compile `repair_summary_event_mixed` (lib) due to 3 previous errors

@@ -1,0 +1,101 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses ad-hoc String status and bool flags instead of a typed state machine. There is no enum representing valid lifecycle states, so any combination of fields is allowed.",
+      "failure_mode": "Callers can construct BudgetWorkflow with status=\"sent\" but is_sent=false, or is_validated=true with status=\"draft\", creating logically inconsistent states that violate business invariants.",
+      "fix": "Replace status, is_validated, and is_sent with a single BudgetState enum (e.g., Draft, Validated, Sent) with an optional sent_at field on the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_String",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String field. Any string value is accepted, including values like \"deleted\", \"cancelled\", \"sent\", \"SENT\", or \"\" that are not part of the domain lifecycle.",
+      "failure_mode": "Invalid or typos in status strings silently propagate through the system. Case variations or future string additions bypass all validation, making it impossible to reason about the budget's lifecycle from the type alone.",
+      "fix": "Replace `pub status: String` with a `pub state: BudgetState` enum. The enum's variants encode all valid states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a standalone bool that does not participate in a type-enforced state transition. It can be set to true independently of any other field.",
+      "failure_mode": "A budget can be marked as validated without ever having been created in a valid lifecycle position. The bool is independently mutable, so race conditions or logic errors can produce inconsistent state.",
+      "fix": "Subsume validation into the BudgetState enum as a transition: Draft -> Validated, with Validated carrying no separate is_validated bool."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a standalone bool that can be flipped independently of status and sent_at_epoch_ms. mark_sent sets both, but any caller can set them independently.",
+      "failure_mode": "A caller can set is_sent=true while status remains \"draft\", or set is_sent=false while status is \"sent\". The mark_sent function is the only safe entry but struct fields are pub, so bypass is trivial.",
+      "fix": "Remove is_sent entirely. The BudgetState::Sent variant implicitly means \"sent\"."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> as a standalone field, orthogonal to status and is_sent. The timestamp can be None while is_sent=true, or Some value while is_sent=false.",
+      "failure_mode": "Inconsistent state: budget marked as sent without a timestamp, or with a timestamp but not marked as sent. This breaks auditability and replay guarantees.",
+      "fix": "Move the timestamp into the BudgetState::Sent variant: `Sent { sent_at_epoch_ms: u64 }`. This makes the timestamp mandatory when in the sent state and impossible to have when not."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a public String, not a newtyped domain ID. Any String value, including empty, whitespace-only, or non-unique strings, is accepted as a budget ID.",
+      "failure_mode": "No uniqueness, format, or non-emptiness guarantees. Two budgets could share the same empty-string ID, or a budget ID could be an arbitrary user-controlled string with no domain validation.",
+      "fix": "Replace with `pub id: BudgetId` newtype that enforces non-emptiness and any format rules via a smart constructor returning a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "Raw primitives cross the parse boundary without fallible smart constructors. mark_sent takes a BudgetWorkflow with public mutable fields directly, so any caller can bypass all validation. There is no constructor that validates the input before entering the domain.",
+      "failure_mode": "Callers can construct BudgetWorkflow via struct literal with any field combination, then pass it to mark_sent or mutate it directly, producing invalid domain states without any parse/validation step.",
+      "fix": "Make all fields private, provide a private constructor, and expose only a smart constructor like `BudgetWorkflow::new(id: BudgetId) -> Result<BudgetWorkflow, ParseError>` that initializes the struct to Draft state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "public_fields_encapsulation",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of BudgetWorkflow are pub. There are no private fields, no smart constructors, and no invariant enforcement. mark_sent mutates fields directly rather than performing a state transition.",
+      "failure_mode": "Every field is independently writable by any caller. The struct provides zero encapsulation, making it impossible to enforce lifecycle invariants or prevent illegal state construction.",
+      "fix": "Make all fields private. Define BudgetState enum. Provide `BudgetWorkflow::new(id) -> Result<Self, Error>` constructor and `fn sent(&self) -> BudgetState` method instead of direct field mutation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_no_guard",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not validate that the budget was in a pre-sent state (e.g., Validated) before transitioning. It unconditionally sets status to \"sent\", is_sent to true, and ignores sent_at_epoch_ms entirely.",
+      "failure_mode": "A budget in any state (Draft, Validated, or Sent) can be marked as sent again. Sending a budget that is already sent is a no-op on sent_at_epoch_ms (no timestamp recorded), and a budget never validated can be sent without any guard.",
+      "fix": "Change signature to `fn try_sent(item: BudgetWorkflow) -> Result<BudgetWorkflow, TransitionError>`. Validate current state is Validated before transitioning, record sent_at_epoch_ms = now(), and return error for invalid transitions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or BudgetWorkflow lifecycle operations",
+    "no profiler data for BudgetWorkflow memory layout or allocation patterns",
+    "no allocation evidence for BudgetWorkflow field sizes or cache behavior",
+    "no command-truth evidence that mark_sent is called with valid pre-state in production",
+    "no test suite exists to verify state machine invariants",
+    "no clippy/fmt/check evidence that the crate compiles under strict lint gates"
+  ],
+  "residual_risk": "Critical: the domain model is structurally incapable of enforcing its own invariants. BudgetWorkflow permits every illegal state combination via pub fields on String/bool/Option primitives. The mark_sent function is the only documented transition but provides no guards and is bypassable by direct field access. Typestate machine replacement is mandatory before any production use."
+}

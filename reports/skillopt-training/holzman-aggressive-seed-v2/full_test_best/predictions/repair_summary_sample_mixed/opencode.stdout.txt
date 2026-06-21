@@ -1,0 +1,11 @@
+Repair complete. All 6 behavior tests pass, `cargo fmt --check` clean, `repair-output.json` written.
+
+**Changes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `parts[1].parse().unwrap()` — unchecked indexing + panic | `split_once(',')` + `ok_or(Invalid)` + `map_err(Invalid)` |
+| `total += value` — unchecked arithmetic | `checked_add` + `ok_or(Overflow)` |
+| `total / count as u64` — unchecked div + lossy `as` | `checked_div(u64::from(count))` + `ok_or(Overflow)` |
+| `Result<String, _>` return type mismatch | `Result<Summary, _>` matching test contract |
+| Missing `render_summary` function | Added, returns formatted `Summary` string |

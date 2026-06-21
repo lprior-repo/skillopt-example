@@ -1,0 +1,10 @@
+Now I have full picture. The function uses `unwrap()` (Holzman violation), ignores `max_items`, doesn't handle empty input, and doesn't return `ParseError`. Let me fix it.
+All 4 tests pass. Writing the output JSON.
+**Repair complete.** All 4 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+1. **Removed `unwrap()`** — replaced `.parse().unwrap()` with `.map_err(|_| ParseError::Invalid)?` so invalid input returns `Err(ParseError::Invalid)` instead of panicking.
+2. **Added empty-input check** — after iterating all parts, if `values.is_empty()`, returns `Err(ParseError::Empty)`.
+3. **Added `max_items` enforcement** — tracks count and returns `Err(ParseError::TooMany)` when exceeded.
+4. **Skips empty trimmed parts** — handles cases like `"1,,3"` gracefully by skipping whitespace-only tokens.

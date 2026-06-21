@@ -1,0 +1,16 @@
+Now I have all the information. Writing the review output.
+Review complete. Wrote `review-output.json` with:
+
+- **12 findings** (8 BLOCKER, 4 MAJOR) covering:
+  - `status: String` should be a domain enum
+  - `is_validated`/`is_sent` booleans should be typestate
+  - `sent_at_epoch_ms: Option<u64>` should live in the sent variant
+  - `id: String` needs a `PacketId` newtype
+  - Missing smart constructors / `TryFrom`
+  - `mark_sent` mutates in-place instead of enforcing typestate transitions
+  - All fields `pub` — zero encapsulation
+  - `"sent".to_string()` unbounded allocation per call
+
+- **5 missing evidence** entries: benchmarks, profiler, allocation analysis, command evidence, second-ring verification
+
+- **Residual risk**: fundamentally broken domain model — illegal states are fully representable at the type level, and no command evidence exists to verify the crate compiles.

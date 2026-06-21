@@ -1,0 +1,15 @@
+Review complete. Found 6 Holzman Rust violations in `src/lib.rs`:
+
+**BLOCKER (3):**
+- `status: String` allows arbitrary invalid values — should be a bounded enum
+- Independent `is_validated`/`is_sent` booleans from `status` make illegal state combinations representable
+- `mark_sent` mutates input in-place instead of returning a pure transformation
+
+**MAJOR (2):**
+- `.to_string()` heap allocation on every `mark_sent` call for a constant string
+- No constructor enforces field consistency — raw primitives accept invalid combinations
+
+**MINOR (1):**
+- No benchmark/profiler evidence for `mark_sent`
+
+`review-output.json` written to the required output path.

@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review.
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**7 BLOCKER findings:**
+
+| # | Rule | File:Line | Problem |
+|---|------|-----------|---------|
+| 1 | make-illegal-states-unrepresentable | `lib.rs:3` | `status: String` — magic literal lifecycle, not a typestate |
+| 2 | make-illegal-states-unrepresentable | `lib.rs:4` | `is_validated: bool` — diverges from `status` |
+| 3 | make-illegal-states-unrepresentable | `lib.rs:5` | `is_sent: bool` — diverges from `status` |
+| 4 | make-illegal-states-unrepresentable | `lib.rs:1` | `id: String` — no domain newtype |
+| 5 | functional-core-no-side-effects | `lib.rs:10` | `.to_string()` allocation on hot path |
+| 6 | no-redundant-state | `lib.rs:9-12` | sets both `status="sent"` and `is_sent=true` |
+| 7 | no-void-functions-must-be-fallible | `lib.rs:9` | no precondition validation before `mark_sent` |
+
+**5 missing evidence items:** no benchmark, no profiler data, no allocation tracing, no second-ring assembly evidence, no command-level evidence.

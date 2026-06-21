@@ -1,0 +1,9 @@
+Now I have the full picture. The current code has these Holzman violations:
+1. `payload.len() as u32` — lossy `as` cast
+2. No payload length check against `max_payload`
+3. No `try_reserve` for allocation safety
+Repair complete. All 2 tests pass. Three Holzman violations fixed in `src/lib.rs:8-21`:
+
+1. **Lossy `as` cast** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)`
+2. **Missing bounds check** — added `payload.len() > max_payload` guard returning `FrameError::PayloadTooLarge`
+3. **No allocation safety** — added `try_reserve` with `checked_add` for capacity, mapped to `FrameError::Allocation`/`Overflow`

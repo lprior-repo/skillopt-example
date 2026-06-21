@@ -1,0 +1,9 @@
+Now I understand the issues. The function doesn't check `payload.len() > max_payload`, doesn't handle u32 overflow for payload length, and doesn't handle allocation failures. Let me fix it.
+`Vec::with_capacity` doesn't return a `Result`. Let me fix this properly.
+Actually, `unwrap()` violates the rules too. Let me use `payload_len` directly for the addition instead.
+Done. Changes to `src/lib.rs`:
+
+1. **Added payload length check** — returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload`
+2. **Added u32 overflow guard** — uses `u32::try_from(payload_len)` instead of unchecked `as u32`
+3. **Added allocation size overflow guard** — uses `checked_add` for `4 + payload_len` instead of direct `as` conversion
+4. **Removed all `as` conversions** — uses `usize` arithmetic with `try_from` for safe u32→u64→u32 path only where needed for big-endian encoding

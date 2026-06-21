@@ -1,0 +1,15 @@
+Now I understand the issues. The current `src/lib.rs` has multiple Holzman violations and doesn't match the test contract. Let me fix it.
+All 6 tests pass. Let me run the full verification gate.
+All 6 tests pass, clippy is clean. Let me write the output.
+Repair complete. Here's the summary of changes to `src/lib.rs`:
+
+**Violations removed:**
+- `parts[1].parse::<u64>().unwrap()` → `split_once(',')` with `ok_or(Invalid)` (no unchecked indexing, no unwrap)
+- `total += value` → `checked_add(value)` with `ok_or(Overflow)` (no unchecked arithmetic)
+- `count += 1` → `checked_add(1)` with `ok_or(Overflow)` (no unchecked arithmetic)
+- `total / count as u64` → `checked_div(u64::try_from(count))` (no lossy cast, no unchecked div)
+- Removed `Vec::collect` allocation (used `split_once` directly per Holzman rule)
+- Changed return type from `Result<String, _>` to `Result<Summary, _>` to match test contract
+- Added missing `render_summary(Summary) -> String` function
+
+**Gates:** `cargo fmt` ✓, `cargo test` 6/6 passed ✓, strict clippy ✓

@@ -1,0 +1,98 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file read failure",
+      "failure_mode": "missing or unreadable file aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> and propagate with ? or map_err at the boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on malformed input or out-of-range value",
+      "failure_mode": "a single non-numeric or oversized field in the CSV aborts the entire session load instead of reporting a typed Parse or Value error",
+      "fix": "use .split(',') with checked indexing (split_once or get), call parse with map_err to a typed ParseError, and validate the u32 fits in u16 before casting"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy as cast from u32 to u16: (.parse::<u32>().unwrap()) as u16 silently truncates values > 65535",
+      "failure_mode": "a valid u32 value of 70000 becomes 4463 without any error, corrupting the domain data",
+      "fix": "use u16::try_from(parsed_u32) or validate with .checked_into::<u16>() and return a typed Value error on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] unchecked indexing into split result without bounds check",
+      "failure_mode": "a line with fewer than 2 comma-separated fields triggers a panic at runtime",
+      "fix": "use line.split_once(',') or iterate with enumerate and guard on len < 2, returning a typed Parse error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] unchecked indexing into split result without bounds check",
+      "failure_mode": "same as above — any line missing the second field panics",
+      "fix": "use split_once(',') to get exactly two parts, or validate .len() >= 2 before indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string) with data parsing in a single public function",
+      "failure_mode": "the pure parsing logic cannot be tested in isolation; I/O failure modes are tangled with domain parsing errors; no deterministic unit tests possible for the parser",
+      "fix": "split into (a) a pure fn parse_session_line(line: &str) -> Result<Record, ParseError> for the core, and (b) a shell fn load_sessions(path: &str) -> Result<Vec<Record>, SessionError> that calls read_to_string, iterates lines, and delegates to parse_session_line"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden side effect inside a data-processing function",
+      "failure_mode": "logging couples the core to a concrete output target, makes the function non-deterministic in output, prevents silent testing, and violates the rule that only the shell may perform side effects",
+      "fix": "remove println entirely from the core; if progress reporting is needed, expose it via a callback or builder pattern in the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no error type — all failures are expressed as panics",
+      "failure_mode": "callers have no way to distinguish file-not-found, parse errors, value-out-of-range, or malformed-line errors; the error taxonomy is entirely missing",
+      "fix": "define a SessionError enum with variants (Io(io::Error), Parse(ParseError), Value(ValueError)) and return Result<Vec<Record>, SessionError>"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec<String> allocation from split without try_reserve or capacity hint",
+      "failure_mode": "malformed lines with many commas can cause unbounded heap allocations, enabling allocation-based DoS",
+      "fix": "compute expected capacity from line.len(), call try_reserve before the map/collect chain, and map allocation failure to an Allocation error"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data (cargo flamegraph, perf, or similar) for the parsing path",
+    "no allocation analysis (e.g., allocs per line, total allocation budget)",
+    "no second-ring evidence: no Miri UB check, no Kani bounded verification, no property tests"
+  ],
+  "residual_risk": "static review only; no commands run. All error paths are panic-exit with zero error taxonomy, lossy casts, unchecked indexing, hidden I/O side effects in the core, and no bounded allocation. This crate is not Holzman-compliant and should not be delivered without the structural splits, typed errors, checked arithmetic, and removed forbidden constructs."
+}

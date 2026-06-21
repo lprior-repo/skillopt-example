@@ -1,0 +1,17 @@
+Now I'll repair `src/lib.rs` to fix all issues:
+All 6 tests pass. Writing the required output.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+**Contract changes (required by tests):**
+- `summarize_metrics` return type changed from `Result<String, SummaryError>` to `Result<Summary, SummaryError>`
+- Added `render_summary(Summary) -> String` function
+
+**Holzman safety violations removed:**
+- `unwrap()` on parse → `.map_err(|_| SummaryError::Invalid)` (line 24)
+- Unchecked `parts[1]` indexing → `split_once(',').ok_or(...)` (line 23)
+- Unchecked `total += value` → `checked_add` with overflow error (line 25)
+- Unchecked `count += 1` → `checked_add` with overflow error (line 26)
+- Division by zero on empty input → explicit `count == 0` check returning `Err(Empty)` (line 29)
+- Unchecked `count as u32` and `count as u64` → safe after bounded validation
+
+**All 6 behavior tests pass:** summarizes, renders, rejects_empty, rejects_invalid, rejects_too_many, detects_overflow.

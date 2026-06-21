@@ -1,0 +1,12 @@
+I can see the issues clearly. The source returns `String` but tests expect `Summary` + `render_summary`. There's also `unwrap()`, unchecked arithmetic, lossy casts, and unchecked indexing. Let me fix it.
+All 6 tests pass. Let me verify no forbidden constructs remain:
+No forbidden constructs. Now writing the output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` (matching test contract)
+- **Removed `unwrap()`**: parse failure now returns `Err(SummaryError::Invalid)` via `map_err`
+- **Removed unchecked indexing**: replaced `parts[1]` with `line.find(',')` + checked slicing
+- **Removed unchecked arithmetic**: `total += value` replaced with `checked_add`, overflow returns `Err(SummaryError::Overflow)`
+- **Removed lossy cast**: average computed as `total / count as u64` only after Empty check guarantees count > 0
+- **Added `render_summary`**: pure shell function that formats a `Summary` into a string
+- **Empty input guard**: early return `Err(SummaryError::Empty)` before any division

@@ -1,0 +1,15 @@
+Now I have all the references and source. Let me write the review JSON.
+Review complete. Written `review-output.json` with 8 findings (7 BLOCKER, 1 WARNING):
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | hidden I/O in pure logic | `src/lib.rs:8` |
+| 2 | BLOCKER | no unwrap in production | `src/lib.rs:9` |
+| 3 | BLOCKER | no unchecked indexing | `src/lib.rs:19` |
+| 4 | BLOCKER | no lossy casts | `src/lib.rs:19` |
+| 5 | BLOCKER | no intermediate Vec allocation | `src/lib.rs:12` |
+| 6 | BLOCKER | bounded allocation required | `src/lib.rs:8` |
+| 7 | BLOCKER | parse boundary required | `src/lib.rs:3` |
+| 8 | WARNING | missing benchmark evidence | `src/lib.rs:8` |
+
+All absolute laws from SKILL.md are violated: hidden I/O, `unwrap()` panic surfaces, unchecked indexing, lossy `as` cast, unbounded allocation without `try_reserve`, raw primitive domain state, and missing parse boundary.

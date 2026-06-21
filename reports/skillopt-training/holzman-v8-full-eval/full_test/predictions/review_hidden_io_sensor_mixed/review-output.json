@@ -1,0 +1,109 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap on fallible I/O",
+      "construct": "fs::read_to_string(path).unwrap()",
+      "failure_mode": "missing or unreadable sensor file aborts the entire task/thread with a panic instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> (or a domain I/O error enum) and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on fallible parse",
+      "construct": "parse::<u32>().unwrap()",
+      "failure_mode": "malformed CSV field (non-numeric value) panics the caller; hostile input causes denial of service",
+      "fix": "use .map_err(|e| ParseError::InvalidValue { field: parts[0].clone(), raw: parts[1].clone() }) and propagate the error through the map"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 lossy cast from u32 parse result",
+      "construct": "parse::<u32>().unwrap() as u16",
+      "failure_mode": "values in range 65536–4294967295 silently truncate to u16 range, corrupting sensor data without any indication of overflow",
+      "fix": "use TryInto::<u16>::try_into() or u32::try_into() and map the error to a typed Overflow error, or parse directly into u16 with parts[1].parse::<u16>()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_resource_policy",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Unbounded collect of split parts into Vec<String> with no domain cap",
+      "construct": ".split(',').map(|part| part.trim().to_string()).collect()",
+      "failure_mode": "a single line with millions of comma-separated fields triggers unbounded heap allocation, enabling OOM denial of service from hostile input",
+      "fix": "use line.split_once(',') to split into exactly two fields, or count fields and reject if >2 with a typed ParseError::TooManyFields"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — stdout I/O fused into data-loading function",
+      "construct": "println!(\"loaded {}\", parts[0])",
+      "failure_mode": "hidden side effect breaks pure-data semantics, makes the function不可composition (caller cannot suppress logging), and performs blocking I/O on a hot path",
+      "fix": "remove println entirely from the core path; if diagnostics are needed, inject a callback or return a separate tracing event from the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_type_safety",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "No bounds check on parsed u16/u32 value before constructing Record",
+      "construct": "Record { name: parts[0].clone(), value: parts[1].parse::<u32>().unwrap() as u16 }",
+      "failure_mode": "Record can be constructed with any u16 value; no domain rule enforces what constitutes a valid sensor reading (e.g., 0–100 for percentage sensors)",
+      "fix": "Make Record::value a newtype BoundedU16 or add a smart constructor Record::new(name, value) that validates domain constraints and returns Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "Raw String from parts[0] passes directly into Record with no validation",
+      "construct": "name: parts[0].clone()",
+      "failure_mode": "empty string, null bytes, or oversized names are accepted as valid sensor names; no domain invariants on Record name field",
+      "fix": "Validate non-empty and bounded length at the parse boundary, or use a newtype NonEmptyString for the name field"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "indexing_safety",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] and parts[1] — unchecked indexing into split result",
+      "construct": "parts[0].clone(), parts[1].parse::<u32>()",
+      "failure_mode": "line with fewer than 2 comma-separated fields (e.g., empty line or trailing newline) panics with index out of bounds",
+      "fix": "Use line.split_once(',') which returns Option<(&str, &str)> and map None to a typed ParseError::MissingField"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function returns Vec<Record> with no Result wrapper; all errors manifest as panics",
+      "construct": "pub fn load_sensors(path: &str) -> Vec<Record>",
+      "failure_mode": "every failure mode (IO error, parse error, out of bounds, overflow, allocation failure) collapses into a panic, making the function unsafe for hostile or untrusted input",
+      "fix": "Change signature to pub fn load_sensors(path: &str) -> Result<Vec<Record>, LoadError> with a typed LoadError enum covering IoError, ParseError, OverflowError"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied performance of load_sensors",
+    "no profiler evidence for allocation profile of the CSV parsing path",
+    "no allocation audit — Vec<String> collection on every line has no bounded budget",
+    "no command evidence for cargo fmt/check/clippy/test — build gates unverified",
+    "no second-ring evidence for any performance or safety claims"
+  ],
+  "residual_risk": "Static review identifies 9 BLOCKER findings: 3 forbidden constructs (unwrap x2, lossy as), 2 resource/boundary defects (unbounded collect, unchecked indexing), 1 hidden I/O (println), 1 domain modeling gap (no typed errors, no newtypes), 1 parse-boundary violation (raw String into Record), and 1 missing error taxonomy. No commands were run. The function as written will panic on any malformed input, missing file, or hostile payload. Full repair requires: (1) Result-returning signature with typed error enum, (2) split_once instead of split+collect, (3) remove println, (4) checked parse with domain validation, (5) newtype or smart constructor for Record. Residual risk is HIGH because all error paths are panic-only."
+}

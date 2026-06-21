@@ -1,0 +1,31 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/9c8d3af43b84822a/repair_summary_ledger_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/9c8d3af43b84822a/repair_summary_ledger_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/9c8d3af43b84822a/repair_summary_ledger_mixed/.skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    { "command": "cargo fmt", "status": "passed" },
+    { "command": "cargo test", "status": "passed" }
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable",
+    "split_once replaces split+collect+unchecked indexing",
+    "checked_add for accumulator arithmetic",
+    "checked_div for division",
+    "No lossy as conversions",
+    "Empty input returns SummaryError::Empty",
+    "Invalid line format returns SummaryError::Invalid",
+    "Overflow detection via checked_add/checked_div",
+    "TooMany check after full iteration",
+    "Functional core: summarize_metrics is pure, render_summary is pure",
+    "summarize_metrics returns typed Summary, not formatted String",
+    "render_summary is a separate pure function"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All unsafe, unwrap, unchecked indexing, unchecked arithmetic, and lossy casts removed. All tests pass. Pure core separated from rendering."
+}

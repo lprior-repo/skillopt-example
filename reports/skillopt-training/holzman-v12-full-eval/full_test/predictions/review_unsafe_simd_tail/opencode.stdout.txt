@@ -1,0 +1,14 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with 7 BLOCKER findings:
+
+| # | Rule | File:Line |
+|---|------|-----------|
+| 1 | `no_production_unsafe` | `src/lib.rs:3` — entire body wrapped in `unsafe` |
+| 2 | `simd_must_have_safe_scalar_fallback` | `src/lib.rs:1` — no fallback for non-x86_64 |
+| 3 | `unchecked_tail_elements` | `src/lib.rs:8` — reads 16 bytes past slice on non-multiples-of-4 |
+| 4 | `simd_requires_target_feature_gate` | `src/lib.rs:2` — missing `#[target_feature(enable = "sse")]` |
+| 5 | `no_tests` | `src/lib.rs:1` — zero test coverage |
+| 6 | `no_benchmark_evidence` | `src/lib.rs:2` — no baseline, no workload, no measured improvement |
+| 7 | `no_allocation_analysis` | `src/lib.rs:2` — no allocation audit of call chain |
+
+6 missing evidence items (benchmark, profiler, allocation, second-ring assembly, command-truth, correctness tests). Residual risk: High — UB from unchecked tail reads is a silent correctness defect; code must be rewritten in safe Rust per Holzman absolute laws.

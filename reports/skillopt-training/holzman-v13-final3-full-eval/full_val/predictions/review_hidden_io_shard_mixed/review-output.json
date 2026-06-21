@@ -1,0 +1,129 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (file missing, permission denied, etc.)",
+      "failure_mode": "untrusted or malformed filesystem input aborts the entire process instead of returning a typed error the caller can handle",
+      "fix": "return Result<Vec<Record>, LoadError> and use fs::read_to_string(path).map_err(|e| LoadError::Io(e))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value in the second CSV field",
+      "failure_mode": "malformed CSV data (e.g. \"alice,hello\") panics the process instead of returning a typed ParseError",
+      "fix": "use .map_err(|_| ParseError::InvalidValue) on the parse call and propagate through a Result return type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds side-effecting I/O inside the data-loading/shard-parsing logic",
+      "failure_mode": "pure domain logic leaks logging to stdout; the function is not composable, not testable in isolation, and side effects cannot be controlled or suppressed in production",
+      "fix": "remove println! entirely from the core; if logging is needed, delegate it to the shell layer outside this function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 performs a lossy cast from u32 to u16; values >65535 silently truncate",
+      "failure_mode": "a valid u32 value like 70000 wraps to 34468, corrupting the domain value with no error signal or overflow detection",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow) to reject out-of-range values with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "raw String and u16 primitives cross the parse boundary directly; the domain struct accepts unvalidated name strings and unbounded u16 values with no smart constructor or newtype guard",
+      "failure_mode": "any caller can construct a Record with an empty name, whitespace-only name, or any u16 value bypassing domain invariants; illegal domain states are representable",
+      "fix": "introduce a Name newtype with a fallible smart constructor that validates non-empty and trims; replace Record fields with Name and a bounded u16 variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "path: &str is a raw primitive that crosses the parse boundary without validation or fallible smart constructor; the function signature exposes no typed error domain",
+      "failure_mode": "callers can pass empty, null, or hostile path strings directly; the function itself cannot communicate structured failures for bad input, missing files, or parse errors",
+      "fix": "accept a validated path type or return Result<..., LoadError>; the shell layer should validate the path string before calling into core"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing on a split result; a line with fewer than 2 commas panics",
+      "failure_mode": "a CSV line like \"only_onename\" or an empty line panics via index-out-of-bounds instead of returning a typed ParseError",
+      "fix": "use parts.get(0) and parts.get(1).ok_or(ParseError::Invalid) or restructure with split_once(',') to avoid intermediate Vec and indexing entirely"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "no try_reserve, no domain cap, no bounded allocation; every line allocates a Vec<String> and the outer collect() grows unboundedly from any file size",
+      "failure_mode": "a large or malicious input file causes unbounded heap allocation and OOM without graceful error handling",
+      "fix": "validate a domain max_rows cap before the loop, use Vec::new() then out.try_reserve(cap).map_err(|_| LoadError::Allocation)? after cap validation, enforce per-row max, and use split_once(',') with no intermediate Vec"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "data_calculations_actions",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards fuses file I/O (fs::read_to_string), parsing (split/collect), logging (println!), and domain construction (Record) into a single function",
+      "failure_mode": "violates Data/Calculations/Actions separation; pure parsing logic cannot be tested independently of the filesystem, and side effects prevent deterministic reasoning",
+      "fix": "split into: (1) shell layer handles fs::read_to_string and delegates to core; (2) pure parse_shard_line function takes a &str and returns Result<Record, ParseError>; (3) shell iterates lines and collects results"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "use std::fs brings the entire filesystem module into scope for I/O inside what should be core logic",
+      "failure_mode": "core logic depends directly on filesystem I/O, making it untestable in pure contexts and violating the imperative shell / pure core boundary",
+      "fix": "remove std::fs import from the core module; shell layer handles all fs::read_to_string and passes parsed strings or domain types to pure core functions"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmarks, profiler data, or allocation evidence exists; unbounded allocation from file reading has no measured performance profile",
+      "failure_mode": "without workload baseline or allocation measurements, performance characteristics are unknown and cannot be validated against Holzman allocation discipline requirements",
+      "fix": "add a benchmark measuring load_shards against realistic shard file sizes; profile allocation hot path; report bytes/sec and peak memory"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no cargo fmt, cargo check, cargo clippy, or cargo test evidence is present for this crate",
+      "failure_mode": "unverified compilation, lint warnings, or test failures could exist; strict Holzman source gates cannot be confirmed as passed",
+      "fix": "run cargo fmt --check, cargo clippy --lib -- -D warnings, and cargo test to verify zero warnings and passing tests"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark or profiler evidence for shard loading performance or allocation patterns",
+    "no cargo fmt --check, cargo clippy --lib -- -D warnings, cargo check, or cargo test command evidence",
+    "no command-truth evidence for any cargo subcommand execution",
+    "no workload specification or input distribution data for performance claims",
+    "no typed error taxonomy defined (LoadError, ParseError, Allocation, Overflow, Invalid variants missing)"
+  ],
+  "residual_risk": "This crate has 10 blockers and 2 warnings. Every absolute law is violated: panic surfaces (unwrap on I/O and parse), hidden I/O (println! + fs::read_to_string in core), lossy casts (as u16), unchecked indexing, raw primitives crossing parse boundaries with no smart constructors, unbounded allocation with no try_reserve or domain cap, and fused Data/Calculations/Actions with no separation. No cargo commands were run. The code cannot be delivered in its current state."
+}

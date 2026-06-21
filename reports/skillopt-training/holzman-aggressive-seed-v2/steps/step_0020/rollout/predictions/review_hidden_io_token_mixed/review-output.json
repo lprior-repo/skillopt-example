@@ -1,0 +1,112 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file-not-found or I/O error",
+      "failure_mode": "Untrusted or missing file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "Return Result<Vec<Record>, io::Error> and use ? operator, or return a typed domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] uses unchecked indexing on a Vec derived from split",
+      "failure_mode": "A line with zero commas produces a single-element Vec; indexing [0] is technically safe here but the same pattern on [1] panics",
+      "fix": "Use split_once(',') to destructure into exactly (before_comma, after_comma) with no indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] uses unchecked indexing; panics if line has fewer than one comma",
+      "failure_mode": "Malformed input line without a comma causes a panic at runtime instead of a recoverable error",
+      "fix": "Use split_once(',') and match the tuple; reject lines without exactly one comma with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() panics on non-numeric value",
+      "failure_mode": "A line like 'foo,bar' panics instead of returning a ParseError for the record",
+      "fix": "Use .parse::<u32>().map_err(|e| ParseError::InvalidValue(e))? with a typed domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(u32) as u16 is a lossy cast that silently truncates values above 65535",
+      "failure_mode": "A valid u32 like 70000 becomes 4416 without any error, corrupting data silently",
+      "fix": "Use u16::try_from(value) and propagate an overflow error, or validate value <= 65535 before casting"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Record.value is pub u16, allowing any caller to construct a Record with an out-of-range value without domain validation",
+      "failure_mode": "The domain invariant that value must come from a parsed/validated source is not enforced by the type system",
+      "fix": "Make value private or use a newtype like PubValue(u16) with a fallible constructor, and expose only via accessor"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! is a side-effecting I/O call embedded inside data-parsing logic",
+      "failure_mode": "Core data logic is coupled to stdout; cannot be tested deterministically, cannot be suppressed in production, mixes shell and core concerns",
+      "fix": "Remove println! from the parsing function; logging belongs in the imperative shell at the call site"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_allocation_cargo_cult",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(.to_string()).collect() into Vec<String> allocates all parts eagerly when only two fields are needed",
+      "failure_mode": "Unnecessary heap allocations per line increase memory pressure and GC cost; each field string is cloned twice (into Vec then into Record)",
+      "fix": "Use line.split_once(',') to get two &str references, then trim each individually without collecting"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_allocation_cargo_cult",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "part.trim().to_string() allocates a String per field when &str would suffice until the final Record construction",
+      "failure_mode": "Each field is allocated into a heap String inside the intermediate Vec, then cloned again into Record.name",
+      "fix": "Keep as &str until Record fields are constructed; use split_once to avoid intermediate Vec entirely"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_tokens mixes I/O (fs::read_to_string) with parsing logic in a single function",
+      "failure_mode": "The pure parsing cannot be unit-tested without touching the filesystem; violates core/shell separation",
+      "fix": "Split into parse_records(&[str]) -> Result<Vec<Record>, RecordError> (pure core) and load_tokens(path) -> Result<Vec<Record>, Error> (shell that reads and delegates)"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for the token-loading pipeline",
+      "failure_mode": "Allocation-heavy split+collect pattern has no measured performance baseline; regressions go undetected",
+      "fix": "Add criterion or divan benchmarks measuring lines-per-second for typical input sizes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance or allocation characteristics",
+    "no profiler data for the hot path",
+    "no allocation tracking or second-ring defense evidence",
+    "no command-line evidence (cargo fmt, cargo clippy, cargo test) was run"
+  ],
+  "residual_risk": "Static review only; multiple BLOCKER-level panics and silent data corruption paths identified but not fixed. No commands executed. The crate as-is will panic on any malformed input, missing file, or out-of-range numeric value, and silently truncates values above u16::MAX."
+}

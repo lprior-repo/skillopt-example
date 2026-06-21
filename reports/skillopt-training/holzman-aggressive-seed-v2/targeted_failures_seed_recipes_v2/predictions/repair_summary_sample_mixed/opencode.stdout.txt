@@ -1,0 +1,13 @@
+Now I have the full picture. The current `lib.rs` has multiple violations: `unwrap()`, unchecked arithmetic, `as` casts, collecting split parts, and wrong return type (`String` instead of `Summary`). The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a separate `render_summary` function.
+All 6 tests pass. Now writing the output.
+Repair complete. All 6 tests pass. Summary of changes to `src/lib.rs`:
+
+- **Return type**: Changed from `Result<String, SummaryError>` to `Result<Summary, SummaryError>` — `summarize_metrics` now returns a `Summary` struct, with a separate `render_summary` function for formatting.
+- **Removed `unwrap()`**: Replaced with `ok_or(SummaryError::Invalid)?` on `split_once`.
+- **Removed unchecked indexing** (`parts[1]`): Replaced with `split_once(',')`.
+- **Removed `Vec` collect**: Using `split_once` instead of collecting all split parts.
+- **Checked arithmetic**: `total = total.checked_add(value).ok_or(Overflow)?` and `count = count.checked_add(1).ok_or(Overflow)?`.
+- **Checked division**: `total.checked_div(count_u64).ok_or(Invalid)?`.
+- **No lossy casts**: Replaced `count as u32` / `count as u64` / `total / count as u64` with `u32::try_from(count)` and `u64::try_from(count)`.
+- **Early empty check**: Returns `Empty` for empty input.
+- **TooMany check**: Enforced mid-iteration so the count never exceeds `max_rows`.

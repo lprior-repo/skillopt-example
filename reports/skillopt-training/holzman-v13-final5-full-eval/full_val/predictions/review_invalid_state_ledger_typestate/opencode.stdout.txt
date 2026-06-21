@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written 8 findings to `review-output.json`:
+
+| # | Severity | Rule | File:Line |
+|---|---|---|---|
+| 1 | BLOCKER | typestate_state_machine | src/lib.rs:1 |
+| 2 | BLOCKER | status_string | src/lib.rs:3 |
+| 3 | BLOCKER | bool_lifecycle_flags | src/lib.rs:4 |
+| 4 | BLOCKER | option_invalid_state_combinations | src/lib.rs:6 |
+| 5 | BLOCKER | newtype_domain_ids | src/lib.rs:2 |
+| 6 | BLOCKER | parse_boundary | src/lib.rs:9 |
+| 7 | BLOCKER | mark_sent_allows_invalid_transition | src/lib.rs:9 |
+| 8 | BLOCKER | no_tests_no_evidence | src/lib.rs:1 |
+
+The ledger struct violates every type-driven DDD principle mandated by the skill: raw `String` status, independent lifecycle booleans, decoupled `Option` field, no typestate enum, no newtyped IDs, no parse boundary, and no typestate-enforced transition — `mark_sent` can send an unvalidated ledger with no guard.

@@ -1,0 +1,9 @@
+I can see the issues in `lib.rs`. Let me read the review-output contract, then repair.
+Now I have the full picture. The `lib.rs` has multiple Holzman violations: `unwrap()`, no empty check, no max_items enforcement, no parse error handling. Let me repair it.
+All 4 tests pass. Now writing the output JSON.
+Repair complete. All 4 tests pass. Changes made to `src/lib.rs`:
+
+1. **Removed `unwrap()`** - replaced with `map_err(|_| ParseError::Invalid)` for parse failures
+2. **Added empty-input check** - returns `Err(ParseError::Empty)` when input is empty
+3. **Added max_items enforcement** - counts items via `split(',').count()` and returns `Err(ParseError::TooMany)` when over limit
+4. **Pure core preserved** - `parse_sessions` remains a deterministic, side-effect-free function

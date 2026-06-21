@@ -1,0 +1,6 @@
+    Blocking waiting for file lock on package cache
+   Compiling repair_checked_average v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/baseline/repair_checked_average)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/7fc6c7982e3e4d54/debug/deps/repair_checked_average-aa0166dfbb1ba2dd)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/7fc6c7982e3e4d54/debug/deps/behavior-04e721e4b8219076)
+error: test failed, to rerun pass `--test behavior`

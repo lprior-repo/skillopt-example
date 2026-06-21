@@ -1,0 +1,26 @@
+I see multiple Holzman violations and a signature mismatch with tests. Let me read references, then repair.
+Now I have a clear picture. The source has these Holzman violations and test mismatches:
+
+1. `summarize_metrics` returns `Result<String>` but tests expect `Result<Summary>`
+2. Missing `render_summary` function
+3. `unwrap()` on line 24
+4. Unchecked `total += value` (line 25)
+5. Division by zero potential on line 35
+6. Lossy `as` cast on line 33/35
+7. No empty-input guard
+8. No `TooMany` check
+9. No format validation ("bad" → Invalid)
+10. No overflow detection
+All 6 tests pass. Now writing the output.
+Repair complete. All 6 behavior tests pass.
+
+**Violations fixed in `src/lib.rs`:**
+- `summarize_metrics` return type: `Result<String>` → `Result<Summary>` (test contract)
+- Added `render_summary(Summary) -> String` (test import)
+- Removed `unwrap()` → `map_err(|_| SummaryError::Invalid)`
+- Removed unchecked `total += value` → `checked_add` with overflow error
+- Removed division-by-zero risk → `checked_div` with non-zero check
+- Removed lossy `as` casts → `u32::try_from(count)`
+- Removed unchecked `parts[1]` indexing → `splitn(2, ',')` + `parts.len() != 2` guard
+- Added empty-input detection → `SummaryError::Empty`
+- Added format validation for malformed lines → `SummaryError::Invalid`

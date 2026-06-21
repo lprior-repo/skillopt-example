@@ -1,0 +1,18 @@
+Now I have all the source. Let me write the review.
+Review complete. Found 8 findings (4 blockers, 3 major, 2 minor) in `src/lib.rs`:
+
+**BLOCKERs:**
+- `status: String` makes illegal states representable — replace with `LeaseStatus` enum
+- `is_validated: bool` + `is_sent: bool` boolean lifecycle flags — replace with typed state machine
+- `mark_sent` mutates in-place with string allocation — should return new validated state
+
+**MAJOR:**
+- All `pub` fields allow arbitrary invalid construction — make private with validated constructor
+- `id: String` primitive obsession — wrap in `LeaseId` newtype
+- No typestate pattern — scattered primitives instead of enforced transitions
+
+**MINOR:**
+- Unbounded `"sent".to_string()` allocation without handling
+- `sent_at_epoch_ms: Option<u64>` orphaned from sent state
+
+5 missing evidence items flagged (benchmarks, profiler, allocation audit, tests). Output written to `review-output.json`.

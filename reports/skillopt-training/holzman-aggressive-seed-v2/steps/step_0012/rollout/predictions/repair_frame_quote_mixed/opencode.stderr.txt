@@ -1,0 +1,74 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead tests
+[0m→ [0mRead tests/behavior.rs
+[0m
+[0m← [0mEdit src/lib.rs
+Index: /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/repair_frame_quote_mixed/src/lib.rs
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/repair_frame_quote_mixed/src/lib.rs
++++ /tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/repair_frame_quote_mixed/src/lib.rs
+@@ -5,10 +5,21 @@
+     Overflow,
+ }
+ 
+ pub fn encode_frame(payload: &[u8], max_payload: usize) -> Result<Vec<u8>, FrameError> {
++    if payload.len() > max_payload {
++        return Err(FrameError::PayloadTooLarge);
++    }
++    let header_len: u32 = 4;
+     let mut out = Vec::new();
+-    let len = payload.len() as u32;
++    out.try_reserve(
++        payload
++            .len()
++            .checked_add(header_len as usize)
++            .ok_or(FrameError::Overflow)?,
++    )
++    .map_err(|_| FrameError::Allocation)?;
++    let len = u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?;
+     out.extend_from_slice(&len.to_be_bytes());
+     out.extend_from_slice(payload);
+     Ok(out)
+ }
+
+[0m
+[0m$ [0mcargo fmt
+(no output)
+[0m
+[0m$ [0mcargo test 2>&1
+Compiling repair_frame_quote_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/1d989cb9f1f1b109/repair_frame_quote_mixed)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/a56bc759203ad660/debug/deps/repair_frame_quote_mixed-fef81cfa903c2991)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/a56bc759203ad660/debug/deps/behavior-175ae4f1df75931a)
+
+running 2 tests
+test encodes ... ok
+test rejects_limit ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests repair_frame_quote_mixed
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[0m
+[0m← [0mWrite repair-output.json
+Wrote file successfully.
+[0m
+[0m→ [0mRead src/lib.rs

@@ -1,0 +1,15 @@
+Now I have all the source and references. Let me write the review output.
+Review complete. Written to `review-output.json` with 8 BLOCKER findings:
+
+| # | Rule | File:Line | Violation |
+|---|---|---|---|
+| 1 | zero_forbidden_constructs | src/lib.rs:9 | `unwrap()` on I/O |
+| 2 | zero_forbidden_constructs | src/lib.rs:19 | `unwrap()` on parse |
+| 3 | zero_forbidden_constructs | src/lib.rs:19 | Lossy `as u16` cast |
+| 4 | zero_forbidden_constructs | src/lib.rs:16 | Unchecked `parts[0]` indexing |
+| 5 | zero_forbidden_constructs | src/lib.rs:19 | Unchecked `parts[1]` indexing |
+| 6 | functional_core_architecture | src/lib.rs:16 | Hidden I/O (`println!`) in parser |
+| 7 | functional_core_architecture | src/lib.rs:3 | No parse boundary on Record |
+| 8 | functional_core_performance | src/lib.rs:12 | Intermediate `Vec<String>` allocation |
+
+Missing evidence: no benchmarks, profiler data, allocation budgets, or command evidence. All 8 findings classified as BLOCKER per absolute law violations.

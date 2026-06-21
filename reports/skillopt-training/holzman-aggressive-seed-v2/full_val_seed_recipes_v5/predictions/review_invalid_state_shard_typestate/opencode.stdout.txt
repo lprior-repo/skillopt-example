@@ -1,0 +1,6 @@
+Review complete. Wrote `review-output.json` with 9 findings and 4 missing-evidence items. Key issues:
+
+- **BLOCKER**: Raw primitives (`String status`, `bool is_validated`, `bool is_sent`) allow illegal state combinations — no typestate enum, no smart constructor, no invariant enforcement
+- **BLOCKER**: All fields are `pub`, allowing external mutation that bypasses domain invariants
+- **MAJOR**: `mark_sent` mutates in-place rather than returning a new validated domain value
+- **MINOR**: No benchmarks, profiler data, test modules, or command evidence

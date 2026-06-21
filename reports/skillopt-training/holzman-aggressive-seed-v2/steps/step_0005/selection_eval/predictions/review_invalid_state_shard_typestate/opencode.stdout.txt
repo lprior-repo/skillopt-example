@@ -1,0 +1,12 @@
+I've read all source files and references. Now I'll write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:** 8 findings (6 BLOCKER, 4 MAJOR) across 3 categories:
+
+- **Illegal state representable** — `ShardWorkflow` uses independent `bool` fields (`is_validated`, `is_sent`) and `String status`, allowing contradictory states (e.g., `is_sent=true` but `status="pending"`). Fix: collapse into a single enum typestate.
+- **Primitive obsession** — `id: String` and `status: String` are free-form primitives with no domain guard. Fix: `ShardId` and `ShardStatus` newtypes/enums.
+- **No precondition enforcement** — `mark_sent` transitions any shard to sent without checking validation state. Fix: make it fallible with typestate-gated input.
+
+**Missing evidence:** no benchmarks, profiler data, allocation analysis, second-ring integration tests, or command evidence.
+
+**Residual risk:** high — all fields public, no validation, no typestate discipline. Illegal states are fully constructible.

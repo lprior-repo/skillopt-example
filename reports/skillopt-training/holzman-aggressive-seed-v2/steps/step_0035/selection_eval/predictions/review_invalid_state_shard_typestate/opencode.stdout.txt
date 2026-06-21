@@ -1,0 +1,13 @@
+Review complete. Found 9 findings across the task crate:
+
+**4 BLOCKERs** — all centered on the same root cause:
+- `ShardWorkflow` uses `status: String` + `is_validated: bool` + `is_sent: bool` as independent fields, making illegal states representable (e.g. unvalidated but sent)
+- `id: String` is a bare primitive with no domain validation
+
+**5 Majors** — cascading from the model issue:
+- All fields `pub` (no encapsulation)
+- `"sent".to_string()` allocation per call
+- `mark_sent` lacks precondition checks and error return type
+- No domain error taxonomy
+
+The core fix: replace the primitive fields with a `ShardStatus` enum typestate and a `ShardId` newtype, making `mark_sent` return `Result<_, TransitionError>` and only accepting Validated→Sent transitions.

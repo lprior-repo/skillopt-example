@@ -1,0 +1,11 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Valid JSON written to the required output path.
+
+**Summary of findings:** 10 findings total — 6 BLOCKER, 4 MAJOR.
+
+Key violations:
+- **`src/lib.rs:1-7`** — `AuditWorkflow` uses `bool` fields and `String` status, making every illegal state combinable (sent-but-not-validated, double-sent, status/flag mismatch). No constructor enforces invariants.
+- **`src/lib.rs:9-12`** — `mark_sent` has no precondition checks, no error return, no idempotency guard, and performs `.to_string()` allocation.
+- **`src/lib.rs:1-6`** — All fields are `pub`, allowing external mutation bypassing any transition logic.
+
+Missing evidence: no benchmarks, profiler data, allocation measurements, or integration/second-ring tests.

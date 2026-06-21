@@ -1,0 +1,78 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow struct is representable in illegal states: status='sent' with is_sent=false, status='draft' with is_sent=true, or multiple contradictory bool flags.",
+      "failure_mode": "Any caller can construct a LeaseWorkflow with contradictory status and flag fields, leading to silent state inconsistency that propagates through the system and breaks downstream invariants.",
+      "fix": "Replace status: String + is_sent: bool + is_validated: bool with a single LeaseStatus enum typestate that encodes the full lifecycle (e.g. Draft, Validated, Sent). Eliminate the bool flags entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a primitive string with no domain constraints — any arbitrary string value is accepted as a valid status.",
+      "failure_mode": "Typos, missing state transitions, or external input can produce invalid status values (e.g. 'SENT', 'sent!', '') that silently bypass business logic expecting canonical status values.",
+      "fix": "Replace `pub status: String` with a domain enum `pub status: LeaseStatus` where LeaseStatus variants are exhaustive and non-parseable from arbitrary strings."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive boolean flag — does not encode which validation was performed, by whom, or when. Same for is_sent: bool on line 5.",
+      "failure_mode": "Boolean flags encode binary state that the type system cannot constrain or reason about. Callers cannot enforce valid transition graphs (e.g. draft→validated→sent) at compile time.",
+      "fix": "Replace is_validated and is_sent with a single typestate enum LeaseStatus that captures the full lifecycle as variants with associated data (e.g. `Validated { validated_at: u64 }`, `Sent { sent_at: u64 }`).",
+      "line": 5
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes a full struct by value, mutates it in place, and returns it. This is imperative shell behavior leaking into the core — there is no pure transformation from a well-typed source state.",
+      "failure_mode": "The function has no pre-condition checks, no validation, and no type-level guarantee that the input was in a 'draft' or 'validated' state before becoming 'sent'. It mutates state blindly.",
+      "fix": "Define mark_sent as a pure function `fn mark_sent(source: LeaseStatus) -> Result<LeaseStatus, LeaseTransitionError>` that accepts only the source typestate and returns a typed result with the new typestate."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive — no domain validation, no newtype wrapping, no format constraints enforced at the type level.",
+      "failure_mode": "Empty strings, malformed IDs, or IDs from untrusted sources pass through without validation. Any function accepting LeaseWorkflow must re-validate the ID rather than trusting the type.",
+      "fix": "Replace `pub id: String` with a newtype `pub id: LeaseId` where LeaseId has a fallible constructor that validates format (e.g. `LeaseId::try_from(str)`). Reject invalid IDs at the parse boundary."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_efficiency",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a new String every time mark_sent is called, even for a known constant status value.",
+      "failure_mode": "Unnecessary heap allocation in what should be a state-transition function. If mark_sent is called in a hot path, this compounds into measurable allocation pressure.",
+      "fix": "Replace String fields with enum variants so no allocation is needed for status transitions. The enum variant construction is zero-cost."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a raw optional primitive that can exist independently of whether the lease is actually sent. It is disconnected from the typestate.",
+      "failure_mode": "sent_at_epoch_ms can be Some(_) while status is not 'sent', or None while is_sent is true. The timestamp is not guaranteed to correspond to any actual state transition.",
+      "fix": "Tuck the timestamp into the typestate enum variant: `Sent { sent_at_epoch_ms: u64 }`. This makes the timestamp part of the 'sent' state by construction and eliminates Option-bool coupling."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to validate any performance claims",
+    "no profiler evidence for allocation hotspots in mark_sent",
+    "no allocation audit (e.g. alloc-counter or flamegraph) for LeaseWorkflow lifecycle",
+    "no command-evidence that cargo test passes for this crate",
+    "no proof or test evidence that illegal states are actually impossible"
+  ],
+  "residual_risk": "The crate encodes a domain workflow using primitive types (String, bool, Option) that permit illegal states. Without typestate enums, no amount of runtime validation can prevent state contradictions. The mark_sent function performs blind mutation without pre-condition enforcement. Static review only — no commands run, no tests executed, no formal verification."
+}

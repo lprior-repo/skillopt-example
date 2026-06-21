@@ -1,0 +1,82 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status field is `pub String` — any arbitrary string value is representable, including contradictory states like `status: \"draft\"` with `is_sent: true`.",
+      "failure_mode": "Consumer code cannot rely on status to reflect actual lease state; runtime bugs from impossible state combinations.",
+      "fix": "Replace `String` with a sealed `LeaseStatus` enum (e.g., `Draft`, `Validated`, `Sent`) so only valid states compile."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is `pub bool` — a primitive flag that is independent of status, enabling states like `status: \"sent\"` with `is_validated: false`.",
+      "failure_mode": "Lease can be sent without validation, violating domain invariant that sent leases must be validated.",
+      "fix": "Remove `is_validated` as a separate field. Encode validation as part of the `LeaseStatus` enum (e.g., `Sent` variant implicitly carries validated)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is `pub bool` — redundant with `status: String`, and independently mutable, enabling `status: \"draft\"` with `is_sent: true`.",
+      "failure_mode": "Two separate fields encode the same concept; they can drift apart, making the struct's state contradictory and unreliable.",
+      "fix": "Remove `is_sent`. Derive \"is sent\" from `LeaseStatus::Sent` so the concept has exactly one source of truth."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no state-gate — it sets `status = \"sent\"` and `is_sent = true` from any input state, including already-sent or unvalidated leases.",
+      "failure_mode": "Any code can call `mark_sent` on any `LeaseWorkflow` instance, producing invalid state transitions with no compile-time or runtime guard.",
+      "fix": "Change `mark_sent` to accept a state-constrained input (e.g., `ValidatedLeaseWorkflow` newtype) or return a fallible `Result<LeaseWorkflow, TransitionError>` that rejects invalid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_types",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is `Option<u64>` — a raw primitive with no domain meaning attached. No newtype guards against mixing with other timestamps.",
+      "failure_mode": "Caller could confuse sent_at_epoch_ms with created_at_epoch_ms or other epoch fields; no domain-level type safety on timestamp usage.",
+      "fix": "Introduce a `SentTimestamp(u64)` newtype (non-optional if present implies sent) to encode domain semantics at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is `pub String` — raw primitive for a domain identifier with no structural guarantees (format, uniqueness, non-empty).",
+      "failure_mode": "Empty or malformed lease IDs are representable; no domain-level validation at construction.",
+      "fix": "Introduce a `LeaseId(String)` newtype with a fallible constructor that rejects empty/invalid IDs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe_or_panics",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `\"sent\".to_string()` — string-literal state mutation rather than enum construction, reinforcing that status is a primitive rather than a typed domain value.",
+      "failure_mode": "Typo in string literal silently creates a new unrecognized state instead of being caught by the compiler.",
+      "fix": "Construct the `LeaseStatus::Sent` variant directly; the enum makes typos a compile error."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim",
+    "no profiler evidence for allocation patterns",
+    "no allocation audit — `String` and `.to_string()` allocations are unbounded",
+    "no second-ring evidence (clippy, miri, or similar) has been run",
+    "no command evidence (cargo fmt, cargo test, cargo clippy) is available",
+    "no formal spec or TLA+ model for lease state transitions"
+  ],
+  "residual_risk": "The LeaseWorkflow struct is fundamentally broken — it has no typestate, uses primitive obsession (String + bool fields) making illegal states fully representable, and mark_sent provides zero transition guards. Without enum-based typestates and a constrained constructor, this crate cannot enforce its core domain invariant (leases must be validated before being sent). Static review only; no commands run."
+}

@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap on fallible I/O",
+      "failure_mode": "malformed file path or unreadable file aborts the entire program with a panic instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, io::Error> (or a domain error type) and propagate with ? or explicit map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on fallible parsing",
+      "failure_mode": "non-numeric or out-of-range value in the second CSV field panics instead of returning a typed parse error",
+      "fix": "use .parse::<u16>().map_err(|e| ParseError::BadValue(...)) and propagate, or return Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy `as u16` cast after parse — integer width cast",
+      "failure_mode": "values that parsed successfully as u32 but exceed u16::MAX silently wrap to a wrong value instead of being rejected",
+      "fix": "parse directly as u16 using `parse::<u16>()` or use `u16::try_from(parsed_u32).map_err()`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',') + collect + indexed access instead of split_once",
+      "failure_mode": "allocates a full Vec of Strings for every line; if the line has fewer than 2 comma-separated fields, parts[0] and parts[1] indexing panics at runtime",
+      "fix": "use line.split_once(',') to get (name, rest), then rest.split_once(',') to get the value field; handle None cases with map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — hidden I/O side effect in data-loading logic",
+      "failure_mode": "parsing/presentation coupling makes the function non-deterministic, untestable in isolation, and violates the functional core / imperative shell boundary",
+      "fix": "move println! to the shell layer that consumes the Vec<Record>; the core parser should return data only with no side effects"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions performs I/O (fs::read_to_string) — mixing imperative shell and functional core",
+      "failure_mode": "the pure parsing logic cannot be unit-tested without a real file; the function couples file system access to domain record construction",
+      "fix": "split into `fn load_sessions_from(path: &str) -> Result<Vec<Record>, io::Error>` (shell) that calls `fn parse_sessions(text: &str) -> Result<Vec<Record>, ParseError>` (pure core)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_contracts",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String and u16 — no domain validation by construction",
+      "failure_mode": "any string (empty, whitespace-only) and any u16 value is accepted, including values that are semantically invalid in the domain",
+      "fix": "wrap name in a `UserName` newtype with a fallible constructor; use a domain error enum for invalid records instead of allowing illegal states"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Allocating Vec<String> and cloning each part unnecessarily — intermediate allocations in pure pipeline",
+      "failure_mode": "each line allocates a Vec and multiple Strings; for large files this causes excessive heap pressure and GC pressure",
+      "fix": "use split_once to borrow &str segments from the line without cloning; only allocate the final Record fields"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0].clone() — unnecessary String clone from collected Vec",
+      "failure_mode": "redundant allocation per record; the string was already cloned into the Vec during collect()",
+      "fix": "after split_once, use the &str directly: Record { name: name_part.to_string(), ... } — only one allocation per field"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or allocation behavior",
+    "no profiler data for this function's memory allocation profile",
+    "no allocation tracking evidence (no try_reserve or bounded capacity usage — function returns Vec but has no capacity hint)",
+    "no command-layer evidence: no benchmark, profiler, or allocation audit commands were run",
+    "no second-ring review evidence (no black-hat or contract-verification artifacts)"
+  ],
+  "residual_risk": "This is a static review only — no commands were run. The function contains 4 BLOCKER violations (unwrap on I/O, unwrap on parse, lossy as cast, split+collect+indexing instead of split_once), 3 additional architectural violations (hidden I/O, mixed shell/core, raw domain types), and 2 MAJOR performance issues (unnecessary allocation and cloning). The function must be split into shell and core layers, all unwrap/as calls must be replaced with typed error propagation and try_from, and split_once must replace split+collect. Benchmark and allocation evidence are entirely absent."
+}

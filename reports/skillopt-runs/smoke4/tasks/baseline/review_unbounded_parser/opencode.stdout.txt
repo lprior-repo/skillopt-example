@@ -1,0 +1,3 @@
+Now let me explore the task crate structure.
+Now I have all the information needed. The crate has a single `lib.rs` with a 6-line function that uses `.unwrap()` on a parse result—a panic path forbidden by Holzman Rust rules. Let me write the review output.
+Review written to `/tmp/opencode/holzman-skillopt/smoke4/tasks/baseline/review_unbounded_parser/review-output.json` with 4 BLOCKER findings (`.unwrap()` panic path, ignored `Result`, unbounded input-dependent loop, no benchmark) and 1 ERROR (missing benchmark/profiler evidence).

@@ -1,0 +1,10 @@
+Now I see the issues. The current `encode_frame` is missing: payload size check against `max_payload`, checked arithmetic, `try_reserve`, and the lossy `as u32` cast. Let me run the tests first to confirm failures.
+Now I'll apply the Holzman frame/packet encoder repair pattern.
+Repaired. Changes to `src/lib.rs:8-21`:
+
+1. **Added `max_payload` check** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`
+2. **Checked capacity arithmetic** — `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?`
+3. **Replaced `Vec::new()` + `try_reserve`** — allocates with `Vec::new()` then `out.try_reserve(capacity).map_err(...)?` (no `Vec::with_capacity`)
+4. **Replaced lossy cast** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+
+All gates pass: `cargo fmt`, `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` (2/2).

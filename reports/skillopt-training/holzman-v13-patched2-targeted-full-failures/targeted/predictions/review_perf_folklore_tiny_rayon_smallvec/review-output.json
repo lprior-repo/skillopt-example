@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny_fixed_input_no_rayon_smallvec_folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon and SmallVec for a [u8; 4] input purely by folklore. SKILL.md line 47 mandates flagging Rayon/parallel overhead, SmallVec folklore, and tiny fixed-size overhead. Rayon task-scheduling overhead dwarfs processing four bytes; SmallVec is unnecessary for a fixed four-element output with no known common-case size below four.",
+      "failure_mode": "Runtime is measurably slower due to parallel dispatch overhead; code complexity increases for zero benefit.",
+      "fix": "Delete the TODO. For a fixed [u8; 4] input, return [\"&'static str; 4] directly with no heap allocation, no Rayon, no SmallVec."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "fixed_array_return_tiny_input",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns Vec<&'static str> for a known four-element input. SKILL.md line 47 recommends the literal fixed array return [&'static str; 4] or caller-owned output buffer unless measurement proves otherwise. .collect() on four elements forces a heap allocation that is guaranteed for every call.",
+      "failure_mode": "Every call to classify_four performs a heap allocation and deallocation for a fixed four-element output, wasting memory bandwidth and cache. An allocation failure in a mission-critical path could be unhandled.",
+      "fix": "Change return type to [&'static str; 4]. Fill the array with a bounded loop or array method, eliminating all heap allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_performance_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SKILL.md line 83 requires workload, target hardware, input distribution, hot path, baseline command, baseline number, new number, variance/noise notes, and regression threshold for any performance claim. The TODO makes an unmeasured claim that Rayon+SmallVec will be faster with zero evidence.",
+      "failure_mode": "Team ships an optimization that is provably slower, wasting engineering time and degrading latency.",
+      "fix": "Remove the folklore claim. Benchmark any proposed change against a baseline. For a 4-element input, expect the array-returning version to be the baseline and prove no other approach beats it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_benchmark_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler output, or allocation evidence exists. SKILL.md lines 61, 83-84 require allocation budgets, benchmark/profiler evidence, and measured performance for any optimization work.",
+      "failure_mode": "Cannot verify that any code path is optimal. Unmeasured changes risk introducing regressions.",
+      "fix": "Add a criterion or similar benchmark comparing the current Vec-returning implementation against an array-returning version. Run with --release and report throughput/latency with confidence intervals."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation_unbounded_collect",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": ".collect() into Vec has no fallible reserve, no try_reserve, and no domain cap. The allocation can fail with an OOM panic. SKILL.md lines 29-30 require try_reserve with fallible handling for allocation discipline in mission-critical paths.",
+      "failure_mode": "Under memory pressure, classify_four can panic the thread instead of returning a typed Allocation error.",
+      "fix": "If Vec must be used, create Vec::new(), call out.try_reserve(4).map_err(|_| Error::Allocation)?, then extend. Prefer the array return type to eliminate allocation entirely."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "intermediate_vec_materialization",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Iterator pipeline with .map().collect() materializes an intermediate Vec. SKILL.md line 79 says avoid intermediate Vec/String materialization unless required. For a fixed four-element output, materialization is not required.",
+      "failure_mode": "Unnecessary heap allocation and deallocation on every call, increasing tail latency.",
+      "fix": "Replace with a fixed array: let mut result = [\"even\"; 4]; for (i, byte) in bytes.iter().enumerate() { result[i] = if *byte & 1 == 0 { \"even\" } else { \"odd\" }; }; result"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler output identifying the actual hot path",
+    "no allocation evidence (allocatordump, jemalloc stats, or valgrind)",
+    "no second-ring evidence (assembly, cachegrind, or flamegraph)",
+    "no command-truth evidence that any cargo command was executed"
+  ],
+  "residual_risk": "Static review only; no cargo commands were run. The code contains folklore optimization claims (Rayon/SmallVec for 4 elements) that are demonstrably counterproductive, returns Vec for a fixed-size input causing guaranteed heap allocation, and lacks any benchmark or profiler evidence. The safest fix is to return [&'static str; 4] with a simple bounded loop, eliminating all heap allocation."
+}

@@ -1,0 +1,17 @@
+Now I see the full picture. The tests import `render_summary` and expect `summarize_metrics` to return `Result<Summary, SummaryError>`, but the source returns `Result<String, SummaryError>` with many Holzman violations. Let me fix it.
+All 6 tests pass. Now writing the output.
+Wait - I need to fix the `unwrap()` on `checked_div` result. Holzman bans unwrap in production code even when provably safe.
+All 6 tests pass. Repair complete.
+
+**Changes to `src/lib.rs`:**
+- Return type: `Result<String, SummaryError>` → `Result<Summary, SummaryError>` (matching test contract)
+- Added `render_summary(Summary) → String` for the imperative shell boundary
+- Replaced `split(',')` + `collect` + unchecked `parts[1]` with `split_once(',')`
+- Removed `.unwrap()` on parse; mapped to `SummaryError::Invalid`
+- Replaced unchecked `total += value` with `checked_add` → `Overflow`
+- Replaced unchecked `/` division with `checked_div` with safe fallback
+- Added `Empty` error for empty input / no parseable lines
+- Added `Invalid` error for malformed lines (no comma, empty key/value, bad parse)
+- Added `Overflow` error for u64 accumulation overflow
+- Added `TooMany` error when row count exceeds `max_rows`
+- Removed all `unsafe`/`unwrap`/`expect`/`panic`/lossy `as`/unchecked indexing/unchecked arithmetic

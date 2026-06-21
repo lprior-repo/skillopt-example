@@ -1,0 +1,99 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a bare pub String, allowing any arbitrary string value (e.g. \"deleted\", \"pending\", \"\") as a valid budget workflow status.",
+      "failure_mode": "Any caller can set item.status to an invalid lifecycle value, breaking workflow invariants at runtime with no compile-time enforcement.",
+      "fix": "Replace `pub status: String` with a `pub status: BudgetStatus` enum with explicit variants (e.g. `Pending`, `Validated`, `Sent`). Make the field non-pub or provide a fallible constructor that only allows valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bare pub bool — a boolean cannot express the directionality or ordering of a lifecycle transition.",
+      "failure_mode": "A caller can flip is_validated from true to false, creating an illegal reversed transition. The bool provides no information about whether validation was required or what state precedes/follows it.",
+      "fix": "Replace `pub is_validated: bool` with an enum or typestate (e.g. `validation: ValidationState` with `Unvalidated`, `Validated`), or remove the flag entirely and encode validation as a typestate parameter on BudgetWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a bare pub bool — same lifecycle-flag anti-pattern as is_validated.",
+      "failure_mode": "A caller can set is_sent to true without going through mark_sent, or set it to false after marking sent. The bool carries no transition ordering guarantees.",
+      "fix": "Replace `pub is_sent: bool` with an enum or typestate (e.g. `sent: SentState` with `NotSent`, `Sent`), or remove it entirely since status=\"Sent\" already conveys the state once status is an enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_valid_by_construction",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare pub String with no domain newtype. There is no validation that the id has the expected format, length, or prefix.",
+      "failure_mode": "Any invalid string (empty, malformed, wrong prefix) can be stored as a budget workflow id. The core has no invariant enforcement — errors are discovered downstream rather than at the parse boundary.",
+      "fix": "Define a `BudgetId` newtype struct with a private inner String field and a `try_from` constructor that validates format/length. Replace `pub id: String` with `pub id: BudgetId` (non-pub inner)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a free function that mutates struct fields in-place rather than returning a new pure value. It is not a pure calculation — it performs field writes (implicit mutation) and heap allocation via `.to_string()`.",
+      "failure_mode": "The function mutates the caller-owned BudgetWorkflow, so callers cannot reason about immutability. The `.to_string()` allocation is a side effect in what should be a pure core function. No preconditions are checked (e.g. can you mark a \"deleted\" budget as sent?).",
+      "fix": "Rewrite as a pure function on an immutable reference: `fn mark_sent(item: &BudgetWorkflow) -> Result<BudgetWorkflow, BudgetError>` that returns a new BudgetWorkflow with validated transitions. Validate preconditions (status must allow transition to sent) before constructing the new value."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`item.status = \"sent\".to_string()` performs an unbounded heap allocation inside a core function instead of using a zero-copy enum variant or &'static str.",
+      "failure_mode": "Unnecessary allocation in hot-path core logic. If status is an enum, the variant is zero-cost at runtime with no heap allocation.",
+      "fix": "Replace String status with a `BudgetStatus` enum. The transition `item.status = BudgetStatus::Sent` is zero-allocation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BudgetWorkflow are pub, allowing external code to construct arbitrary illegal states directly (e.g. status=\"\", is_validated=true, is_sent=true, sent_at_epoch_ms=None).",
+      "failure_mode": "External callers can bypass any intended workflow invariants by directly setting fields, making the type untrustworthy.",
+      "fix": "Make all fields private (remove `pub`). Provide a fallible constructor `BudgetWorkflow::try_new(...)` that enforces invariants, and expose only read-only getters or a builder for controlled construction."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "domain_newtype_for_epoch",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a bare Option<u64> with no domain semantics. Any u64 is valid, including nonsensical timestamps.",
+      "failure_mode": "Callers can set sent_at_epoch_ms to 0, u64::MAX, or any arbitrary value with no semantic meaning. No validation that the timestamp is in a reasonable range.",
+      "fix": "Replace with a `sent_at: Option<EpochMillis>` newtype that wraps u64 with a validated constructor (e.g. rejects 0, enforces reasonable range). Make the inner value non-pub."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_no_transition_validation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not validate any preconditions — it will set status to \"sent\" and is_sent to true regardless of the current status, is_validated, or is_sent state.",
+      "failure_mode": "Calling mark_sent on an already-sent budget, a deleted budget, or a non-validated budget silently succeeds, corrupting the workflow state machine.",
+      "fix": "Add precondition checks: return `Err(BudgetError::InvalidTransition)` if current status is not in a state that allows transition to sent. Check is_validated is true before allowing sent."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim on BudgetWorkflow or mark_sent",
+    "no profiler data (flamegraph, cachegrind) for allocation hot paths",
+    "no allocation tracing (e.g. alloc_counter, dhat-rs) proving zero-allocation transition on enum-based status",
+    "no second-ring analysis (e.g. MIRI, Miri, or borrow-checker proof) for mutation safety",
+    "no command-level evidence for cargo fmt, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "Static review only — no commands run. The crate has fundamental typestate violations: all fields are public primitives (String, bool, Option<u64>) that make every illegal state representable. No enum-based status, no typestate on lifecycle, no domain newtypes for id or timestamp, no transition validation, and the sole function mutates in-place with heap allocation. These are architectural blockers that cannot be patched with local fixes; the struct and function signatures require redesign."
+}

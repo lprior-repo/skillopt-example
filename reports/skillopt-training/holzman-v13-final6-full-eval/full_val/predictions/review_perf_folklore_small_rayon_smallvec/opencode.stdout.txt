@@ -1,0 +1,15 @@
+Now I have all the source. Let me write the review output.
+Review complete. Wrote `review-output.json` with 6 findings and 5 missing-evidence items.
+
+**Summary of violations found in `src/lib.rs`:**
+
+| # | Severity | Rule | Line | Issue |
+|---|----------|------|------|-------|
+| 1 | BLOCKER | `folklore_rayon_tiny_data` | 2 | Rayon proposed for `[u8; 4]` — parallel overhead dwarfs 4 elements |
+| 2 | BLOCKER | `folklore_smallvec_tiny_data` | 2 | SmallVec proposed for fixed-size output — unnecessary bookkeeping overhead |
+| 3 | BLOCKER | `unmeasured_performance_claim` | 2 | "will be faster" with zero workload/hardware/baseline/evidence |
+| 4 | MAJOR | `unnecessary_allocation_on_every_call` | 6 | `collect()` allocates heap Vec per call for known-4 elements |
+| 5 | MAJOR | `missing_benchmark_profiler_allocation_evidence` | 1 | No benchmark harness, profiler, or allocation measurement infrastructure |
+| 6 | MAJOR | `missing_command_evidence` | 1 | No benchmark/profiler/UB commands executed or recorded |
+
+**Recommended fix**: Replace `Vec<&'static str>` with `[&'static str; 4]` return type and populate via indexed assignment — eliminates all heap allocation and removes folklore optimization comments.

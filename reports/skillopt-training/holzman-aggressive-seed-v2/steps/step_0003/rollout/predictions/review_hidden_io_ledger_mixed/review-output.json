@@ -1,0 +1,114 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file does not exist, is unreadable, or the path is invalid.",
+      "failure_mode": "untrusted or missing file path causes process abort instead of returning a typed I/O error to the caller.",
+      "fix": "Return a Result<_, LedgerError> with an I/O variant. Use map_err on read_to_string to convert io::Error into a domain error. Propagate with ?."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics when the second comma-separated field is not a valid u32.",
+      "failure_mode": "malformed ledger line with a non-numeric value field causes a panic instead of returning a typed ParseError.",
+      "fix": "Chain ? through a Result<Record, LedgerError> with a Parse variant. Use parts[1].parse::<u32>().map_err(|_| LedgerError::Parse)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_as_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 silently truncates any u32 value greater than 65535.",
+      "failure_mode": "A valid u32 like 70000 is silently converted to 34464, producing silently corrupted ledger data with no error signal.",
+      "fix": "Use u16::try_from(parts[1].parse::<u32>()?).map_err(|_| LedgerError::ValueOutOfRange) or parse directly as u16 via parts[1].parse::<u16>()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing into a Vec<String>. Lines with fewer than 2 comma-separated fields will panic.",
+      "failure_mode": "A ledger line with missing fields causes a runtime panic instead of a recoverable error.",
+      "fix": "Use split_once(',') and handle the missing-field case with an Err, or use .get(0) and .get(1) with ? propagation into a Result."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_ledgers mixes I/O (fs::read_to_string), side effects (println!), and parsing in a single function. The core contract requires I/O and side effects in the imperative shell, with the pure parsing core separate.",
+      "failure_mode": "The parsing logic is untestable without a real file on disk and produces stdout side effects, making the core impure and fragile.",
+      "fix": "Split into (a) load_ledgers_raw(path: &str) -> Result<String, io::Error> for I/O, (b) parse_ledger_line(line: &str) -> Result<Record, ParseError> for pure parsing, and (c) load_ledgers that wires them together. Remove println!."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() is a stdout side effect embedded in the parsing pipeline. This is a hidden I/O effect in a function that appears to be data processing.",
+      "failure_mode": "Calling this function produces observable side effects, making it non-hermetic, untestable in isolation, and incompatible with functional-core purity. Concurrent callers will have interleaved stdout.",
+      "fix": "Remove println!(). If logging is needed, return a small metadata field or pass an observer callback from the imperative shell layer, not from the pure parser."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation_missing",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts: Vec<String> = line.split(',').map(...).collect() allocates a Vec per line with no capacity hint. Every line heap-allocates a Vec even when the split produces exactly 2 elements.",
+      "failure_mode": "Unbounded allocation per line with no try_reserve or SmallVec optimization. Under memory pressure, repeated allocation failures produce OOM instead of a typed Allocation error.",
+      "fix": "Replace with split_once(',') to avoid Vec allocation entirely, or use SmallVec<[String; 2]> with try_reserve, or iterate with .next() and .nth(1) on the split iterator."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "The function returns Vec<Record> with no error type. All failure modes (file not found, I/O error, malformed line, parse failure, out-of-range value, insufficient fields) are collapsed into panics.",
+      "failure_mode": "The caller cannot distinguish between a missing file and a malformed line, cannot recover from any error, and cannot report meaningful errors up the call stack.",
+      "fix": "Define a sealed LedgerError enum with variants: Io(io::Error), Parse(ParseError), ValueOutOfRange, MalformedLine(String). Return Result<Vec<Record>, LedgerError> or Result<Record, LedgerError> per-line."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark exists for load_ledgers or parse_ledger_line. No baseline, workload description, or performance claim is provided.",
+      "failure_mode": "Any future optimization (SmallVec, Bytes, iterator chains, parallelism) has no measured target and may regress performance without evidence.",
+      "fix": "Add a benches/ directory with criterion or similar, measuring parse throughput on representative ledger files with known line counts and field distributions."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No profiler evidence (flamegraph, perf, cargo-flamegraph) exists to identify hot paths in the ledger loading pipeline.",
+      "failure_mode": "Allocation hotspots (Vec::collect per line, String::clone per field) are assumed but never measured. Optimizations may target cold code.",
+      "fix": "Run cargo-flamegraph or perf record on a realistic workload and include the profile as second-ring evidence for any optimization."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [dev-dependencies] or [[bench]] section in Cargo.toml. No test binary targets defined. No benchmark infrastructure is declared.",
+      "failure_mode": "No verifiable test or benchmark commands can be executed to validate the crate under Holzman verification gates.",
+      "fix": "Add criterion as a dev-dependency with [[bench]] entry, or add a simple [dev-dependencies] with assert_cmd/assert_fs for integration tests."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_ledgers throughput or latency",
+    "no profiler evidence (flamegraph/perf) for allocation hotspots",
+    "no second-ring evidence for any zero-cost or performance claims",
+    "no command evidence that cargo fmt --check, cargo clippy, or cargo test pass",
+    "no allocation tracking (e.g., mimalloc stats, jemalloc profiling) for per-line Vec overhead",
+    "no command-evidence that the strict Holzman gate commands pass"
+  ],
+  "residual_risk": "The crate has 8 BLOCKER findings: three unwrap() calls on fallible operations (file I/O, parsing), a lossy as-u16 cast, unchecked indexing, hidden stdout I/O side effect, no bounded allocation strategy, no error taxonomy, and mixed I/O/parsing in a single function. Any optimization work is unmetered with zero benchmark/profiler evidence. The crate as written will panic on any malformed input, any missing file, any value over 65535, and produces uncontrolled stdout. Residual risk is high: all panics are reachable from untrusted input and there is zero error recovery or typed failure semantics."
+}

@@ -1,0 +1,11 @@
+Now I have all the context. Writing the review output.
+Review complete. Written 6 BLOCKER findings to `review-output.json`:
+
+1. **Rayon folklore** (line 2) — Rayon overhead dwarfs any benefit for 4 elements
+2. **SmallVec folklore** (line 2) — SmallVec adds complexity with no benefit for fixed 4-element output
+3. **Unnecessary heap allocation** (line 1) — `Vec<&'static str>` for `[u8; 4]` input; should return `[&'static str; 4]`
+4. **Missing benchmark evidence** (line 1) — No baseline, no workload description, no measurement
+5. **Missing profiler/allocation evidence** (line 1) — No flamegraph, no allocation counting, no bottleneck analysis
+6. **Folklore over measurement** (line 2) — TODO encodes performance folklore without empirical evidence
+
+All 7 missing evidence items and residual risk documented.

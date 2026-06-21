@@ -1,0 +1,15 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**6 findings across the task crate:**
+
+| Severity | Rule | Location | Core Issue |
+|---|---|---|---|
+| BLOCKER | `typestate` | `src/lib.rs:1` | `status: String`, `is_validated: bool`, `is_sent: bool` allow illegal state combinations (e.g., `is_sent=true` with `status="pending"`) |
+| BLOCKER | `parse_boundary` | `src/lib.rs:1` | All fields are `pub` raw primitives — any caller constructs invalid states directly |
+| BLOCKER | `zero_forbidden_constructs` | `src/lib.rs:10` | `.to_string()` allocates heap on every `mark_sent` call; string literals are typo-prone |
+| BLOCKER | `typestate` | `src/lib.rs:9` | `mark_sent` has no precondition checks (e.g., must be validated before sending) |
+| WARNING | `functional_core` | `src/lib.rs:9` | Free function with mutable pub fields — no module-level invariant enforcement |
+| INFO | `newtype` | `src/lib.rs:2,6` | `id: String` and `sent_at_epoch_ms: Option<u64>` lack domain newtypes |
+
+**Missing evidence:** no benchmarks, profiler/allocation data, or command evidence (cargo test/clippy/fmt) was run. Residual risk: static review only; illegal states are fully representable and constructable.

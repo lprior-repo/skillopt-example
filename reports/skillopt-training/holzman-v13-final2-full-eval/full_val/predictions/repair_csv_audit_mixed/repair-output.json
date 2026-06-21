@@ -1,0 +1,31 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/b91f0087472e6cb5/repair_csv_audit_mixed/.skill/holzman-rust/SKILL.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib -- -D warnings", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros",
+    "No unchecked indexing or unchecked arithmetic",
+    "No lossy as conversions",
+    "No ignored fallible results",
+    "Empty input rejected with ParseError::Empty",
+    "Invalid values rejected with ParseError::Invalid",
+    "TooMany enforced per-item with typed error",
+    "try_reserve used for bounded allocation",
+    "No Vec::with_capacity",
+    "No split().collect() pattern",
+    "All 4 behavior tests pass",
+    "Clippy clean with strict lint flags",
+    "Format check clean",
+    "Smallest production-source change applied"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None identified. All absolute laws satisfied. Source compiles clean under strict clippy, all behavior tests pass, no forbidden patterns remain."
+}

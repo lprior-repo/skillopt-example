@@ -1,0 +1,8 @@
+Review complete. Wrote `review-output.json` with 6 findings:
+
+- **2 BLOCKERs**: `SessionWorkflow` makes illegal states representable via redundant `bool`/`String` flags instead of an enum/typestate; `status: String` allows arbitrary values
+- **2 MAJORs**: `is_sent` redundant with `status` (consistency hazard); `mark_sent` has no typed error return and allows transitions on any state
+- **1 MAJOR**: `id: String` bare primitive with no validation constructor
+- **1 MINOR**: `.to_string()` allocation on every `mark_sent` call, avoidable with enum-based state encoding
+
+All 4 missing evidence categories flagged: no benchmarks, profiler data, allocation tracking, or command-layer evidence.

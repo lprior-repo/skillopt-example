@@ -1,0 +1,113 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/hardening-checklist.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-status-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String instead of an enum; any string value (e.g. \"sent\", \"validated\", \"deleted\", \"\") is representable, making illegal states like status=\"sent\" with is_validated=false impossible to catch at compile time",
+      "failure_mode": "Business logic downstream may assume valid lifecycle transitions based on status string but receives invalid combinations, leading to silent misrouting or double-sending",
+      "fix": "Replace `status: String` with a `MetricStatus` enum (e.g., `Pending`, `Validated`, `Sent`). Remove the enum from the struct variant and put it in the appropriate variant that owns the lifecycle stage."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-lifecycle-booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bare bool lifecycle flag; combined with is_sent (line 5) this creates 4 state combinations, two of which are logically impossible (sent without validated, validated-sent-then-reset)",
+      "failure_mode": "Code cannot prevent or detect that a MetricWorkflow enters an invalid lifecycle state (e.g., marked sent but never validated), and resetting is_sent does not reset is_validated",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typestate enum (e.g., `MetricStage: Unvalidated | Validated | Sent`) so that only valid transitions exist and compiler enforces correctness."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-typestate-machine",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "No typestate transition machine exists; mark_sent (line 9) mutates status string and sets is_sent independently with no validation that the prior state was Validated",
+      "failure_mode": "Any caller can call mark_sent on an unvalidated MetricWorkflow, producing an invalid composite state that violates the domain invariant that metrics must be validated before being sent",
+      "fix": "Encode lifecycle stages as enum variants with associated data. Replace mark_sent with a method on the typestate that only compiles when the source type is Validated, e.g., `impl Validated { fn mark_sent(self) -> Sent { ... } }`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-newtype-id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain semantics, validation, or formatting guarantees; any empty string or malformed ID is valid",
+      "failure_mode": "Downstream consumers cannot distinguish a valid metric ID from an empty string or garbage, leading to silent misidentification or collisions in distributed systems",
+      "fix": "Introduce a newtype `MetricId(String)` or `MetricId(Uuid)` with a smart constructor that validates the ID format and returns a typed error on invalid input."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "domain-newtype-timestamp",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a raw Option<u64> epoch millisecond value with no type-level domain meaning; any u64 value is accepted including nonsensical timestamps",
+      "failure_mode": "Consumers cannot distinguish a real sent timestamp from a stale value, uninitialized placeholder, or overflowed counter; arithmetic on timestamps requires manual checked conversion",
+      "fix": "Introduce a `SentAt(Instant)` or `SentAt(SystemTime)` type that carries actual time semantics. Set it inside the Sent variant rather than as an independent optional field."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-imperative-shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is named as an action/command (imperative shell) but mutates domain struct fields directly with no shell/calculation boundary; it fuses command execution with state mutation",
+      "failure_mode": "Cannot reason about when side effects occur; the function cannot be composed with retry, logging, metrics, or persistence layers because it is not structured as a command returning a domain result",
+      "fix": "Split into: (1) a pure calculation `validate_transition(&current_stage) -> Result<NewStage, TransitionError>` and (2) a shell command `execute_mark_sent(command: MarkSentCommand) -> Result<(), Error>` that invokes the calculation, performs I/O, and returns a typed result."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "smart-constructor-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No smart constructor or sealed constructor exists for MetricWorkflow; all fields are pub and can be constructed with invalid combinations",
+      "failure_mode": "Any crate code can create `MetricWorkflow { id: \"\".into(), status: \"\".into(), is_validated: false, is_sent: false, sent_at_epoch_ms: None }`, a fully-invalid struct that passes through the entire pipeline",
+      "fix": "Make all fields private. Provide `MetricWorkflow::new(id: MetricId, ...) -> Result<Self, Error>` that validates and constructs trusted domain values, or use a builder/enum-based API."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "hidden-io-mutation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `.to_string()` (heap allocation via String::from_static) to set status, allocating a new String every call for what is logically a state transition",
+      "failure_mode": "Every mark_sent call allocates a new String even though the value is a known domain constant; in hot paths this creates unnecessary heap pressure and allocation variance",
+      "fix": "Use an enum variant for status so no String allocation is needed. If the value must be formatted, use `Display` impl on the enum at the presentation boundary, not at the domain mutation point."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for mark_sent or any throughput/latency claim about MetricWorkflow lifecycle operations",
+      "failure_mode": "Cannot verify whether the typestate refactor or allocation changes improve or degrade performance; optimization decisions would be unmeasured",
+      "fix": "Add a criterion or mini-benchmark comparing the current String-based approach against the typestate-enum approach for mark_sent throughput."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, cachegrind, perf) exists to identify the actual bottleneck in MetricWorkflow lifecycle",
+      "failure_mode": "Optimization may target the wrong code path; String allocation may not be the bottleneck at all",
+      "fix": "Run `cargo flamegraph` or `perf record` on a representative workload to identify actual hot paths before optimizing."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No allocation tracking (e.g., dlmalloc stats, jemalloc profiling, or `#[global_allocator]` tracing) exists to quantify heap pressure from String allocations",
+      "failure_mode": "Cannot prove whether the String allocation in mark_sent is a real memory-pressure issue or a false positive concern",
+      "fix": "Add allocation tracing or jemalloc profiling to measure per-call allocation count and bytes for mark_sent."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or latency",
+    "no profiler evidence (flamegraph/perf) for MetricWorkflow lifecycle hot paths",
+    "no allocation evidence (jemalloc/dlmalloc profiling) for String allocation pressure in mark_sent",
+    "no second-ring evidence: no clippy run, no cargo test, no Miri/Kani/proptest coverage",
+    "no command evidence: no CI log or terminal output showing gate commands ran"
+  ],
+  "residual_risk": "Static review only. The struct has no typestate enforcement whatsoever - all 4 boolean/string combinations are valid at compile time, creating an explosion of illegal states. The mark_sent function provides zero lifecycle validation. No commands were run (cargo check, clippy, tests), so compilation status and runtime test coverage are unknown. The crate has no tests at all. The architectural debt is high: every downstream consumer must manually check status strings and booleans instead of relying on the type system."
+}

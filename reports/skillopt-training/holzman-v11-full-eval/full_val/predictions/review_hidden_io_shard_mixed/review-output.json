@@ -1,0 +1,129 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file is missing, unreadable, or not UTF-8",
+      "failure_mode": "untrusted or missing file path aborts the entire process instead of returning a typed I/O error",
+      "fix": "use .map_err(|e| LoadError::Io(e))? and return Result<Vec<Record>, LoadError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "std::fs is imported and used inside load_shards which fuses file I/O, parsing, domain construction, and console side-effects into one function",
+      "failure_mode": "pure domain logic cannot be unit-tested in isolation; shell work (I/O, logging) bleeds into the functional core",
+      "fix": "split into: shell function read_and_parse(path: &str) -> Result<String, LoadError>, and core function parse_records(text: &str) -> Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side-effect embedded inside the mapping closure that builds domain records",
+      "failure_mode": "parsing logic is no longer pure or deterministic; logging leaks into the core, breaking referential transparency and making output non-reproducible",
+      "fix": "move all console output to the shell layer; parse_records must return data with no side effects"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing into a Vec<String> produced by split(',')",
+      "failure_mode": "a line with zero or one comma panics with IndexOutOfBounds; hostile or truncated input aborts processing",
+      "fix": "use parts.get(0).ok_or(ParseError::Invalid)? and parts.get(1).ok_or(ParseError::Invalid)?, or let (name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input and on empty string after trim",
+      "failure_mode": "malformed CSV field aborts the entire collection instead of returning a typed parse error",
+      "fix": "use value_str.trim().parse::<u32>().map_err(|_| ParseError::Invalid)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(...) as u16 performs a lossy narrowing cast from u32 to u16; values in range 65536..=4294967295 silently wrap to 0..=2790403",
+      "failure_mode": "invalid domain values are accepted silently, corrupting data integrity without any error signal",
+      "fix": "use u16::try_from(value).map_err(|_| ParseError::Overflow)? instead of as u16"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "raw string primitives from CSV splitting cross the parse boundary without fallible smart constructors; caller can construct Record with any name string and any u16 value directly",
+      "failure_mode": "illegal domain states are representable; no validation occurs at the parse boundary so invalid names and out-of-range values enter the core",
+      "fix": "create Record::new(name: String, value: u16) -> Result<Record, ParseError> with validation, or use newtype for name and value; parse with split_once and smart constructor"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards returns Vec<Record> with no Result type; all errors (I/O, parse, bounds, allocation) are silently converted to panics via unwrap()",
+      "failure_mode": "callers have no way to distinguish file-not-found from malformed data from overflow; error recovery is impossible",
+      "fix": "return Result<Vec<Record>, LoadError> where LoadError is an enum with Io(ParseError), Invalid, Overflow variants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No cap on the number of records; no try_reserve on the output Vec; unbounded external file can cause arbitrary heap allocation",
+      "failure_mode": "a sufficiently large input file exhausts available memory, causing OOM kill instead of graceful error",
+      "fix": "enforce a domain max record count before collecting; call Vec::with_capacity or values.try_reserve(max).map_err(|_| LoadError::Allocation)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_model_coercion",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is a raw String with no validation; Record.value is a raw u16 with no range invariant or newtype",
+      "failure_mode": "illegal states (empty names, names with control characters, values exceeding domain bounds) are representable at the type level",
+      "fix": "use a Name newtype with a smart constructor that validates non-empty and character constraints; value can stay u16 only if parse-time bounds enforcement is proven"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "shell_leakage",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards fuses three responsibilities: (1) filesystem I/O via fs::read_to_string, (2) CSV parsing with split, and (3) domain Record construction — all in one function",
+      "failure_mode": "cannot unit-test parsing logic without a real file on disk; cannot mock I/O without mocking the entire function",
+      "fix": "extract shell layer: fn load_shards(path: &str) -> Result<Vec<Record>, LoadError> { let text = fs::read_to_string(path).map_err(|e| LoadError::Io(e))?; parse_records(&text) } and core fn parse_records(text: &str) -> Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_access",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "line.split(',') produces variable-length slices; no guard against single-field or empty lines before indexing parts[0] and parts[1]",
+      "failure_mode": "empty lines, trailing newlines, or truncated rows panic at parts[0] or parts[1] access",
+      "fix": "use split_once(',') and match on (Some((name, val)), _) to destructurally bind with guaranteed indices"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_shards throughput or memory usage",
+    "no profiler data showing allocation profile of the collect() path",
+    "no allocation measurement proving try_reserve or bounded capacity usage",
+    "no second-ring evidence (Kani/Proptest/Miri) for parse error handling paths",
+    "no command evidence that cargo clippy passes with -D warnings -D unsafe_code -D panic_in_result_fn -D indexing_slicing -D as_conversions",
+    "no command evidence that cargo test passes",
+    "no command evidence that cargo fmt --check passes"
+  ],
+  "residual_risk": "Review found 12 BLOCKER findings including panic surfaces (unwrap on I/O and parse), unchecked indexing into split results, lossy narrowing cast (u32 as u16), hidden I/O and logging in pure parsing logic, unbounded allocation, absence of typed error taxonomy, and raw primitive domain state (String name, u16 value). No commands were run; the code will not compile cleanly under strict clippy gates due to unwraps in non-Result-returning context and indexing_slicing violations. Functional Core / Imperative Shell is entirely violated: I/O, logging, parsing, and domain construction are fused in one function. Typestate, newtypes, and smart constructors are absent."
+}

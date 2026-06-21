@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "RouteWorkflow exposes all fields as pub, allowing callers to set status=\"sent\" without setting is_sent=true, or set both flags inconsistently. Illegal states are directly constructable.",
+      "failure_mode": "A caller can produce a RouteWorkflow with status=\"sent\" and is_sent=false (or vice versa), breaking the invariant that sent state requires both fields in sync. Downstream logic relying on either field alone will behave incorrectly.",
+      "fix": "Make all fields private. Provide a sealed constructor or builder that enforces invariants. Replace bool flags and status String with a single typed enum typestate that cannot represent invalid combinations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String, allowing any arbitrary string value (e.g., \"deleted\", \"sent\", \"foo\", \"SENT\"). There is no domain-typed enum for route status.",
+      "failure_mode": "Callers can set status to values outside the intended domain (e.g., \"canceled\", \"SENT\"), making pattern matching and state validation unreliable. String comparison is error-prone and case-sensitive.",
+      "fix": "Replace `pub status: String` with `pub status: RouteStatus` where `RouteStatus` is a sealed enum with only the valid domain variants (e.g., `Pending`, `Validated`, `Sent`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bool, which cannot encode the full lifecycle. A bool only distinguishes two states, but the domain has at least three (pending, validated, sent).",
+      "failure_mode": "Cannot represent or enforce the correct lifecycle ordering. A route could appear unvalidated but already sent, with no way to catch this via the type system.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typestate enum `RouteState` that encodes the full lifecycle (e.g., `enum RouteState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`). Use newtype for `sent_at_epoch_ms` to replace bare `Option<u64>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes a mutable RouteWorkflow by value and mutates it in-place. It performs no validation of the pre-condition (e.g., the route must be in a validated state before marking sent).",
+      "failure_mode": "Any route in any state can be marked sent, including routes that were never validated. This violates the domain invariant that validation must precede sending. No typed error is returned for invalid transitions.",
+      "fix": "Replace with a pure function that takes the current typed state and returns the next state or a typed error: `fn mark_sent(state: RouteState) -> Result<RouteState, TransitionError>`. Use pattern matching on the typestate enum to reject invalid transitions at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_expect_panic",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `\"sent\".to_string()` which allocates a new String every call. While not a panic, it violates the zero-allocation-in-core principle for a pure operation.",
+      "failure_mode": "Unnecessary heap allocation on every transition. In high-throughput paths this adds measurable GC/allocator pressure.",
+      "fix": "Eliminate by using an enum variant instead of a String for status, which is zero-cost and stack-only."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is `Option<u64>`, a bare primitive. There is no newtype wrapper (e.g., `EpochMs(u64)`) to encode domain meaning.",
+      "failure_mode": "Callers can confuse epoch milliseconds with other u64 values (timestamps in seconds, durations, counts). No type-level distinction between different u64 domains.",
+      "fix": "Replace with `sent_at: Option<EpochMs>` where `EpochMs` is a newtype: `pub struct EpochMs(u64);`"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare `String` with no newtype wrapper (e.g., `RouteId`).",
+      "failure_mode": "Route IDs can be confused with other string identifiers in the system (user IDs, job IDs). No domain-level guarantee that the string is a valid route identifier.",
+      "fix": "Replace with `pub id: RouteId` where `RouteId` is a newtype: `pub struct RouteId(String);` with a fallible constructor if format validation is needed."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "RouteWorkflow is a public struct with no methods, making it a data bag rather than a domain object. All logic lives outside the type.",
+      "failure_mode": "No encapsulation of domain invariants. Any caller can construct or mutate the struct arbitrarily, bypassing all validation. The type provides zero behavioral guarantees.",
+      "fix": "Make RouteWorkflow a private implementation detail. Expose only the typestate enum as the public API. Move mark_sent into an impl block on the typestate enum as a fallible transition method."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for mark_sent or RouteWorkflow lifecycle operations. The .to_string() allocation on every transition is unmeasured.",
+      "failure_mode": "Cannot verify whether the allocation-free enum approach would deliver measurable throughput improvement.",
+      "fix": "Add a benchmark comparing the current String-based approach vs an enum-based approach with a realistic workload."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation profiling evidence for RouteWorkflow lifecycle operations.",
+      "failure_mode": "Cannot assess the real-world allocation cost of the current String-based design.",
+      "fix": "Run allocation profiler (e.g., `dhat`, `tracing` with alloc events) against a realistic workload to establish a baseline."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or RouteWorkflow lifecycle",
+    "no allocation profiling evidence",
+    "no profiler evidence for transition paths",
+    "no second-ring evidence (no integration or behavioral tests found)",
+    "no command-level evidence of cargo test, cargo fmt, or cargo clippy execution"
+  ],
+  "residual_risk": "The domain model is fundamentally underspecified: primitive types (String, bool) replace typed enums and typestates, making illegal states fully representable. mark_sent has no pre-condition validation, allowing invalid state transitions. The struct has no encapsulation or behavioral methods. Static review only; no commands run. The crate needs a complete typestate redesign before any delivery."
+}

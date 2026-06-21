@@ -1,0 +1,14 @@
+{
+  "candidate": "holzman-rust-candidate-v13-patched7",
+  "skill_sha256": "ca9f71b6a3beba628b9c788de93c39a822bce11a722091cb4ab2bf036e75ca6f",
+  "split": "val",
+  "n": 1,
+  "hard": 1.0,
+  "soft": 1.0,
+  "passed": 1,
+  "failed": [],
+  "fail_reasons": {},
+  "model_counts": {
+    "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf": 1
+  }
+}

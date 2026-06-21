@@ -1,0 +1,60 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/runtime-performance-architecture.md",
+    "references/zero-cost-abstractions.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Unchecked arithmetic: `start + len as usize` can overflow if offset + len exceeds usize::MAX",
+      "failure_mode": "unchecked_arithmetic",
+      "fix": "Use checked arithmetic (checked_add) and return a typed error or Option instead of panicking on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Unchecked indexing: `&buf[start..end]` panics if start > buf.len() or end > buf.len()",
+      "failure_mode": "unchecked_indexing_in_production",
+      "fix": "Use bounds-checked indexing (e.g., get_unchecked or validate bounds first) or return Option<&[u8]> to handle OOB gracefully"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Panic-prone slice indexing with no Result/Option return; no validation that offset and len are within buf bounds",
+      "failure_mode": "unchecked_indexing",
+      "fix": "Return Result<&[u8], Error> or Option<&[u8]>, validate bounds, and use checked arithmetic"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No assertions, bounds checks, or type-level invariants to prove offset+len does not exceed buffer length",
+      "failure_mode": "missing_invariant",
+      "fix": "Add type-level proof, constructor validation, or explicit bounds check that returns a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "arithmetic_side_effects",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`start + len as usize` is unchecked integer addition; overflow is silent undefined behavior in release",
+      "failure_mode": "unchecked_arithmetic",
+      "fix": "Use checked_add, validate range, or prove mathematically that offset+len <= usize::MAX for all valid inputs"
+    }
+  ],
+  "missing_evidence": [],
+  "residual_risk": "Static review only; no cargo commands run. Function returns unchecked slice reference that can panic on out-of-bounds access. Arithmetic overflow possible on large offsets."
+}

@@ -1,0 +1,9 @@
+Done. The `parse_shards` function in `src/lib.rs` was repaired to eliminate all Holzman law violations:
+
+**Removed:**
+- `.unwrap()` on parse results → `.map_err(|_| ParseError::Invalid)`
+- No-empty-input check → returns `Err(ParseError::Empty)`
+- No max_items enforcement → checks `values.len() >= max_items` before each push
+- No allocation discipline → `try_reserve(max_items).map_err(...)` after `Vec::new()`
+
+**All 4 tests pass**, clippy clean under strict flags, formatting clean.

@@ -1,0 +1,15 @@
+Issues found in `src/lib.rs`:
+1. `max_payload` parameter unused - tests expect payload rejection when exceeding it
+2. Line 10: lossy `as u32` cast instead of `try_from`
+3. No `try_reserve` for allocation safety
+4. No checked arithmetic for output size calculation
+All tests pass. Now writing the required output JSON.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** - payload length compared against `max_payload`, returns `Err(FrameError::PayloadTooLarge)` when exceeded
+2. **Removed lossy `as u32` cast** - replaced with `u32::try_from(payload.len())` returning `Err(FrameError::Overflow)` on failure
+3. **Added checked arithmetic** - `header_len.checked_add(payload.len())` with `FrameError::Overflow` fallback
+4. **Added allocation safety** - `try_reserve(total_len)` with `FrameError::Allocation` fallback
+5. **Added type annotation** - `let header_len: usize = 4` required by `checked_add`
+
+Tests: 2/2 passed.

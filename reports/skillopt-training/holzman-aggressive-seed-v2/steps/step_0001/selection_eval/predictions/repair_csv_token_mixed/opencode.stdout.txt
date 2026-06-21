@@ -1,0 +1,13 @@
+Repair complete. All 4 behavior tests pass.
+
+**Changes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse (panic) | `.map_err(\|_\| ParseError::Invalid)?` |
+| No empty input handling | Returns `Err(ParseError::Empty)` |
+| No invalid input handling | Returns `Err(ParseError::Invalid)` via `map_err` |
+| No `max_items` enforcement | Returns `Err(ParseError::TooMany)` |
+| `Vec::with_capacity` (no allocation error handling) | `Vec::new()` + `try_reserve(...).map_err(\|_\| ParseError::Allocation)?` |
+
+All forbidden constructs (`unwrap`, `panic`, unchecked indexing, lossy `as`) removed. Tests and `Cargo.toml` unchanged.

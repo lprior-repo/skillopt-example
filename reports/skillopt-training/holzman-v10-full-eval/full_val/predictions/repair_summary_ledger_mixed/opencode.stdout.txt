@@ -1,0 +1,16 @@
+Now I have a clear picture. The source has multiple violations: `.unwrap()`, unchecked indexing `parts[1]`, lossy `as` in `count as u32` and `count as u64`, no checked arithmetic, missing `render_summary`, wrong return type, no empty-input handling. Tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a separate `render_summary` function.
+Repaired. All 6 tests pass, all strict lint gates pass, no production violations remain.
+
+**Changes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| SummaryError::Invalid)` |
+| Unchecked `parts[1]` indexing | `split_once(',')` with `_name` discard |
+| `total += value` (unchecked add) | `checked_add` + `Overflow` error |
+| `count += 1` (unchecked add) | `checked_add` + `Overflow` error |
+| `total / count as u64` (lossy `as`) | `checked_div` via `u64::try_from(count)` |
+| `count as u32` (lossy `as`) | `u32::try_from(count)` |
+| No empty-input handling | Returns `SummaryError::Empty` when count==0 |
+| Wrong return type `Result<String,...>` | Changed to `Result<Summary,...>` |
+| Missing `render_summary` | Added as pure formatting function |

@@ -1,0 +1,43 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead Cargo.toml
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; d=json.load(open('/tmp/opencode/holzman-skillopt-train/a9b5c3633a249839/review_hidden_io_order_mixed/review-output.json')); print('Valid JSON. status:', d['status'], 'findings:', len(d['findings']), 'missing_evidence:', len(d['missing_evidence']))"
+Valid JSON. status: reviewed findings: 11 missing_evidence: 4
+[0m
+[0m$ [0mpython3 -c "
+import json
+d = json.load(open('/tmp/opencode/holzman-skillopt-train/a9b5c3633a249839/review_hidden_io_order_mixed/review-output.json'))
+required = ['severity','rule','file','line','problem','failure_mode','fix']
+for i,f in enumerate(d['findings']):
+    missing = [k for k in required if k not in f]
+    if missing:
+        print(f'Finding {i} missing: {missing}')
+    else:
+        print(f'Finding {i}: {f[\"severity\"]:9} {f[\"rule\"]:35} {f[\"file\"]}:{f[\"line\"]} OK')
+print('All findings valid.')
+"
+Finding 0: BLOCKER   zero_forbidden_constructs           src/lib.rs:9 OK
+Finding 1: BLOCKER   zero_forbidden_constructs           src/lib.rs:16 OK
+Finding 2: BLOCKER   zero_forbidden_constructs           src/lib.rs:16 OK
+Finding 3: BLOCKER   zero_forbidden_constructs           src/lib.rs:19 OK
+Finding 4: BLOCKER   zero_forbidden_constructs           src/lib.rs:19 OK
+Finding 5: BLOCKER   zero_forbidden_constructs           src/lib.rs:19 OK
+Finding 6: BLOCKER   parsing_access_pattern              src/lib.rs:12 OK
+Finding 7: MAJOR     functional_core_imperative_shell    src/lib.rs:8 OK
+Finding 8: MAJOR     type_discipline                     src/lib.rs:3 OK
+Finding 9: MAJOR     error_taxonomy                      src/lib.rs:8 OK
+Finding 10: MINOR     functional_core_performance         src/lib.rs:14 OK
+All findings valid.
+[0m

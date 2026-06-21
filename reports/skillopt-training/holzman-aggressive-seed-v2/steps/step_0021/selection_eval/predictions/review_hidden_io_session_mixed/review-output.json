@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, truncated file)",
+      "failure_mode": "untrusted filesystem input can abort the entire process instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> and propagate with ? or map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on malformed input (missing second field or non-numeric value)",
+      "failure_mode": "corrupt or truncated session file can panic the caller instead of returning a typed ParseError",
+      "fix": "use parts.get(1).ok_or(MalformedRecord) and handle parse failure with map_err to a domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy `as u16` cast from u32 truncates values outside 0..=65535 silently",
+      "failure_mode": "values > 65535 wrap around silently producing invalid Records with no indication of data loss",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ValueOutOfBounds) or check range with .is_ok() / .is_err()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',') + collect() into Vec instead of split_once for two-field CSV grammar",
+      "failure_mode": "allocates a full Vec of all split parts when only two fields are needed; also silently ignores lines with extra commas, masking data quality issues",
+      "fix": "use split_once(',') to extract name and value parts directly, handling the Some/None case"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "unchecked indexing parts[1] after split — line may have fewer than 2 comma-separated fields",
+      "failure_mode": "malformed input (e.g. single field line \"foo\") panics with index out of bounds",
+      "fix": "use .get(1) or destructure the split_once result to handle missing fields explicitly"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() side effect inside pure-looking parsing function",
+      "failure_mode": "hidden I/O breaks purity of the parsing pipeline; makes the function non-deterministic in output and untestable without capturing stdout",
+      "fix": "remove println! or move logging to the shell layer; return data-only from the core function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no try_reserve or bounded capacity handling",
+      "failure_mode": "maliciously large file triggers unbounded heap allocation; allocation failure is not handled, leading to OOM or panic",
+      "fix": "use try_reserve on the Vec with a configurable maximum capacity, handling AllocationError"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmarks, profiler data, or allocation evidence exist for the load_sessions hot path",
+      "failure_mode": "cannot verify that the split/collect pattern, println! call, or allocation strategy are optimal for the target workload",
+      "fix": "add criterion or custom benchmarks measuring throughput and allocation count for representative input sizes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or allocation profile",
+    "no profiler evidence for hot-path CPU cost of split/collect + println",
+    "no allocation audit (no try_reserve or capacity budget)",
+    "no second-ring evidence for any performance claims",
+    "no command-level evidence (cargo fmt/check/clippy/test) was run"
+  ],
+  "residual_risk": "8 blockers remain: 3 forbidden constructs (unwrap on I/O, unwrap on parse, lossy as cast), 2 parsing/access violations (collect+split instead of split_once, unchecked parts[1]), 1 functional core violation (println in pure function), 1 allocation gap (no try_reserve). The function as written will panic on any malformed or missing input file and silently corrupt out-of-range values. All blockers must be repaired before this code is acceptable for delivery."
+}

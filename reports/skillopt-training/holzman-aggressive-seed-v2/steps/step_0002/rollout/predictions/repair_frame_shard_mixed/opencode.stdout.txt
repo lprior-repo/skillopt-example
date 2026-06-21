@@ -1,0 +1,8 @@
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `FrameError::PayloadTooLarge` when payload exceeds limit (was silently ignored)
+2. **Removed lossy `as` cast** — replaced `payload.len() as u32` with `u32::try_from(payload.len())`, mapping overflow to `FrameError::Overflow`
+3. **Added bounded allocation** — computed capacity with `checked_add`, used `try_reserve` instead of unbounded `Vec::new()`, maps allocation failure to `FrameError::Allocation`
+4. **All forbidden constructs eliminated** — no `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, unchecked arithmetic, or lossy casts
+
+Both tests pass (`encodes`, `rejects_limit`). Output written to `repair-output.json`.

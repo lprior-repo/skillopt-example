@@ -1,0 +1,14 @@
+Now I can see the issues. The tests expect:
+1. `encode_frame` to check `max_payload` and reject oversized payloads
+2. No lossy `as` cast (line 10: `as u32`)
+
+Let me run the tests first to confirm failures.
+Confirmed: `rejects_limit` fails because `max_payload` is unused, and there's a lossy `as u32` cast. Let me repair.
+All 2 tests pass. Let me write the output.
+Repair complete. Changes made to `src/lib.rs`:
+
+1. **Added `max_payload` bounds check** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` (fixes `rejects_limit` test)
+2. **Replaced lossy `as u32` cast** with `u32::try_from(payload.len())` mapped to `FrameError::Overflow` (Holzman rule: all width-reducing casts must use `try_from`)
+3. **Added `try_reserve`** for bounded allocation mapped to `FrameError::Allocation` (Holzman rule: bounded Vec must use `try_reserve`)
+
+All 2 tests pass, JSON output written to `repair-output.json`.

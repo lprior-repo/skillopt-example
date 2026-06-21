@@ -1,0 +1,62 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses primitive String for status, bool for is_validated and is_sent, and Option<u64> for sent_at_epoch_ms. This allows invalid states such as status=\"sent\" with is_sent=false, is_validated=false with status=\"sent\", or is_sent=true with sent_at_epoch_ms=None.",
+      "failure_mode": "Any combination of the four fields can represent an impossible or inconsistent lease lifecycle. Consumers cannot rely on status alone to infer sent/validated state, leading to silent logic errors or incorrect conditional branches downstream.",
+      "fix": "Replace status/is_validated/is_sent/sent_at_epoch_ms with a single enum typestate (e.g., LeaseState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }) that makes illegal combinations unconstructable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a primitive string that can hold any value (e.g., \"sent\", \"PENDING\", \"deleted\", \"\"). There is no validation, no enum, and no typestate enforcing a closed set of lifecycle states.",
+      "failure_mode": "Invalid status strings bypass domain invariants. String equality checks are fragile and non-exhaustive. Switching on a String requires match arms for every possible literal, which is impossible, so callers fall through to unsafe defaults.",
+      "fix": "Replace `status: String` with a sealed `LeaseStatus` enum with exactly the allowed variants. Parse at the boundary into this type; do not accept raw strings in the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive lifecycle flag. Booleans cannot encode directionality or ordering of state transitions (e.g., validated->sent vs sent->validated).",
+      "failure_mode": "Callers can call mark_sent on an unvalidated lease, or set is_validated independently of status. The boolean provides no information about transition order or which other fields are valid.",
+      "fix": "Encode validation as a distinct typestate variant (e.g., LeaseState::Validated) so that the type system enforces that only validated leases can transition to sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is redundant with status=\"sent\" but stored separately, creating a divergence risk. If one is updated without the other, the struct becomes internally inconsistent.",
+      "failure_mode": "mark_sent updates both fields, but callers can mutate them independently, producing states like status=\"sent\" with is_sent=false or status=\"pending\" with is_sent=true.",
+      "fix": "Remove is_sent entirely. Encode the sent state in the typestate enum variant (e.g., LeaseState::Sent { sent_at_epoch_ms: u64 }). The presence of the variant encodes both that it is sent and the timestamp."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership of LeaseWorkflow and returns it, mutating fields in place with String allocations (\"sent\".to_string()). This is a side-effecting imperative mutation disguised as a pure function. There is no functional core — data is mutable and validated by convention, not by type.",
+      "failure_mode": "The function has no preconditions or guards. It will happily mutate any LeaseWorkflow into sent state regardless of prior validation. No typed error is returned on violation.",
+      "fix": "Use a pure functional design: fn transition_to_sent(lease: LeaseState) -> Result<LeaseState, LeaseTransitionError> where LeaseState is a typestate enum that only permits valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_string_identity_fields",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw untyped string identifier. There is no LeaseId newtype to enforce format, length, or uniqueness constraints at the type level.",
+      "failure_mode": "Any string (empty, malformed, too long) can be assigned as an id. Cross-field invariants (e.g., id uniqueness) cannot be enforced by the type system.",
+      "fix": "Introduce a `LeaseId` newtype with a fallible constructor that validates the id format. Accept only LeaseId in the core."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for any performance claim", "no profiler data for allocation hotspots", "no allocation tracing evidence", "no second-ring evidence (property tests, fuzzing, or formal specs)", "no command evidence (no cargo test, cargo clippy, or cargo fmt reported)"],
+  "residual_risk": "Static review only; no commands run. The entire domain model violates the Power-of-Ten by allowing illegal states through primitive types. Without typestate enforcement, the crate cannot guarantee lease lifecycle correctness. A repair would require a full typestate rewrite of the struct and all callers."
+}

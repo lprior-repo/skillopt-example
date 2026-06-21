@@ -1,0 +1,27 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 14 findings across the task crate:
+
+**8 BLOCKERs:**
+- `status: String` instead of typed enum (line 3)
+- `is_validated: bool` lifecycle flag (line 4)
+- `is_sent: bool` lifecycle flag (line 5)
+- `sent_at_epoch_ms: Option<u64>` decoupled from typestate (line 6)
+- `id: String` without newtype (line 2)
+- No smart constructor / invariant enforcement (line 1)
+- Hardcoded `"sent".to_string()` mutation (line 10)
+- `mark_sent` with no preconditions or error return (line 9)
+
+**2 MAJORs:**
+- Mutating parameter anti-pattern (line 9)
+- Missing typed error taxonomy (line 9)
+
+**2 MAJOR** (evidence):
+- Missing benchmarks and tests
+
+**2 MINORs:**
+- All-public fields (line 2)
+- Raw `u64` timestamp without newtype (line 6)
+
+**Missing evidence:** No benchmarks, tests, clippy, fmt, or command-truth evidence.
+
+**Residual risk:** Architectural — all public fields are mutable from any caller with no type-level state machine. The structural issues require a complete enum-based typestate redesign.

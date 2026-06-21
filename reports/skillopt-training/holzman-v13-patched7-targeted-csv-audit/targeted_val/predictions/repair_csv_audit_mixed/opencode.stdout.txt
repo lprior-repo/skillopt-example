@@ -1,0 +1,9 @@
+Clear issues: `unwrap()` on parse, no empty check, no max_items enforcement, no `try_reserve`, unbounded `collect`.
+All 4 tests pass. Writing the required output.
+Repair complete. All 4 behavior tests pass. Violations fixed:
+
+- **`unwrap()`** → `map_err(|_| ParseError::Invalid)?`
+- **`Vec::with_capacity`** → `Vec::new()` + `try_reserve`
+- **Empty input** → rejected as `ParseError::Empty` before parsing
+- **Unbounded collect** → per-element `len() >= max_items` guard + explicit loop
+- **No typed error on parse failure** → `map_err` → `ParseError::Invalid`

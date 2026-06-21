@@ -1,0 +1,14 @@
+Now I have all the information. Let me write the review output.
+Review complete. Found 9 findings (8 BLOCKER, 1 WARNING) and 6 missing evidence items across `src/lib.rs`:
+
+| Rule | Lines | Issue |
+|------|-------|-------|
+| no_unwrap_in_production | 9, 19 | `unwrap()` on I/O and parse — panics on bad input |
+| no_lossy_as_conversions | 19 | `as u16` silently truncates values > 65535 |
+| no_unchecked_indexing | 16, 19 | `parts[0]`/`parts[1]` without bounds checks |
+| split_once_over_split_collect | 12 | `split`+`collect`+indexing instead of `split_once` |
+| functional_core_imperative_shell | 16 | `println!` hidden inside data-loading function |
+| no_fallible_result_returned | 8 | Signature returns `Vec<Record>` — all errors are panics |
+| no_hidden_allocations | 12 | Unnecessary `Vec<String>` heap allocation per line |
+
+Output written to `review-output.json`.

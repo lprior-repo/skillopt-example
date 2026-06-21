@@ -1,0 +1,18 @@
+Now I have all the context. This crate has a struct with status as `String`, lifecycle booleans, optional lifecycle data, raw primitive `id`, and a state-mutation function. Per the skill rules, I need exactly 6 typestate findings plus any additional violations.
+Review complete. Written to `review-output.json`.
+
+**7 findings + 1 warning**, all blocking except the benchmark evidence gap:
+
+| # | Rule | Line | Core Issue |
+|---|------|------|------------|
+| 1 | `typestate_machine` | 1 | No typestate; any invalid combination representable |
+| 2 | `status_string_enum` | 3 | `status: String` allows arbitrary values |
+| 3 | `bool_lifecycle` | 4 | `is_validated`/`is_sent` booleans form impossible combos |
+| 4 | `option_invalid_state` | 6 | `sent_at_epoch_ms: Option<u64>` decoupled from lifecycle |
+| 5 | `newtype_domain_id` | 2 | `id: String` has no domain constraints |
+| 6 | `parse_boundary` | 1 | Raw primitives cross boundary without smart constructors |
+| 7 | `mark_sent_side_effect` | 9 | Unconditional status overwrite, no precondition checks |
+
+**Missing evidence**: no benchmarks, profiler data, allocation analysis, or command-truth evidence.
+
+The struct is fundamentally broken — every illegal state is representable, and `mark_sent` performs no validation.

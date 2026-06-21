@@ -1,0 +1,14 @@
+Now I have a clear picture. The issues are:
+
+1. `encode_frame` ignores `max_payload` entirely - needs a `PayloadTooLarge` check
+2. `payload.len() as u32` is a lossy `as` conversion (Holzman violation)
+3. No `checked` arithmetic for capacity calculations
+All 2 tests pass. Now writing the repair output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Added bounds check**: `payload.len() > max_payload` returns `Err(FrameError::PayloadTooLarge)` — satisfies `rejects_limit` test
+- **Removed lossy `as`**: `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+- **Added checked capacity arithmetic**: `checked_add(4, payload.len())` with overflow → `Overflow` error
+- **Added bounded allocation**: `try_reserve(capacity)` with allocation error → `Allocation` error
+
+All 2 tests pass, JSON output written to `repair-output.json`.

@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "functional-core-performance.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "Make illegal states unrepresentable / typestate discipline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "status is pub status: String - any arbitrary string is valid, including conflicting values like 'sent' alongside is_validated=false. The type system cannot enforce the ledger lifecycle invariant.",
+      "failure_mode": "Corruption - code can construct or mutate a LedgerWorkflow with status values that contradict other fields (e.g., status='draft' but is_sent=true). No compile-time guarantee that status reflects actual lifecycle stage.",
+      "fix": "Replace pub status: String with a sealed enum, e.g. pub enum LedgerStatus { New, Validated, Sent } and make all fields private with a fallible constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Replace bool lifecycle flags with enums or typestates",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are primitive lifecycle flags. They are independently mutable and can reach illegal combinations (is_validated=true, is_sent=false, status='sent').",
+      "failure_mode": "State corruption - concurrent or sequential mutations can leave the ledger in logically impossible states that the compiler cannot detect. The boolean flags are orthogonal to status, enabling contradictory configurations.",
+      "fix": "Replace is_validated and is_sent with a single typestate enum (or typestate struct parameterization) that encodes the entire lifecycle, e.g. pub struct Ledger<T> { ... } with types LedgerNew, LedgerValidated, LedgerSent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Replace bool lifecycle flags with enums or typestates",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool - same lifecycle-flag anti-pattern. Combined with is_validated: bool and status: String, there are 3 redundant fields describing a single dimension of state.",
+      "failure_mode": "State corruption - redundant orthogonal fields cannot stay in sync without manual coordination. No single constructor can guarantee consistency across all three.",
+      "fix": "Subsume into the typestate enum from the status field. sent_at_epoch_ms can remain as Option within the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Functional core - data valid by construction; no mutable shell mutation in pure core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes LedgerWorkflow by value and mutates it in-place (item.status = 'sent'.to_string(); item.is_sent = true;). This is shell-style mutation, not a pure state transition. It also creates a String allocation on every call.",
+      "failure_mode": "Side-effect leakage - the core function performs heap allocation ('sent'.to_string()) and destructive mutation instead of returning a new typed value. Cannot be reasoned about purely.",
+      "fix": "Change mark_sent to a pure transition: pub fn into_sent(self) -> LedgerSent { LedgerSent { ... } } returning a distinct typestate type with no allocations inside the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "Parse at boundaries into trusted data - no primitive domain APIs",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> - raw epoch milliseconds leaked into the core. The core should not know the unit or format; a newtype or parsed type (e.g. EpochMs) would be clearer.",
+      "failure_mode": "Ambiguity - callers may pass incorrect units (seconds vs ms vs ns). The type system provides no protection against unit confusion.",
+      "fix": "Use a newtype wrapper: pub struct EpochMs(u64), constructed only at the I/O boundary with explicit unit handling."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "All fields must be private; expose behavior via methods",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of LedgerWorkflow are pub, allowing external code to construct and mutate the struct directly, bypassing any invariants.",
+      "failure_mode": "Invariant violation - any caller can set is_sent=true without going through mark_sent, or set status to an arbitrary string.",
+      "fix": "Make all fields private. Provide a fallible constructor fn new(...) -> Result<LedgerWorkflow, ...> and behavior methods."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmark evidence for mark_sent allocation pattern (String::to_string on every call).",
+    "No profiler data to confirm allocation hot path.",
+    "No allocation audit - the to_string() call on line 10 is unbounded heap allocation in core.",
+    "No command-line evidence (cargo test, cargo clippy) for this isolated eval crate.",
+    "No typestate transition coverage evidence - no tests covering legal vs illegal state transitions."
+  ],
+  "residual_risk": "HIGH - The entire LedgerWorkflow type violates the foundational Holzman Rust principle of making illegal states unrepresentable. With three redundant, independently mutable fields (status: String, is_validated: bool, is_sent: bool), the compiler cannot prevent any contradiction between them. mark_sent performs shell-style mutation with heap allocation in the core. Without typestates, newtypes, and private fields, no downstream code can rely on any ledger invariant. This is a fundamental architectural failure, not a localized bug."
+}

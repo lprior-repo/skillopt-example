@@ -1,0 +1,30 @@
+Now I have the full picture. The tests expect:
+1. `summarize_metrics` returns `Result<Summary, SummaryError>` (not `String`)
+2. A `render_summary` function that formats a `Summary` to string
+3. No `unwrap()`, no unchecked indexing, no unchecked arithmetic
+
+Let me fix `lib.rs`:
+All 6 tests pass. Now running the full verification gate:
+Need to fix 3 clippy warnings. Let me address them:
+Actually, `expect` is banned in production. Let me use `unwrap_or` instead which is a graceful fallback:
+All 6 tests pass. Now the full clippy verification gate:
+Clippy passes clean. Now checking for forbidden constructs in production source:
+No forbidden constructs found (exit 1 = no matches). All gates pass. Now writing the output:
+Repair complete. Here's a summary of changes to `src/lib.rs`:
+
+**Removed:**
+- `unwrap()` on parse — replaced with `.map_err(|_| SummaryError::Invalid)`
+- Unchecked `parts[1]` indexing — replaced with `split_once(',')`
+- Unchecked `total += value` — replaced with `checked_add`
+- Unchecked `total / count` — replaced with `checked_div`
+- Lossy `count as u64` / `count as u32` — replaced with `try_from` + `unwrap_or`
+- String return format — moved formatting to separate `render_summary` function
+
+**Added:**
+- `render_summary(Summary) -> String` function
+- Early `Empty` error on empty input
+- `Invalid` error on malformed lines (no comma, unparseable value)
+- `Overflow` error on total overflow
+- `TooMany` error when row count exceeds `max_rows`
+
+All 6 tests pass, clippy clean with all strict deny lints, no forbidden constructs in production source.

@@ -1,0 +1,46 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/bd873727713fb675/repair_frame_sensor_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/bd873727713fb675/repair_frame_sensor_mixed/Cargo.toml",
+    "/tmp/opencode/holzman-skillopt-train/bd873727713fb675/repair_frame_sensor_mixed/src/lib.rs",
+    "/tmp/opencode/holzman-skillopt-train/bd873727713fb675/repair_frame_sensor_mixed/tests/behavior.rs"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo fmt --check",
+      "status": "passed"
+    },
+    {
+      "command": "cargo check --workspace --all-targets --all-features",
+      "status": "passed"
+    },
+    {
+      "command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test --workspace --all-features",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "Payload length validated against max_payload before encoding",
+    "Lossy as u32 replaced with checked u32::try_from, returning Overflow on failure",
+    "No production unsafe, unwrap, expect, panic, todo, unimplemented, unreachable, assert, unchecked indexing, unchecked arithmetic, or lossy conversions",
+    "All behavior tests pass (encodes, rejects_limit)",
+    "Clippy passes with all deny lints (unwrap_used, expect_used, panic, todo, unimplemented, indexing_slicing, as_conversions, arithmetic_side_effects, unsafe_code)",
+    "cargo fmt check passes",
+    "No assert!/unreachable! in production source",
+    "Smallest change: added length check + checked conversion only"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "FrameError::Allocation variant is unused but retained as part of the public API contract. No allocation path exists in encode_frame, so Allocation is a placeholder for future memory-constrained scenarios."
+}

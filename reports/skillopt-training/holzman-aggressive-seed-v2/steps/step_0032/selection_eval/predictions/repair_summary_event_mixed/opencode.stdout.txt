@@ -1,0 +1,28 @@
+Now I have full context. The issues are clear:
+
+1. `summarize_metrics` returns `String` but tests expect `Summary`
+2. Missing `render_summary` function
+3. `unwrap()` on parse (forbidden)
+4. Unchecked indexing `parts[1]` (forbidden)
+5. No `split_once` usage
+6. Unchecked division `total / count` (forbidden)
+7. Unchecked addition (overflow not detected)
+8. No empty-input handling
+9. No invalid-line handling
+
+Let me repair the production source:
+All gates pass. Writing the repair output:
+Repair complete. All 6 tests pass, all Holzman safety gates pass, and `repair-output.json` is written with valid JSON.
+
+**Summary of changes to `src/lib.rs`:**
+
+| Issue | Before | After |
+|-------|--------|-------|
+| Return type | `Result<String, ...>` | `Result<Summary, ...>` |
+| Parse | `.unwrap()` | `.map_err(\|_\| SummaryError::Invalid)` |
+| Indexing | `parts[1]` (unchecked) | `split_once(',')` with `ok_or` |
+| Addition | `total += value` | `checked_add` → `Overflow` |
+| Division | `total / count` | `checked_div` → `Overflow` |
+| Empty input | No handling | `Err(Empty)` |
+| Invalid lines | No handling | `Err(Invalid)` |
+| `render_summary` | Missing | Added as pure shell function |

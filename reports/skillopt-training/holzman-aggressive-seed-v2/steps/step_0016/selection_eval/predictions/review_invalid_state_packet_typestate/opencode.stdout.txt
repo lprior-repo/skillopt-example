@@ -1,0 +1,17 @@
+Now I have all references read. Let me write the review.
+Review complete. Written to `/.../review-output.json`.
+
+**8 BLOCKER findings**, all centered on the core Holzman Rust violation:
+
+| # | Rule | Line | Summary |
+|---|------|------|---------|
+| 1 | invalid-states-representable | 1 | `status: String`, `is_validated: bool`, `is_sent: bool` allow impossible combos (sent+not-sent, arbitrary strings) |
+| 2 | primitive-obsession | 2 | `id: String` — no newtype, no validation |
+| 3 | missing-fallible-constructor | 1 | No `impl`, no constructor, all fields `pub` |
+| 4 | mark_sent-bypasses-state-gate | 9 | No precondition checks, no double-send guard, no timestamp |
+| 5 | data-integrity-breach | 9 | `is_sent=true` with `sent_at_epoch_ms=None` |
+| 6 | string-status-vs-enum | 3 | Status should be an enum for exhaustive matching + zero-cost |
+| 7 | no-must-use-on-state-transition | 9 | Return value can be silently dropped |
+| 8 | zero-cost-abstraction-violation | 10 | Unnecessary `to_string()` allocation per transition |
+
+**5 missing evidence**: benchmarks, profiler, allocation tracking, behavior tests, second-ring evidence.

@@ -1,0 +1,53 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "FrameWorkflow uses raw String for status and bools for lifecycle flags, allowing illegal states like status='deleted' with is_sent=true, or is_validated=true with status='invalid'.",
+      "failure_mode": "The struct admits contradictory lifecycle representations that cannot be detected at compile time and can only be caught by ad-hoc runtime checks scattered across callers.",
+      "fix": "Replace status: String with a domain enum (e.g., enum FrameStatus { Pending, Validated, Sent, Archived }) and is_validated/is_sent booleans with a single typestate enum that encodes valid transitions. Make all fields private behind a constructor that enforces invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints, and status is a raw String instead of a typed domain enum. This violates the principle of parsing at boundaries into trusted types.",
+      "failure_mode": "Callers must repeatedly validate the id and status strings throughout the codebase instead of relying on type-level guarantees.",
+      "fix": "Introduce a newtype Id(String) or Id([u8; N]) with a fallible constructor, and replace status: String with a domain enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields on FrameWorkflow are pub, allowing any external code to mutate fields into illegal states (e.g., item.is_sent = true; item.status = \"gone\";).",
+      "failure_mode": "External mutation bypasses any constructor-level invariant checks, making illegal states representable by design.",
+      "fix": "Make all fields private and expose only domain-safe mutation methods (e.g., mark_sent, validate) that enforce typestate transitions."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses 'sent'.to_string() to overwrite a String field. If status were a typed enum, this would be an enum variant assignment with zero allocation.",
+      "failure_mode": "Unnecessary heap allocation on every sent transition, measurable overhead in hot paths.",
+      "fix": "Replace status field with a typed enum and assign the variant directly. If status must remain String, at minimum avoid to_string() on a literal."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes and returns FrameWorkflow by value with mutable in-place mutation, rather than a pure function that constructs a new validated frame from a given state.",
+      "failure_mode": "Side-effectful mutation at the function boundary blurs the functional core / imperative shell separation and makes reasoning about state transitions harder.",
+      "fix": "Take an immutable reference or a domain typestate and return a new FrameWorkflow with the transition applied. Or keep the API but make the transition logic pure inside a typed typestate machine."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent allocation behavior", "no profiler data for FrameWorkflow lifecycle hot paths", "no allocation analysis (e.g., cargo-asm or alloc counters) for mark_sent path",    "no second-ring analysis (no formal proof, Kani harness, or property tests for typestate invariants)", "no command evidence (cargo test, cargo clippy, cargo fmt) was run -- static review only"],
+  "residual_risk": "Static review only; no commands run. The core issue is architectural -- invalid states are directly representable by the struct definition. This cannot be fixed by linting or testing alone; it requires a type-level redesign (enum typestate + newtypes + private fields). The missing benchmark/profiler evidence means performance claims about mark_sent are unsubstantiated."
+}

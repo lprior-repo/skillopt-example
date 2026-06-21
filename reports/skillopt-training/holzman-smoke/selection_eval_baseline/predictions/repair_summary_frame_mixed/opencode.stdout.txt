@@ -1,0 +1,13 @@
+I've read the skill, references, Cargo.toml, source, and tests. Let me analyze the issues and fix them.
+All 6 tests pass. Now let me write the output.
+Repair complete. All 6 behavior tests pass. Summary of changes to `src/lib.rs`:
+
+1. **Fixed return type**: `Result<String, SummaryError>` → `Result<Summary, SummaryError>` to match test contract
+2. **Added `render_summary`**: Pure presentation function formatting `Summary` into the expected string shape
+3. **Removed `unwrap()`**: `parse::<u64>()` now returns `Err(SummaryError::Invalid)` on failure
+4. **Removed unchecked arithmetic**: `total += value` → `checked_add` with `Overflow` error; `total / count` → `checked_div`
+5. **Added Empty validation**: Returns `Err(SummaryError::Empty)` for empty input before any division
+6. **Added Invalid validation**: Lines without a comma separator return `Err(SummaryError::Invalid)`
+7. **Removed unchecked indexing**: `parts[1]` guarded by `parts.len() < 2` check
+
+Output written to `repair-output.json`.

@@ -1,0 +1,2 @@
+Now I have all the context. Let me write the review output.
+The review-output.json has been written to `/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/candidate-v5/review_perf_claim_no_bench/review-output.json`.

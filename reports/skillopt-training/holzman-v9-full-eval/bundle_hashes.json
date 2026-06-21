@@ -1,0 +1,8 @@
+{
+  "skill": "c577dc3cf3d44cac948ad99f57085340f13bb1e4fc42f9d8dbe24a7d20c8cf65",
+  "references": {
+    "references/functional-core-performance.md": "3e9c1753907711664525455630d04e4aa7bbf85b1c0f114496d1beec2bcd05a7",
+    "references/hardening-checklist.md": "fe58cde02ff2d4a766cef78d52427f86545abdd6000b82d0ffb6b12c56bea0c6",
+    "references/review-output-contract.md": "675297d9b75a93f59e0cd7c0955286e782993be304105131896df8a89b526950"
+  }
+}

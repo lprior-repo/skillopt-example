@@ -1,0 +1,4 @@
+Repaired. All changes:
+
+- **src/lib.rs:9-23** — Replaced `.unwrap()` parsing with checked `parse().map_err()`, added empty-input check, `max_items` cap enforcement, and `try_reserve` bounded allocation.
+- 4/4 behavior tests pass, clippy strict lint clean, fmt clean.

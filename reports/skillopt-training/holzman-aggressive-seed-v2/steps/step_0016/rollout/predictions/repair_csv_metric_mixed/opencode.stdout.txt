@@ -1,0 +1,8 @@
+Repair complete. All 4 tests pass.
+
+**Changes in `src/lib.rs`:**
+- Replaced `.unwrap()` with `map_err(|_| ParseError::Invalid)` for parse failures
+- Added empty-input check returning `ParseError::Empty`
+- Added `max_items` enforcement returning `ParseError::TooMany`
+- Replaced unchecked `.collect()` with `try_reserve(max_items)` + incremental push, handling `ParseError::Allocation`
+- Used `split(',')` iteration (no `split` + `collect` + indexing anti-pattern)

@@ -1,0 +1,15 @@
+Now I have the full picture. The production code has multiple Holzman violations: unchecked indexing `parts[1]`, `.unwrap()`, unchecked `+=`, lossy `as` casts, unchecked `/`, empty-input not rejected, wrong return type vs tests, and missing `render_summary`. Let me repair.
+All gates pass. Writing the required output JSON.
+Repair complete. All 6 behavior tests pass, all strict lint gates pass, and `repair-output.json` is written.
+
+**Changes made to `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`) to match test contract
+- Added `render_summary(Summary) -> String` function
+- Replaced `split(',').map(...).collect()` with mandatory `split_once(',')` pattern
+- Replaced unchecked `parts[1]` indexing with fallible `split_once` + `ok_or`
+- Replaced `.unwrap()` on parse with `.map_err(|_| SummaryError::Invalid)`
+- Replaced `total += value` with `checked_add`
+- Replaced `count += 1` with `checked_add`
+- Replaced `total / count as u64` with `checked_div` using `u64::try_from(count)`
+- Added empty-input check returning `Err(SummaryError::Empty)`
+- Overflow on parse/sum returns `Err(SummaryError::Overflow)`

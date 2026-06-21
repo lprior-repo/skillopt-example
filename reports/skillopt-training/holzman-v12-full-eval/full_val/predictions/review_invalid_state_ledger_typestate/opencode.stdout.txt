@@ -1,0 +1,15 @@
+Review complete. Wrote `review-output.json` with 8 findings:
+
+**BLOCKER (7):**
+1. **typestate_state_machine** — `is_validated`/`is_sent` booleans + `Option<u64>` instead of a single typestate enum allow impossible state combinations
+2. **status_string** — `status: String` permits arbitrary values ("", "foo", "SENT"), no compile-time exhaustiveness
+3. **bool_lifecycle** — Two disjoint booleans create a 4-state Cartesian product with only 2-3 valid states, no transition enforcement
+4. **option_invalid_state_combinations** — `sent_at_epoch_ms: Option<u64>` is inconsistent with `is_sent: bool` (both can be independently false/true)
+5. **newtype_domain_ids** — `id: String` is a raw primitive with no domain validation, non-empty check, or identity semantics
+6. **parse_boundary** — No constructor/smart constructor; all fields are `pub` so callers bypass all invariants
+7. **mark_sent_no_transition_enforcement** — `mark_sent` unconditionally overwrites state without checking validation, preventing double-send, or setting timestamp
+
+**WARNING (1):**
+8. **missing_benchmark_evidence** — `"sent".to_string()` allocates per call; no benchmark/profiler/allocation budget exists
+
+All required fields (`severity`, `rule`, `file`, `line`, `problem`, `failure_mode`, `fix`) are populated per finding.

@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/runtime-performance-architecture.md",
+    "references/latency-throughput-playbook.md",
+    "references/zero-cost-abstractions.md",
+    "references/mechanical-empathy-toolchain.md",
+    "references/simd-patterns.md",
+    "references/evaluation-and-repair-protocol.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "dense_runtime_ir",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Hot path function 'route' uses serde_json::Value and HashMap<String, serde_json::Value> as runtime representation. This is exactly the anti-pattern condemned in runtime-performance-architecture.md: 'No serde_json::Value in hot paths' and 'HashMap<String, T> is for cold lookups, not hot paths'.",
+      "failure_mode": "The function name 'route' and event/rules parameters indicate this is a hot path that evaluates accepted human/spec data repeatedly. Repeated JSON parsing and HashMap lookup at runtime violates 'prove slow, execute fast': human config should be compiled to dense numeric-ID IR before runtime, not evaluated as JSON objects at runtime.",
+      "fix": "Compile JSON rules to dense prevalidated IR (numeric OpIds, Box<[Op]>, fixedbitset::FixedBitSet for flags) at initialization. Use direct array indexing by precompiled ID in the route() hot path. Return typed errors instead of Option<String> for the internal lookup failure case."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_no_post_init_alloc",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "to_string() allocates a heap String on every call in the hot path. src/lib.rs:7 format!(\"route:{key}\") allocates another String on every successful match. Neither allocation is declared in any budget, and no benchmark/profiler evidence justifies them.",
+      "failure_mode": "Hot path allocates after initialization without declared budget, benchmark evidence, or regression guard. Per nasa-jpl-standards.md Rule 3 and runtime-performance-architecture.md, performance-only hot paths may allocate only with explicit budget, measurement, and regression guard.",
+      "fix": "Use a preallocated output buffer or return a numeric routing ID instead of formatting strings at runtime. If string output is required, use caller-owned scratch space."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "serde_json::Value and std::collections::HashMap are hot-path dependencies without benchmark justification. The task name 'review_dense_ir_hot_path' confirms this is intended as a performance-critical hot path.",
+      "failure_mode": "serde_json parsing and HashMap lookup are in the hot path with no measurement against simpler alternatives. Per latency-throughput-playbook.md, hot-path dependencies require benchmark proof against the simpler option.",
+      "fix": "Prove with benchmarks that serde_json::Value + HashMap beats a precompiled IR lookup; otherwise adopt dense IR with numeric IDs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation_budget",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "No allocation budget exists for this hot path. The function allocates on every invocation (to_string, format) with zero declared maximum.",
+      "failure_mode": "Per zero-cost-abstractions.md and latency-throughput-playbook.md, hot paths must declare allocation count/bytes maximum and prove with profiler evidence when allocation behavior changes.",
+      "fix": "Declare 'max allocations per call = 0' or 'max allocations per call = 2' with benchmark evidence and regression guard."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_evidence",
+      "file": "src/lib.rs",
+      "line": 0,
+      "problem": "No benchmark, profiler, latency/throughput measurement, or second-ring evidence (cargo asm, cargo llvm-lines, perf stat) exists for the 'dense_ir_hot_path' crate. The task name itself implies performance claims that require evidence.",
+      "failure_mode": "Per mechanical-empathy-toolchain.md, performance claims require actual command evidence tied to real symbols. Per holzman-rust SKILL.md: 'Missing required command evidence or benchmark numbers block completion.'",
+      "fix": "Run cargo bench, perf stat, and cargo llvm-lines on the route() hot path symbol and record actual numbers before claiming the implementation is correct for the hot path."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "storage_placement",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "HashMap iteration over rules is the hot path lookup mechanism. Per runtime-performance-architecture.md: 'Hash maps are for compilation, metadata, admin paths, or cold lookups. If keys are bounded integers, direct indexing usually beats hashing.'",
+      "failure_mode": "HashMap<String, serde_json::Value> in a hot routing path means O(n) string comparison on every call instead of O(1) array index. No measurement proves HashMap is faster than a precompiled dense array for this bounded key set.",
+      "fix": "Convert String-keyed HashMap to numeric-ID-indexed dense array at compile/validation time. Benchmark both shapes."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "latency_budget",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "No p50/p95/p99 or max latency target declared for the route() function. The function is clearly latency-sensitive (named 'route', processes events).",
+      "failure_mode": "Per latency-throughput-playbook.md, latency-sensitive work must define and measure latency targets. Without a target, there is no acceptance criterion.",
+      "fix": "State the latency target (e.g., p99 < 500ns) and measure against it with perf stat."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for route() hot path",
+    "no profiler evidence (perf stat, cargo flamegraph) for dense_ir_hot_path crate",
+    "no allocation measurement (heaptrack, DHAT) for route()",
+    "no cargo asm / cargo llvm-lines evidence for route symbol",
+    "no latency target declared (p50/p95/p99 or max)",
+    "no throughput target declared (ops/sec or items/sec)"
+  ],
+  "residual_risk": "Static review only; cargo commands were not run per task rules. No benchmark, profiler, or second-ring assembly/IR evidence exists for the dense_ir_hot_path crate. The route() hot path uses exactly the anti-patterns (serde_json::Value, HashMap, format!, to_string) condemned in the Holzmann Rust references for repeated-evaluation runtime IR paths."
+}

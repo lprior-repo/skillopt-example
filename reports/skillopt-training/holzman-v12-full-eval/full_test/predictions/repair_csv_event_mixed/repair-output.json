@@ -1,0 +1,35 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_event_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_event_mixed/.skill/holzman-rust/references/claim-traceability.md",
+    "/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_event_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_event_mixed/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_event_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/tmp/opencode/holzman-skillopt-train/baa1b9c032e9fa72/repair_csv_event_mixed/.skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo clippy -- -D warnings", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/FFI/raw pointers/panic surfaces",
+    "unwrap replaced with map_err returning typed ParseError::Invalid",
+    "Empty input rejected with ParseError::Empty",
+    "max_items enforced with ParseError::TooMany before push",
+    "try_reserve used after cap validation before loop",
+    "Typed error taxonomy (Empty, Invalid, TooMany, Allocation)",
+    "Bounded control flow: loop bounded by max_items check",
+    "Function under 25 logical lines per hot-path rule",
+    "Zero clippy warnings",
+    "Tests unchanged - behavior contract preserved",
+    "Cargo.toml unchanged"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All tests pass, clippy clean, no forbidden constructs remain."
+}

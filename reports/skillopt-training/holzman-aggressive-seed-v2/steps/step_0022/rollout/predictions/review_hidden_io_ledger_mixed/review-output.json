@@ -1,0 +1,101 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md",
+    "references/nasa-jpl-standards.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "panic_free_standard",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file does not exist, is unreadable, or exceeds memory. This is an external-input-boundary operation with no error handling.",
+      "failure_mode": "Any missing or inaccessible ledger file aborts the entire program instead of returning a typed I/O error (e.g., IOError).",
+      "fix": "Return Result<Vec<Record>, io::Error> (or a domain-typed error enum). Propagate with ? or map_err."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "panic_free_standard",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics when the second comma-separated field is not a valid u32. External input reaches this code via the file path parameter.",
+      "failure_mode": "A malformed ledger line corrupts the entire load operation by panicking rather than producing a per-line parse error.",
+      "fix": "Use try_fold or map with ? on parse, returning a typed ParseError. Collect results into Result<Vec<Record>, ParseError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "arithmetic_standard",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy as u16 cast on the result of parse::<u32>(). Values in range 65536..=4294967295 silently truncate to u16, producing incorrect domain values.",
+      "failure_mode": "A u32 value of 70000 becomes 4464 in the Record, silently corrupting ledger data with no diagnostic.",
+      "fix": "Use u32::try_into().map_err(...) or parts[1].parse::<u16>() to get a fallible, explicit conversion."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "panic_free_standard",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing. If a line has fewer than 2 comma-separated fields, index access panics at runtime.",
+      "failure_mode": "A blank line or single-field line in the ledger file crashes the parser instead of producing a parse error.",
+      "fix": "Use get(0) and get(1) with if-let, or use split_once(',') to extract at most two fields safely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! inside load_ledgers couples I/O (stdout) into a function that claims to be a ledger loader. This violates functional core / imperative shell: the function does both I/O (file read, stdout print) and parsing.",
+      "failure_mode": "The function cannot be unit-tested in isolation, cannot be composed in different shell contexts (no stdout, log-to-file, structured logging), and mixes pure parsing with side effects.",
+      "fix": "Remove println!. Return parsed Records. The imperative shell layer should handle all logging after the pure parse results are returned."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "load_ledgers performs file I/O (fs::read_to_string) which is an imperative/shell operation, mixed with parsing logic that should be pure calculations.",
+      "failure_mode": "The parsing logic cannot be tested without a real file on disk. The function has no pure-parse counterpart for composition or testing.",
+      "fix": "Split into (a) load_ledger_text(path: &str) -> Result<String, io::Error> for the I/O shell, and (b) parse_ledger_lines(text: &str) -> Result<Vec<Record>, ParseError> for the pure functional core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collecting split results into Vec<String> allocates a heap vector and clones every field string, even for a 2-field record. The trim + to_string pattern creates intermediate allocations.",
+      "failure_mode": "Every line in a ledger produces 2 heap allocations (Vec + 2 Strings) that are immediately consumed. For large ledgers this is a measurable allocation overhead and cache penalty.",
+      "fix": "Use split_once(',') to get two &str pieces, trim those, and parse directly. Avoid Vec entirely. Use Cow<str> or &str borrows where lifetimes allow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_discipline",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record has pub fields with no validation. Name can be empty, value can be any u16 including semantically invalid values (e.g., 0 if the domain excludes it). No constructor enforces invariants.",
+      "failure_mode": "Callers can construct invalid Records directly, bypassing any domain rules. The type does not encode its own constraints.",
+      "fix": "Make fields private, provide a constructor fn new(name: &str, value: u16) -> Result<Record, RecordError> that validates invariants, or use a validated newtype."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_resource_standard",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_ledgers has no upper bound on the number of records loaded. A very large file will allocate an unbounded Vec<Record> and can OOM.",
+      "failure_mode": "An attacker or misconfiguration providing a multi-gigabyte ledger file exhausts memory, causing OOM kill rather than graceful backpressure.",
+      "fix": "Accept a max_records parameter, use try_reserve, or stream lines with an iterator consumer instead of collecting into Vec."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_ledgers throughput or latency",
+    "no profiler evidence (perf stat, flamegraph) for the hot path",
+    "no allocation audit (count/bytes per line) for the parsing pipeline",
+    "no second-ring evidence (assembly listing, MIR) confirming bounds-check elimination or SIMD readiness",
+    "no command evidence: cargo fmt --check, cargo clippy, cargo test were not run",
+    "no error taxonomy defined for ledger I/O failures (missing file, parse error, type mismatch, OOM)"
+  ],
+  "residual_risk": "Multiple BLOCKER findings: panic paths on every external-input boundary (file read, parse, index access, u32-to-u16 cast), functional core contaminated with I/O and logging, unbounded allocation, and no typed error model. The code as written will panic on any malformed input. All panic paths must be converted to typed error returns, the function must be split into I/O shell and pure core, and a benchmark/profiler suite must be added before any performance claim can be evaluated. No verification commands were executed in this static review."
+}

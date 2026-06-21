@@ -1,0 +1,8 @@
+Repaired. Summary of changes to `src/lib.rs:9-23`:
+
+- **Removed `.unwrap()`** — replaced with `map_err(|_| ParseError::Invalid)` on parse
+- **Added empty input check** — returns `Err(ParseError::Empty)` for `""` or empty tokens
+- **Enforced `max_items` cap** — returns `Err(ParseError::TooMany)` when more than `max_items` values present
+- **No `assert!`, `panic`, `unwrap`, `expect`, or `unsafe`** in production code
+
+All 4 behavior tests pass. All Holzman verification gates (fmt, clippy, check, assert lint) pass. Output written to `repair-output.json`.

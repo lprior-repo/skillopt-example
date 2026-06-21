@@ -1,0 +1,26 @@
+    Checking repair_remove_unsafe_copy v0.1.0 (/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/repair_remove_unsafe_copy)
+error: usage of an `unsafe` block
+ --> src/lib.rs:6:5
+  |
+6 | /     unsafe {
+7 | |         out.set_len(len);
+8 | |         std::ptr::copy_nonoverlapping(input.as_ptr(), out.as_mut_ptr(), len);
+9 | |     }
+  | |_____^
+  |
+  = note: requested on the command line with `-D unsafe-code`
+
+error: calling `set_len()` immediately after reserving a buffer creates uninitialized values
+ --> src/lib.rs:5:5
+  |
+5 |     let mut out = Vec::with_capacity(len);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |     unsafe {
+7 |         out.set_len(len);
+  |         ^^^^^^^^^^^^^^^^
+  |
+  = help: initialize the buffer or wrap the content in `MaybeUninit`
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninit_vec
+  = note: `#[deny(clippy::uninit_vec)]` on by default
+
+error: could not compile `repair_remove_unsafe_copy` (lib) due to 2 previous errors

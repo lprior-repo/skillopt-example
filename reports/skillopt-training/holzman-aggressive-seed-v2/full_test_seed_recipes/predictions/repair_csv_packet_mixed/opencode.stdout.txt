@@ -1,0 +1,6 @@
+Repaired. All 4 behavior tests pass. Key changes in `src/lib.rs`:
+
+- **Removed** `unwrap()` on parse (Holzman violation)
+- **Added** empty-input check → `ParseError::Empty`
+- **Added** `max_items` enforcement → `ParseError::TooMany`
+- **Added** invalid-parse handling → `ParseError::Invalid`

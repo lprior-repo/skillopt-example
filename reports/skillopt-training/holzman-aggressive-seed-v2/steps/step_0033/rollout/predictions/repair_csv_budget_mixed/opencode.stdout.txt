@@ -1,0 +1,18 @@
+Now I understand the issues. The current code has:
+- `unwrap()` on parse (banned)
+- No empty input check
+- No `max_items` enforcement
+- No `Invalid` error path
+
+Let me fix the production source:
+All 4 tests pass. Now let me address the Holzman rule about `try_reserve` instead of `with_capacity`:
+All 4 tests pass. Let me verify the final source:
+Repair complete. Changes to `src/lib.rs`:
+
+- Removed `unwrap()` on parse - replaced with `map_err(|_| ParseError::Invalid)?`
+- Added empty input check → `ParseError::Empty`
+- Added `max_items` enforcement → `ParseError::TooMany`
+- Replaced `Vec::with_capacity` with `try_reserve` + `map_err(|_| ParseError::Allocation)?`
+- Uses iterator-based `split(',')` without `collect` + indexing
+
+All 4 behavior tests pass.

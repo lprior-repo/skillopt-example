@@ -1,0 +1,22 @@
+Now I have all references and source read. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**Summary: 9 BLOCKER findings, 0 passed, 100% architectural violations.**
+
+The task crate (`src/lib.rs:1-13`) is a textbook violation of every core Holzman + Functional Rust principle:
+
+| # | Rule | Lines | Core Issue |
+|---|------|-------|------------|
+| 1 | `enum_typestate_state_machine` | 1-7 | No typestate; free-form mutable fields |
+| 2 | `status_string_to_enum` | 3 | `pub status: String` — arbitrary text |
+| 3 | `bool_lifecycle_to_typestate` | 4-5 | Two booleans = 4 combinations, many illegal |
+| 4 | `option_invalid_state_combinations` | 6 | `Option<u64>` decoupled from lifecycle booleans |
+| 5 | `newtype_domain_id` | 2 | `pub id: String` — no domain validation |
+| 6 | `parse_boundary_missing` | 1 | Raw primitives cross boundary, no smart constructors |
+| 7 | `mark_sent_no_validation` | 9-12 | No preconditions, unchecked mutation |
+| 8 | `hidden_allocation_in_core` | 10 | `.to_string()` allocates in core logic |
+| 9 | `public_field_access_no_encapsulation` | 2-6 | All fields pub, invariants unenforceable |
+
+**Missing evidence:** benchmarks, profiler data, allocation audit, command evidence (cargo fmt/check/clippy), second-ring performance proof.
+
+**Residual risk:** Complete rewrite required — replace struct with typed state enum, smart constructors, private fields, and `Result`-returning state transitions.

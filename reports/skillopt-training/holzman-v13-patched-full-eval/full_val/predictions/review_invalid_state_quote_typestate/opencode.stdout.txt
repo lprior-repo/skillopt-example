@@ -1,0 +1,18 @@
+Now I have all context. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**8 findings** across the task crate `src/lib.rs`:
+
+- **6 BLOCKERs** covering the required typestate review:
+  1. No typestate enum — free-form `status: String` allows any state
+  2. Status string — raw primitive with no parse boundary or validation
+  3. Bool lifecycle — `is_validated` + `is_sent` contradict each other and status
+  4. Option invalid-state — `sent_at_epoch_ms` disconnected from `is_sent`
+  5. Newtype domain IDs — `id: String` has no format/uniqueness enforcement
+  6. Parse boundary — `mark_sent` mutates directly, no smart constructor, no pre-condition check
+
+- **2 MAJORs**:
+  7. Hidden allocation — `.to_string()` on every call in domain logic
+  8. Public struct fields — no encapsulation, any caller can corrupt state
+
+**5 missing evidence** items: no benchmarks, no profiler, no allocation audit, no command evidence, no baseline.

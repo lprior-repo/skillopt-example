@@ -1,0 +1,4 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/lib.rs (target/debug/deps/repair_byte_at-717e4f92370e882e)
+     Running tests/behavior.rs (target/debug/deps/behavior-85f7c2754d9ff3bb)
+   Doc-tests repair_byte_at

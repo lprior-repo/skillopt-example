@@ -1,0 +1,93 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_data_layer",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string performs file I/O inside load_sensors which fuses I/O with parsing and domain construction, violating Data/Calculations/Actions separation",
+      "failure_mode": "side-effectful file access is inseparable from domain logic, making the function untestable without filesystem fixtures and preventing composition with in-memory or network data sources",
+      "fix": "Split into a shell function that reads bytes (fs::read_to_string or reader argument) and a pure parsing function that accepts a string or &[u8] and returns Vec<Record> with typed errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any file-system error (not found, permission denied, I/O error)",
+      "failure_mode": "untrusted filesystem state aborts the process instead of returning a recoverable error; a missing config file crashes the entire program",
+      "fix": "Return Result<Vec<Record>, SensorError> and use .map_err(|e| SensorError::Io(e))? to propagate typed I/O errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_data_layer",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) performs console I/O inside the data/calculation layer",
+      "failure_mode": "pure domain logic leaks side effects into logging, breaking functional purity; output is emitted even when the caller does not want it, and the function cannot be used in batch or headless contexts",
+      "fix": "Remove println entirely from the parsing path; if logging is needed, pass a callback or return a log event as a separate result from the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use raw index access on a Vec without bounds checking after split",
+      "failure_mode": "a line with fewer than 2 comma-separated fields panics via index-out-of-bounds; empty lines, trailing newlines, or malformed CSV trigger runtime panic instead of a typed parse error",
+      "fix": "Use line.split_once(',').ok_or(SensorError::Invalid)? to get (_name, value_str) for two-field records, eliminating index and bounds access entirely"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 performs a lossy u32-to-u16 cast that silently truncates values above 65535",
+      "failure_mode": "a sensor value of 70000 parses as u32 successfully but truncates to 4435 as u16, silently corrupting data without any error; the unwrap also panics on non-numeric input",
+      "fix": "Parse directly to u16 with parts[1].trim().parse::<u16>().map_err(|_| SensorError::Invalid)?, or use u32::try_from(parsed_u32).map_err(|_| SensorError::Overflow)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() allocates a full Vec<String> for every single line, each string being a temporary owned copy",
+      "failure_mode": "unbounded allocation per line with no domain cap or try_reserve; every CSV line allocates at least two heap strings regardless of whether the data fits in the struct, and the Vec allocation itself is unbounded",
+      "fix": "Use line.split_once(',') to avoid intermediate collection entirely; parse directly from &str slices with trim() and parse::<u16>(), eliminating Vec<String> materialization"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No domain error enum exists; all failures (I/O, parse, overflow, bounds) would panic or return opaque errors",
+      "failure_mode": "callers cannot distinguish between a missing file, malformed CSV, invalid numeric value, or out-of-range sensor ID; every failure mode collapses into a panic or untyped error",
+      "fix": "Define an enum enum SensorError { Io(std::io::Error), Invalid, Overflow, TooMany(usize) } and return Result<Vec<Record>, SensorError> from the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No domain cap or try_reserve exists on the final Vec<Record> collection; unbounded file contents can be read and parsed",
+      "failure_mode": "a very large sensor file causes unbounded heap allocation that can exhaust memory; no max_rows or domain cap limits the number of records parsed from any input",
+      "fix": "Accept a max_rows: usize parameter, validate it first, create Vec::new(), call values.try_reserve(max_rows).map_err(|_| SensorError::Allocation)?, and reject lines beyond the cap with SensorError::TooMany(max_rows)"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to justify any performance claim for load_sensors",
+    "no profiler data or allocation profile for the intermediate Vec<String> per-line allocation pattern",
+    "no second-ring evidence (assembly, cache analysis, or benchmark) for throughput claims",
+    "no command-truth evidence: no cargo fmt, clippy, or test commands documented as run"
+  ],
+  "residual_risk": "Review is static-only; no commands executed. Source contains 8 BLOCKER violations across panic surfaces, unchecked indexing, lossy casts, hidden I/O, unbounded allocation, missing error taxonomy, and intermediate allocations. The function fuses file I/O, console logging, parsing, and domain construction into a single untestable impure function. Delivery is blocked until all absolute laws are satisfied."
+}

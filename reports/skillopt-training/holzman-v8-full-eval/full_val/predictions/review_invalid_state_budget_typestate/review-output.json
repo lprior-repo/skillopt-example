@@ -1,0 +1,101 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses raw String for status plus separate lifecycle bools (is_validated, is_sent) plus Option<u64> sent_at_epoch_ms, allowing every combination including invalid ones (e.g. is_sent=true with status=\"draft\", or is_sent=true with sent_at_epoch_ms=None, or is_validated=false with status=\"sent\").",
+      "failure_mode": "The type system permits states the domain cannot meaningfully represent, pushing validation to runtime callers and enabling bugs where lifecycle flags contradict the status string.",
+      "fix": "Replace status + bools + Option with a single enum typestate (e.g. enum BudgetState { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }) that makes illegal combinations impossible at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_strings_should_be_enums",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String field, meaning any string value can flow through the core. No smart constructor or type-level guard constrains it.",
+      "failure_mode": "Downstream logic comparing status strings is fragile, typo-prone, and cannot exhaustively match. Invalid status values silently propagate.",
+      "fix": "Replace String with a non-exhaustive enum (BudgetStatus or BudgetState) with explicit variants. Core logic consumes the enum; boundary code converts to/from strings."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle_booleans_should_be_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle flags that encode a partial ordering but can be set in any combination.",
+      "failure_mode": "A BudgetWorkflow can have both is_validated=true and is_sent=true without the sent_at_epoch_ms being set, or can be is_sent=true while is_validated=false, representing states that violate the domain workflow.",
+      "fix": "Collapse into a single typestate enum where each variant owns its lifecycle data (e.g. Sent variant owns sent_at_epoch_ms). The compiler enforces valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional_lifecycle_data_owns_variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a global field separate from the lifecycle flags. It can be None when is_sent=true, or Some(...) when is_sent=false.",
+      "failure_mode": "The sent timestamp can be missing after marking sent, or present on a non-sent budget, breaking any logic that assumes sent_at_epoch_ms implies sent state.",
+      "fix": "Move sent_at_epoch_ms into the enum variant that owns the sent lifecycle (e.g. BudgetState::Sent { sent_at_epoch_ms: u64 }), so it exists only when appropriate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_smart_constructor_validation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes a raw BudgetWorkflow and mutates status + is_sent without checking any preconditions (e.g. is_validated must be true, status must be in a sendable state). No typed error return.",
+      "failure_mode": "Any caller can mark any BudgetWorkflow as sent regardless of its actual domain state, silently corrupting the workflow invariant.",
+      "fix": "Replace with a function that consumes a validated typestate (e.g. fn mark_sent(state: BudgetStateValidated) -> BudgetStateSent) returning a typed Result or directly constructing the next typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "raw_string_id_no_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String has no domain constraints. Budget IDs should be a newtype with length/format rules enforced at construction.",
+      "failure_mode": "Empty strings, excessively long IDs, or malformed IDs can flow through the core, causing downstream validation loops or errors.",
+      "fix": "Introduce a newtype (e.g. struct BudgetId(String) or a validated struct) with a smart constructor that enforces domain rules and returns a typed error."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_benchmark_or_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmarks, profiler data, or allocation analysis exist for mark_sent or BudgetWorkflow operations.",
+      "failure_mode": "Performance claims cannot be verified. The current implementation allocates a String (\"sent\".to_string()) on every call, which may be unnecessary for hot paths.",
+      "fix": "Add a benchmark measuring mark_sent throughput and allocation profile. Consider using a &'static str or enum variant instead of .to_string() for status assignment."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "hidden_allocation_in_core_function",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs an allocation (\"sent\".to_string()) inside what should be a pure-core-adjacent function. The function mutates and returns the struct, creating owned copies.",
+      "failure_mode": "Repeated calls allocate heap memory for the status string. In a hot path this adds measurable allocation pressure with no benefit over a &'static str or enum.",
+      "fix": "Use a &'static str literal or enum variant for status. If the enum typestate approach is used, the variant itself carries the state with zero allocation."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo check, cargo fmt, clippy, or test evidence is present. The crate has no test files.",
+      "failure_mode": "No verification that the code compiles, is correctly formatted, or passes any behavioral tests. The struct has no methods or impl blocks, suggesting incomplete implementation.",
+      "fix": "Run cargo check --workspace --all-targets and cargo clippy on the crate. Add tests covering the full state machine lifecycle and edge cases."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or allocation profile",
+    "no profiler data for BudgetWorkflow construction or mutation patterns",
+    "no allocation analysis (alloc/heap evidence) for hot-path operations",
+    "no second-ring evidence (proptest, Kani, Miri) for state machine invariants",
+    "no command evidence (cargo check/clippy/test) was run or reported",
+    "no test file exists for the crate"
+  ],
+  "residual_risk": "The type system currently permits every invalid state combination through the entire codebase. mark_sent has no precondition checks and silently accepts any input. Without the enum typestate redesign, all callers must manually validate state before operations, which is error-prone and not enforced by the compiler. Static review only; no commands run."
+}

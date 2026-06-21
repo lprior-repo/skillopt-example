@@ -1,0 +1,12 @@
+Now I have all source and references. Writing the review output.
+Review complete. Written to `review-output.json` with 10 findings (8 blockers, 2 warnings) covering:
+
+- **Status as String** — must be a domain enum
+- **Lifecycle booleans** (`is_validated`, `is_sent`) — must be typestate
+- **Optional lifecycle field** (`sent_at_epoch_ms`) — must live in the owning variant
+- **Raw `String` ID** — must be a newtyped domain ID with smart constructor
+- **`mark_sent` bypasses typestate** — no validation precondition check
+- **No smart constructor** — all fields pub, any hostile state constructible
+- **Missing benchmarks/profiler/command evidence**
+
+Residual risk: fundamental type-level violations make illegal states representable at every level.

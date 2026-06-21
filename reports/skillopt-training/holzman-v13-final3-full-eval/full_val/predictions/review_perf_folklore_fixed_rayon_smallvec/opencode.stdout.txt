@@ -1,0 +1,8 @@
+Now I have all the context. Let me write the review.
+Review complete. Written 8 findings to `review-output.json`:
+
+- **3 BLOCKERs**: Folklore Rayon/SmallVec optimization claim for 4-element input, heap allocation for fixed tiny input, unmeasured performance claims
+- **3 MAJORs**: Missing benchmark evidence, missing profiler evidence, missing allocation evidence and second-ring evidence
+- **1 MINOR**: Missing command truth evidence (no cargo fmt/check/clippy/test run)
+
+Key finding: The TODO on `src/lib.rs:2` proposing "Rayon and SmallVec because it will be faster" for a `[u8; 4]` input is a textbook folklore optimization violation. Rayon thread-pool overhead dwarfs 4-element work. The fix is to return `[&'static str; 4]` eliminating all allocation, and remove the unmeasured claim entirely.

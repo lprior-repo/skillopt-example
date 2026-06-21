@@ -1,0 +1,16 @@
+Now let me also read the canonical Holzman references to ensure completeness.
+Now I have all the context needed. Let me write the review output.
+Review complete. Written to `/tmp/opencode/.../review-output.json`.
+
+**9 BLOCKER findings** across 6 rules:
+
+| Rule | Key violations |
+|---|---|
+| `panic_free_standard` | `.unwrap()` on file I/O (line 9), parse (line 19), and unchecked indexing (lines 16, 19) |
+| `arithmetic_standard` | Lossy `as u16` cast from `u32` (line 19) |
+| `functional_core_separation` | File I/O + `println!` mixed with parsing (lines 9, 16) |
+| `zero_forbidden_constructs` | Unnecessary `Vec<String>` allocation per line (line 12) |
+| `type_discipline` | `pub` fields with no validation constructor (line 3) |
+| `bounded_resource_standard` | No upper bound on records loaded; OOM risk (line 8) |
+
+**6 missing evidence items**: no benchmark, profiler, allocation audit, second-ring assembly evidence, or verification commands run.

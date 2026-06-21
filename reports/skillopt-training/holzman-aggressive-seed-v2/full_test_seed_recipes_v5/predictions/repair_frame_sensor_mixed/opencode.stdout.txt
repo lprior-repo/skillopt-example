@@ -1,0 +1,15 @@
+Now I'll read the references and fix the source. The issues are:
+1. No `max_payload` check (test `rejects_limit` expects `PayloadTooLarge`)
+2. Lossy `as u32` cast instead of `try_from`
+3. No capacity reservation with `try_reserve`
+4. No checked capacity arithmetic
+Now I'll fix the source. Issues: (1) missing `max_payload` check, (2) lossy `as u32`, (3) no checked capacity, (4) no `try_reserve`.
+All 2 tests pass. Now writing the output JSON.
+Repair complete. Changes to `src/lib.rs`:
+
+- **Added `max_payload` guard** (line 9-11) — returns `PayloadTooLarge` when exceeded, satisfying `rejects_limit` test
+- **Checked capacity arithmetic** (line 12-14) — `checked_add` instead of unchecked `+`, mapped to `Overflow`
+- **`try_reserve` before allocation** (line 16-17) — maps allocation failure to `FrameError::Allocation`
+- **Replaced lossy `as u32`** (line 18) — `u32::try_from(payload.len())` mapped to `Overflow` instead of `payload.len() as u32`
+
+All 2 tests pass. Output written to `repair-output.json`.

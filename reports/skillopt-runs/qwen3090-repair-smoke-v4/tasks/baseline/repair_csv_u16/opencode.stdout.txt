@@ -1,0 +1,4 @@
+I've read the skill, reference, Cargo.toml, `src/lib.rs`, and `tests/behavior.rs`. The source has multiple Holzman violations: `.unwrap()` call, no empty-input check, no `max_items` enforcement, and no error handling.
+All 4 tests pass. Let me run clippy for Holzman compliance:
+Clean clippy. Now writing the output:
+Repaired `src/lib.rs` by replacing the `.unwrap()` with proper `Result` error handling, added empty-input validation, and added `max_items` enforcement — all tests pass and clippy is clean. Output written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/baseline/repair_csv_u16/repair-output.json` with `cargo test` passed.

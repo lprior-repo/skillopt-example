@@ -1,0 +1,24 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/f35ceb7d37380739/repair_frame_audit_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/f35ceb7d37380739/repair_frame_audit_mixed/.skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "Replaced `as` width cast with `u32::try_from` (checked conversion)",
+    "Added `max_payload` bounds check returning `PayloadTooLarge` error",
+    "Added `try_reserve` before vector growth instead of relying on default allocation",
+    "No unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert in production source",
+    "No test files edited",
+    "No Cargo.toml edits",
+    "Smallest production-source change satisfying all tests",
+    "All 2 behavior tests pass"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None — all Holzman violations (as-cast, ignored parameter, missing try_reserve) are resolved; tests exercise both success and error paths."
+}

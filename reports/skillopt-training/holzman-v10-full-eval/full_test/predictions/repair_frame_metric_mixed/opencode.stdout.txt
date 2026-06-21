@@ -1,0 +1,10 @@
+Issues in `src/lib.rs`:
+- Line 10: `payload.len() as u32` is a lossy `as` conversion (violates absolute laws)
+- No `payload.len() > max_payload` check (test `rejects_limit` requires it)
+Repaired. Three Holzman law violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** (line 10): `payload.len() as u32` replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+2. **Missing payload size guard**: Added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge` (required by `rejects_limit` test)
+3. **Unbounded allocation**: Added `try_reserve` with checked capacity arithmetic before extend
+
+All 2 tests pass. Strict clippy gate passes. JSON output written to required path.

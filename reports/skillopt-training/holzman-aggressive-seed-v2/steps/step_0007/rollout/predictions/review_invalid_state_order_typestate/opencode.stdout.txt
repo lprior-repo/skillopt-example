@@ -1,0 +1,14 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 9 findings:
+
+**6 BLOCKERs** — all centered on the same root cause: `OrderWorkflow` is a POJO that makes every invalid state combination constructable and directly mutable:
+- `status: String` instead of an enum — magic strings, no compile-time guarantees
+- `is_validated: bool` + `is_sent: bool` instead of a typestate — encodes impossible states (sent but not validated)
+- All fields are `pub` — invariants are bypassable
+- `mark_sent` has no precondition checks — allows double-send, send-before-validate
+- `mark_sent` mutates by value instead of producing an immutable newtype
+- `sent_at_epoch_ms` never set or validated
+
+**3 additional findings** — missing benchmark, profiler, and allocation evidence.
+
+**Residual risk:** Zero domain invariants enforced by the type system. Repairable by introducing an `OrderStatus` enum and typestate transitions.

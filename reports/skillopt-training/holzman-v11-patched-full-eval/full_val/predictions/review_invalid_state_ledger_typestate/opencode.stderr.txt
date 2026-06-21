@@ -1,0 +1,47 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .skill/holzman-rust/references/hardening-checklist.md
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .
+[0m
+[0m$ [0mfind /tmp/opencode/holzman-skillopt-train/15449ea24115afcd/review_invalid_state_ledger_typestate/src -type f | sort
+/tmp/opencode/holzman-skillopt-train/15449ea24115afcd/review_invalid_state_ledger_typestate/src/lib.rs
+[0m
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead Cargo.toml
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/15449ea24115afcd/review_invalid_state_ledger_typestate/review-output.json'); d=json.load(f); print('Valid JSON, findings:', len(d['findings']), 'missing_evidence:', len(d['missing_evidence']))"
+Valid JSON, findings: 10 missing_evidence: 4
+[0m
+[0m$ [0mpython3 -c "
+import json
+with open('/tmp/opencode/holzman-skillopt-train/15449ea24115afcd/review_invalid_state_ledger_typestate/review-output.json') as f:
+    d = json.load(f)
+required = ['severity','rule','file','line','problem','failure_mode','fix']
+for i, finding in enumerate(d['findings']):
+    missing = [k for k in required if k not in finding]
+    if missing:
+        print(f'Finding {i} missing: {missing}')
+    else:
+        print(f'Finding {i}: {finding[\"severity\"]:10s} {finding[\"rule\"]:30s} {finding[\"file\"]}:{finding[\"line\"]}')
+print('All findings validated.')
+"
+Finding 0: BLOCKER    typestate-state-machine        src/lib.rs:1
+Finding 1: BLOCKER    no-status-string               src/lib.rs:3
+Finding 2: BLOCKER    no-lifecycle-bools             src/lib.rs:4
+Finding 3: BLOCKER    option-invalid-state           src/lib.rs:6
+Finding 4: BLOCKER    newtype-domain-ids             src/lib.rs:2
+Finding 5: BLOCKER    parse-boundary                 src/lib.rs:9
+Finding 6: BLOCKER    no-mutable-domain              src/lib.rs:9
+Finding 7: MAJOR      missing-benchmark-evidence     src/lib.rs:1
+Finding 8: MAJOR      missing-command-evidence       src/lib.rs:1
+Finding 9: MAJOR      anemic-domain-model            src/lib.rs:1
+All findings validated.
+[0m

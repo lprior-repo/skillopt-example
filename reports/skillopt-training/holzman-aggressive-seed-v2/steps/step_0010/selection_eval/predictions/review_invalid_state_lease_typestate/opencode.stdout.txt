@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**Summary of 6 findings (5 BLOCKER, 2 MAJOR):**
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `make_illegal_states_unrepresentable` | 1 | Raw `String` + `bool` flags allow impossible states |
+| 2 | `typestate_booleans` | 4 | `is_validated: bool` should be a typestate enum |
+| 3 | `typestate_booleans` | 5 | `is_sent: bool` + `mark_sent` sets `sent_at_epoch_ms=None` — the exact invalid state bug |
+| 4 | `functional_core_imperative_shell` | 9 | `mark_sent` mutates in-place with string literals |
+| 5 | `parse_at_boundaries` | 3 | `status: String` is an unvalidated primitive in the core |
+| 6 | `no_unchecked_input` | 2 | `id: String` has no validation |
+
+The crate is a textbook example of invalid-state-by-construction — the struct can represent logically impossible states (e.g., `is_sent=true` with `sent_at_epoch_ms=None`) with zero compile-time enforcement.

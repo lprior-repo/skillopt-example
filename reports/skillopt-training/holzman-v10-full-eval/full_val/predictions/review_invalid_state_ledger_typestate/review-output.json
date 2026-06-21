@@ -1,0 +1,159 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-to-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "pub status: String",
+      "problem": "Domain lifecycle state represented as a free-form String instead of a typed enum",
+      "failure_mode": "Any string value can be assigned (e.g. \"sentt\", \"SENT\", \"\"); no compile-time enforcement of valid state transitions; callers cannot pattern-match on state",
+      "fix": "Replace with `pub status: LedgerStatus` where `LedgerStatus` is an enum with exactly the valid states (e.g. `Pending`, `Validated`, `Sent`)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-to-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub is_validated: bool",
+      "problem": "Lifecycle flag expressed as a bare bool, orthogonal to status string and is_sent bool",
+      "failure_mode": "Invalid state combinations are possible (e.g. status=\"pending\" with is_validated=true, or status=\"sent\" with is_validated=false); no type-level guarantee that booleans are consistent with status",
+      "fix": "Fold lifecycle state into the `LedgerStatus` enum variants (e.g. `Validated { validated_at: Option<u64> }`, `Sent { sent_at_epoch_ms: u64 }`) so each variant owns its lifecycle data"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-to-typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "construct": "pub is_sent: bool",
+      "problem": "Second lifecycle flag that overlaps with status string semantics",
+      "failure_mode": "Redundant with status=\"sent\" and independently mutable, enabling inconsistent states like status=\"sent\" with is_sent=false or status=\"pending\" with is_sent=true",
+      "fix": "Remove `is_sent` entirely; represent sent state as a dedicated enum variant (e.g. `LedgerStatus::Sent`) that carries the sent timestamp"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combos",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "pub sent_at_epoch_ms: Option<u64>",
+      "problem": "Optional lifecycle data lives outside the typestate that should own it",
+      "failure_mode": "sent_at_epoch_ms can be Some while is_sent=false or status is not \"sent\"; the Option is decoupled from the lifecycle flag that determines when it should be populated",
+      "fix": "Move `sent_at_epoch_ms: u64` into the `LedgerStatus::Sent` variant so it only exists when the ledger is actually in the sent state"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "id-newtype-missing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub id: String",
+      "problem": "Domain identifier stored as a raw String, accepting any string content",
+      "failure_mode": "Empty strings, whitespace, malformed UUIDs, or non-identifier content can be assigned; no compile-time distinction between a Ledger ID and other strings (e.g. status strings, names)",
+      "fix": "Introduce `pub struct LedgerId(String)` or `pub struct LedgerId(Uuid)` with a smart constructor that validates and returns a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smart-constructor-missing",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub struct LedgerWorkflow { ... }",
+      "problem": "No smart constructor or invariant enforcement at construction; all fields are public with no validation",
+      "failure_mode": "Callers can construct LedgerWorkflow with status=\"foo\", is_validated=true, is_sent=false, and Option<u64>::Some(0), creating a state that violates domain invariants from the moment of creation",
+      "fix": "Replace public struct with private fields and a `LedgerWorkflow::new(...) -> Result<LedgerWorkflow, LedgerError>` smart constructor, or use an enum-based typestate as described above"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-string-mutation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "construct": "item.status = \"sent\".to_string();",
+      "problem": "Hardcoded string literal for state transition, bypassing any type-level state machine",
+      "failure_mode": "Any caller can set status to \"sent\" without validation; the transition logic is a bare mutation with no preconditions (e.g. must be validated first), no postconditions, and no error return",
+      "fix": "Replace with `LedgerWorkflow::mark_sent(item) -> Result<LedgerWorkflow, TransitionError>` that pattern-matches on current state, enforces preconditions, and returns a typed error for invalid transitions"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-validated-transition-guards",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: LedgerWorkflow) -> LedgerWorkflow",
+      "problem": "State transition function has no precondition checks and returns the same type unconditionally",
+      "failure_mode": "Can transition from any state (including already-sent) to \"sent\" without error; no idempotency guard, no ordering requirement (e.g. validated before sent)",
+      "fix": "Return `Result<LedgerWorkflow, TransitionError>`; pattern-match on current `LedgerStatus` and only allow transitions from `Validated` to `Sent`; reject all others with a typed error"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "mutating-parameter",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: LedgerWorkflow) -> LedgerWorkflow",
+      "problem": "Takes and mutates an owned copy rather than returning a new value or using &mut with clear ownership semantics",
+      "failure_mode": "Caller's original value is moved into the function with no way to recover it; the `mut` keyword on the parameter is an anti-pattern that obscures which fields change and makes the function signature less self-documenting",
+      "fix": "Take `item: LedgerWorkflow` (no mut), construct and return a new `LedgerWorkflow` with updated fields, or return a newtype wrapping the transition result"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-typed-error-taxonmy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: LedgerWorkflow) -> LedgerWorkflow",
+      "problem": "No error type defined for transitions; function cannot express why a transition failed",
+      "failure_mode": "Invalid transitions are silently ignored rather than reported; callers have no way to distinguish 'already sent' from 'not yet validated' from 'unknown state'",
+      "fix": "Define `pub enum LedgerError { InvalidTransition { from: LedgerStatus, to: LedgerStatus }, AlreadySent }` and return `Result<LedgerWorkflow, LedgerError>`"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "No benchmark module",
+      "problem": "No benchmarks exist for any performance-relevant code in the crate",
+      "failure_mode": "No measurable baseline to verify that the ledger workflow operations meet performance requirements; optimization decisions would be unguided",
+      "fix": "Add a `benches/` directory with at least one benchmark measuring LedgerWorkflow construction, state transitions, and serialization under realistic payload sizes"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-test-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "No test module",
+      "problem": "No tests exist for any function or type in the crate",
+      "failure_mode": "No evidence that mark_sent behaves correctly for valid transitions, invalid transitions, or edge cases (already-sent, not-validated, etc.)",
+      "fix": "Add `#[cfg(test)]` module with tests covering: valid Pending->Sent transition, rejection of invalid transitions (e.g. Pending->Sent without validation), idempotency check, and typestate invariants"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "public-fields-no-encapsulation",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub struct LedgerWorkflow { pub id: String, pub status: String, ... }",
+      "problem": "All fields are public, allowing external code to bypass any invariants",
+      "failure_mode": "Any downstream crate can set `status = \"sent\"` directly without going through `mark_sent`, completely bypassing the transition logic",
+      "fix": "Make fields private and expose behavior through methods or constructor functions only"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "timestamp-newtype-missing",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "sent_at_epoch_ms: Option<u64>",
+      "problem": "Timestamp stored as raw u64 without domain semantics",
+      "failure_mode": "No compile-time distinction between epoch milliseconds and other u64 values (e.g. IDs, counts, byte lengths); accidental misuse possible",
+      "fix": "Introduce `pub struct SentAtEpochMs(u64)` with a constructor from u64 and Display/debug implementations clarifying the unit"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance-relevant code path",
+    "no tests exist for mark_sent or LedgerWorkflow construction",
+    "no clippy run evidence against the crate",
+    "no fmt --check evidence",
+    "no command-truth evidence for any build/test/lint commands"
+  ],
+  "residual_risk": "The crate has no typestate enforcement, uses String for domain state, has no error taxonomy, no smart constructors, no tests, and no benchmarks. All public fields are mutable from any caller. The structural issues (String status, bool lifecycle flags, no enum typestate) are architectural blockers that cannot be fixed by local changes; they require a complete type-level redesign of LedgerWorkflow. Without a type-level state machine, no amount of testing or linting can prevent invalid state construction."
+}

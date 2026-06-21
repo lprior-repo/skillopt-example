@@ -1,0 +1,13 @@
+Review complete. Written 8 findings to `review-output.json`.
+
+**Key blockers identified:**
+
+1. **`src/lib.rs:2`** — The TODO claims "Rayon and SmallVec will be faster" for a 4-element workload. Rayon dispatch overhead is orders of magnitude larger than processing 4 bytes. This is performance folklore, not measured fact.
+
+2. **`src/lib.rs:1`** — Returns `Vec<&'static str>` for a fixed-size output of exactly 4 elements. Every call heap-allocates. A fixed-size array `[&'static str; 4]` or caller-owned buffer pattern would eliminate allocation entirely.
+
+3. **No benchmark/profiler/allocation evidence exists** — The entire crate lacks `benches/`, criterion, or any measurement infrastructure. No baseline command, baseline number, target hardware, or regression threshold is specified.
+
+4. **`src/lib.rs:3`** — Uses `collect()` without `try_reserve`, though for fixed-size 4 this is minor.
+
+**Residual risk:** Static review only, no commands run. The safest single change would be replacing the Vec return type with a fixed-size array or caller-owned buffer—this eliminates allocation without needing benchmarks. Optimization claims should be driven by profiling data before implementation.

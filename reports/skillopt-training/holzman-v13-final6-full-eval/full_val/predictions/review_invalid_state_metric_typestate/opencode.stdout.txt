@@ -1,0 +1,13 @@
+Now I have the full picture. The task crate is a simple struct with `status: String`, lifecycle `bool` fields, and an `Option<u64>` — classic typestate violations. Writing findings per the skill's typestate review rules (line 49).
+Review complete. Wrote `review-output.json` with 6 BLOCKER findings:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `typestate_enum_state_machine` | 1 | No state machine — independent fields permit any invalid combination |
+| 2 | `status_string_enum` | 3 | `status: String` allows any value, magic-string mutation in `mark_sent` |
+| 3 | `bool_lifecycle_typestate` | 4 | `is_validated: bool` + `is_sent: bool` cannot enforce lifecycle ordering |
+| 4 | `option_invalid_state_combinations` | 6 | `sent_at_epoch_ms: Option<u64>` detached from lifecycle booleans |
+| 5 | `newtype_domain_ids` | 2 | `id: String` is raw primitive, no validation or newtype |
+| 6 | `parse_boundary` | 1 | Raw primitives cross into domain with no smart constructors or validation |
+
+All 6 align with the skill's mandatory typestate review (line 49: enum/state machine, status/String, bool/lifecycle, Option invalid-state, newtype/domain IDs, parse boundary).

@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses String for status and independent bools (is_validated, is_sent) instead of enums/typestates, making illegal states representable (e.g. status=\"pending\" with is_sent=true, or both is_validated=true and is_sent=true without ordering guarantee).",
+      "failure_mode": "Any combination of status string and boolean flags is constructible, including contradictory ones. External callers can create a LedgerWorkflow with is_sent=true and status=\"failed\", or set is_validated=false while is_sent=true, breaking domain invariants at construction time rather than at validation time.",
+      "fix": "Replace status: String with a domain enum (e.g. enum LedgerStatus { New, Validated, Sent }) and replace (is_validated: bool, is_sent: bool) with a typestate enum (e.g. enum LedgerPhase { Draft, ReadyToValidate, Sent }). Remove sent_at_epoch_ms or tie it to the Sent typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain newtype wrapper, allowing arbitrary strings as ledger identifiers with no domain invariants (format, uniqueness, length).",
+      "failure_mode": "Any arbitrary string (empty, too long, malformed) is accepted as a valid ledger ID. No domain rules are enforced at the type level, pushing validation to runtime everywhere the id is used.",
+      "fix": "Introduce a typed newtype (e.g. pub struct LedgerId(String)) with a fallible constructor that enforces domain rules, and use it in LedgerWorkflow instead of raw String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs a mutating domain action (transitioning ledger to sent state) but has no precondition checks, no typed error return, and returns the mutated struct directly. This is a shell-level action, not a pure core calculation.",
+      "failure_mode": "A ledger can be marked sent regardless of whether it has been validated or is in a valid state. The function silently accepts any LedgerWorkflow and mutates it, with no way for callers to handle failure (e.g. sent when not validated). No railway-oriented error handling.",
+      "fix": "Introduce a pure core function that computes the next state transition (e.g. fn try_transition_to_sent(phase: LedgerPhase) -> Result<LedgerPhase, TransitionError>) with precondition validation, then have the shell compose the core transition with mutation. Return Result<LedgerWorkflow, LedgerError> from mark_sent with typed error types."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no-unwrap-expect-panic-strings-as-domain",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "Marking sent uses .to_string() to assign a hardcoded status string literal into a String field, coupling the domain to raw string representation. No validation that \"sent\" is a legitimate status value.",
+      "failure_mode": "The domain language is encoded as a magic string literal instead of a typed enum variant. A typo (e.g. \"snt\") would silently create an invalid state with no compiler or runtime check.",
+      "fix": "Replace status: String with an enum (enum LedgerStatus { New, Validated, Sent }) and set item.status = LedgerStatus::Sent instead of a string literal."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "option-lifecycle-fields",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an Option lifecycle field that is decoupled from the is_sent bool. The sent timestamp could be None while is_sent=true, or Some(value) while is_sent=false.",
+      "failure_mode": "The Option creates a separate lifecycle dimension from is_sent, enabling inconsistent states where the ledger is marked sent but has no timestamp, or has a timestamp but is not marked sent. Both fields should be collapsed into a typestate.",
+      "fix": "Tie the timestamp into the typestate enum (e.g. enum LedgerPhase { Draft, ReadyToValidate, Sent { sent_at_epoch_ms: u64 } }) so the timestamp exists only in the Sent variant."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for LedgerWorkflow or mark_sent. The crate has no benches/ directory, no #[bench] functions, and no benchmark dependency in Cargo.toml.",
+      "failure_mode": "Performance claims about allocation patterns, throughput, or latency of ledger transitions cannot be verified. Adding typestate enums or newtypes changes allocation behavior and must be measured.",
+      "fix": "Add a benches/ directory with criterion-based benchmarks measuring allocation and throughput for create/validate/sent lifecycle transitions."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing-command-evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No dev-dependencies for testing or benchmarking (no criterion, no proptest, no rstest). The Cargo.toml only declares the package with no dependency sections.",
+      "failure_mode": "No automated behavior tests, property tests, or benchmarks exist to verify correctness of domain invariants or performance characteristics. The crate cannot be verified without manual testing.",
+      "fix": "Add criterion or similar as a dev-dependency for benchmarks, and add proptest or manual tests for typestate transitions and invariant enforcement."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmarks exist for stated or implied performance claims",
+    "no profiler evidence for allocation patterns of LedgerWorkflow",
+    "no second-ring evidence (proptest/fuzz) for typestate transition invariants",
+    "no command evidence: cargo fmt, cargo test, cargo clippy not run",
+    "no allocation audit: .to_string() and String fields produce heap allocations with no try_reserve or capacity analysis"
+  ],
+  "residual_risk": "The crate is a thin wrapper with no unsafe, no arithmetic, and no I/O in core, but has fundamental domain modeling violations. All state invariants are unenforced by the type system, making it trivially constructible into contradictory states. The core is effectively absent — mark_sent is a shell-level mutation with no pure transition logic. Without typestates and domain enums, the code is functionally correct only by caller discipline, not by compiler enforcement."
+}

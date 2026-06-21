@@ -1,0 +1,107 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/nasa-jpl-standards.md",
+    "references/runtime-performance-architecture.md",
+    "references/review-output-contract.md",
+    "references/zero-cost-abstractions.md",
+    "references/latency-throughput-playbook.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "dense_runtime_ir",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Function takes serde_json::Value and HashMap<String, serde_json::Value> as parameters, parsing and walking arbitrary JSON at runtime instead of using precompiled dense IR with numeric IDs",
+      "failure_mode": "Every call re-parses JSON structure, does string-keyed HashMap lookups, and performs dynamic type dispatch (as_str, as_bool) instead of operating on a frozen, prevalidated compiled artifact",
+      "fix": "Define typed input structs with checked parsing at boundaries, and replace HashMap<String, Value> with a dense lookup by u32/u64 OpId using Box<[T]> or Vec indexed by numeric ID. Compile away JSON before runtime."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "for (key, value) in rules iterates over an unbounded HashMap with no static upper bound on iterations",
+      "failure_mode": "An adversarial or malformed rules input can cause unbounded iteration, leading to denial of service or unbounded latency. Violates Power of Ten Rule 2 directly.",
+      "fix": "Bound the iteration count with .iter().take(MAX_RULES) where MAX_RULES is a compile-time constant, or replace HashMap with a fixed-size ArrayVec<[RuleEntry; N] and iterate the fixed array."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "prove_slow_execute_fast",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The hot path does runtime JSON schema walking (event.get(\"name\"), value.get(\"enabled\")) instead of executing prevalidated artifacts. Human-friendly JSON is evaluated at runtime repeatedly.",
+      "failure_mode": "Every invocation re-validates the same structure that should have been validated once at compile/acceptance time. This is the exact anti-pattern the runtime-performance-architecture reference forbids in hot paths.",
+      "fix": "Validate JSON once at the boundary, compile into a typed event struct with known fields, and replace the rules HashMap with an immutable compiled artifact keyed by numeric ID. The runtime path should only do a direct lookup and conditional check."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Chained ? operators on value.get(\"enabled\")?.as_bool()? silently converts missing/malformed fields to None, silently dropping validation failures",
+      "failure_mode": "A rule with enabled set to a non-boolean (e.g., enabled: \"yes\") is silently ignored rather than producing a typed error. The caller cannot distinguish 'no matching rule' from 'malformed rule data'.",
+      "fix": "Return a Result<RuleOutcome, RouteError> and explicitly validate that 'enabled' is a boolean, returning a typed error for malformed data instead of silently swallowing it with ?."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "No type-level invariant enforcement on event structure or rules structure. The function accepts arbitrary serde_json::Value and checks field existence at runtime.",
+      "failure_mode": "Invalid states are representable: events without names, rules with missing or wrong-typed fields. Type system provides zero guarantees about the input shape.",
+      "fix": "Define typed structs (Event, RuleConfig) with validated constructors using serde deserialize with explicit field validation. Use Result<ValidatedEvent, ParseError> at the API boundary so the hot path only sees valid types."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Uses HashMap<String, serde_json::Value> in the parameter signature. Both HashMap and serde_json::Value are explicitly listed as avoid-in-hot-paths in runtime-performance-architecture.md",
+      "failure_mode": "HashMap allocates and hashes on every lookup. serde_json::Value requires dynamic type discrimination (serde_json::Type enum dispatch) on every field access. Both add unpredictable branch and allocation pressure to the hot path.",
+      "fix": "Replace with typed structs and dense numeric-ID-based lookups. If string-keyed config is needed for non-hot paths, compile it at init time into a Vec<[u32; 3]> or similar dense representation indexed by u32 OpId."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "format!(\"route:{key}\") performs heap allocation and string formatting in what should be a fast hot path. format! allocates a new String on the heap.",
+      "failure_mode": "Unnecessary heap allocation per call. If this function is on a latency-sensitive path, every call allocates memory, defeating zero-allocation hot path discipline.",
+      "fix": "If the output must be a String, document the allocation budget. If the caller can accept a borrowed or numeric result, return OpId or a string slice reference into a static table. Use try_reserve or pre-allocated buffers if String is required."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "event.get(\"name\")?.as_str()?.to_string() silently returns None when the event has no 'name' key or it is not a string. This is a data-dependent silent failure, not a typed validation error.",
+      "failure_mode": "Callers cannot distinguish between 'no rule matched' and 'input was malformed'. This makes error handling and observability impossible without adding logging or extra validation layers.",
+      "fix": "Validate at the boundary: require 'name' as a string field in a typed Event struct with a Result-returning constructor, so the hot path only sees confirmed-valid data."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_short_functions",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "While the function is 8 lines (within size limits), the logic conflates parsing, validation, lookup, and formatting. This makes it harder to reason about each concern.",
+      "failure_mode": "Single-function design makes it harder to verify individual invariants. The parsing/validation concern mixes with the hot-path lookup concern.",
+      "fix": "Separate boundary validation (typed parsing with Result) from the core route function (dense-array lookup). Keep the hot path function focused on the transition lookup only."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated hot path (route function)",
+    "no profiler data to confirm this is a bottleneck",
+    "no allocation count or budget declared for the route function",
+    "no latency target (p50/p95/p99) or throughput target stated",
+    "no rust-toolchain.toml with pinned nightly present",
+    "no second-ring evidence (cargo asm, cargo llvm-ir, perf stat) for any performance claim",
+    "no assembly or IR evidence that the route function compiles to expected shape",
+    "no regression guard defined for future performance changes"
+  ],
+  "residual_risk": "Static review only. No commands were run (review task). The code has no unsafe, unwrap, expect, panic, or other forbidden constructs, but fundamentally violates the dense IR architecture by performing runtime JSON parsing and HashMap iteration instead of using precompiled numeric-ID-based artifacts. The unbounded loop over rules is a direct Power of Ten Rule 2 violation. All performance claims are unsubstantiated due to missing benchmark/profiler evidence."
+}

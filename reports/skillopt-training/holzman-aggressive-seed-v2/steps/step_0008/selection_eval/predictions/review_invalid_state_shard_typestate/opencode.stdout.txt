@@ -1,0 +1,12 @@
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**6 BLOCKER findings, 1 WARNING, 1 MISSING finding, 4 missing evidence items:**
+
+- **BLOCKER** -- `status: String` should be a typed enum (`ShardStatus`)
+- **BLOCKER** -- `is_validated: bool` + `is_sent: bool` should be a single typestate enum (`ShardState`)
+- **BLOCKER** -- `sent_at_epoch_ms: Option<u64>` decoupled from `is_sent` allows sent-shard-without-timestamp
+- **BLOCKER** -- `mark_sent` doesn't require validation and doesn't record timestamp, enabling invalid state transitions
+- **BLOCKER** -- `id: String` lacks domain newtype with validation
+- **BLOCKER** -- Public struct fields with no invariants; any caller can bypass `mark_sent`
+- **WARNING** -- Unnecessary `.to_string()` heap allocation on state transitions
+- **MISSING** -- No benchmark/profiler/allocation evidence for `mark_sent`

@@ -1,0 +1,74 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow has no typestate enum; status and lifecycle flags are independent mutable fields, so any combination (e.g. is_validated=true with status=\"sent\", or is_sent=true with status=\"pending\") is representable with no enforcement of valid transitions.",
+      "failure_mode": "Callers construct or mutate ShardWorkflow into logically impossible states (e.g. validated but not sent, sent but not validated, sent_at_epoch_ms set without is_sent), and mark_sent mutates fields without verifying preconditions, producing silently corrupted state.",
+      "fix": "Replace the flat struct with a typestate enum such as enum ShardState { Pending, Validated { sent_at_epoch_ms: u64 }, Sent { sent_at_epoch_ms: u64 } } with smart constructors and explicit transition methods that return Result or consume self immutably."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "enum-status-replacement",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String that can hold any value (e.g. \"sent\", \"pending\", \"\", null-representation), making the state machine unenforceable at compile time.",
+      "failure_mode": "Typos, empty strings, or unknown literals in status are accepted by the compiler and runtime, so downstream logic comparing status strings silently misbehaves instead of getting a compile-time guarantee of known states.",
+      "fix": "Replace `status: String` with a domain enum like `enum ShardStatus { Pending, Validated, Sent }` with Display/FromStr impls only at the shell boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-replacement",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are independent booleans that do not form a coherent state machine; they encode a partial ordering (validated before sent) but allow is_validated=true with is_sent=false alongside is_sent=true with is_validated=false.",
+      "failure_mode": "A shard can appear validated without being sent, or sent without being validated—both violate the implicit lifecycle invariant. mark_sent sets is_sent=true unconditionally without checking is_validated first.",
+      "fix": "Replace both booleans with a single typestate enum that encodes the valid transition graph (Pending -> Validated -> Sent), so each state uniquely determines which lifecycle properties hold."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combo",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a standalone field decoupled from is_sent, allowing sent_at_epoch_ms to be Some(value) while is_sent=false, or None while is_sent=true, creating logically impossible combinations.",
+      "failure_mode": "Optional lifecycle data lives outside the variant that owns it (violating SKILL.md line 74), so callers can set a sentinel timestamp without marking the shard sent, or mark it sent without recording when, producing inconsistent audit trails.",
+      "fix": "Move sent_at_epoch_ms into the typestate enum variant that owns it, e.g. `Sent { sent_at_epoch_ms: u64 }`, so the timestamp is only present when the shard is actually sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain-specific type, so any string (empty, whitespace, non-ASCII, too-long) is accepted without validation or size bounds.",
+      "failure_mode": "Callers pass bare strings as shard IDs; there is no compile-time distinction between a shard ID and a generic string, so invalid IDs (empty, duplicate-format, oversized) silently enter the system and can cause collisions or parser confusion downstream.",
+      "fix": "Introduce `pub struct ShardId(String)` with a private field and a smart constructor `ShardId::try_from(s: String) -> Result<ShardId, ParseError>` that validates non-empty, bounded length, and character restrictions at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary-violation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts a fully-formed ShardWorkflow and mutates its raw fields in place without any fallible validation or parse boundary—the parse boundary is bypassed entirely, so callers can construct invalid domain states directly and mutate them without smart constructors.",
+      "failure_mode": "Any caller with a ShardWorkflow can call mark_sent to force it into the sent state regardless of whether it was validated first, and mark_sent also uses `\"sent\".to_string()` which allocates on every call instead of reusing a static or enum-based representation.",
+      "fix": "Replace mark_sent with a method on the typestate enum such as `fn validate(self) -> Result<ShardState, ValidationErr>` and `fn send(self) -> Result<ShardState, SendErr>` that consume self and enforce preconditions at transition points with typed errors."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation behavior (String::to_string on every call)",
+    "no profiler evidence that the flat-struct approach was measured against the typestate alternative",
+    "no allocation evidence showing ShardWorkflow field access patterns in hot paths",
+    "no command-truth evidence: no cargo commands were run to verify the crate compiles under strict clippy gates"
+  ],
+  "residual_risk": "Static review only; no commands run. The struct is trivial (13 lines) but fundamentally violates five Holzman+Functional Rust laws: invalid states are representable, status is a String not an enum, lifecycle booleans are not typestate, optional lifecycle data is not owned by the correct variant, and the parse boundary is absent. All six typestate findings are independently gradable blockers."
+}

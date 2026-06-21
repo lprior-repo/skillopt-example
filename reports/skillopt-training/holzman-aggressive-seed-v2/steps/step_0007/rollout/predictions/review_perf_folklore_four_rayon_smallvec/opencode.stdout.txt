@@ -1,0 +1,12 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Key findings in `src/lib.rs`:**
+
+1. **BLOCKER - Rayon on 4 elements** (line 2): The TODO comment cargo-cults Rayon for a 4-byte fixed-size input. Thread pool scheduling overhead vastly exceeds any computation benefit.
+
+2. **BLOCKER - SmallVec for deterministic size-4 output** (line 1): SmallVec is only useful when small-size distribution is known/measured. A fixed `classify_four` always produces exactly 4 elements — no small-vs-large distribution to optimize.
+
+3. **WARNING - Unnecessary heap allocation** (line 1): Returns `Vec` for a pure function on 4 bytes. Should return `[&'static str; 4]` or accept a caller-owned buffer.
+
+4. **WARNING - False folklore TODO** (line 2): The comment itself is a hazard — encodes incorrect performance assumptions that a future developer will blindly follow.

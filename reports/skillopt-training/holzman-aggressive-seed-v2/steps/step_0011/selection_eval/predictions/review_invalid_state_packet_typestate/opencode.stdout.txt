@@ -1,0 +1,16 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+- **3 BLOCKERs** — All stem from the same root cause: `PacketWorkflow` uses primitive fields (`status: String`, `is_validated: bool`, `is_sent: bool`, `sent_at_epoch_ms: Option<u64>`) that make illegal states representable. Specifically:
+  - `is_validated=false` + `is_sent=true` is constructible
+  - `status: String` accepts arbitrary values with no domain constraints
+  - `sent_at_epoch_ms: Option<u64>` is decoupled from `is_sent`, allowing contradictory states
+  - `mark_sent` performs the transition with zero precondition validation
+
+- **2 Warnings** — Missing benchmarks and behavior tests.
+
+- **No violations** of unsafe/unwrap/expect/panic/unreachable/unchecked-indexing/lossy-as rules (clean in those categories).
+
+The fix is to replace the 4 primitive fields with a single typestate enum (`PacketLifecycle`) that encodes the valid transitions and ties `sent_at_epoch_ms` to the `Sent` variant.

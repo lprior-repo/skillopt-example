@@ -1,0 +1,9 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 12 findings:
+
+- **6 BLOCKER**: 2x `unwrap()` on fallible I/O/parse, 1x lossy `as u16` cast, 2x unchecked `parts[]` indexing, 1x `println!` hidden I/O in core pipeline
+- **4 MAJOR**: primitive `String` name (no newtype), no bounded allocation (`try_reserve`), I/O leaking into core without `Result` return type, unnecessary `Vec<String>` collection vs `split_once`
+- **1 MINOR**: no typed error taxonomy
+- **1 INFO**: missing benchmark evidence
+
+Missing evidence: no benchmarks, profiler, allocation tracing, Miri, or CLI wrapper evidence.

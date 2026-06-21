@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | `lib.rs:3` |
+| 2 | BLOCKER | replace_bool_lifecycle_flags_with_typestates | `lib.rs:4` |
+| 3 | BLOCKER | functional_core_imperative_shell | `lib.rs:9` |
+| 4 | BLOCKER | primitive_obsession | `lib.rs:6` |
+| 5 | WARNING | parsed_at_boundary | `lib.rs:2` |
+| 6 | WARNING | no_benchmark_evidence | `lib.rs:1` |
+| 7 | INFO | no_command_evidence | `lib.rs:1` |
+
+**Core issue:** The `LeaseWorkflow` struct uses `String` for status and separate `bool` flags (`is_validated`, `is_sent`) that can diverge from each other, making every illegal state constructible. `mark_sent` mutates in place with no error path. No benchmarks, tests, or verification evidence exist.

@@ -1,0 +1,21 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mSkill "holzman-rust"
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m
+[0m$ [0mfind /tmp/opencode/holzman-skillopt-train/65531a8c46d0de1c/review_invalid_state_order_typestate/src -type f -name '*.rs' | sort
+/tmp/opencode/holzman-skillopt-train/65531a8c46d0de1c/review_invalid_state_order_typestate/src/lib.rs
+[0m
+[0m→ [0mRead src/lib.rs
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/65531a8c46d0de1c/review_invalid_state_order_typestate/review-output.json'); d=json.load(f); print('Valid JSON:', len(d['findings']), 'findings'); f.close()"
+Valid JSON: 9 findings
+[0m

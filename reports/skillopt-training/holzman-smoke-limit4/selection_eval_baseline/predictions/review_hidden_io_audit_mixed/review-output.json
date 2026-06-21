@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing, unreadable, or untrusted file paths.",
+      "failure_mode": "External file path causes process abort instead of returning a typed I/O error.",
+      "fix": "Return Result<Vec<Record>, io::Error> and use fs::read_to_string(path)? or .map_err(io::Error::custom) without unwrap."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or out-of-range field values.",
+      "failure_mode": "Malformed CSV value crashes the process instead of returning a typed parse error.",
+      "fix": "Use .map_err(...) or ? to propagate ParseError, and return Result<Vec<Record>, E> with a domain or io error type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "parts is indexed at [0] and [1] without bounds checking. Lines with fewer than 2 comma-separated fields cause a panic.",
+      "failure_mode": "Truncated or single-field CSV lines panic at runtime.",
+      "fix": "Use parts.first() and parts.get(1) and handle None with map_err or return a typed malformed-line error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "parse::<u32>().unwrap() as u16 silently truncates values above 65535.",
+      "failure_mode": "Values in [65536, u32::MAX] wrap around, producing invalid Record data without any indication of overflow.",
+      "fix": "Use u16::try_from(parts[1].parse::<u32>().unwrap()) or better parse directly as u16 (parts[1].parse::<u16>()) and propagate errors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_io",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "println!() inside load_audits is a hidden I/O side effect in a function that should be pure parsing logic.",
+      "failure_mode": "Logging is embedded in the data-parsing pipeline, making it impossible to test parsing deterministically and mixing shell concerns with core concerns.",
+      "fix": "Move println! to the caller/shell layer. load_audits should return parsed records without side effects. If audit logging is needed, pass a writer or callback abstraction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_audits mixes I/O (fs::read_to_string) with parsing logic in a single public function. No functional core / imperative shell split.",
+      "failure_mode": "Cannot unit-test parsing without mocking the filesystem; parsing logic is not independently verifiable or deterministic.",
+      "fix": "Split into (1) load_audits_raw(path: &str) -> Result<String, io::Error> for I/O and (2) parse_records(text: &str) -> Result<Vec<Record>, ParseError> for pure logic. Call parse_records from load_audits_raw."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "collect() into Vec<String> allocates an intermediate heap collection for every line, even when only 2 fields are needed.",
+      "failure_mode": "Unnecessary heap allocations per line increase allocation pressure and allocation-count variance in tight loops.",
+      "fix": "Use split_once(',', line).map(...) or iterator-based splitting with take(2) to avoid Vec allocation per line."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim on load_audits",
+    "no profiler evidence (flamegraph, perf) for allocation hotspots",
+    "no allocation audit (e.g., alloc_counter, jemalloc profiling) for Vec<String> per-line allocation cost",
+    "no second-ring validation evidence (e.g., property tests) for malformed input handling",
+    "no command evidence: cargo test was not run"
+  ],
+  "residual_risk": "This is a static review only. No commands were run (cargo test, cargo clippy, cargo fmt, benchmarks). Multiple BLOCKERs remain: unwrap on fallible I/O and parse, lossy u32-to-u16 cast, unchecked indexing on split results, hidden println side effect in core logic, and no functional core/shell separation. All require code changes before this crate is delivery-ready."
+}

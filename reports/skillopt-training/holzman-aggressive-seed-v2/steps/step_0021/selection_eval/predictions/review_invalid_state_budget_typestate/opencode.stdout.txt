@@ -1,0 +1,9 @@
+Now I have all the context needed. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings** across the crate, all stemming from the same root issue: `BudgetWorkflow` uses `pub String` + `pub bool` fields, making illegal states fully representable and bypassing all type-level invariants.
+
+Key findings:
+- **4 BLOCKERs** — illegal states representable (`pub String` status, bool lifecycle flags), mutable in-place transition with no preconditions, no domain newtypes
+- **3 MAJORs** — public mutable fields, unmeasured allocations, infallible signature for a fallible operation
+- **5 missing evidence** — no benchmarks, profiler data, allocation audit, or CI command evidence

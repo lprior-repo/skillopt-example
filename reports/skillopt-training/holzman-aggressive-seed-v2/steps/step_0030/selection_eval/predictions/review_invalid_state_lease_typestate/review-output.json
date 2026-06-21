@@ -1,0 +1,108 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String, allowing any arbitrary string value. The domain requires a finite set of lifecycle states (e.g., draft, validated, sent). Any string not matching a real state is an illegal state constructible by any caller.",
+      "failure_mode": "A caller sets status to \"sent\" but forgets is_sent=true, or sets is_sent=true but leaves status=\"draft\". The struct admits contradictory states that the compiler cannot reject.",
+      "fix": "Replace `pub status: String` with a sealed enum `pub status: LeaseStatus` where `LeaseStatus` enumerates only valid lifecycle states (e.g., Draft, Validated, Sent). Make the enum non-exhaustive if needed for future states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a pub bool field. Boolean lifecycle flags are primitive obsession and allow contradictory state (e.g., is_sent=true and is_validated=false when sent implies validated).",
+      "failure_mode": "Callers can set is_validated and is_sent independently, creating states where the workflow is marked sent but not validated, or validated but with status string \"draft\". No invariant enforces the lifecycle ordering.",
+      "fix": "Remove both `is_validated: bool` and `is_sent: bool`. Replace them with a single `pub state: LeaseState` enum that encodes the lifecycle (e.g., `LeaseState::Draft`, `LeaseState::Validated`, `LeaseState::Sent { sent_at: Timestamp }`). The compiler guarantees only one state is active at a time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a pub bool field that duplicates and conflicts with both `status: String` and the concept of being in a sent lifecycle stage. This creates a 3-way redundancy (status string, is_sent bool, sent_at Option) that can all disagree.",
+      "failure_mode": "is_sent=true with status=\"draft\" and sent_at=Some(0) is a fully constructible but semantically broken state. There is no constructor enforcing consistency among the three fields.",
+      "fix": "Subsume into the typestate enum. A `Sent` variant carries `sent_at: Timestamp` as associated data. The enum structure makes it impossible to be sent without a timestamp."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> with no domain newtype. u64 is a raw primitive; the domain rule is that sent_at is only present when the lease is in the Sent state. Option<u64> as a bare field allows it to be Some at any lifecycle stage or None in Sent.",
+      "failure_mode": "A caller sets sent_at_epoch_ms=Some(timestamp) while the lease is still in Draft, leaking temporal data into an invalid state. Or the lease transitions to Sent but sent_at remains None.",
+      "fix": "Replace `Option<u64>` with a newtyped `sent_at: Option<SentTimestamp>` and ultimately bake the timestamp into the typestate enum so that `Sent` variants carry `sent_at: SentTimestamp` as required data, not an optional field on all states."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `.to_string()` allocation to overwrite status. This is a mutation on the imperative shell side but the mutation is a raw String clone rather than an enum variant construction. The function takes ownership and returns the same type, making it a data-mutator rather than a pure domain transition.",
+      "failure_mode": "If `status` is later converted to an enum, `.to_string()` becomes a compile error. The mutation pattern does not express intent — it mutates internal fields without domain validation. Callers could call `mark_sent` on an already-sent lease, creating duplicate-sent artifacts.",
+      "fix": "Replace `mark_sent` with a pure transition function `fn transition_to_sent(item: LeaseWorkflow) -> Result<LeaseWorkflow, LeaseError>` that validates the pre-state (must be Validated) and returns the new state via enum construction. Or better: `fn LeaseWorkflow::into_sent(self, timestamp: SentTimestamp) -> Result<LeaseWorkflow, LeaseTransitionError>`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a free function that mutates and returns the same struct. It does not validate preconditions (e.g., must be in validated state before sending). This is imperative mutation in what should be a pure domain transition.",
+      "failure_mode": "Any caller can call mark_sent on a draft lease with no validation, violating the business rule that leases must be validated before being marked sent.",
+      "fix": "Wrap the transition in a fallible method `LeaseWorkflow::transition_to_sent(self, clock: Clock) -> Result<Self, TransitionError>` on the domain type, or use a builder/monadic pattern that enforces state ordering via types."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for any performance claim. The crate has no `benches/` directory and no `[[bench]]` section in Cargo.toml.",
+      "failure_mode": "No measured evidence that this code meets any performance or allocation budget.",
+      "fix": "Add a `benches/` directory with a criterion or basic benchmark measuring the allocation profile of the typestate construction path."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiling evidence (perf, flamegraph, heaptrack) exists for the crate.",
+      "failure_mode": "Allocation hotspots and CPU profile unknown.",
+      "fix": "Run `cargo bench --profile-time 5` or equivalent profiler and report results."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "The `.to_string()` call on line 10 allocates a new String. No allocation audit or try_reserve pattern exists. For a typestate migration, allocation profile is relevant.",
+      "failure_mode": "Unknown whether this allocation is acceptable in the performance budget or if a zero-copy enum construction would be preferred.",
+      "fix": "Audit allocations with `#[global_allocator]` tracing or jemalloc profiling. Eliminate the `.to_string()` allocation by constructing the enum variant directly."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No test target or behavior tests exist. Cargo.toml has no `[dev-dependencies]`, `[[test]]`, or `[[bench]]` sections. No `cargo test` or `cargo clippy` evidence can be produced.",
+      "failure_mode": "No behavioral contract is enforced by automated tests. The code could change and break invariants with zero test coverage.",
+      "fix": "Add behavior tests under `tests/` that verify: (a) Draft cannot transition to Sent without Validated, (b) Sent always carries a timestamp, (c) mark_sent on an already-sent lease returns an error."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data (perf/flamegraph/heaptrack) for allocation profile",
+    "no behavior tests — no automated contract enforcement",
+    "no cargo test or cargo clippy command evidence",
+    "no allocation audit for .to_string() on status field"
+  ],
+  "residual_risk": "The crate represents a textbook anti-pattern: a data bag struct with independent boolean and string fields that admit illegal states. The compiler guarantees zero invariants — any combination of status/is_validated/is_sent/sent_at is constructible. Converting to a typestate enum with the timestamp embedded in the Sent variant is the minimal compliant fix. Without tests, benchmarks, or command evidence, the code cannot be considered Holzman-compliant. Static review only; no commands run."
+}

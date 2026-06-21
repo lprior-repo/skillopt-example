@@ -1,0 +1,17 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written valid JSON to `/review-output.json`.
+
+**Summary of findings:**
+
+6 BLOCKER findings across `src/lib.rs`:
+
+| # | Rule | Line | Problem |
+|---|------|------|---------|
+| 1 | `make_illegal_states_unrepresentable` | 1 | `String` status + `bool` flags allow any invalid combination |
+| 2 | `no_bool_option_lifecycle_fields` | 4 | `is_validated: bool` is a forbidden primitive lifecycle flag |
+| 3 | `no_string_lifecycle_status` | 3 | `status: String` allows arbitrary values — no compile-time domain enforcement |
+| 4 | `no_mark_sent_without_precondition` | 9 | `mark_sent` has no state guard — any state can transition to sent |
+| 5 | `functional_core_purity` | 1 | Public mutable fields, no encapsulation, no typed invariants |
+| 6 | `no_error_type` | 9 | No `Result` return — invalid transitions are silently accepted |
+
+5 missing evidence items flagged (no benchmarks, profiler data, allocation evidence, second-ring tests, or command output).

@@ -1,0 +1,26 @@
+{
+  "batch_size": 1,
+  "failure_summary": [
+    {
+      "failure_type": "missing_split_once",
+      "count": 1,
+      "description": "Agent used manual indexing or split/collect instead of split_once for first-delimiter parsing."
+    },
+    {
+      "failure_type": "missing_try_from",
+      "count": 1,
+      "description": "Agent used lossy as casts instead of try_from for width conversions."
+    }
+  ],
+  "patch": {
+    "reasoning": "The agent failed to use split_once for parsing and try_from for conversions, despite previous instructions. The current skill text is verbose and repetitive. I will consolidate the 'Core Contract' into a single, high-signal paragraph that explicitly mandates these APIs for their specific use cases, removing the fragmented lists that agents seem to ignore.",
+    "edits": [
+      {
+        "op": "replace",
+        "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the failure mode requires them.\n- For `Vec`-producing parsers/encoders with a known maximum, compute capacity with checked arithmetic, call `try_reserve` (not `Vec::with_capacity`) before pushing/extending, and map allocation failure to a typed error such as `Allocation` when available.\n- For frame encoders, summaries, and counters: use `checked_add` for sizes/totals, use `checked_div` after proving the divisor is nonzero, and use `u32::try_from`/`usize::try_from` instead of lossy width casts.\n- For unsafe byte parsing, SIMD, unchecked slicing, or transmute-like shortcuts, require a safe scalar fallback or safe standard API (`from_le_bytes`, `get`, `split_at_checked` where available) plus explicit endian/bounds behavior.\n- Iterator chains and manual bounded loops are both allowed. Choose the clearer, safer, allocation-aware shape. Performance claims require workload, baseline, command, number, variance, and profiler/benchmark evidence.",
+        "content": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.\n- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.\n- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.\n- **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.\n- **Performance:** Do not cargo-cult Rayon, SmallVec, Cow, or manual loops. Use them only with measured evidence."
+      }
+    ]
+  },
+  "source_type": "failure"
+}

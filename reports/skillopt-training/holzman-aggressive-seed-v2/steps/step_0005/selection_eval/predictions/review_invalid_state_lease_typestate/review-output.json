@@ -1,0 +1,87 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses String for status and bool flags (is_validated, is_sent), allowing illegal state combinations such as status='sent' with is_sent=false, or is_validated=false with is_sent=true. The type name itself references typestate, but none is implemented.",
+      "failure_mode": "Any code consuming LeaseWorkflow cannot trust that status, is_validated, or is_sent reflect a coherent lifecycle. Business invariants are invisible to the compiler and must be rechecked at every call site.",
+      "fix": "Replace status with an enum LeaseStatus {Pending, Validated, Sent, ...}. Replace is_validated and is_sent with typestate transitions via a struct parameterized on a typestate enum, or use a single enum state field with a fallible constructor rejecting invalid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_typestates",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "pub is_validated: bool is a primitive lifecycle flag. Booleans encode no transition rules and cannot prevent invalid state transitions at compile time.",
+      "failure_mode": "Code can flip is_validated or is_sent independently of status, producing states like (status=Pending, is_validated=true, is_sent=true) that violate the lease lifecycle invariant.",
+      "fix": "Model lifecycle as an enum LeaseState with variants encoding the full lifecycle position (e.g., LeaseState::New, LeaseState::Validated, LeaseState::Sent), or use a typestate pattern with a generic parameter."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_string_status_with_domain_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "pub status: String accepts arbitrary text. There is no enforced set of valid statuses, no transition logic, and no compile-time guarantee that status matches the lifecycle flags.",
+      "failure_mode": "Typos, unexpected values, or corrupted data produce undetectable invalid states. Comparisons require string equality instead of exhaustive enum matching.",
+      "fix": "Replace with `pub status: LeaseStatus` where LeaseStatus is an exhaustive enum (e.g., `enum LeaseStatus { Pending, Validated, Sent }`). Drop is_validated and is_sent flags entirely as they are derivable from the enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell_separation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates a domain struct directly with no typed error return, no validation, and no core/shell boundary. Status changes are side effects that should be explicit actions, not free functions on domain data.",
+      "failure_mode": "No failure path exists. If validation must precede marking sent, there is no way to express that constraint. The function silently accepts invalid transitions.",
+      "fix": "Split into a pure core function that computes the next valid state from a valid input state, returning a typed error via Result on invalid transitions. The shell function handles I/O and calls the core. Or use a builder/actor pattern where the transition method returns Result<NewState, TransitionError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_expect_panics_in_production",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() performs an allocation for a hardcoded string. Combined with the String status field, this is an unbounded allocation path that silently succeeds even under memory pressure.",
+      "failure_mode": "Under memory pressure, repeated mark_sent calls can OOM the process rather than returning a typed Allocation error that the caller can handle.",
+      "fix": "Use an enum LeaseStatus and eliminate the String allocation entirely. If a String is unavoidable at a boundary, use try_reserve or fallible allocation with typed error mapping."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "id_should_be_newtyped",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "pub id: String is a bare string with no domain type. Any function accepting String can be passed this id, losing compile-time differentiation from other string fields.",
+      "failure_mode": "API confusion: passing a different String field as the lease id compiles silently. String equality is used instead of type-level identity.",
+      "fix": "Introduce a newtype `pub struct LeaseId(String)` or `pub struct LeaseId([u8; N])` with Display, Serialize, etc. implemented. Use it as the field type."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "pub_exposes_internal_state",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of LeaseWorkflow are pub. External code can modify status, is_validated, and is_sent directly, bypassing any transition logic.",
+      "failure_mode": "The struct offers no encapsulation. Any crate code can set item.is_sent = true without calling mark_sent, completely sidestepping the intended workflow.",
+      "fix": "Make fields private. Provide a fallible constructor and transition methods that enforce invariants. If the struct must be returned from functions, derive Serialize/Clone but keep internal state encapsulated."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "sent_at_epoch_ms_without_context",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> stores a raw epoch millisecond value with no type or clock abstraction. In the functional core, time should not appear; in the shell, it should use an injectable clock.",
+      "failure_mode": "Tests cannot be deterministic. The value is opaque without a type alias or newtype. Concurrent code cannot mock the clock.",
+      "fix": "If the core needs the timestamp, use `Option<ClockTick>` or similar newtype. Move clock interaction to the imperative shell. In the core, the timestamp should be an input parameter, not mutable state."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition",
+    "no profiler data for allocation patterns in LeaseWorkflow",
+    "no allocation audit for the to_string() path on status updates",
+    "no second-ring command evidence (no cargo test, cargo clippy, or Miri runs)",
+    "no command or CLI interface evidence for the lease workflow",
+    "no formal spec or TLA+ model of the lease typestate transitions"
+  ],
+  "residual_risk": "Static review only. The crate has no tests, no benchmarks, no CI, and no formal verification. The LeaseWorkflow struct cannot enforce its own invariants due to untyped fields. All state transitions are silent and unvalidated. The code is functionally correct for the single happy path but cannot represent or reject any illegal lease state. A reviewer or caller must manually verify every usage site for valid transitions."
+}

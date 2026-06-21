@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String, allowing any arbitrary string value including invalid lifecycle states like 'sent' with is_sent=false, or 'draft' with is_sent=true.",
+      "failure_mode": "Domain invariant (status matches sent/validated flags) is enforced only by convention, not type; callers can construct incoherent state that silently violates workflow semantics.",
+      "fix": "Replace pub status: String with a sealed enum (e.g., PacketStatus { Draft, Validated, Sent }) so the compiler enforces valid lifecycle states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent flags that can be in contradictory or unreachable combinations (both true, both false, or true/true without a defined ordering).",
+      "failure_mode": "Workflow state machine has 4 reachable states (false/false, true/false, false/true, true/true) when the domain has a strict linear progression. Invalid combinations silently pass compilation and runtime.",
+      "fix": "Replace both bools with a single typestate enum (PacketState { Draft, Validated, Sent }) or a state machine type that enforces valid transitions at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a lifecycle flag that should be a typestate enum variant. Combined with is_validated bool, creates 4 combinatorial states instead of a linear workflow.",
+      "failure_mode": "Calling mark_sent() sets is_sent=true but does not clear is_validated, producing a packet with both flags true — an impossible real-world state that the type system cannot prevent.",
+      "fix": "Replace with a single PacketState enum; mark_sent transitions the enum from Validated to Sent (or Draft to Sent if that is the intended transition)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_not_in_core",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is pub String — raw primitive at the core boundary with no domain type wrapping it. Every caller must validate the ID format independently.",
+      "failure_mode": "Empty strings, malformed IDs, or IDs with disallowed characters propagate into the core without any single point of validation or rejection.",
+      "fix": "Introduce a newtype PacketId(String) with a private constructor that validates the format, making invalid IDs unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes PacketWorkflow by value and mutates it in-place (mut item, item.status = ..., item.is_sent = ...). This is imperative mutation, not functional core. The function also uses .to_string() allocation for a literal.",
+      "failure_mode": "The function has side-effect semantics disguised as a pure transform. .to_string() allocates on every call for a static string literal. The caller still holds the original (now stale) reference if they clone, or the original is consumed with no clear ownership contract.",
+      "fix": "Return a new PacketWorkflow from a pure core function (e.g., fn mark_sent(p: &PacketWorkflow) -> PacketWorkflow) that constructs the result via enum-based transition, and allocate the status string only once if it is a known literal (use &'static str or Cow<'static, str>)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pub_struct_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of PacketWorkflow are pub, allowing external code to bypass all invariants by direct field assignment (e.g., item.is_sent = true; item.is_validated = false; item.status = \"anything\").",
+      "failure_mode": "Any caller can put the struct into any state without going through domain constructors or transition functions, completely nullifying type-level invariants.",
+      "fix": "Make all fields private (no pub on fields). Provide a fallible constructor `fn new(...) -> Result<PacketWorkflow, Error>` and transition methods, or derive/build via a builder pattern."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() performs an unnecessary heap allocation for a literal string that could be &'static str or deduplicated.",
+      "failure_mode": "Every call to mark_sent allocates a new String on the heap for the literal \"sent\", increasing memory pressure and GC work on an allocation that is functionally identical across all calls.",
+      "fix": "Use a &'static str field or an enum variant for status; if String is required by trait bounds, use Cow<'static, str> or intern the literal."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for the PacketWorkflow struct or mark_sent function. The use of String + .to_string() has not been measured against alternatives.",
+      "failure_mode": "Unmeasured allocations may become a bottleneck under high throughput; without benchmarks, performance regressions are invisible.",
+      "fix": "Add a criterion or simple microbenchmark comparing String-based status vs enum/str-based status, measuring allocation count and throughput for mark_sent under load."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or PacketWorkflow throughput",
+    "no profiler data for allocation patterns of String fields",
+    "no allocation audit (e.g., `tracelive` or `dhat` evidence) for the packet lifecycle",
+    "no second-ring validation: status string has no format validator or unit test",
+    "no command evidence (cargo test, cargo fmt, cargo clippy) — static review only"
+  ],
+  "residual_risk": "Static review only; no commands run. The code compiles but has fundamental domain model violations: boolean lifecycle flags, unrestricted pub fields, raw String status, and imperative mutation. These are all BLOCKERs that must be fixed before delivery. No performance or safety evidence exists. The crate has zero tests, zero benchmarks, and no behavior coverage."
+}

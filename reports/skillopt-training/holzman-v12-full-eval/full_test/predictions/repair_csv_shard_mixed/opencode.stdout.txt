@@ -1,0 +1,16 @@
+Now I have full context. The production code has `.unwrap()`, ignores `max_items`, and lacks all error handling. Let me fix it.
+All 4 tests pass. Now writing the required output JSON.
+Repair complete. Summary:
+
+**Changed file:** `src/lib.rs`
+
+**Bugs fixed:**
+1. `.unwrap()` → typed `ParseError::Invalid` via `map_err`
+2. Empty input → `ParseError::Empty` check before any processing
+3. `max_items` ignored → enforced as hard cap before each `push`
+4. Unchecked allocation → `try_reserve` with `ParseError::Allocation`
+5. Iterator collect with panic → bounded explicit loop with per-item validation
+
+**All 4 behavior tests pass:** `parses_values`, `rejects_empty`, `rejects_invalid`, `rejects_too_many`
+
+**Output written to:** `repair-output.json`

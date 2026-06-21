@@ -1,0 +1,16 @@
+[
+  {
+    "op": "replace",
+    "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` fo",
+    "content_preview": "- **Arithmetic:** ALL integer arithmetic involving totals, counts, or capacity MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. Never use `+`, `-`, `*`, `/`, or `as` for these oper",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "append",
+    "target": "",
+    "content_preview": "## Common Syntax Pitfalls\n- `try_from` is an associated function: use `T::try_from(value)` or `u32::try_from(value)`, NOT `value.try_from()`.\n- `checked_add`/`checked_mul`/`checked_div` return `Option",
+    "status": "applied_append",
+    "index": 2
+  }
+]

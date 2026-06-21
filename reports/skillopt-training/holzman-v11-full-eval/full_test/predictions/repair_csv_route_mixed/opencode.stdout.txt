@@ -1,0 +1,8 @@
+Repaired. All 4 tests pass, `cargo fmt` passes, JSON output written and validated.
+
+**Changes to `src/lib.rs`:**
+- Removed `unwrap()` panic surface — replaced with `map_err` → `ParseError::Invalid`
+- Added empty-input check → `ParseError::Empty`
+- Added `max_items` enforcement before push → `ParseError::TooMany`
+- Added `try_reserve` with `ParseError::Allocation` on failure
+- Treats empty trimmed segments as `ParseError::Invalid`

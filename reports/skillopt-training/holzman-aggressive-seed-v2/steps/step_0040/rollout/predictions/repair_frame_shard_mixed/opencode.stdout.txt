@@ -1,0 +1,18 @@
+Issues found in `src/lib.rs`:
+1. `payload.len() as u32` — lossy `as` conversion (banned)
+2. `max_payload` parameter ignored — `rejects_limit` test fails
+3. No `try_reserve` for bounded-capacity Vec
+
+Fixing:
+Both tests pass. Now writing the repair output.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+| Issue | Fix |
+|---|---|
+| `payload.len() as u32` — lossy `as` conversion | `u32::try_from(payload.len())` with `map_err(FrameError::Overflow)` |
+| `max_payload` parameter ignored | Added bounds check: `payload.len() > max_payload` → `Err(FrameError::PayloadTooLarge)` |
+| No bounded-capacity allocation | `try_reserve(total_len)` with `checked_add` for capacity, errors mapped to `FrameError::Allocation` |
+
+Commands: `cargo fmt` passed, `cargo test` passed (2/2 tests).
+
+Output written to: `repair-output.json`

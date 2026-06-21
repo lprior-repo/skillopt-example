@@ -1,0 +1,14 @@
+Now I have all the context. This is a tiny fixed-input performance review task (`[u8; 4]` → `Vec<&'static str>` with a TODO claiming Rayon/SmallVec "will be faster"). Let me write the review.
+Review complete. Written to `review-output.json` with 5 findings:
+
+| # | Severity | Rule | Line | Issue |
+|---|----------|------|------|-------|
+| 1 | BLOCKER | tiny-rayon-overhead | 2 | Rayon dispatch overhead dwarfs 4-element work |
+| 2 | BLOCKER | tiny-smallvec-folklore | 2 | SmallVec adds dependency with no benefit for 4 elements |
+| 3 | BLOCKER | unbounded-alloc-tiny-input | 1 | `Vec` return for known-4-element output is unnecessary heap allocation |
+| 4 | BLOCKER | missing-benchmark-baseline | 2 | Performance claim in TODO has no evidence, baseline, or workload |
+| 5 | MAJOR | alloc-collect-tiny | 6 | `.collect()` allocates Vec on heap for 4 items |
+
+Missing evidence: no benchmark, no workload definition, no profiler output, no hardware specification.
+
+Residual risk: code is functionally correct (no absolute law violations). Risk is developers acting on folklore TODO and degrading performance by adding Rayon/SmallVec. Recommended fix: remove TODO, return `[&'static str; 4]` instead of `Vec`.

@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses `status: String` and `is_sent: bool` as separate fields, making it trivially constructable into invalid states (e.g., status=\"sent\" but is_sent=false, or status=\"draft\" but is_sent=true). No constructor enforces invariants.",
+      "failure_mode": "Any code path reading LeaseWorkflow must defensively re-validate status vs is_sent consistency, violating functional-core contract parity and enabling silent logic errors.",
+      "fix": "Replace `status: String` and `is_sent: bool` with a single `LeaseStatus` enum (e.g., `Draft`, `Validated`, `Sent { sent_at: u64 }`) that makes illegal state transitions unrepresentable at compile time. Remove public fields or provide a fallible constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a boolean lifecycle flag that leaks implementation detail into the domain model. It cannot express the state machine ordering (e.g., validated implies not draft) and provides no information about what validation means.",
+      "failure_mode": "State transitions are not enforced; callers can skip validation or toggle it backwards, bypassing domain invariants.",
+      "fix": "Merge `is_validated` into the same `LeaseStatus` enum so the enum variants encode the full lifecycle (e.g., `Draft`, `Validated`, `Sent { sent_at: u64 }`). The compiler enforces valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_domain_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a primitive domain identifier with no domain semantics (format, length, uniqueness). Callers must repeatedly validate it.",
+      "failure_mode": "Invalid or empty lease IDs propagate through the system, requiring redundant validation at every call site.",
+      "fix": "Introduce a `LeaseId` newtype with a fallible constructor that validates format/length, then use `LeaseId` in `LeaseWorkflow`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mut_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `LeaseWorkflow` are `pub`, allowing external code to mutate any field directly, bypassing any domain invariants.",
+      "failure_mode": "External code can set `is_sent = true` without calling `mark_sent`, or corrupt `status` to an unrecognized string.",
+      "fix": "Make all fields `pub(crate)` or `private` and provide domain methods (e.g., `LeaseWorkflow::mark_sent() -> Result<Self, Error>`) that enforce state transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_api",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes `mut item: LeaseWorkflow` by value and mutates fields directly instead of using a method on the struct or a constructor-based pure function. No state transition validation is performed.",
+      "failure_mode": "Any current state can be transitioned to \"sent\", including already-sent or invalid states. No precondition check (e.g., must be validated before sent).",
+      "fix": "Define `mark_sent(self) -> Result<LeaseWorkflow, TransitionError>` on `LeaseWorkflow` that validates the current state is in a sent-eligible variant before producing the new state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_error_for_transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` returns `LeaseWorkflow` directly with no error type, so there is no way to signal an invalid transition.",
+      "failure_mode": "Callers cannot distinguish success from rejected transitions; the function either works silently or the invalid state is silently stored.",
+      "fix": "Define a `LeaseTransitionError` enum (e.g., `AlreadySent`, `NotValidated`) and return `Result<LeaseWorkflow, LeaseTransitionError>`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "timestamp_type",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` uses a raw `u64` for a timestamp with no domain semantics. No bounds, no monotonicity guarantee, no timezone/context.",
+      "failure_mode": "Callers cannot distinguish a zero timestamp from a valid one, and cannot reason about temporal ordering without external knowledge.",
+      "fix": "Introduce an `EpochMs` newtype wrapping `u64` with a constructor that rejects zero, or use `std::time::SystemTime` / a domain timestamp type with explicit bounds."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_tests_or_benchmarks",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The crate has no tests, benchmarks, or behavior specifications. No proof that the domain model or `mark_sent` function is correct.",
+      "failure_mode": "Any future changes have no behavioral baseline; regressions in state transitions or newtype invariants go undetected.",
+      "fix": "Add at minimum: a test module verifying `mark_sent` succeeds for valid preconditions and fails for invalid ones; property tests for newtype invariants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data for hot path analysis",
+    "no allocation tracking (no `try_reserve` or capacity analysis needed for current scope but absent)",
+    "no second-ring evidence (assembly, ABI, or SBOM) because no performance claims are stated",
+    "no command verification evidence (cargo fmt/check/clippy/test not run)"
+  ],
+  "residual_risk": "The domain model makes illegal states trivially representable. Status, validation, and sent flags are independent booleans/strings that can be arbitrarily combined. The `mark_sent` function has no precondition checks and returns no error type. This is a severe DDD contract violation: the type system encodes zero domain invariants. Without an enum-based typestate, any consumer must manually re-validate state consistency at every access point."
+}

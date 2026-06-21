@@ -1,0 +1,14 @@
+{
+  "n": 21,
+  "hard": 0.7142857142857143,
+  "soft": 0.9063492063492065,
+  "passed": 15,
+  "failed": [
+    "repair_summary_event_mixed",
+    "repair_summary_ledger_mixed",
+    "repair_summary_route_mixed",
+    "repair_summary_shard_mixed",
+    "review_invalid_state_budget_typestate",
+    "review_invalid_state_ledger_typestate"
+  ]
+}

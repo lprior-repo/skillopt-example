@@ -1,0 +1,25 @@
+Analysis complete. Violations found:
+1. `unwrap()` on line 24 - BLOCKER
+2. Unchecked indexing `parts[1]` - BLOCKER
+3. `total += value` unchecked arithmetic - BLOCKER
+4. `total / count` without non-zero check + lossy `as` - BLOCKER
+5. `split(',')` + `collect` instead of `split_once` - BLOCKER
+6. Returns `String` but tests expect `Summary` struct
+7. Missing `render_summary` function
+
+Repair: refactor to return `Result<Summary, ...>`, use `split_once`, `checked_add`, `checked_div`, extract formatting to `render_summary`.
+All 6 tests pass. Now writing the output.
+Repair complete. All 6 behavior tests pass.
+
+**Blocked violations fixed in `src/lib.rs`:**
+
+| Rule | Before | After |
+|------|--------|-------|
+| No `unwrap` | `parts[1].parse().unwrap()` | `.map_err(\|_\| SummaryError::Invalid)?` |
+| No unchecked indexing | `parts[1]` | `split_once(',').ok_or(...)` |
+| No unchecked arithmetic | `total += value` | `total.checked_add(value).ok_or(Overflow)?` |
+| No lossy `as` | `count as u32`, `count as u64` | `u32::try_from(count)`, `max_rows as u64` (usize→u64 comparison is safe, not width-loss) |
+| No `split+collect` | `split(',').map(...).collect()` | `split_once(',')` |
+| Division safety | `total / count` | `total.checked_div(count)` |
+
+**API contract repair:** `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`), and `render_summary(Summary) -> String` is a new pure formatting function.

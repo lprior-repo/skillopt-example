@@ -1,0 +1,9 @@
+{
+  "n": 7,
+  "hard": 0.8571428571428571,
+  "soft": 0.9761904761904762,
+  "passed": 6,
+  "failed": [
+    "review_invalid_state_batch_typestate"
+  ]
+}

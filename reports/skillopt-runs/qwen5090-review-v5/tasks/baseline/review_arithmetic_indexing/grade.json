@@ -1,0 +1,24 @@
+{
+  "task_id": "review_arithmetic_indexing",
+  "kind": "review",
+  "bundle": "baseline",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/baseline/review_arithmetic_indexing",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen5090-review-v5/tasks/baseline/review_arithmetic_indexing",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": null,
+  "bundle_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+  "task_digest": "7a4db7869dfe4f644a71d9d5de833a617826485a7f74d47e102fd7bf72b2c2bd",
+  "grade": {
+    "kind": "review",
+    "hard": 1.0,
+    "soft": 1.0,
+    "matched_groups": 5,
+    "total_groups": 5,
+    "missing_groups": [],
+    "json_valid": true,
+    "json_errors": [],
+    "mutation_errors": [],
+    "execution_errors": []
+  }
+}

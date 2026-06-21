@@ -1,0 +1,17 @@
+Now I have the full picture. Writing the review output.
+Review complete. Wrote valid JSON to `/tmp/opencode/holzman-skillopt-train/77f3fab34a37781f/review_invalid_state_lease_typestate/review-output.json`.
+
+**Summary of 8 findings (7 BLOCKER, 1 MINOR):**
+
+| # | Rule | File:Line | Problem |
+|---|------|-----------|---------|
+| 1 | typestate | `lib.rs:3` | `status: String` admits any value; illegal states representable |
+| 2 | typestate | `lib.rs:4` | `is_validated: bool` carries no domain semantics |
+| 3 | typestate | `lib.rs:5` | `is_sent: bool` duplicates `status`, can drift out of sync |
+| 4 | typestate | `lib.rs:6` | `sent_at_epoch_ms: Option<u64>` has no invariant link to `is_sent` |
+| 5 | newtype | `lib.rs:2` | `id: String` bare primitive, no domain validation |
+| 6 | mutation | `lib.rs:9` | `mark_sent` mutates in-place; no pre/post state encoding |
+| 7 | alloc | `lib.rs:10` | `.to_string()` heap allocates on every transition |
+| 8 | behavior-test | `lib.rs:1` | No test files at all |
+
+**Missing evidence:** No benchmark, profiler, allocation audit, second-ring tests (Miri/Kani), or command evidence.

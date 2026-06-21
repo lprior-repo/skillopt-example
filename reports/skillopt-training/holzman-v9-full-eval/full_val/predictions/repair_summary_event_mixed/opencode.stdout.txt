@@ -1,0 +1,18 @@
+Now I have full context. The source has multiple Holzman violations: `unwrap()`, unchecked arithmetic, lossy `as` cast, unchecked division, missing `render_summary`, wrong return type, and no error handling. Let me write the repair.
+All 6 tests pass. There's an unused variable warning from double-parsing. Let me clean that up.
+All 6 tests pass with zero warnings. Now writing the required JSON output.
+Repair complete. All 6 behavior tests pass with zero warnings.
+
+**Violations repaired in `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `map_err(|_| SummaryError::Invalid)` |
+| `total += value` (unchecked add) | `total.checked_add(value).ok_or(Overflow)?` |
+| `total / count as u64` (lossy `as`, unchecked div) | `total_u64.checked_div(u64::from(count_u32))` |
+| `parts[1]` (unchecked indexing) | `split_once(',')` with `ok_or(Invalid)` |
+| `count += 1` (unchecked arithmetic) | Single-pass accumulation, `lines.len()` |
+| `Vec::with_capacity` (unbounded allocation) | `try_reserve(max_rows)` |
+| Missing `render_summary` | Added pure formatting function |
+| Wrong return type (`Result<String>` → `Result<Summary>`) | Changed to return `Summary` struct |
+| Double-pass parse (dead code) | Single-pass: validate, parse, accumulate together |

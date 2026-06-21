@@ -1,0 +1,8 @@
+Now I see the issues. The `encode_frame` function ignores `max_payload` and uses a lossy `as u32` conversion. Let me fix it.
+Repair complete. Three fixes applied to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` (was ignored)
+2. **Removed lossy `as u32` conversion** — replaced with `u32::try_from(payload.len())` returning `Err(FrameError::Overflow)`
+3. **Added allocation safety** — `try_reserve(prefix_size + payload.len())` instead of bare `Vec::new()`, returning `Err(FrameError::Allocation)`
+
+All 2 tests pass, no forbidden constructs remain.

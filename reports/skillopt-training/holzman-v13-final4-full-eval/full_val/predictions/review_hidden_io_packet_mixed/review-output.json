@@ -1,0 +1,121 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_core",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets fuses file I/O (fs::read_to_string), logging (println), parsing, and domain construction into a single function, violating Data/Calculations/Actions architecture. The shell should handle I/O and pass DTOs to pure parsing logic.",
+      "failure_mode": "Cannot unit-test the parsing and construction logic without real files; cannot swap storage backends; logging is embedded in domain path and cannot be disabled or redirected.",
+      "fix": "Split into a shell function that reads bytes and a pure parse_records function that takes &[str] and returns Result<Vec<Record>, ParseError>. Move println to the shell boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file is missing, unreadable, or not valid UTF-8.",
+      "failure_mode": "Complete process crash on absent or malformed input file instead of returning a typed I/O error that callers can handle gracefully.",
+      "fix": "Return Result<Vec<Record>, IoError> (or a domain error enum) and propagate the error with ? instead of unwrap."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics when the value field is not a valid integer.",
+      "failure_mode": "Process crash on malformed CSV data instead of returning a typed ParseError that distinguishes invalid format from valid-but-out-of-range values.",
+      "fix": "Use .parse::<u16>().map_err(|e| ParseError::Invalid)? or .parse::<u32>().map_err(|_| ParseError::Invalid)? with a domain-typed error return."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 silently truncates a u32 parse result. Values above 65535 wrap to a small number without error.",
+      "failure_mode": "Invalid domain state: a value like 70000 parses successfully and silently becomes 4464, corrupting data without any caller awareness.",
+      "fix": "Use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow)? or parse directly as u16 with .parse::<u16>().map_err(...). This makes out-of-range a typed error, not silent truncation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use index access without bounds checking. Malformed lines with fewer than 2 comma-separated fields will panic at runtime.",
+      "failure_mode": "Runtime panic (index out of bounds) on malformed input instead of a typed error. The bounds check is hidden inside the index operator, making it unreachable through error handling.",
+      "fix": "Use line.split_once(',').ok_or(ParseError::Invalid)? to get (name_str, value_str) safely, avoiding Vec allocation and index bounds entirely. For two-field records, split_once is the correct pattern per hardening checklist."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_path",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds side-effect I/O inside the data-parsing map closure, violating the Calculations layer which must be pure and deterministic.",
+      "failure_mode": "Side-effectful code inside iterator pipeline is not observable or testable; output depends on external console state; makes the function non-deterministic from a testing perspective.",
+      "fix": "Remove println from the parse path. If logging is needed, return a result that the shell layer can log, or use a pure callback/writer abstraction injected by the shell."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_raw_primitives",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Raw String primitives flow through the entire pipeline without a parse boundary. The name field is a raw String with no invariants, and CSV strings are parsed inline without a dedicated parse function that converts external input into trusted domain values.",
+      "failure_mode": "Callers can construct Record with any String value (empty, whitespace, embedded commas), making illegal states representable at the type level. No smart constructor enforces domain invariants.",
+      "fix": "Introduce a RecordName newtype with a smart constructor that validates non-empty and invariant properties. Add a dedicated parse_record function that takes raw CSV lines and returns Result<Record, ParseError>, enforcing all invariants at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string_instead_of_enum",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses pub name: String, a raw string field with no type-level constraints. The name could be empty, contain invalid characters, or violate domain rules.",
+      "failure_mode": "Invalid record names are representable at the type level; any caller can create a Record with an empty or malformed name string.",
+      "fix": "Replace String with a RecordName newtype that has a private constructor and validates on creation. Encode name invariants in the type system so invalid names cannot be constructed."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::with_capacity equivalent via collect() from split has no domain cap on line count and no try_reserve. Every line allocates a new Vec<String> with trim + to_string allocations.",
+      "failure_mode": "Unbounded allocation per line and per record; a large file causes unbounded heap growth with no cap. Each line's intermediate Vec and String allocations are unbounded and unmeasured.",
+      "fix": "Validate a domain cap/max rows before iteration. Use Vec::new() with try_reserve(max_lines).map_err(|_| AllocationError)? before the collect loop. For single-line parsing, replace the Vec allocation entirely with split_once as noted above."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_performance_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function allocates a Vec per line (split + trim + to_string + collect), then a Vec for the final result. No benchmark, baseline measurement, profiler data, or allocation evidence exists to justify the approach.",
+      "failure_mode": "Performance characteristics are unknown; intermediate allocations could be eliminated with streaming or split_once; allocation pattern may be unacceptable in mission-critical paths per Holzman allocation discipline.",
+      "fix": "Add a benchmark comparing the current approach vs. split_once + &str-based parsing. Report ops/sec or items/sec with workload details. If allocation is in a hot path, use try_reserve and consider returning &str-backed records or a zero-copy design."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo fmt, cargo check, cargo clippy, cargo test, or benchmark commands were executed. No evidence that the code compiles, passes lint gates, or has correct behavior.",
+      "failure_mode": "The code may not even compile; clippy warnings (unwrap_used, indexing_slicing, arithmetic_side_effects) are unverified; no test coverage evidence exists.",
+      "fix": "Run cargo fmt --check, cargo clippy with strict gates, cargo test, and document results. Add behavior tests covering valid input, malformed CSV, missing file, overflow, and empty input."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied performance of load_packets",
+    "no profiler evidence for allocation patterns (per-line Vec/String allocation)",
+    "no allocation budget or try_reserve evidence for bounded allocation",
+    "no second-ring evidence (compiler IR, assembly) for any performance claim",
+    "no command evidence: cargo fmt, cargo clippy, cargo check, cargo test have not been run",
+    "no behavior tests exist for error paths (missing file, malformed CSV, overflow)"
+  ],
+  "residual_risk": "This crate has 11 findings (8 BLOCKER, 3 MAJOR). All absolute laws are violated: no production unwrap allowed but two are present; no hidden I/O allowed but file I/O and println are in the parse path; no lossy casts allowed but as u16 truncates silently; no unchecked indexing allowed but parts[0] and parts[1] lack bounds guards. The function must be split into shell and pure parsing layers, all unwrap/expect/panic surfaces must be replaced with typed errors, the lossy as u16 cast must become try_from, indexing must become split_once, and a RecordName newtype must enforce name invariants. No delivery is possible until all BLOCKER findings are resolved."
+}

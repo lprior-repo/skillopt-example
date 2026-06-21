@@ -1,0 +1,19 @@
+{
+  "n": 22,
+  "hard": 0.5,
+  "soft": 0.9140909090909091,
+  "passed": 11,
+  "failed": [
+    "repair_csv_event_mixed",
+    "repair_csv_shard_mixed",
+    "repair_frame_lease_mixed",
+    "repair_frame_ledger_mixed",
+    "repair_frame_packet_mixed",
+    "repair_frame_sensor_mixed",
+    "repair_summary_sample_mixed",
+    "review_invalid_state_job_typestate",
+    "review_invalid_state_route_typestate",
+    "review_invalid_state_sample_typestate",
+    "review_invalid_state_telemetry_typestate"
+  ]
+}

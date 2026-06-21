@@ -1,0 +1,40 @@
+    Checking repair_summary_ledger_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/a1b1be344aeb469c/repair_summary_ledger_mixed)
+error: this pattern reimplements `Result::unwrap_or`
+  --> src/lib.rs:35:26
+   |
+35 |       let max_rows_limit = match u32::try_from(max_rows) {
+   |  __________________________^
+36 | |         Ok(v) => v,
+37 | |         Err(_) => u32::MAX,
+38 | |     };
+   | |_____^ help: replace with: `u32::try_from(max_rows).unwrap_or(u32::MAX)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_unwrap_or
+   = note: `-D clippy::manual-unwrap-or` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_unwrap_or)]`
+
+error: match can be simplified with `.unwrap_or_default()`
+  --> src/lib.rs:43:19
+   |
+43 |       let average = match total.checked_div(count as u64) {
+   |  ___________________^
+44 | |         Some(average) => average,
+45 | |         None => 0,
+46 | |     };
+   | |_____^ help: replace it with: `total.checked_div(count as u64).unwrap_or_default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_unwrap_or_default
+   = note: `-D clippy::manual-unwrap-or-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::manual_unwrap_or_default)]`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:43:43
+   |
+43 |     let average = match total.checked_div(count as u64) {
+   |                                           ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: could not compile `repair_summary_ledger_mixed` (lib) due to 3 previous errors

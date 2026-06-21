@@ -1,0 +1,10 @@
+Now I understand the issues. Let me fix the production source:
+
+1. `payload.len() as u32` — lossy cast (Holzman violation)
+2. No `max_payload` check — `rejects_limit` test expects `PayloadTooLarge`
+Repair complete. Two issues fixed in `src/lib.rs`:
+
+1. **Lossy cast removed**: `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+2. **Max payload check added**: Returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`
+
+Both behavior tests pass. Output written to `repair-output.json`.

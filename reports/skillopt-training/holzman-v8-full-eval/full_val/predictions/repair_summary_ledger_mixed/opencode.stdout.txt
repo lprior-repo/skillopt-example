@@ -1,0 +1,11 @@
+Now I understand the full picture. The tests import `render_summary` and expect `summarize_metrics` to return `Result<Summary, SummaryError>`, but the current code returns `Result<String, SummaryError>` and has multiple Holzman violations (`unwrap`, unchecked indexing, unchecked arithmetic). Let me fix this.
+All 6 tests pass. Now writing the required output file.
+Repaired. Changes made to `src/lib.rs`:
+
+1. **`summarize_metrics` return type**: `Result<String>` → `Result<Summary>` (matches test contract)
+2. **Removed `unwrap()`**: Parse failure now returns `Err(SummaryError::Invalid)` via `map_err`
+3. **Removed unchecked indexing `parts[1]`**: Replaced with `split_once(',')` + `ok_or`
+4. **Removed unchecked arithmetic `total += value`**: Replaced with `checked_add` → `Err(SummaryError::Overflow)`
+5. **Division by zero guard**: Returns `Empty` when count is 0
+6. **Removed `Vec<String>` allocation per line**: Uses `split_once` with borrowed slices
+7. **Added `render_summary`**: Pure shell function that formats a `Summary` into a string (extracted from core logic per Functional Core / Imperative Shell)

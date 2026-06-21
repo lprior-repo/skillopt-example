@@ -1,0 +1,12 @@
+    Checking repair_summary_route_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/b1773b2015f727f8/repair_summary_route_mixed)
+error: this call to `from_str_radix` can be replaced with a call to `str::parse`
+  --> src/lib.rs:26:21
+   |
+26 |         let value = u64::from_str_radix(value_str.trim(), 10).map_err(|_| SummaryError::Invalid)?;
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `value_str.trim().parse::<u64>()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#from_str_radix_10
+   = note: `-D clippy::from-str-radix-10` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::from_str_radix_10)]`
+
+error: could not compile `repair_summary_route_mixed` (lib) due to 1 previous error

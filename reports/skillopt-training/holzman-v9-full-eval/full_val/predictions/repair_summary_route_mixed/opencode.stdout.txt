@@ -1,0 +1,20 @@
+Now I have full picture. Multiple Holzman law violations: `unwrap()`, unchecked arithmetic, lossy casts, no checked division, no `render_summary`, wrong return type. Let me repair.
+All 6 tests pass. Let me verify with strict clippy as well.
+Clean clippy. Now writing the required output JSON.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+**Violations removed:**
+- `unwrap()` → `?` with `map_err` to typed `SummaryError::Invalid`
+- `total += value` → `total.checked_add(value).ok_or(Overflow)?`
+- `count += 1` → `count.checked_add(1).ok_or(Overflow)?`
+- `total / count as u64` → `total.checked_div(u64::try_from(count).map_err(Overflow)?)` — no unchecked division, no lossy cast
+- `count as u32` → `u32::try_from(count).map_err(Overflow)?`
+- Unchecked `parts[1]` → `split_once(',')` pattern matching with `.ok_or(Invalid)`
+- Empty input → returns `Err(SummaryError::Empty)`
+
+**Architecture fixes:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`) to separate pure logic from rendering
+- Added `render_summary(Summary) -> String` as the imperative-shell rendering function
+- Functional Core / Imperative Shell boundary enforced
+
+**Results:** `cargo fmt` clean, 6/6 tests pass, clippy strict gate passes with zero warnings.

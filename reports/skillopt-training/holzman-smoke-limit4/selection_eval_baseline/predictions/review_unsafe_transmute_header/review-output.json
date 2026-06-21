@@ -1,0 +1,53 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production code contains an `unsafe` block using `std::mem::transmute` to reinterpret bytes as `u32`.",
+      "failure_mode": "transmute bypasses endian semantics and relies on platform endianness; on big-endian targets this returns host-endian data that callers will misinterpret as little-endian, producing silently corrupt length values.",
+      "fix": "Replace the entire `unsafe` block with `u32::from_le_bytes([input[0], input[1], input[2], input[3]])` or `u32::from_be_bytes(...)` depending on the wire format, and add a bounds check."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Direct indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` with no length guard panics on inputs shorter than 4 bytes.",
+      "failure_mode": "A caller passing a slice with fewer than 4 elements triggers a bounds panic, turning a recoverable malformed-input case into a process abort.",
+      "fix": "Check `input.len() >= 4` before indexing, or return a `Result<u32, Error>` and use `input.get(0)..input.get(3)` with `?` propagation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_transmute_for_type_conversion",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`std::mem::transmute::<[u8; 4], u32>` is misused for what is fundamentally an endianness-aware byte-to-int conversion, not a bit-for-bit alias.",
+      "failure_mode": "transmute guarantees identical bit layout but does not encode endianness intent; future readers and static analyzers cannot reason about the byte order contract, and on big-endian architectures the returned value will be byte-swapped relative to any little-endian assumption.",
+      "fix": "Use `u32::from_le_bytes` or `u32::from_be_bytes` to make the endianness explicit in the type signature and eliminate the `unsafe` block entirely."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for `read_len`.",
+      "failure_mode": "Without evidence the function's performance characteristics (branch on bounds check, cache behavior) are unverified.",
+      "fix": "Add a `criterion` or `divan` benchmark exercising the short-path (<=3 bytes) and long-path (>=4 bytes) to confirm the bounds-checked variant meets the performance budget."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No test target, no benchmark target, and no dev-dependencies declared.",
+      "failure_mode": "The crate has no verifiable test or benchmark harness; no commands can be run to validate behavior or performance claims.",
+      "fix": "Add `[[test]]` or `[[bench]]` sections and `criterion`/`proptest` under `[dev-dependencies]`."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for `read_len`", "no test target in Cargo.toml", "no profiler output", "no allocation analysis"],
+  "residual_risk": "static review only; no commands run. The `unsafe transmute` and unchecked indexing are definitive BLOCKERS that must be repaired before any delivery gate."
+}

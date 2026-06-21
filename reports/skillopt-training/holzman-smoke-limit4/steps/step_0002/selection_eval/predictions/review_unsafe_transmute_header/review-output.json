@@ -1,0 +1,80 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production code uses `unsafe { std::mem::transmute }` to reinterpret bytes as a u32",
+      "failure_mode": "transmute between [u8; 4] and u32 is platform-endian-dependent and invokes undefined behavior under strict-aliasing and value-representation rules; the caller cannot reason about endianness or guarantee identical byte order on all targets",
+      "fix": "Replace with `u32::from_le_bytes` or `u32::from_be_bytes` (choose the correct endianness for the protocol) and remove the unsafe block entirely"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "transmute is used as a zero-copy byte-to-int converter instead of a safe API",
+      "failure_mode": "Silent endianness mismatch: on a little-endian host the bytes [0x01,0x00,0x00,0x00] yield 1, but on big-endian the same bytes yield 0x01000000; protocol consumers get silently corrupted integers",
+      "fix": "Use `u32::from_le_bytes([input[0], input[1], input[2], input[3]])` for little-endian wire format, or `u32::from_be_bytes` for big-endian. Document the chosen endianness in the function doc comment."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panics",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Unbounded array indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` on a raw slice without length check",
+      "failure_mode": "Input slice shorter than 4 bytes causes a bounds-check panic (index out of bounds), violating the Holzman rule against production panics and turning a recoverable error into a process termination",
+      "fix": "Return a typed result: `fn read_len(input: &[u8]) -> Result<u32, TooShort>`, check `input.len() >= 4` with `match input.get(0).and_then(|_| input.get(1))...` or slice pattern matching `&[b0, b1, b2, b3, ..]`, and return the error instead of panicking"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panics",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Four separate unchecked indexing operations on `input` with no guard",
+      "failure_mode": "Any of the four indices can panic independently, producing inconsistent error behavior depending on which byte is missing — the caller cannot distinguish a 1-byte-short input from a 3-byte-short input without catching a panic",
+      "fix": "Use `input.get(..4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]))` which returns `Option<[u8; 4]>`, then convert `Option` to `Result` with `ok_or(TooShort)` for a single atomic bounds check"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function takes `&[u8]` but immediately copies into a stack-allocated `[u8; 4]` before transmuting",
+      "failure_mode": "The copy defeats the purpose of borrowing; no measurable performance benefit exists for this single-copy pattern, and the function signature misleads callers into thinking it avoids allocation when it performs a fixed-size copy on every call",
+      "fix": "If the intent is zero-copy reads, accept a pointer-based API with explicit length validation; if the intent is safe parsing, the `from_le_bytes` approach already copies exactly 4 bytes — make the doc comment reflect that this function reads a fixed 4-byte wire length"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_docs_or_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No doc comment documenting endianness, error conditions, or safety contract",
+      "failure_mode": "Callers have no way to know whether bytes are little-endian or big-endian, whether the function requires >= 4 bytes, or what error type to handle — this is a public API with implicit invariants",
+      "fix": "Add a doc comment: `/// Reads a 4-byte little-endian unsigned length from the front of `input`.\n/// Returns `Err(TooShort)` if `input.len() < 4`."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_evidence",
+      "file": "N/A",
+      "line": 0,
+      "problem": "No benchmark exists for any performance claim",
+      "failure_mode": "N/A — this is a static review finding; without benchmarks there is no evidence that the function (or a replacement) meets any performance target",
+      "fix": "Add a `criterion` or `divan` benchmark comparing `transmute` vs `from_le_bytes` vs slice pattern match on representative input sizes"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_evidence",
+      "file": "N/A",
+      "line": 0,
+      "problem": "No allocation or profiler evidence for hot-path usage",
+      "failure_mode": "N/A — if this function is on a hot path (e.g., packet parsing loop), the fixed-size copy and potential panic path have unmeasured latency characteristics",
+      "fix": "Run `cargo bench` or `perf record` to verify the function's latency profile in context"
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for the stated performance claim", "no allocation/profiler evidence for hot-path usage"],
+  "residual_risk": "static review only; no commands run. The code contains two BLOCKER-class unsafety issues (transmute UB + unbounded indexing panic) that must be fixed before this code is merged. Residual risk after fix: low, assuming tests cover short-input error paths and correct endianness."
+}

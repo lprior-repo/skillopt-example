@@ -1,0 +1,28 @@
+Now I understand the issues. The current `parse_packets` has:
+1. No empty input rejection
+2. `.unwrap()` panic surface on parse
+3. No `max_items` enforcement
+4. No `try_reserve`
+5. Direct `collect()` from split
+I need to fix - `ParseError::Overflow` doesn't exist in the enum. Let me map it to `TooMany`:
+Let me verify the full source and run tests:
+All 4 tests pass. Let me also verify clippy and fmt:
+All checks pass. Now writing the required JSON output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+**Removed:**
+- `.unwrap()` panic surface on parse
+- Direct `.collect()` from split (intermediate Vec allocation)
+- No empty input check
+- No `max_items` enforcement
+- No `try_reserve`
+
+**Added:**
+- Empty input rejection at entry
+- `Vec::new()` + `try_reserve(max_items)` with `Allocation` error mapping
+- `checked_add(1)` for count with `TooMany` overflow mapping
+- `max_items` cap enforced before each push
+- `.map_err(|_| ParseError::Invalid)` on parse
+- Post-parse empty check (handles inputs like `" , , "` with only whitespace)
+
+All 4 behavior tests pass, clippy zero warnings, no formatting drift.

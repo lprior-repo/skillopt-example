@@ -1,0 +1,31 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/.skill/holzman-rust/references/claim-traceability.md",
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/Cargo.toml",
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/src/lib.rs",
+    "/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/repair_frame_audit_mixed/tests/behavior.rs"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo clippy --lib -- -D warnings", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No lossy as conversion: replaced payload.len() as u32 with u32::try_from(payload.len()).map_err()",
+    "Payload size check: added payload.len() > max_payload guard returning FrameError::PayloadTooLarge",
+    "Checked arithmetic: added 4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?",
+    "Bounded allocation: Vec::new() + try_reserve(capacity).map_err() replaces unbounded growth",
+    "No unwrap/expect/panic/todo/unimplemented/unreachable in production source",
+    "All fallible results propagated with typed FrameError variants",
+    "Two behavioral tests pass: encodes and rejects_limit",
+    "cargo fmt --check clean, clippy -D warnings clean"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All Holzman absolute laws satisfied: no unsafe, no lossy casts, no unchecked arithmetic, no unchecked indexing, bounded allocation with try_reserve, typed errors for all failure modes, and both behavioral tests pass."
+}

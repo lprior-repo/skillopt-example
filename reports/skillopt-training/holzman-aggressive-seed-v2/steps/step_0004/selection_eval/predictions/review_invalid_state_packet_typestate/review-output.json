@@ -1,0 +1,89 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses pub String for status, pub bool for is_validated and is_sent. Illegal states are freely representable: is_sent=true with status='pending', is_validated=false with status='validated', both booleans true simultaneously, or status set to arbitrary strings like 'xyzzy'.",
+      "failure_mode": "Downstream logic can observe inconsistent lifecycle state, causing incorrect routing, duplicate sends, or silent data corruption. The bool flags and status string are three independent sources of truth that can diverge.",
+      "fix": "Replace status: String with an enum PacketStatus { Pending, Validated, Sent, ... }. Replace is_validated: bool and is_sent: bool with a single typestate enum or derive from PacketStatus. Remove pub fields and provide a fallible constructor that enforces valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive boolean lifecycle flag. It is an independent source of truth from status and is_sent, making it trivially possible to have inconsistent state.",
+      "failure_mode": "Boolean flags are bit-patterns the compiler cannot reason about. Setting is_validated=true without updating status creates a state that passes boolean checks but fails status-based logic.",
+      "fix": "Fold validation state into an enum typestate. Use PacketStatus::Validated instead of is_validated: bool."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a primitive boolean lifecycle flag, redundant with status='sent'. Two independent fields encode the same lifecycle fact.",
+      "failure_mode": "Setting is_sent=true but leaving status='pending' means a status-based query misses an already-sent packet, potentially causing duplicate sends or missed tracking.",
+      "fix": "Remove is_sent entirely. Derive sent-ness from PacketStatus::Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_data_by_construction",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are pub with no constructor. Any caller can construct PacketWorkflow with empty id, arbitrary status, or inconsistent flag combinations.",
+      "failure_mode": "Downstream callers bypass all domain invariants at compile time. There is no single point of enforcement — every field assignment is a potential invariant violation.",
+      "fix": "Make all fields private. Provide fn new(id: PacketId) -> Result<Self, InvalidPacket> or a builder that enforces the initial state. Domain types should be valid by construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_string_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a bare primitive. It carries no domain rules (format, length, uniqueness).",
+      "failure_mode": "Callers can pass empty strings, malformed IDs, or non-unique identifiers. No compile-time distinction between packet IDs and arbitrary strings.",
+      "fix": "Create a newtype: pub struct PacketId(String) or use a typed identifier. Provide a fallible constructor PacketId::from_str(s: &str) -> Result<Self, InvalidPacketId>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "string_status_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary strings. The mark_sent function naively assigns 'sent' without any validation or transition logic.",
+      "failure_mode": "Any string is valid. A caller could set status to 'sent' without going through proper validation, or the mark_sent function could be called on an already-sent packet causing no-op or double-send semantics.",
+      "fix": "Replace with: pub enum PacketStatus { Pending, Validated, Sent }. mark_sent should be fn mark_sent(self) -> Result<Self, TransitionError> that enforces Pending|Validated -> Sent transitions."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes and returns PacketWorkflow by value. While it is a pure function with no I/O (good), it operates on a type that cannot represent valid domain invariants.",
+      "failure_mode": "The function is pure but its contract is vacuous — it cannot prevent the caller from passing an already-sent packet or an invalid state.",
+      "fix": "Once types are corrected, mark_sent should consume self and return Result<Self, TransitionError> to enforce state machine transitions."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for PacketWorkflow or mark_sent. Allocation behavior and performance characteristics are unmeasured.",
+      "failure_mode": "If this code processes high-volume packets, String fields cause heap allocations on every copy. Without benchmarks, performance claims are cargo-culted.",
+      "fix": "Add a benchmark for mark_sent to measure allocation behavior. Consider SmallVec or interned strings if volume warrants it."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_behavior_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests exist for PacketWorkflow or mark_sent. No behavior contract is encoded.",
+      "failure_mode": "Refactors to the typestate model could silently break expected behavior without tests as the safety net.",
+      "fix": "Add behavior tests for: valid transitions, rejected invalid transitions, mark_sent from each valid prior state, and mark_sent from Sent (should error)."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent allocation behavior", "no behavior tests for lifecycle transitions", "no allocation profiling data for PacketWorkflow copies", "no command-level evidence (cargo test, cargo clippy, cargo bench not run)"],
+  "residual_risk": "Static review only; no commands run. The crate has no tests, no benchmarks, and no formal verification. The dominant risk is invalid state representation through String/bool fields that make illegal states trivially representable. This is a BLOCKER for any Holzman Rust delivery."
+}

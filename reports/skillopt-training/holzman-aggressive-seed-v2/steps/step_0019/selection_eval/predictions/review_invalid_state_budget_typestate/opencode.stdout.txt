@@ -1,0 +1,16 @@
+Review complete. Written to `review-output.json` with **14 findings**:
+
+**Blockers (7):**
+- `BudgetWorkflow` uses `pub String`/`pub bool` fields — illegal states (invalid+sent, arbitrary status strings) are fully constructible
+- No typestates or enums for lifecycle — `is_validated`, `is_sent`, `status` should be compiler-enforced
+- `mark_sent` doesn't check validation — can send unvalidated budgets
+- Raw `String` for `id` and `sent_at_epoch_ms` — no domain newtypes
+- All fields `pub` — no encapsulation
+
+**Majors (4):**
+- Unnecessary heap allocation via `"sent".to_string()` on every call
+- No typestate transition pattern (returns same type instead of phase-gated type)
+
+**Majors (3):**
+- Missing benchmark, profiler, and allocation evidence
+- No second-ring command evidence (clippy/miri/fmt)

@@ -1,0 +1,7 @@
+Repair complete. All 4 behavior tests pass, all strict lint gates pass.
+
+**Changes in `src/lib.rs`:**
+- Removed `.unwrap()` on parse — now returns `ParseError::Invalid`
+- Added empty-input check — returns `ParseError::Empty`
+- Enforced `max_items` cap before pushing — returns `ParseError::TooMany`
+- Added `try_reserve` for bounded allocation — returns `ParseError::Allocation`

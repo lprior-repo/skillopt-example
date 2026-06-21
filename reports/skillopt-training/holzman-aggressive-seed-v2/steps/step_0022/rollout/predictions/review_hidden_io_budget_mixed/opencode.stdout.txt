@@ -1,0 +1,17 @@
+Now I have all the information needed. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 BLOCKER findings across `src/lib.rs`:**
+
+| Line | Rule | Problem |
+|------|------|---------|
+| 9 | zero_forbidden_constructs | `.unwrap()` on I/O result |
+| 16 | zero_forbidden_constructs | Unchecked `parts[0]`/`parts[1]` indexing |
+| 19 | zero_forbidden_constructs | `.unwrap()` on `.parse::<u32>()` |
+| 19 | zero_forbidden_constructs | Lossy `as u16` cast (truncation) |
+| 16 | functional_core_imperative_shell | `println!()` in parsing core |
+| 8 | no_hidden_io_errors | `-> Vec<Record>` hides all failure modes |
+| 12 | no_cargo_cult_split_collect | `split(',')...collect()` instead of `split_once` |
+| 8 | allocation_budget_handling | No `try_reserve` before Vec collection |
+
+All paths through `load_budgets` can panic. The function needs typed errors, `split_once`, checked parsing into `u16`, allocation budget handling, and removal of side-effect I/O from the core.

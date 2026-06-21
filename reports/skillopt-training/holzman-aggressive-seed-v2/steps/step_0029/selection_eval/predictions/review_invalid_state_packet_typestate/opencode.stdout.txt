@@ -1,0 +1,21 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | `make_illegal_states_unrepresentable` | `src/lib.rs:1` |
+| 2 | BLOCKER | `no_primitive_obsession` | `src/lib.rs:2` |
+| 3 | BLOCKER | `no_primitive_obsession` | `src/lib.rs:6` |
+| 4 | BLOCKER | `functional_core_imperative_shell` | `src/lib.rs:9` |
+| 5 | BLOCKER | `redundant_state` | `src/lib.rs:10` |
+| 6 | WARNING | `missing_benchmark_evidence` | `src/lib.rs:1` |
+| 7 | WARNING | `missing_profiler_evidence` | `src/lib.rs:1` |
+| 8 | INFO | `missing_allocation_evidence` | `src/lib.rs:10` |
+
+**Core issues:**
+- `PacketWorkflow` uses `String`, `bool`, and `Option<u64>` primitives — any illegal state is constructible (e.g., `status="sent"` + `is_sent=false`)
+- Redundant `status`/`is_sent` fields track the same thing; `mark_sent` sets both but leaves `sent_at_epoch_ms` as `None` — inconsistent state
+- No `PacketStatus` enum or typestate exists; no `PacketId` or `EpochMs` newtypes
+- `mark_sent` mutates in place with `.to_string()` allocation instead of being a pure transformation

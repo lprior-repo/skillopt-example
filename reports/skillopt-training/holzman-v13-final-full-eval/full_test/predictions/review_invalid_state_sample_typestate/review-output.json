@@ -1,0 +1,94 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SampleWorkflow uses no typestate at all. Lifecycle progression (created/validated/sent) is encoded as loose booleans and a string instead of a finite state machine with valid transitions.",
+      "failure_mode": "Any combination of is_validated and is_sent is reachable; callers can set is_sent=true without is_validated=true, or set is_validated=false after validation, producing logically invalid states that no runtime check prevents.",
+      "fix": "Replace status + is_validated + is_sent with a single Lifecycle enum (e.g. enum Lifecycle { Created, Validated, Sent { sent_at_epoch_ms: u64 } }) and make SampleWorkflow carry it as a private field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String, not a domain enum. The mark_sent function at line 10 sets it to a magic string literal \"sent\" with no validation that the string was a valid state value.",
+      "failure_mode": "Any string is accepted as status (e.g. \"sent\", \"SENT\", \"\", \"pending\"). The string can be set to any value by any caller, bypassing domain invariants. mark_sent hardcodes a literal instead of a typed transition, making the state space unbounded and unvalidated.",
+      "fix": "Replace `pub status: String` with a private `status: Lifecycle` enum field. Replace `mark_sent` with a method that performs a typed state transition from the enum, not a string assignment."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a public bool encoding lifecycle state. bool/lifecycle fields are explicitly forbidden as lifecycle encoders by the SKILL.md (line 44, 75).",
+      "failure_mode": "is_validated can be flipped to false after being true, creating a logically impossible state. It is independently mutable alongside is_sent, so states like {is_validated: false, is_sent: true} are representable and silently accepted.",
+      "fix": "Eliminate `pub is_validated: bool`. Fold validation into the Lifecycle enum variant (e.g. `Lifecycle::Validated`) so the type system forbids invalid boolean combinations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_is_sent",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a public bool encoding lifecycle state, same class violation as is_validated (SKILL.md line 44, 75).",
+      "failure_mode": "is_sent can be toggled independently, allowing a workflow to be marked sent then un-sent, or sent without validation. The bool provides zero transition semantics — only the current boolean value matters, not the history.",
+      "fix": "Eliminate `pub is_sent: bool`. Represent the sent state as an enum variant (e.g. `Lifecycle::Sent { sent_at_epoch_ms: u64 }`) that owns the timestamp data in the variant that requires it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> that is semantically tied to the sent lifecycle stage but exists as an independent optional field. SKILL.md (line 75, 12) requires optional lifecycle data to live inside the enum variant that owns it.",
+      "failure_mode": "sent_at_epoch_ms can be None while is_sent=true (sent without timestamp), or Some(timestamp) while is_sent=false (timestamp without being sent). These are logically invalid combinations that Option alone cannot prevent.",
+      "fix": "Move sent_at_epoch_ms into the Lifecycle::Sent variant: `Lifecycle::Sent { sent_at_epoch_ms: u64 }`. This makes it impossible to have a timestamp without sent status and vice versa."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a public String with no domain semantics, validation, or newtype wrapper. IDs that carry rules (format, uniqueness, length) should be newtyped.",
+      "failure_mode": "Callers can set id to any string including empty, null-like, or malformed values. There is no validation, length check, or format enforcement. The string can be mutated at any time after construction.",
+      "fix": "Replace `pub id: String` with a private field of type `WorkflowId` (newtype). Provide a smart constructor `WorkflowId::from_str(s: &str) -> Result<Self, ParseError>` with format/length validation. Make the field non-public."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SampleWorkflow exposes all fields as public String/bool/Option. Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly. No constructor, smart factory, or parse function exists to validate input before domain ingestion.",
+      "failure_mode": "Every caller can independently set status to any string, both booleans to any combination, and sent_at_epoch_ms to any Option value, producing illegal state combinations (e.g. sent without validated, empty id, negative timestamps via u64 underflow in callers). The struct is a data bag with zero invariants.",
+      "fix": "Make all fields private. Provide a single fallible constructor or builder: `impl SampleWorkflow { fn new(id: WorkflowId, lifecycle: Lifecycle) -> Result<Self, Error> }`. Parse external primitives (strings, booleans, timestamps) exactly once at the shell boundary into trusted domain types before reaching the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_leakage",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes SampleWorkflow by value and returns it, but performs domain logic (status mutation, lifecycle change) in what should be a pure core function while the struct is a mutable data bag. The function signature provides no type-safety — it accepts any SampleWorkflow regardless of its current lifecycle state.",
+      "failure_mode": "mark_sent can be called on a SampleWorkflow that is already sent (double-sent), not yet validated, or in any other state. There is no guard against calling it in an invalid state. The function silently overwrites status and sets is_sent=true without checking preconditions.",
+      "fix": "Replace mark_sent with a typed method on Lifecycle: `impl Lifecycle { fn transition_to_sent(self, now_ms: u64) -> Result<Lifecycle, TransitionError> }`. The function should accept the current lifecycle enum, not the raw struct, and return a Result with typed transition errors."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition path",
+    "no profiler data for SampleWorkflow construction or transition hot paths",
+    "no allocation analysis — to_string() on line 10 allocates on every call to mark_sent",
+    "no second-ring evidence (binary size, symbol-level) for any performance claim",
+    "no command evidence that cargo fmt/check/clippy/test were executed on this crate",
+    "no command-truth evidence: no build, test, or lint output recorded"
+  ],
+  "residual_risk": "Static review only; no commands were run. The crate has 8 BLOCKER findings: all fields are public raw primitives with no typestate, no smart constructors, no parse boundary, and a stateless mutation function that accepts any struct. The domain model is a data bag that can represent every logically invalid combination of lifecycle states. Delivery is blocked until fields are private, Lifecycle enum replaces status/booleans, WorkflowId newtype wraps id, and a typed constructor enforces invariants."
+}

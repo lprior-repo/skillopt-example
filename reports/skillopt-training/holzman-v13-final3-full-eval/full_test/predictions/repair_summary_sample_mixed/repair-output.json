@@ -1,0 +1,36 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/repair_summary_sample_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/repair_summary_sample_mixed/.skill/holzman-rust/references/hardening-checklist.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo clippy -- -D warnings", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert",
+    "No lossy as conversions (count as u32, count as u64 removed)",
+    "No unchecked arithmetic (checked_add for total and count, checked_div for average)",
+    "No unchecked indexing (split_once replaces split+index)",
+    "CSV/parser pattern: Vec::new + try_reserve + checked pushes with max enforcement",
+    "split_once(',') mandatory parser pattern in use",
+    "u64::try_from(count) and u32::try_from(count) present (no lossy casts)",
+    "summarize_metrics returns Result<Summary, SummaryError> matching test contract",
+    "render_summary function added matching test import",
+    "Rejected empty input before processing",
+    "Typed error returns: Empty, Invalid, TooMany, Overflow",
+    "Summary struct preserved with count: u32, total: u64, average: u64",
+    "Tests untouched (behavior contract)",
+    "Cargo.toml untouched",
+    "Zero clippy warnings",
+    "Formatting clean"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All absolute laws satisfied. All 6 behavior tests pass. Zero clippy warnings. All mandatory repair patterns present in source."
+}

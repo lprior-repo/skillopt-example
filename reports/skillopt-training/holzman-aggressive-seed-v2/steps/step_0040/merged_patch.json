@@ -1,0 +1,33 @@
+{
+  "reasoning": "The agent consistently misses try_reserve in review findings and uses unchecked arithmetic in repairs. The 'parse/boundary' failure suggests agents aren't explicitly checking for domain type violations (raw strings/ints) and safe parsing (split_once) in review mode. We need to reinforce try_reserve as a mandatory review finding for bounded allocations, enforce checked arithmetic as a hard rule for all integer math involving totals/counts, and add explicit parse/boundary checks for review mode to catch raw primitives and unsafe parsing.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Never use `Vec::with_capacity` in production code.",
+      "source_type": "failure",
+      "support_count": 4
+    },
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** ALL integer arithmetic involving totals, counts, or capacity MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. Never use `+`, `-`, `*`, `/`, or `as` for these operations. Division MUST use `checked_div` with error propagation. Use `T::try_from(value)` for conversions, never `as`.",
+      "source_type": "failure",
+      "support_count": 4
+    },
+    {
+      "op": "insert_after",
+      "target": "## Review Mode",
+      "content": "\n## Review Mode Additions\n- **Bounded Allocation:** Flag any `Vec::new()` or `Vec::with_capacity()` where the capacity is known/bounded but `try_reserve` is not used. This is a BLOCKER.\n- **Parse & Boundary:** Flag raw `String`/`u32`/`i64` fields that should be domain newtypes. Flag `split(',') + collect` or `parts[i]` indexing where `split_once` or `get` is appropriate. Flag missing `try_from` for width changes.",
+      "source_type": "failure",
+      "support_count": 4
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded, unchecked `+`/`-`/`*`/`/` in capacity/length/summary math, integer `/` where `checked_div` is required, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "source_type": "failure",
+      "support_count": 4
+    }
+  ]
+}

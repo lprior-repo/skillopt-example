@@ -1,0 +1,7 @@
+The current code has two issues: (1) no `max_payload` check — ignores the limit entirely, and (2) lossy `as` cast on line 10. Tests require rejecting payloads over `max_payload` and encoding length as BE bytes.
+Repair complete. Two fixes in `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload` (test `rejects_limit` was failing because the original code ignored the limit entirely).
+2. **Removed lossy `as` cast** — replaced `payload.len() as u32` with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)` per Holzman constraint on lossy conversions.
+
+Both behavior tests pass, no forbidden constructs remain.

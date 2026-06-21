@@ -1,0 +1,16 @@
+Now I have all the data. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**11 findings, 5 missing evidence items.**
+
+Key blockers:
+- `status: String` should be an enum (line 3)
+- `is_validated: bool` + `is_sent: bool` should be typestate (lines 4-5)
+- No transition machine — `mark_sent` validates nothing (line 9)
+- `id: String` needs newtype (line 2)
+- `sent_at_epoch_ms: Option<u64>` needs timestamp newtype (line 6)
+- No smart constructor — all fields `pub` (line 1)
+- `mark_sent` fuses shell/action with domain mutation (line 9)
+- `to_string()` allocation for known constant on every call (line 10)
+
+Missing evidence: no benchmarks, no profiler, no allocation profiling, no clippy/test runs, no command evidence.

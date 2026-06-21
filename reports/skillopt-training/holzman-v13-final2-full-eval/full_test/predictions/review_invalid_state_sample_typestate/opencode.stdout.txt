@@ -1,0 +1,11 @@
+Review complete. Wrote 7 findings to `review-output.json` covering:
+
+1. **typestate-state-machine** (line 1) - no state machine, all field combinations constructible
+2. **status-string** (line 3) - public `String` accepts arbitrary values
+3. **bool-lifecycle** (lines 4-5) - independent booleans allow impossible combinations
+4. **option-invalid-state** (line 6) - `Option<u64>` decoupled from lifecycle flag
+5. **newtype-domain-ids** (line 2) - raw `String` id, raw `u64` timestamp
+6. **parse-boundary** (line 9) - raw primitives cross boundary, mutation instead of transition
+7. **public-fields-encapsulation** (line 1) - all fields pub, zero domain protection
+
+All 6 required typestate findings plus public-fields are BLOCKER severity. Missing evidence: no benchmarks, profiler, allocation analysis, second-ring evidence, or command-truth.

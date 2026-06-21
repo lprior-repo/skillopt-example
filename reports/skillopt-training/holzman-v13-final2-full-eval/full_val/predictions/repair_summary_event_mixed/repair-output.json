@@ -1,0 +1,34 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/b91f0087472e6cb5/repair_summary_event_mixed/.skill/holzman-rust/SKILL.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock", "status": "passed"},
+    {"command": "cargo check --workspace --all-targets --all-features", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap/expect/panic/todo/unimplemented/unreachable",
+    "Checked arithmetic: total.checked_add, count.checked_add, total.checked_div",
+    "Checked conversions: u64::try_from(count), u32::try_from(count)",
+    "split_once used instead of split + Vec allocation",
+    "Empty input detected before processing",
+    "Invalid format returns SummaryError::Invalid via split_once + parse map_err",
+    "Overflow detection via checked_add and checked_div",
+    "TooMany check enforced before exceeding max_rows",
+    "render_summary function added to separate I/O formatting from pure logic",
+    "summarize_metrics returns Summary struct per test contract",
+    "No count as u64 or count as u32 casts - uses try_from",
+    "No count += 1 - uses checked_add(1)",
+    "No total += value - uses checked_add",
+    "No total / count - uses checked_div",
+    "No intermediate Vec allocation for split parts",
+    "All 6 behavior tests pass"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All production panic surfaces, unchecked arithmetic, lossy casts, and intermediate Vec allocations removed. All 6 tests pass. Clippy and fmt gates clean."
+}

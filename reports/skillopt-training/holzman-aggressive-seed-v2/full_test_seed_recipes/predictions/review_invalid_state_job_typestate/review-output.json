@@ -1,0 +1,103 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Job struct uses `status: String` (primitive) instead of a domain enum or typestate. Any string value including \"foo\", \"\", or invalid transitions like \"completed\" -> \"running\" are representable.",
+      "failure_mode": "Invalid job states can be constructed at compile time; no runtime enforcement of valid status transitions; business logic must repeat string-equality checks everywhere",
+      "fix": "Replace `status: String` with a domain enum `JobStatus { Pending, Running, Completed, Failed }` (or similar) and use it as the sole status carrier"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Job struct uses two independent lifecycle booleans `started: bool, completed: bool`. These allow impossible combinations: both false with status \"running\", both true, completed without started, started after completed.",
+      "failure_mode": "The compiler cannot enforce that lifecycle is monotonic or that exactly one lifecycle stage holds; invalid combinations silently pass construction and only surface as bugs at runtime",
+      "fix": "Replace `started: bool, completed: bool` with a single typestate enum `Lifecycle { NotStarted, Started, Completed }` that makes illegal combinations unrepresentable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "constructor_validation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "`Job::new()` is an infallible constructor that accepts raw primitives and stores them directly with zero validation. It can construct a Job where status=\"running\" but lifecycle booleans are false, or status=\"\".",
+      "failure_mode": "Every call to `new()` can produce a logically invalid Job; all callers inherit the invalid state and must defensively check, or silently operate on corrupt data",
+      "fix": "Replace `new()` with a fallible smart constructor or derive-into from validated inputs. Use `From`/`Into` for the newtype enum so construction goes through the enum constructors which are exhaustive by construction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "state_machine_enforcement",
+      "file": "src/lib.rs",
+      "line": 22,
+      "problem": "`update_status(&mut self, new_status: &str)` accepts any string and assigns it unconditionally. No state-machine transition check (e.g., cannot transition from Completed back to Running).",
+      "failure_mode": "Invalid state transitions are silently accepted (e.g., Completed -> Running), corrupting the job lifecycle; downstream logic relying on monotonic lifecycle will behave incorrectly",
+      "fix": "Replace with a typed method such as `fn transition_to(&mut self, target: JobStatus)` that enforces valid transitions via an enum match or transition table"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_leaking_internal_representation",
+      "file": "src/lib.rs",
+      "line": 31,
+      "problem": "`get_status(&self) -> &str` leaks the internal `String` type as a raw `&str`. Combined with the primitive `String` status, this exposes implementation details and offers no type safety at call sites.",
+      "failure_mode": "Callers receive a naked `&str` and must compare against string literals instead of matching on enum variants, making them brittle to renaming and unable to exhaustively handle all states",
+      "fix": "Return `&JobStatus` (or `JobStatus` if Copy) so callers match on the domain enum rather than comparing strings"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typed_domain_values",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`created_at: Option<String>` and `completed_at: Option<String>` use raw `String` for timestamps. No type safety, no parsing guarantees, no canonical format enforcement.",
+      "failure_mode": "Timestamps can hold any invalid string (\"not-a-date\", \"\", random text); no compile-time or constructor-time guarantee of valid timestamp format; downstream consumers must re-parse and re-validate everywhere",
+      "fix": "Introduce a newtype `Timestamp` (or use a crate like `chrono::DateTime`) and store `Option<Timestamp>` instead of `Option<String>`; validate at the parse boundary"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "The entire Job struct is mutable imperative state with no functional core. `update_status` mutates in place; there is no pure transition function that takes a Job and returns a new Job or a Result.",
+      "failure_mode": "State mutations are side-effectful and irreversible; no ability to reason about state transitions declaratively; harder to test, harder to replay, harder to reason about correctness",
+      "fix": "Add a pure transition function `fn transition(job: &Job, target: JobStatus) -> Result<Job, TransitionError>` in the functional core; keep the mutable struct only at the imperative shell boundary"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for any performance claims. The crate has zero benchmark targets.",
+      "failure_mode": "Any stated performance characteristics are unsubstantiated; no evidence that changes do not regress",
+      "fix": "Add `[[bench]]` section in Cargo.toml with criterion or similar, and benchmark the hot path (transition logic, status checks)"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, perf, cadvisor) exists for the code path.",
+      "failure_mode": "Allocation hotspots and CPU-bound paths are unknown; optimizations are cargo-culted rather than evidence-driven",
+      "fix": "Run `cargo flamegraph` or `perf record` on representative workloads to identify actual hotspots before optimizing"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No verification commands (cargo test, cargo fmt, cargo clippy) have been executed or evidenced.",
+      "failure_mode": "Cannot confirm the codebase compiles cleanly under the Holzman strict-gate lints",
+      "fix": "Run `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test`; record exact commands and outputs in the review ledger"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler/benchmark data to substantiate allocation or throughput claims",
+    "no cargo test / cargo clippy / cargo fmt command evidence",
+    "no second-ring command evidence (e.g., Miri, Kani) for state transitions"
+  ],
+  "residual_risk": "The Job type is a primitive-anemic struct with no typestate enforcement, no constructor validation, and no state-machine transitions. Invalid states are fully representable and constructible at compile time. Without replacing `String`/`bool` fields with enums/typestates and adding a fallible smart constructor, any consumer of this API operates on potentially corrupt state. Static review only; no commands run."
+}

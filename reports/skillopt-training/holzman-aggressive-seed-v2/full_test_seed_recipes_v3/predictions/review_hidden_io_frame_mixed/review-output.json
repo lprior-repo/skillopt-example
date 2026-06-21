@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_on_io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any file I/O failure (missing file, permissions, ENOMEM)",
+      "failure_mode": "untrusted or absent file path aborts the entire process instead of returning a typed parse/load error",
+      "fix": "return a Result<Vec<Record>, LoadError> and use .map_err(|e| LoadError::Io(e)) or match on Err to return a typed IO variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are unchecked index accesses on a Vec produced by split. If a line has fewer than 2 comma-separated fields, this panics with index out of bounds",
+      "failure_mode": "malformed CSV lines (fewer than 2 columns) cause a panic at runtime instead of returning a typed parse error",
+      "fix": "use split_once(',', line).ok_or(ParseError::Invalid) or parts.get(0).ok_or(...)/parts.get(1).ok_or(...) with map_err to return a typed Invalid field error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_on_parse",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics when the second CSV field is not a valid u32. Additionally, the result is lossily cast via `as u16`, silently truncating values in the range 256..=u32::MAX",
+      "failure_mode": "non-numeric or out-of-range values in CSV data panic instead of returning a typed parse error; values >65535 are silently truncated producing incorrect data",
+      "fix": "replace with parts[1].trim().parse::<u16>().map_err(|_| ParseError::InvalidValue)? or use u32::parse then u16::try_from with map_err returning an Overflow variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lossy_as_conversion",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 is a lossy cast. Any parsed value greater than u16::MAX silently wraps, producing incorrect data without any error",
+      "failure_mode": "values in 65536..=4294967295 silently truncate to u16 range, corrupting data integrity with no visibility to the caller",
+      "fix": "use parse::<u16>() directly or parse::<u32>() followed by u16::try_from(val).map_err(|_| ParseError::Overflow)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_ignored_fallible_result",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side-effecting log call inside the parser pipeline. Holzman doctrine requires I/O/logging in the imperative shell, not the pure core",
+      "failure_mode": "parser function has hidden side effects, making it non-deterministic, untestable in isolation, and violating functional-core/imperative-shell separation",
+      "fix": "move the println! call to the caller/shell layer after the Record is constructed; keep the parser pure with no I/O"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typed error enum exists for this module. All fallible operations (I/O, parsing, out-of-range) would silently panic via unwrap instead of composing through a domain error type",
+      "failure_mode": "caller cannot distinguish IO failure, invalid CSV format, invalid numeric value, or value overflow — all manifest as panics",
+      "fix": "define a `pub enum LoadError { Io(std::io::Error), InvalidField, InvalidValue, Overflow }` and change the return type to `Result<Vec<Record>, LoadError>`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No pre-allocation or capacity management on the Vec. For large files, unbounded growth with repeated reallocations is inefficient and there is no `try_reserve` to fail gracefully on OOM",
+      "failure_mode": "OOM or allocation failure during parsing causes a panic (Vec allocation panic) instead of returning a typed Allocation error",
+      "fix": "compute an estimated capacity from file size or line count, call `values.try_reserve(estimated).map_err(|_| LoadError::Allocation)?` before the loop, and enforce a max_items bound"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_benchmark_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [dev-dependencies] section with criterion/asm-benchmark and no [[bench]] target. The crate has no benchmark infrastructure for measuring load_frames performance",
+      "failure_mode": "no measurable performance baseline; any future optimization is unmeasured and unverifiable against requirements",
+      "fix": "add criterion as dev-dependency, define [[bench]] targets for load_frames with representative workload, and record baseline numbers before any change"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_frames throughput or latency",
+    "no profiler evidence (flamegraph, perf, or cargo-flamegraph) for hot-path analysis",
+    "no allocation profiling (e.g., heaptrack, dhat-rs, or jemalloc profiling) to verify try_reserve and allocation budget",
+    "no second-ring evidence (assembly output via cargo-expand + rustc -C opt-level=3) to confirm bounds-check elimination or vectorization",
+    "no command evidence (cargo fmt, cargo clippy, cargo test) because this is a static review only"
+  ],
+  "residual_risk": "Static review identified 8 BLOCKER findings: three unwrap calls on I/O and parse paths, two unchecked index accesses, one lossy as-cast, one I/O side-effect in a parser, no typed error taxonomy, no bounded allocation, and no benchmark infrastructure. The function will panic on any malformed input, missing file, or value overflow. All unwrap and unchecked indexing must be replaced with Result-returning typed error handling before this code can be considered delivery-ready. No commands were run; residual risk includes unverified compiler lint state and test coverage."
+}

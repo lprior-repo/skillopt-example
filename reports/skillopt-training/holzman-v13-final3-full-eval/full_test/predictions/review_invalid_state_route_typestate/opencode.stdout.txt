@@ -1,0 +1,13 @@
+Now I have all references and the source. Let me write the review.
+Review complete. Wrote `review-output.json` with 6 BLOCKER findings:
+
+| # | Rule | File:Line | Issue |
+|---|------|-----------|-------|
+| 1 | `typestate_state_machine` | `src/lib.rs:1` | Flat booleans + status string instead of typestate enum |
+| 2 | `status_string` | `src/lib.rs:3` | `status: String` allows arbitrary values, not closed set |
+| 3 | `bool_lifecycle` | `src/lib.rs:4` | Independent `is_validated`/`is_sent` allow impossible combinations |
+| 4 | `option_invalid_state_combinations` | `src/lib.rs:6` | `Option<u64>` timestamp disconnected from state machine |
+| 5 | `newtype_domain_ids` | `src/lib.rs:2` | `id: String` raw primitive, no newtype wrapper |
+| 6 | `parse_boundary` | `src/lib.rs:1` | Raw primitives cross boundary; pub fields allow unrestricted construction |
+
+All 6 findings are the exact typestate review set required by SKILL.md line 45-46. 5 missing evidence items flagged (benchmark, profiler, allocation, second-ring, command-truth).

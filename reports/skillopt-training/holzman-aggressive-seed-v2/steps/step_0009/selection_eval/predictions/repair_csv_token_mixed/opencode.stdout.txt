@@ -1,0 +1,15 @@
+Now I understand the issues. The current code has:
+1. `.unwrap()` on parse (banned)
+2. No empty input check
+3. No `max_items` enforcement
+4. No allocation handling
+
+Let me fix the production source:
+Wait, I need to reconsider - `Vec::with_capacity` panics on allocation failure. Per Holzman rules, I should use `try_reserve` without `with_capacity`. Let me fix:
+All 4 tests pass. Now let me write the output:
+Repaired. All 4 behavior tests pass. Key changes to `src/lib.rs:9-33`:
+
+- **Removed `.unwrap()`** → `.map_err(|_| ParseError::Invalid)` for parse errors
+- **Added empty check** → returns `Err(ParseError::Empty)` for `""` input
+- **Added max_items enforcement** → returns `Err(ParseError::TooMany)` when segments exceed limit
+- **Allocation safety** → `try_reserve` with `ParseError::Allocation` mapping instead of `with_capacity`

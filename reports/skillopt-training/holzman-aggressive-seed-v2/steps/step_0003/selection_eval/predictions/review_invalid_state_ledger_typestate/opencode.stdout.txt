@@ -1,0 +1,10 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Valid JSON written to `review-output.json`.
+
+**Summary: 8 findings (5 BLOCKER, 2 MAJOR, 1 MINOR), 6 missing evidence items.**
+
+Core issues:
+- **Illegal states representable** — `LedgerWorkflow` uses `String` for status and `bool` for lifecycle flags (`is_validated`, `is_sent`), allowing inconsistent states (e.g., `status="sent"` with `is_sent=false`, or `is_sent=true` with `sent_at_epoch_ms=None`). The fix is an enum-based typestate replacing all three fields with a single `LedgerStatus` enum that embeds `sent_at_epoch_ms` in the `Sent` variant.
+- **`mark_sent` performs mutation without precondition validation** — returns the struct by value rather than a `Result`, so callers cannot handle transition failures.
+- **No `LedgerId` newtype** — raw `String` id bypasses boundary parsing discipline.
+- **All fields are `pub`** — external code can mutate internal state directly, bypassing transition guards.

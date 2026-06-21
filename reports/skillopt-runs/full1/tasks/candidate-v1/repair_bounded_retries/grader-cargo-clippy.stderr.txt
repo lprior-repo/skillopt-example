@@ -1,0 +1,11 @@
+    Checking repair_bounded_retries v0.1.0 (/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/repair_bounded_retries)
+error: unused variable: `max_attempts`
+ --> src/lib.rs:7:38
+  |
+7 | pub fn retry_delays(attempts: usize, max_attempts: usize) -> Result<Vec<u64>, RetryError> {
+  |                                      ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_max_attempts`
+  |
+  = note: `-D unused-variables` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: could not compile `repair_bounded_retries` (lib) due to 1 previous error

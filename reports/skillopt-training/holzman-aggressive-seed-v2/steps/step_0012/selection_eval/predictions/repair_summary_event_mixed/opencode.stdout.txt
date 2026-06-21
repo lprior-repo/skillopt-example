@@ -1,0 +1,16 @@
+Now I have the full picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` (not `String`), and there's a missing `render_summary` function. The source has multiple Holzman violations: unchecked indexing, `unwrap`, unchecked arithmetic, lossy `as`, no `checked_div`.
+Repair complete. All 6 behavior tests pass. Here's what was fixed in `src/lib.rs`:
+
+**Contract parity:**
+- Changed `summarize_metrics` return type from `Result<String, ...>` to `Result<Summary, ...>` to match test contract
+- Added missing `render_summary(Summary) -> String` function
+
+**Holzman violations removed:**
+- `parts[1]` unchecked indexing → `split_once(',')` with `ok_or(Invalid)`
+- `.parse().unwrap()` → `.parse().map_err(|_| Invalid)`
+- `total += value` (unchecked add) → `checked_add` → `Overflow`
+- `total / count as u64` (unchecked div + lossy cast) → `checked_div(u64::from(...))` + `try_from`
+- Unnecessary `Vec<String>` allocation → zero-allocation `split_once`
+- Missing `Empty` error for empty input → early return
+
+**Result:** `cargo fmt` passed, `cargo test` — 6/6 passed. Repair output written to `repair-output.json`.

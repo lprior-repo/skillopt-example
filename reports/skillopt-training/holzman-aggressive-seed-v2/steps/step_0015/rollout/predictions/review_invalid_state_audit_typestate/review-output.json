@@ -1,0 +1,82 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal_state_representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "AuditWorkflow uses independent bool fields (is_validated, is_sent) and a String status that can represent contradictory states: e.g. is_sent=true with status=\"pending\", or is_validated=false with is_sent=true. The compiler cannot enforce valid transitions.",
+      "failure_mode": "Any code reading is_sent assumes the audit was sent, but status could say otherwise. A downstream consumer trusting is_sent without checking status may act on unsanctioned state.",
+      "fix": "Replace status: String + is_validated: bool + is_sent: bool with a single enum typestate (e.g. enum AuditState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }) that makes invalid states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typestate_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a bare String, allowing arbitrary values (\"pending\", \"foo\", \"SENT\", \"\") with no domain enforcement. mark_sent blindly sets status=\"sent\" without any validation gate.",
+      "failure_mode": "A caller can construct AuditWorkflow with status=\"sent\" and is_sent=false (or vice versa), creating inconsistent internal state that no runtime check catches.",
+      "fix": "Replace status: String with a domain enum (e.g. pub enum AuditStatus { Pending, Validated, Sent }). Remove is_sent entirely; derive it from the enum variant. mark_sent should accept the enum and return a new variant, not mutate a String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typestate_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is an independent flag that can be true while is_sent=true or status=\"sent\", violating the implied workflow invariant that validation precedes sending.",
+      "failure_mode": "A validated-but-not-sent audit could be observed as sent if is_sent is toggled separately, or vice versa. No type enforces the ordering invariant.",
+      "fix": "Fold is_validated into the typestate enum. For example: AuditState::Validated carries no sent flag; AuditState::Sent carries sent_at_epoch_ms. There is no path from Sent back to Validated or Pending."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typestate_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is an independent flag orthogonal to status, creating a 2^N state space where only a subset of combinations are valid. The struct has 2^5 = 32 possible bit-pattern combinations but likely fewer than 4 are valid.",
+      "failure_mode": "Pattern-matching on one field (e.g. is_sent) is insufficient; callers must cross-check status, is_validated, and sent_at_epoch_ms, leading to silent bugs when cross-checks are omitted.",
+      "fix": "Eliminate is_sent. Use a single typestate enum whose variants encode the complete lifecycle position. sent_at_epoch_ms belongs inside the Sent variant, not as an orphan Option<u64>."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare String with no domain semantics. Any string (empty, whitespace, over-long) is accepted without validation or bounds enforcement.",
+      "failure_mode": "An empty or malformed id could cause lookup failures, duplicate entries, or injection issues downstream.",
+      "fix": "Introduce a typed newtype: pub struct AuditId(String) with a fallible constructor that validates non-empty and bounded length. Use AuditId in AuditWorkflow instead of bare String."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes AuditWorkflow by value and returns AuditWorkflow (pass-by-value mutation pattern). While this avoids shared mutation, it duplicates the entire struct on every call, and there is no error type for invalid transition attempts.",
+      "failure_mode": "Calling mark_sent on a Pending audit should be rejected, but there is no guard — it transitions directly to Sent without requiring Validated first.",
+      "fix": "Sign the function against the typestate enum: pub fn mark_sent(state: AuditState) -> AuditState where only Validated transitions to Sent; Pending and Sent return an error or are rejected by the type system via separate methods."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_parsing_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The struct has no constructor. Public fields with no factory mean any caller can construct an AuditWorkflow in any invalid state combination, bypassing all domain invariants.",
+      "failure_mode": "External code can write AuditWorkflow { id: \"\".to_string(), status: \"\".to_string(), is_validated: false, is_sent: true, sent_at_epoch_ms: Some(0) } — a fully constructed invalid state.",
+      "fix": "Make all fields private and provide a constructor (or derive from the typestate enum). Use private fields with public accessors only where needed."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists — no workload, hot path, or performance target is specified",
+    "no profiler evidence — no flamegraph, sampling data, or allocation profile",
+    "no allocation analysis — no alloc counter or heap profile for AuditWorkflow size",
+    "no second-ring evidence — no assembly listing or bounds-check removal proof",
+    "no command evidence — cargo fmt, cargo check, cargo clippy, cargo test were not run (review-only mode)",
+    "no command-baseline report — no benchmark command with baseline numbers for performance claims"
+  ],
+  "residual_risk": "The crate has a fundamentally broken domain model: independent bool/String fields create an explosion of illegal states that the type system cannot prevent. Even if all Holzman lint gates pass, the typestate violation is a BLOCK_GLOBAL — the entire struct must be redesigned before any downstream code can be trusted. Static review only; no commands run."
+}

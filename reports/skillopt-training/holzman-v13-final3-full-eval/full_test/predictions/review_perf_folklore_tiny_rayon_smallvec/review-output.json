@@ -1,0 +1,66 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-fixed-overhead",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function takes a [u8; 4] (16 bytes total) and returns Vec<&'static str>, heap-allocating a Vec plus four string-slice allocations on every call. For a fixed-size 4-element input the return type should be [&'static str; 4], a zero-allocation fixed array.",
+      "failure_mode": "Every call performs at minimum one heap allocation (the Vec buffer) plus four dereferences into static data, destroying cache locality and defeating the purpose of a 16-byte stack input. This makes the function orders of magnitude slower than a simple array return, and any downstream consumer that iterates must handle a heap-allocated buffer.",
+      "fix": "Change the return type to [&'static str; 4]. Build the result with a const-size array literal or a bounded loop, e.g. let mut out: [&'static str; 4] = [\"\"; 4]; then fill and return out."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "rayon-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO comment asserts 'use Rayon and SmallVec because it will be faster.' Rayon parallel dispatch has startup overhead (thread pool coordination, work splitting, result collection) that dwarfs the work of classifying four bytes. SmallVec is pointless here because the output is already 4 elements — SmallVec only avoids a heap allocation when the common-case size is smaller than its inline capacity, but the return type itself is Vec which already heap-allocates.",
+      "failure_mode": "Introducing Rayon for 4 elements will cause the function to spawn or borrow from a thread pool, schedule two (or more) tasks, and synchronize results — adding microseconds of overhead per call versus the ~hundreds of nanoseconds of the serial loop. This inverts the claimed speedup and breaks the static-dispatch-first rule.",
+      "fix": "Remove the Rayon/SmallVec TODO entirely. A serial loop or iterator over four elements is the fastest path. If measurement ever shows parallel overhead is a concern for a larger dataset, handle batching at the caller level, not inside this tiny function."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-performance-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO comment makes a performance claim ('it will be faster') with zero benchmark evidence: no workload definition, no target hardware, no baseline measurement, no regression threshold. SKILL.md line 84 requires workload, target hardware, input distribution, hot path, baseline command, baseline number, new number, variance notes, and regression threshold for any performance claim.",
+      "failure_mode": "Unmeasured optimization decisions introduce regressions. Without a baseline, there is no way to detect that the change made the code slower, and without a regression threshold there is no acceptance criterion.",
+      "fix": "Remove the speculative TODO. If Rayon or SmallVec are later warranted by real workload data, add a proper benchmark with baseline measurements and evidence before any change."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation-discipline",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "The .map(...).collect() pipeline allocates a Vec on every call. For a function that processes exactly 4 elements and produces exactly 4 outputs, this is unbounded allocation in a hot path. The SKILL.md allocation-discipline rule (line 62) requires allocation budgets and measured evidence for hot paths; this function has neither.",
+      "failure_mode": "Repeated calls cause continuous heap allocation and deallocation, increasing GC pressure (in environments with GC), causing heap fragmentation, and destroying temporal locality. A caller in a tight loop will see this allocation pattern dominate execution time.",
+      "fix": "Replace the Vec return with a fixed-size array return type [&'static str; 4]. If the caller needs a Vec for larger workloads, let the caller allocate and collect — not this function."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "speculative-todo-comments",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production source contains a TODO that encodes a performance optimization plan without evidence. TODO comments in production code that prescribe architectural changes (Rayon, SmallVec) act as technical debt that can be accidentally implemented, violating the absolute laws.",
+      "failure_mode": "A future implementer or automated agent may take the TODO literally and introduce Rayon + SmallVec, believing it to be an approved directive rather than a speculative suggestion. This propagates folklore-based decisions into production.",
+      "fix": "Remove the TODO. If the optimization is genuinely warranted by measurement, replace the TODO with a documented benchmark reference and acceptance criteria."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated (or implied) performance claim",
+    "no profiler data identifying this as a hot path",
+    "no allocation tracking evidence (e.g., alloc counters, heap profiling)",
+    "no second-ring evidence tying any performance tool output to the classify_four symbol",
+    "no command evidence that cargo fmt, cargo check, cargo clippy, or cargo test were run"
+  ],
+  "residual_risk": "Static review only. No commands were run (cargo fmt/check/clippy/test). The code compiles but contains a speculative TODO that, if acted upon, would introduce measurable performance regressions (Rayon overhead on 4 elements) and unnecessary heap allocations. The core logic (bitwise parity classification) is correct and pure, but the allocation and folklore claims violate multiple Holzman rules. A correct fix is to return [&'static str; 4] and remove the TODO."
+}

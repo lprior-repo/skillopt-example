@@ -1,0 +1,17 @@
+Review complete. Valid JSON written to `/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/review_invalid_state_lease_typestate/review-output.json`.
+
+**Summary of 7 findings -- all BLOCKER severity:**
+
+| # | Rule | File:Line | Issue |
+|---|------|-----------|-------|
+| 1 | `typestate_state_machine` | `src/lib.rs:1` | No typestate enum; every illegal state combination is representable |
+| 2 | `status_string_enums` | `src/lib.rs:3` | `status: String` allows arbitrary values (e.g. `"banana"`) |
+| 3 | `bool_lifecycle_typestate` | `src/lib.rs:4` | `is_validated: bool` + `is_sent: bool` encode independent bits, bypassing workflow order |
+| 4 | `option_invalid_state_combinations` | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` decoupled from `is_sent` -- inconsistent states possible |
+| 5 | `newtype_domain_ids` | `src/lib.rs:2` | `id: String` lacks domain constraints or validation |
+| 6 | `parse_boundary` | `src/lib.rs:2` | Raw `String` primitives cross parse boundary with no fallible smart constructor |
+| 7 | `no_error_taxonomy` | `src/lib.rs:9` | `mark_sent` returns `LeaseWorkflow` directly -- no `Result`, no typed errors |
+
+**Missing evidence:** No benchmarks, profiler data, allocation evidence, command evidence.
+
+**Residual risk:** Delivery is blocked -- the struct represents every illegal state at compile time with no enforcement.

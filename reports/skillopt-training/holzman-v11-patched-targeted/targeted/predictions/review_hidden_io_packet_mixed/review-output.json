@@ -1,0 +1,91 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-imperative-shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "file I/O (fs::read_to_string), logging (println!), allocation (Vec::collect), and domain construction (Record) are fused in a single function; the functional core leaks shell concerns into pure logic",
+      "failure_mode": "the parser cannot be tested in isolation, cannot be composed into larger pipelines, and couples async/I/O concerns to pure data transformation",
+      "fix": "split into a pure parse_line(line: &str) -> Result<Record, ParseError> and a shell function load_packets(path: &str) -> Result<Vec<Record>, LoadError> that handles fs::read_to_string and iteration"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() - unwrap on fallible file I/O",
+      "failure_mode": "missing file, permission errors, or unreadable paths cause a synchronous panic instead of returning a typed error the caller can handle",
+      "fix": "return Result<Vec<Record>, LoadError> and propagate with ? or explicit map_err to a typed I/O error variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() - unwrap on fallible numeric parse",
+      "failure_mode": "malformed numeric fields in packet data cause a synchronous panic, aborting the entire packet load instead of reporting which record was invalid",
+      "fix": "parse with .map_err(|e| ParseError::InvalidValue(parts[0].clone())) and return Result<Record, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] - unchecked indexing into split result with no bounds check",
+      "failure_mode": "empty lines or lines with fewer than 2 comma-separated fields panic at runtime with index-out-of-bounds",
+      "fix": "use split_once(',') to destructure into exactly two fields and handle the None case with a typed Invalid error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] - unchecked indexing into split result with no bounds check",
+      "failure_mode": "lines with only one field (no comma) panic at runtime with index-out-of-bounds when accessing parts[1]",
+      "fix": "use split_once(',') so the two fields are structurally guaranteed or the None branch handles the error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 - lossy as conversion from u32 to u16 after parsing",
+      "failure_mode": "values in range 256..=4294967295 silently truncate to u16 range, corrupting data without any error or validation at the parse boundary",
+      "fix": "parse directly as u16 with .parse::<u16>() or use u16::try_from(u32_val).map_err(|_| ParseError::ValueOutOfBounds) for a checked widening-to-narrowing conversion"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-no-hidden-io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) - logging inside pure parsing logic",
+      "failure_mode": "side-effecting I/O in the core function makes it impure, breaks deterministic testing, and couples domain logic to console output which may be undesirable in libraries or embedded contexts",
+      "fix": "remove println! entirely from the parser; if diagnostics are needed, have the shell caller log after successful parse, using the Result type to carry record names"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns unbounded Vec<Record> with no max_items cap, no try_reserve, and no external-input size validation before allocation",
+      "failure_mode": "an attacker or misconfigured file with millions of lines triggers unbounded heap allocation, potentially causing OOM kill of the process or denial of service",
+      "fix": "add max_items: usize parameter, validate file line count or track count during iteration with count.checked_add(1), enforce count <= max_items, allocate with Vec::new() then out.try_reserve(max_items).map_err(|_| ParseError::Allocation) before the push loop"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for packet loading performance",
+    "no profiler evidence for allocation hot path",
+    "no allocation analysis (e.g., valgrind/dhat/Rust allocation tracing) for Vec growth under typical input sizes",
+    "no second-ring evidence for any performance or zero-cost claim (none stated, but absence of benchmarks makes any future perf claim unverifiable)",
+    "no command-line interface entry point; function is a library API with no CLI harness for end-to-end evidence"
+  ],
+  "residual_risk": "static review only; no commands run. All eight findings are BLOCKER-severity violations of absolute Holzman Rust laws (no unwrap, no unchecked indexing, no lossy conversions, no hidden I/O, no unbounded allocation, functional-core/shell separation). The code must be repaired before any delivery gate. A typed error enum, split_once-based parsing, checked narrowing, removal of println!, I/O separation into a shell function, and bounded allocation with try_reserve are required."
+}

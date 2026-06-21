@@ -1,0 +1,36 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable",
+    "No unchecked indexing - replaced Vec collect with split_once",
+    "No unchecked arithmetic - used checked_add and checked_div",
+    "No lossy as conversions - used u32::try_from and u64::try_from",
+    "Functional core: pure Summary returned, formatting separated into render_summary",
+    "Parse at boundaries into trusted Summary type",
+    "Empty input rejected with SummaryError::Empty",
+    "Invalid lines (no comma or non-numeric value) rejected with SummaryError::Invalid",
+    "Too-many check enforced before final result",
+    "Overflow detected on total and count with checked_add",
+    "Average computed with checked_div after proving divisor nonzero via count > 0 invariant"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All production unwrap, unchecked arithmetic, lossy casts, and unchecked indexing removed. Return type corrected to Summary struct with separate render_summary for formatting. All 6 behavior tests pass."
+}

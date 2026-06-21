@@ -1,0 +1,2 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written 14 findings and 5 missing-evidence items to `review-output.json`. Every line of `src/lib.rs` violates Holzman Rust v10 absolute laws: `unwrap()` panic surfaces, unchecked indexing, lossy `as u16` cast, hidden `println!` I/O, no typed error taxonomy, no functional core/shell split, no bounded allocation, no domain newtypes. Zero commands were run; residual risk is maximum.

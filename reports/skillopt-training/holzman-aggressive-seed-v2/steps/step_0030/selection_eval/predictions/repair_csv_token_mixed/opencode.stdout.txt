@@ -1,0 +1,12 @@
+Now I have the full picture. The source has multiple Holzman violations: `.unwrap()`, no empty check, no max_items enforcement, no parse error handling. Let me repair it.
+All 4 tests pass. Let me write the repair output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+**Violations removed:**
+- `.unwrap()` → `.map_err(|_| ParseError::Invalid)` on parse
+- Missing empty-input check → returns `Err(ParseError::Empty)`
+- Missing max_items enforcement → returns `Err(ParseError::TooMany)`
+- `Vec::with_capacity` → `Vec::new()` + `try_reserve` with error handling
+- No allocation error handling → mapped to `ParseError::Allocation`
+
+**All 4 behavior tests pass** (parses_values, rejects_empty, rejects_invalid, rejects_too_many).

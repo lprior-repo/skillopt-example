@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**14 findings** across `src/lib.rs`:
+
+**BLOCKER (10):**
+- Line 9: `unwrap()` on `fs::read_to_string` — panic on I/O failure
+- Line 16: `println!` hidden I/O in parsing logic — violates Functional Core/Imperative Shell
+- Lines 18, 19: `parts[0]` and `parts[1]` unchecked indexing — panic on malformed input
+- Line 19: `parse::<u32>() as u16` lossy cast — silent truncation of values ≥ 65536
+- Line 8: `load_packets` fuses I/O, logging, parsing, collection with no error type
+- Line 8: No typed error taxonomy — all failures manifest as panics
+- Line 10: No `try_reserve` or record cap — unbounded allocation from adversarial input
+- Lines 12-15: `split(',').collect()` instead of `split_once` — unnecessary per-line Vec allocation, no structural field guarantee
+
+**MAJOR (4):**
+- Line 3: `pub name: String, pub value: u16` — illegal states representable, no smart constructor
+- No benchmark, profiler, allocation analysis, or second-ring evidence for any performance claim

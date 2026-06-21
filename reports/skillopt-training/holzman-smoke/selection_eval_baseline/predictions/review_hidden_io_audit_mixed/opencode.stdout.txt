@@ -1,0 +1,18 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings** across the single-file crate `src/lib.rs`:
+
+**6 BLOCKERs:**
+- `unwrap()` on `fs::read_to_string` (line 9) — panics on I/O failure
+- `unwrap()` on `.parse::<u32>()` (line 13) — panics on non-numeric input
+- `as u16` lossy cast (line 13) — silent truncation of values > 65535
+- Unchecked `parts[0]` indexing (line 12) — panics on empty/zero-comma lines
+- Unchecked `parts[1]` indexing (line 13) — panics on lines without commas
+- `println!` side effect in core (line 12) — violates functional core/shell boundary
+
+**2 WARNINGs:**
+- I/O mixed with parsing in one function (line 8) — cannot unit-test pure logic
+- `collect()` into `Vec<String>` (line 11) — unnecessary heap allocations; `split_once` would be zero-copy
+
+**4 missing evidence items:** no benchmarks, profiler data, allocation analysis, or command evidence.

@@ -1,0 +1,48 @@
+{
+  "step": 20,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 3,
+  "failure_patterns": [
+    {
+      "pattern": "missing_try_reserve: Agent consistently fails to use try_reserve for bounded Vec allocations in repair and review contexts.",
+      "count": 1,
+      "task_ids": [
+        "repair_csv_sensor_mixed"
+      ]
+    },
+    {
+      "pattern": "missing_checked_arithmetic: Agent fails to use checked_add/checked_mul for capacity calculations involving multiple terms.",
+      "count": 1,
+      "task_ids": [
+        "review_hidden_io_token_mixed"
+      ]
+    },
+    {
+      "pattern": "parse_boundary_violation: Agent fails to identify missing parse boundary validation or typed error handling in review contexts.",
+      "count": 1,
+      "task_ids": [
+        "review_invalid_state_audit_typestate"
+      ]
+    }
+  ],
+  "score_before": 0.8,
+  "score_after": 0.6,
+  "rejected_edits": [
+    {
+      "op": "insert_after",
+      "content": "\n- **Review Allocation Check:** In review mode, explicitly flag any `Vec` construction that lacks `try_reserve` when capacity is bounded as a BLOCKER. Include \"missing bounded allocation handling\" in missing_evidence if no `try_reserve` is present.",
+      "target": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback."
+    },
+    {
+      "op": "insert_after",
+      "content": "\n- **Review Parse Boundary Check:** In review mode, explicitly flag any parsing logic that lacks typed domain errors, `split_once`/`get` usage, or checked arithmetic as a BLOCKER. Include \"missing parse boundary validation\" in missing_evidence if raw primitives are used without validation.",
+      "target": "- **Review Allocation Check:** In review mode, explicitly flag any `Vec` construction that lacks `try_reserve` when capacity is bounded as a BLOCKER. Include \"missing bounded allocation handling\" in missing_evidence if no `try_reserve` is present."
+    },
+    {
+      "op": "replace",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Use `checked_add`/`checked_mul` for all capacity computations.",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+    }
+  ]
+}

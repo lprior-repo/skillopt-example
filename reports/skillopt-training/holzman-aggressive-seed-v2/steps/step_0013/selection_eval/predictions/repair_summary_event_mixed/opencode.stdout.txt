@@ -1,0 +1,12 @@
+Now I understand the issues. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. The current code has many Holzman violations. Let me fix it.
+All 6 tests pass. Let me write the repair output.
+Repair complete. All 6 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+1. **Return type fixed** - `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`, matching the test contract
+2. **Added `render_summary`** - Pure formatting function that takes a `Summary` and returns a `String`, separating I/O concern from core logic
+3. **Removed `unwrap()`** - Replaced `.unwrap()` on parse with `split_once` + `map_err` for safe field extraction and parsing
+4. **Removed unchecked arithmetic** - Used `checked_add` for total accumulation (returns `Overflow` on overflow) and `checked_div` for average
+5. **Removed `Vec` allocation** - Replaced `.split(',').map(...).collect()` with `split_once(',')` for single-delimiter extraction
+6. **Correct error ordering** - Invalid → accumulate → empty check → too-many check → compute average

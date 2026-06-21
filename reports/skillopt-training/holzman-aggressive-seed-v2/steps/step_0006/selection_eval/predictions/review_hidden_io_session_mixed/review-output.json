@@ -1,0 +1,103 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() uses unwrap() on fallible I/O",
+      "failure_mode": "Missing or unreadable file panics the caller instead of returning a typed error (e.g. Io/Parse)",
+      "fix": "Return Result<Vec<Record>, E> and propagate with ? or map_err; do not unwrap()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() uses unwrap() on fallible parse",
+      "failure_mode": "Malformed line (non-numeric second field) panics instead of returning a typed Parse/Decode error",
+      "fix": "Use .parse::<u16>().map_err(|e| Error::Parse(...))? on a safely-indexed field"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy as cast from u32 to u16: parse::<u32>().unwrap() as u16",
+      "failure_mode": "Values > 65535 silently truncate, corrupting data silently without error",
+      "fix": "Parse directly as u16 (parts[1].trim().parse::<u16>()) and propagate errors via Result; never use lossy as for width narrowing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Unreachable! implied by unchecked parts[0] indexing after split (no bounds check)",
+      "failure_mode": "Empty or single-field lines cause index-out-of-bounds panic",
+      "fix": "Use split_once(',') to get exactly two fields, or parts.get(0) and parts.get(1) with ? propagation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] unchecked indexing into split result",
+      "failure_mode": "Empty line or missing first field causes index-out-of-bounds panic",
+      "fix": "Use split_once(',') which returns Option<(&str, &str)>, match on Some/None to handle missing fields"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Hidden side effect: println!() inside data-loading logic",
+      "failure_mode": "I/O logging leaks into the data-loading function, making pure parsing non-deterministic and untestable; pollutes stdout in library consumers",
+      "fix": "Remove println!; log only in the imperative shell layer (caller side), keep core pure"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation_pattern",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collects all split parts into Vec<String> when only two fields are needed",
+      "failure_mode": "Unnecessary heap allocation per line; allocates N Strings for a two-field record; violates bounded-allocation discipline",
+      "fix": "Use line.split_once(',') to get (&str, &str) without intermediate Vec or String allocations"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string, println) with pure parsing in one function",
+      "failure_mode": "Cannot test parsing logic independently of file system; side effects make the core impure and brittle",
+      "fix": "Split into (1) load_sessions_raw(path) -> Result<String, E> for I/O and (2) parse_records(text: &str) -> Result<Vec<Record>, E> for pure parsing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "error_propagation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no Result wrapper despite multiple fallible operations",
+      "failure_mode": "Caller has no way to distinguish success from failure; all errors manifest as panics",
+      "fix": "Change signature to fn load_sessions(path: &str) -> Result<Vec<Record>, Box<dyn std::error::Error>> or a domain-specific Error enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>() then as u16 wastes arithmetic checks; no overflow guard before width narrowing",
+      "failure_mode": "Values in [65536, u32::MAX] silently wrap to u16 range without error",
+      "fix": "Parse directly as u16; the parser natively rejects out-of-range values and returns an error"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or allocation profile",
+    "no profiler data (criterion, perf, or flamegraph) for the parsing hot path",
+    "no allocation tracking (e.g. mimalloc stats or dlmalloc counters) for per-line Vec<String> overhead",
+    "no command-line evidence (cargo test / cargo clippy output) was produced for this review"
+  ],
+  "residual_risk": "Static review only; no commands run. All 10 findings are BLOCKERs. The crate has zero type safety on external input, uses unwrap on every fallible boundary, has a lossy cast, leaks I/O into core logic, and allocates unboundedly per line. A full repair would require: (1) Result-returning signature, (2) split_once parsing, (3) parse::<u16> directly, (4) no println in core, (5) try_reserve on the output Vec, (6) removal of all unwrap/panic/as casts. Residual risk is high until all blockers are resolved and evidence is produced."
+}

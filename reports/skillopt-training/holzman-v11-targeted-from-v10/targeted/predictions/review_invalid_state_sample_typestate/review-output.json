@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-to-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String, allowing any arbitrary string value including invalid workflow states",
+      "failure_mode": "callers can set item.status to \"foo\" or \"\" which represents an impossible workflow state, breaking all state-machine invariants",
+      "fix": "replace with an enum: pub enum WorkflowStatus { Pending, Validated, Sent } and make it private with a smart constructor"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-booleans-to-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are separate bool fields that can reach inconsistent combinations (e.g. is_sent=true but status not \"sent\", or is_validated=false but is_sent=true)",
+      "failure_mode": "no type-level enforcement of valid lifecycle transitions; callers can construct states like (validated=false, sent=true, status=\"pending\") which is logically impossible",
+      "fix": "encode the lifecycle as an enum typestate (e.g. WorkflowState<T> with variants Pending, Validated(T), Sent { sent_at: u64 }) so invalid combinations are unrepresentable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional-lifecycle-data-in-variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> at the struct level rather than owned by the Sent variant",
+      "failure_mode": "is_sent can be true while sent_at_epoch_ms is None, or sent_at_epoch_ms can hold a value while is_sent is false; the timestamp is decoupled from the lifecycle phase that requires it",
+      "fix": "move sent_at_epoch_ms into the enum variant that represents the Sent phase: Sent { sent_at_epoch_ms: u64 }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare pub String with no domain-level validation or newtype protection",
+      "failure_mode": "callers can create a SampleWorkflow with an empty, malformed, or unbounded id; no smart constructor enforces id constraints; String is not a domain-specific identifier",
+      "fix": "create a newtype: pub struct WorkflowId(String) or validate and wrap in a smart constructor returning Result<WorkflowId, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "raw String values for id and status cross the parse boundary without fallible smart constructors; callers can construct invalid domain states directly via public struct fields",
+      "failure_mode": "no boundary parsing means hostile or malformed input propagates into core logic as valid-looking data; every field is pub so there is no encapsulation gate",
+      "fix": "replace pub fields with a private struct and provide smart constructors like fn new(id: &str, initial_status: &str) -> Result<SampleWorkflow, ParseError> that validate and convert at the boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent-no-transition-guards",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent blindly sets status and is_sent without validating preconditions (e.g. item must be validated first, status must be in a permissible pre-sent state)",
+      "failure_mode": "callers can call mark_sent on a workflow that was never validated, or on one already sent, violating lifecycle invariants with no runtime or compile-time check",
+      "fix": "change the function signature to accept the validated lifecycle phase explicitly (e.g. fn transition_to_sent(state: ValidatedWorkflow) -> SentWorkflow) so the type system enforces ordering"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark, profiler, allocation, or command evidence exists for any performance or allocation claim in the crate",
+      "failure_mode": "any performance claim about mark_sent or SampleWorkflow is unmeasured folklore; Vec/String allocations and their costs are unknown",
+      "fix": "add a criterion or tinybench benchmark measuring mark_sent allocation profile with realistic input sizes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation or latency",
+    "no profiler evidence for hot-path analysis",
+    "no allocation audit (try_reserve, Vec::with_capacity, or bounded allocation evidence)",
+    "no verification gate commands run (cargo fmt/check/clippy/test)"
+  ],
+  "residual_risk": "The struct makes illegal states fully representable via pub String status, disjoint lifecycle booleans, and optional lifecycle data. mark_sent has no transition guards. All fixes require refactoring the type system (enum state machine + typestate transitions + smart constructors). Static review only; no commands executed."
+}

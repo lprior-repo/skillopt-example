@@ -1,0 +1,12 @@
+Now I have a clear picture. The function has multiple Holzman violations: `unwrap()`, no empty check, no max_items enforcement, no allocation safety. Let me fix it.
+All 4 tests pass. Let me write the required output.
+Done. Here's what was repaired in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(|_| ParseError::Invalid)` |
+| No empty-input check | Returns `Err(ParseError::Empty)` for `""` and empty split fields |
+| `max_items` ignored | Pre-flight count check returns `Err(ParseError::TooMany)` |
+| No allocation safety | `try_reserve(count)` returns `Err(ParseError::Allocation)` |
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

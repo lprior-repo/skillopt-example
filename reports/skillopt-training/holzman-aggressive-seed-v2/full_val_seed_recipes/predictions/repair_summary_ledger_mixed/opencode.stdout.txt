@@ -1,0 +1,20 @@
+Now I have the full picture. The code has multiple Holzman violations: `unwrap()`, unchecked indexing, unchecked arithmetic, lossy casts, wrong return type vs. tests, missing `render_summary`, and improper empty/overflow handling.
+
+Let me fix all of these:
+All 6 tests pass. Now writing the repair output:
+Repair complete. All 6/6 tests pass.
+
+**Changes in `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `.map_err(\|_\| SummaryError::Invalid)` |
+| Unchecked `parts[1]` indexing | `line.split_once(',').ok_or(SummaryError::Invalid)` |
+| Unchecked `total += value` | `total.checked_add(value).ok_or(SummaryError::Overflow)` |
+| Unchecked `total / count` | `total.checked_div(...)` |
+| Lossy `count as u32` | `u32::try_from(count)` |
+| Wrong return type (`String`) | Returns `Summary` value (pure core) |
+| Missing `render_summary` | Added as formatting-only function |
+| TooMany checked too late | Enforced before each row processed |
+| Empty not rejected | Returns `SummaryError::Empty` early |
+| `Vec<String>` allocations | Eliminated - uses `split_once` |

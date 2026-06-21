@@ -1,0 +1,68 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String field, allowing any arbitrary value (e.g. \"sent\" with is_sent=false, \"unknown\", \"SENT\"). The domain invariant that status reflects an atomic lifecycle position cannot be enforced by the type system.",
+      "failure_mode": "Callers can construct or mutate a LeaseWorkflow into an inconsistent state such as status=\"pending\" with is_sent=true, or status=\"SENT\" (wrong case), violating the intended state machine.",
+      "fix": "Replace `pub status: String` with a sealed enum typestate (e.g. `pub enum LeaseStatus { Pending, Sent }`) and make it the sole lifecycle carrier. Remove is_sent and is_validated bool flags."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_over_bool_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated (bool) and is_sent (bool) are independent flags that encode lifecycle state. The compiler cannot prevent states like (is_validated=false, is_sent=true) or (is_validated=true, is_sent=true) depending on intended invariants. This is the classic bool-lifecycle-anti-pattern.",
+      "failure_mode": "Logical contradictions in lifecycle: a lease can be marked sent without validation, or validated without being sent, or both. No single source of truth for the workflow state.",
+      "fix": "Collapse is_validated and is_sent into a single typed enum or typestate machine (e.g. `enum LeaseState { Unvalidated, Validated, Sent }`). The enum variant encodes the complete lifecycle position. Remove both bool fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_untrusted_data_in_core",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw `String` with no domain constraints or newtype wrapper. Lease identifiers in a domain model should be a `LeaseId` newtype that validates format/length at construction.",
+      "failure_mode": "Empty strings, malformed IDs, or IDs exceeding domain limits can flow through the core unvalidated, causing silent corruption or downstream failures.",
+      "fix": "Introduce `pub struct LeaseId(String)` (or a fixed-size `[u8; N]` if applicable) with a `new()` constructor that validates and returns a domain error on invalid input. Use `LeaseId` in the struct."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs mutation on a struct with raw string fields and no validation. It should accept validated domain types and return a Result or new typestate, not mutate a flat struct in place.",
+      "failure_mode": "The transition function has no guard against invalid preconditions (e.g. can mark any lease as sent regardless of validation state). No error path for forbidden transitions.",
+      "fix": "Sign the function as `pub fn mark_sent(lease: LeaseWorkflow) -> Result<LeaseWorkflow, LeaseTransitionError>` and encode allowed transitions in the typestate enum. Return a domain error if the transition is invalid."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow has no constructor. All fields are public and unvalidated. There is no boundary between raw input and trusted data — any caller can build the struct with arbitrary values.",
+      "failure_mode": "Every consumer can bypass all domain invariants by directly constructing the struct with `LeaseWorkflow { .. }`.",
+      "fix": "Make all fields private. Provide a `LeaseWorkflow::new(id: LeaseId, initial_state: LeaseStatus) -> Result<Self, LeaseError>` constructor. Remove pub visibility from all fields."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_raw_string_lifecycle",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent sets status via raw string literal `\"sent\".to_string()` instead of an enum variant or typed transition. This is a fragile, error-prone pattern that bypasses compile-time guarantees.",
+      "failure_mode": "A future maintainer can typo the string, use the wrong case, or set it to an unexpected value, silently corrupting state.",
+      "fix": "Replace `item.status = \"sent\".to_string()` with an enum assignment like `item.status = LeaseStatus::Sent` (after converting String to the enum, or better, after replacing the String field with the enum)."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler or allocation analysis exists",
+    "no second-ring review or black-hat review evidence",
+    "no command evidence (no cargo test, cargo fmt, or clippy output)",
+    "no state-machine transition table or invariants document"
+  ],
+  "residual_risk": "Static review only — no commands run. The crate is a minimal stub with pervasive type-system violations: raw String for status, bool flags for lifecycle, no constructors, no domain errors, no validation. These are structural BLOCKERs that prevent any meaningful Holzman Rust compliance regardless of later additions."
+}

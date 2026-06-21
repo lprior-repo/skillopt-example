@@ -1,0 +1,107 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses String for status and bools for is_validated/is_sent, allowing illegal states such as status='sent' with is_sent=false, or status='draft' with is_sent=true. These invalid combinations are constructible and cannot be rejected by the type system.",
+      "failure_mode": "Downstream code trusts inconsistent lifecycle flags, causing silent state corruption or incorrect branching logic without any error or invariant violation.",
+      "fix": "Replace status: String with an enum BudgetStatus { Draft, Validated, Sent }. Replace is_validated: bool and is_sent: bool with a typestate enum or remove them as redundant with BudgetStatus. Remove the separate bools entirely so only BudgetStatus encodes lifecycle."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_with_enum_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle flag that should be an enum or typestate. Two bools (is_validated, is_sent) are insufficient to encode the full workflow state machine and are redundant with the status String.",
+      "failure_mode": "Adding a new lifecycle stage requires modifying multiple independent bools, creating race conditions between flags and status. Bool flags cannot express multi-step workflows like Draft->Validated->Sent with invariants.",
+      "fix": "Replace is_validated: bool and is_sent: bool with a single enum: pub enum BudgetStatus { Draft, Validated, Sent }. Derive sent_at_epoch_ms from the Sent variant if needed."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_primitive_domain_with_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive domain value without a newtype wrapper. There is no BudgetId type to enforce format/length/domain rules at the type level.",
+      "failure_mode": "Any String can be used as a budget ID, allowing empty strings, malformed IDs, or confusion with other string fields. Validation must be repeated at every use site.",
+      "fix": "Introduce: pub struct BudgetId(String); with a private field and a fallible constructor that validates format/length. Use BudgetId in BudgetWorkflow instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_primitive_domain_with_newtype",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> uses a raw primitive for a domain timestamp. No EpochMilli newtype enforces unit, range, or conversion rules.",
+      "failure_mode": "Timestamp values can be confused with other u64 fields (IDs, counts), and conversions between time units require repeated checked arithmetic at every use site instead of once in a constructor.",
+      "fix": "Introduce: pub struct EpochMilli(u64); with a private field. Use checked arithmetic in the constructor. Use EpochMilli in BudgetWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_validation_gate",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not validate preconditions: it does not check is_validated before allowing the transition to sent. The function mutates status and is_sent without any invariant enforcement.",
+      "failure_mode": "An invalid (non-validated) budget can be marked as sent, violating the workflow invariant that budgets must be validated before being sent. This is a domain logic error that compiles cleanly.",
+      "fix": "Change mark_sent to take a validated budget type (e.g., BudgetStatus::Validated) and return BudgetStatus::Sent with sent_at_epoch_ms. Or use a typestate pattern where only a Validated budget can transition to Sent."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_pure_calculation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs .to_string() allocation to set status, mixing imperative shell concerns (allocation, string construction) into what should be a pure domain calculation. The function also has no pure deterministic output — it depends on the input mutation rather than producing a new valid state.",
+      "failure_mode": "The allocation on every call increases GC pressure and prevents the function from being pure. A pure core function should take domain types and return a new domain value without heap allocation at the call boundary.",
+      "fix": "Use enum variants directly: match item.status { BudgetStatus::Validated => BudgetWorkflow { status: BudgetStatus::Sent, sent_at_epoch_ms: Some(EpochMilli(...)), ..item } } — no .to_string() needed."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No CLI command or script evidence for the budget workflow. There is no documented way to invoke, test, or audit the domain logic.",
+      "failure_mode": "Without command evidence, the behavior of mark_sent and the full workflow cannot be verified at runtime. Domain invariants cannot be validated against real inputs.",
+      "fix": "Provide a CLI binary or test harness with concrete commands showing valid and invalid workflow transitions, including attempts to send non-validated budgets."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for mark_sent or the BudgetWorkflow allocation pattern.",
+      "failure_mode": "Cannot verify whether .to_string() allocation or enum-based refactoring improves performance. No measured evidence to guide optimization.",
+      "fix": "Add a micro-benchmark comparing current String-based transitions against enum-based transitions using criterion or similar."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_profiler",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, perf, or similar) for BudgetWorkflow lifecycle.",
+      "failure_mode": "Cannot identify hot paths or allocation hotspots in the budget workflow without profiling data.",
+      "fix": "Run cargo flamegraph or perf record to identify allocation and execution hotspots in the budget workflow."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation tracking evidence (e.g., dhat, heaptrack, or jemalloc profiling) for BudgetWorkflow.",
+      "failure_mode": "Cannot confirm that enum-based refactoring reduces heap allocations compared to String-based lifecycle flags.",
+      "fix": "Use dhat or similar allocation profiler to measure per-call allocations in BudgetWorkflow lifecycle operations."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_second_ring",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring evidence (integration tests, property tests, or fuzzer runs) for BudgetWorkflow invariants.",
+      "failure_mode": "Domain invariants like 'must validate before sending' are not tested with property-based or fuzzed inputs.",
+      "fix": "Add proptest-based property tests verifying that all workflow transitions respect typestate invariants, and that illegal transitions are rejected."
+    }
+  ],
+  "missing_evidence": ["no benchmark for mark_sent or BudgetWorkflow transitions", "no profiler data for allocation hotspots", "no allocation tracking (dhat/heaptrack) evidence", "no second-ring property tests or fuzzer runs for workflow invariants", "no CLI or command evidence for invoking the budget workflow"],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental architectural violations (primitive obsession, missing typestates, missing validation gates) that are BLOCKER-severity. The code compiles and represents illegal domain states. A full refactor to enums, newtypes, and typestates with validation in mark_sent is required before any performance or verification work."
+}

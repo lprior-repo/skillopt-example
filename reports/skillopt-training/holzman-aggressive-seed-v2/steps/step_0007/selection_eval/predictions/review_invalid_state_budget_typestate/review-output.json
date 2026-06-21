@@ -1,0 +1,78 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String; any arbitrary string value (\"sent\", \"\", \"cancelled\", \"foo\") is a valid BudgetWorkflow, violating the typestate guarantee that status transitions are enforced by the compiler.",
+      "failure_mode": "A caller can set status to any string, creating illegal states that no runtime check can prevent; downstream code cannot pattern-match on status at the type level.",
+      "fix": "Replace `pub status: String` with `pub status: BudgetStatus` where `BudgetStatus` is an enum (e.g., `Draft`, `Validated`, `Sent`) and remove the separate `is_sent` flag."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are independent bool flags that can represent logically impossible combinations (validated=true, sent=false, sent=true, validated=false — i.e., a sent budget that was never validated).",
+      "failure_mode": "A budget can reach the state {is_validated: true, is_sent: false} or {is_validated: false, is_sent: true}, both of which violate the domain invariant that sent budgets must first be validated. Runtime checks on two independent booleans cannot prevent these illegal states at compile time.",
+      "fix": "Replace both bool fields with a single typestate enum (e.g., `BudgetState { Draft, Validated, Sent { sent_at: Timestamp } }`) so illegal states are unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_lacks_precondition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any BudgetWorkflow and unconditionally marks it as sent, with no check that is_validated is true before allowing the transition. The name implies a workflow precondition (validated first) that is not enforced in code.",
+      "failure_mode": "An invalid/unvalidated budget can be marked as sent, bypassing the validation gate and allowing unvalidated budgets into downstream systems. This is a data-integrity violation at the domain boundary.",
+      "fix": "Change the signature to accept a `ValidatedBudget` (newtype wrapping BudgetWorkflow with validated=true) or return a Result, requiring the caller to prove validation before calling mark_sent. Alternatively, use a typestate enum and only accept the Validated variant in a `transition_to_sent` method."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "public_fields_encapsulation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BudgetWorkflow are pub, allowing external code to mutate status, is_validated, and is_sent directly without going through any domain method or transition function.",
+      "failure_mode": "External callers can set is_sent = true without invoking mark_sent, completely bypassing the (already weak) lifecycle logic. Public mutable fields are an encapsulation breach.",
+      "fix": "Make all fields private and provide only domain methods (e.g., `new()`, `validate()`, `mark_sent()`) or constructors for each valid state variant."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "id_should_be_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints or newtype wrapper. Any string is accepted as a budget ID.",
+      "failure_mode": "Empty strings, malformed IDs, or IDs from unrelated domains can be used interchangeably, risking ID collisions and comparison mistakes with other String IDs in the system.",
+      "fix": "Introduce `pub struct BudgetId(String)` with a fallible constructor that enforces domain constraints (non-empty, valid format), and use `BudgetId` as the field type."
+    },
+    {
+      "severity": "INFO",
+      "rule": "sent_at_epoch_ms_raw_type",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64>, a raw epoch-ms value with no newtype or timezone/semantics annotation. No checked arithmetic or conversion guards are present.",
+      "failure_mode": "Consumers may interpret this as a different time unit, overflow when converting to other types, or treat year-2038 values incorrectly. Without a typed wrapper, domain semantics are lost.",
+      "fix": "Introduce `pub struct SentAtEpochMs(u64)` and use it as the field type. Provide `TryFrom` impls for safe conversions and document the epoch-ms contract."
+    },
+    {
+      "severity": "INFO",
+      "rule": "mark_sent_returns_mutable_input",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes `mut item: BudgetWorkflow` by value and returns `BudgetWorkflow`, mutating the input in place and returning the whole struct. This is a command-style mutation, not a pure functional-core pattern.",
+      "failure_mode": "Callers may reuse the original binding thinking it was immutable; the mutation happens on the parameter and the caller must use the return value. Pure functions would take an immutable reference or a constructor-style API.",
+      "fix": "Either accept `&BudgetWorkflow` and return a new `BudgetWorkflow` / `BudgetState::Sent` variant, or use a builder/constructor pattern that produces a new typed value instead of mutating in place."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler output (flamegraph, perf, cargo-flamegraph) for mark_sent or BudgetWorkflow hot paths",
+    "no allocation analysis (allocations-per-call, valgrind-memcheck, or bench allocation counts) for BudgetWorkflow construction or mark_sent",
+    "no second-ring evidence: no integration tests, no contract tests against a boundary API, no property-based tests for state transitions",
+    "no command evidence: cargo test, cargo fmt, cargo clippy not executed",
+    "no TLA+ or state-transition model documenting the BudgetWorkflow lifecycle (Draft -> Validated -> Sent)"
+  ],
+  "residual_risk": "Static review only; no commands run. The code is structurally deficient in type safety: illegal states are fully representable, validation preconditions are not enforced, and mark_sent bypasses the domain workflow. Without enum-based typestates and a validated-only constructor for mark_sent, the crate cannot prevent unvalidated budgets from being marked as sent."
+}

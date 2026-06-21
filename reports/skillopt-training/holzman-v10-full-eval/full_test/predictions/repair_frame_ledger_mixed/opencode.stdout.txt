@@ -1,0 +1,7 @@
+Repair complete. Two fixes in `src/lib.rs`:
+
+1. **Added `max_payload` check** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`, satisfying the `rejects_limit` test.
+
+2. **Removed lossy `as` conversion and unchecked arithmetic** — replaced `payload.len() as u32` with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)`, and added `checked_add` + `try_reserve` for safe capacity computation and allocation.
+
+Both tests pass. JSON output written to required path.

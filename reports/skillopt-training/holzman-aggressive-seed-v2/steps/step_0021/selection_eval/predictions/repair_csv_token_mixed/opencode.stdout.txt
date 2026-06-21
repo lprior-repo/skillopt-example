@@ -1,0 +1,18 @@
+Now I have full picture. The source has multiple violations: `.unwrap()` on parse, no empty/TooMany/Allocation checks, ignores `max_items`. Let me repair it.
+All 4 tests pass. Now the full verification gate:
+Repair complete. Here's the summary of changes made to `src/lib.rs`:
+
+**Violations fixed:**
+1. **`unwrap()` on parse** (line 12 original) → Replaced with `.map_err(|_| ParseError::Invalid)` for safe error propagation
+2. **Missing empty check** → Added `input.is_empty()` guard returning `Err(ParseError::Empty)`
+3. **`max_items` ignored** → Added `count > max_items` check returning `Err(ParseError::TooMany)`
+4. **No allocation handling** → Added `try_reserve` with `.map_err(|_| ParseError::Allocation)`
+5. **`split` + `map` + `collect` pattern** → Replaced with explicit for-loop for per-item error handling
+
+**Verification:**
+- `cargo fmt` — passed
+- `cargo fmt --check` — passed
+- `cargo check --workspace --all-targets --all-features` — passed
+- `cargo clippy` (strict mode) — passed with zero warnings
+- `cargo test` — 4/4 tests passed
+- No forbidden macros (`assert!`, `unreachable!`) in production code

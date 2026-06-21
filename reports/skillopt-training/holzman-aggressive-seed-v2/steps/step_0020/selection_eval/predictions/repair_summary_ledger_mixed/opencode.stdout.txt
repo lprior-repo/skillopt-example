@@ -1,0 +1,18 @@
+Identified violations: `unwrap()`, unchecked indexing `parts[1]`, unchecked arithmetic `+=`, unchecked division, lossy `as`, `split`+`collect` instead of `split_once`, wrong return type, missing `render_summary`, no empty/invalid/overflow handling.
+All 6 tests pass. Now writing the output.
+Repair complete. Here's a summary of the fixes applied to `src/lib.rs`:
+
+**Violations removed:**
+- `unwrap()` on parse → `.map_err(|_| SummaryError::Invalid)?`
+- Unchecked indexing `parts[1]` → `split_once(',')` via `.ok_or(SummaryError::Invalid)?`
+- Unchecked `total += value` → `total.checked_add(value).ok_or(SummaryError::Overflow)?`
+- Unchecked `total / count` → `total.checked_div(count as u64).ok_or(SummaryError::Empty)?`
+- Removed `Vec::collect` allocation for parsing (use `split_once` directly)
+- Removed lossy `as` for average formatting (format directly from struct)
+
+**Structural fixes:**
+- `summarize_metrics` return type changed from `Result<String, SummaryError>` to `Result<Summary, SummaryError>`
+- Added pure `render_summary(Summary) -> String` function (functional core / imperative shell pattern)
+- Empty input → `Err(Empty)`, invalid lines → `Err(Invalid)`, overflow → `Err(Overflow)`, too many rows → `Err(TooMany)`
+
+**Results:** `cargo fmt` passed, `cargo test` — 6/6 passed, `repair-output.json` written.

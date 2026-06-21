@@ -1,0 +1,43 @@
+{
+  "id": "review_invalid_state_ledger_typestate",
+  "hard": 0,
+  "soft": 0.6666666666666666,
+  "task_type": "review",
+  "task_description": "Review review_invalid_state_ledger for Holzman + functional-core Rust violations.",
+  "fail_reason": "Option/invalid state; parse/boundary",
+  "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_ledger_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_ledger_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_ledger_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_ledger_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+  "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make_illegal_states_unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"LedgerWorkflow uses pub status: String, is_validated: bool, is_sent: bool \u2014 four independent fields that can express every combination including impossible ones (e.g. status='sent' with is_sent=false, or status='invalid' with is_sent=true). No typestate or enum enforces valid transitions.\",\n      \"failure_mode\": \"Any caller can construct or mutate a LedgerWorkflow into an illegal state (e.g. validated but not sent, or sent with wrong status string), making all invariants reliant on manual discipline rather than compiler enforcement.\",\n      \"fix\": \"Replace status: String with a sealed enum (e.g. enum LedgerStatus { New, Validated, Sent }) and is_sent/is_validated bools with a single enum or typestate struct. Use a fallible constructor that rejects impossible combinations. Remove pub fields; provide read-only accessors and a dedicated transition API.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"mark_sent is a bare fn that mutates the domain struct in place with string assignment and boolean toggle. It has no typed error return, no separation of pure calculation from shell action, and no typestate guard \u2014 it is both a domain mutation and an action with no shell layer.\",\n      \"failure_mode\": \"The side effect (mutating status and is_sent) is indistinguishable from a pure calculation. Callers cannot handle failure, cannot reason about the transition as a domain event, and the function is trivially callable from any context including the pure core.\",\n      \"fix\": \"Introduce a typestate (e.g. struct ValidatedWorkflow) so mark_sent can only be called on a validated item. Return a Result<SentWorkflow, TransitionError> instead of mutating in place. Move the string assignment into a shell layer that converts the domain enum to wire format.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_pub_mutable_fields\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"All fields (id, status, is_validated, is_sent, sent_at_epoch_ms) are pub, allowing any external code to mutate the struct without any domain guard or transition logic.\",\n      \"failure_mode\": \"External crates can bypass all workflow logic by directly setting item.status = \\\"anything\\\" or item.is_sent = true, completely undermining invariants.\",\n      \"fix\": \"Make all fields private. Provide a constructor that builds valid states. Expose read-only accessors. Route all mutations through typed transition methods.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"primitive_obsession\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"id: String is a bare primitive with no domain constraints. sent_at_epoch_ms uses raw u64 without a wrapper type that encodes the 'epoch milliseconds' invariant.\",\n      \"failure_mode\": \"Callers can pass empty strings, arbitrary-length strings, or nonsensical epoch values. No compile-time distinction between a ledger ID and any other string.\",\n      \"fix\": \"Introduce a newtype struct LedgerId(String) or similar with a fallible constructor that validates length/non-empty. Wrap sent_at_epoch_ms in a MillisTimestamp newtype if the value has domain semantics beyond raw u64.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for mark_sent allocation behavior\",\n    \"no profiler evidence for LedgerWorkflow size/alignment impact\",\n    \"no allocation analysis \u2014 .to_string() on every mark_sent call produces a fresh heap allocation with no try_reserve or capacity discipline\",\n    \"no second-ring review (proof-plan or black-hat) for the typestate redesign\",\n    \"no command evidence for cargo fmt, cargo clippy, or cargo test\"\n  ],\n  \"residual_risk\": \"Static review only; no commands run. The crate as written has no tests, no benchmarks, and no typestate \u2014 the illegal-state invariant is entirely unenforced. A compliant redesign (enum status, typestate transitions, private fields, Result return) is required before any performance or verification claims can be evaluated.\"\n}\n",
+  "n_turns": 1,
+  "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0037/selection_eval/predictions/review_invalid_state_ledger_typestate",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/review_invalid_state_ledger_typestate",
+  "grade": {
+    "hard": 0.0,
+    "soft": 0.6666666666666666,
+    "failures": [
+      [
+        "Option",
+        "invalid state"
+      ],
+      [
+        "parse",
+        "boundary"
+      ]
+    ],
+    "json_valid": true,
+    "matched_groups": 4,
+    "total_groups": 6,
+    "missing_groups": [
+      [
+        "Option",
+        "invalid state"
+      ],
+      [
+        "parse",
+        "boundary"
+      ]
+    ],
+    "execution_errors": [],
+    "mutation_errors": []
+  }
+}

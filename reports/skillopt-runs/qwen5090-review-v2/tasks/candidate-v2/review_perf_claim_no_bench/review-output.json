@@ -1,0 +1,107 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/latency-throughput-playbook.md",
+    "references/nasa-jpl-standards.md",
+    "references/review-output-contract.md",
+    "references/zero-cost-abstractions.md",
+    "references/runtime-performance-architecture.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "benchmark_proof",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Comment claims 'This is faster than the old implementation' but there is no benchmark, no baseline, no profiler evidence, no input distribution, no hardware specification, and no acceptance threshold anywhere in the crate.",
+      "failure_mode": "Unmeasurable performance claim cannot be validated or regression-tested; future changes will have no benchmark to fail against.",
+      "fix": "Remove the performance claim comment until a named benchmark target exists with before/after numbers. Add a criterion or iai-callgrind benchmark in benches/ that measures collect_even across input sizes and reports p50/p95/p99 or throughput."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "Cargo.toml",
+      "line": 7,
+      "problem": "rayon is a dependency with runtime initialization cost, thread-pool allocation, and task-scheduling overhead, but there is no benchmark evidence that parallel iteration beats sequential iteration for the stated workload.",
+      "failure_mode": "Rayon thread pool spawns overhead on every call; for small inputs the parallel fan-out cost exceeds any benefit, making the 'faster' claim potentially false and the dependency a silent throughput regressor.",
+      "fix": "Add a named benchmark comparing rayon::par_iter().filter() vs slice::iter().filter() across input sizes (10, 100, 1000, 10000). Only keep rayon if benchmark evidence shows throughput wins at realistic input sizes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "par_iter().filter().copied().collect() fans out to a thread pool with no bounds on work size, no batching threshold, and no upper bound on parallel task count. The input is unbounded.",
+      "failure_mode": "Rayon's work-stealing scheduler can spawn an unbounded number of tasks for adversarial or very-large inputs, causing thread exhaustion, memory pressure, or OOM.",
+      "fix": "Either bound the input with a max-size parameter and return a typed error for over-capacity, or add a work-chunk size threshold (e.g., rayon's built-in splitting threshold) and document it. For safety-critical use, add an explicit input cap."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_no_post_init_alloc",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "SmallVec<[u64; 64]> allocates on the heap when the input contains more than 64 even numbers. There is no allocation budget, no capacity pre-allocation strategy, and no documented allocation behavior.",
+      "failure_mode": "Unbounded input triggers unbounded heap allocation in the hot path, defeating cache locality and introducing allocator contention.",
+      "fix": "Either bound the input size so SmallVec inline storage always suffices, or accept a caller-owned Vec<>/Scratch buffer parameter to reuse capacity across calls, or document the allocation budget with benchmark evidence."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "storage_placement",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "The function owns the output allocation (returns SmallVec), forcing the caller to either accept ownership or clone. No caller-owned buffer pattern is offered.",
+      "failure_mode": "Repeated hot-path calls cannot reuse buffer capacity, causing per-call allocation churn even when the SmallVec inline storage suffices.",
+      "fix": "Provide an overload that accepts an output buffer: fn collect_even_into(values: &[u64], out: &mut SmallVec<[u64; 64]>). This lets callers reuse capacity across calls."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_simple_control_flow",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "The function body is a single chained iterator pipeline but its parallel semantics are opaque: par_iter, filter, copied, collect. A reviewer cannot determine the actual control flow, branch predictability, or termination without reading rayon's source.",
+      "failure_mode": "Hidden control flow in iterator chains makes static analysis, proof, and verification impossible without tracing through rayon internals.",
+      "fix": "Add a doc comment explaining the function's behavior, complexity, and bounds. For safety-critical code, prefer an explicit loop with a documented iteration bound over chained iterator combinators."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "mechanical_empathy_order",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "rayon (a heavyweight parallelism library) is introduced before any profiler evidence that the bottleneck is CPU-bound iteration. The optimization hierarchy requires algorithm and memory-traffic fixes before concurrency.",
+      "failure_mode": "Premature parallelism can degrade performance on small inputs, add scheduling overhead, and introduce concurrency bugs (data races, contention) without measurable benefit.",
+      "fix": "Profile the sequential version first. Only introduce rayon after profiler evidence confirms CPU-bound iteration is the bottleneck at realistic input sizes."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_short_functions",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The crate has no tests, no benchmarks, no doc comments, no error handling, and no rust-toolchain.toml. A 7-line library is acceptable in isolation but the absence of any tests makes the performance claim unverifiable.",
+      "failure_mode": "No regression guard exists; any future change to this function cannot be validated for correctness or performance.",
+      "fix": "Add at minimum: a #[cfg(test)] module with property tests (e.g., 'all output elements are even', 'output count <= input count'), a named benchmark target, and a rust-toolchain.toml if nightly features are needed."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "No #[must_use] attribute on a function that returns a collected result. A caller can silently discard the output.",
+      "failure_mode": "The caller may believe work was done when the result was dropped, masking logic errors.",
+      "fix": "Add #[must_use = \"result discarded\"] to the function signature."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark target exists in Cargo.toml or benches/ for the stated 'faster' claim",
+    "no profiler evidence (flamegraph, perf stat, cachegrind, DHAT, heaptrack) for any performance claim",
+    "no assembly/IR evidence (cargo asm, cargo llvm-ir, cargo llvm-lines) for the parallel iterator path",
+    "no rust-toolchain.toml with pinned nightly, feature allowlist, or release profile configuration",
+    "no tests in the crate to validate correctness of collect_even",
+    "no latency or throughput target, input distribution, or hardware specification stated",
+    "no allocation budget documented for SmallVec heap growth beyond 64 elements",
+    "no baseline measurement to compare against any 'old implementation'"
+  ],
+  "residual_risk": "Static review only with no commands executed. The crate makes an explicit performance claim ('faster than the old implementation') without any benchmark, profiler, or second-ring evidence. The rayon dependency introduces parallelism overhead that is unproven to help, and the SmallVec return type introduces unbounded heap allocation for large inputs. All findings are unverified without running cargo check, clippy, tests, or benchmarks. The single most critical blocker is the absence of any benchmark—without it the 'faster' claim is unverifiable and unguardable."
+}

@@ -1,0 +1,35 @@
+{
+  "id": "review_unsafe_transmute_header",
+  "hard": 0,
+  "soft": 0.8,
+  "task_type": "review",
+  "task_description": "Review review_unsafe_transmute_header for Holzman + functional-core Rust violations.",
+  "fail_reason": "scalar/fallback",
+  "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/dbe727c829242853/review_unsafe_transmute_header/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/dbe727c829242853/review_unsafe_transmute_header/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/dbe727c829242853/review_unsafe_transmute_header\nRequired output path: /tmp/opencode/holzman-skillopt-train/dbe727c829242853/review_unsafe_transmute_header/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+  "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_production_unsafe\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"Production code contains an `unsafe` block using `std::mem::transmute` to reinterpret bytes as `u32`.\",\n      \"failure_mode\": \"transmute bypasses endian semantics and relies on platform endianness; on big-endian targets this returns host-endian data that callers will misinterpret as little-endian, producing silently corrupt length values.\",\n      \"fix\": \"Replace the entire `unsafe` block with `u32::from_le_bytes([input[0], input[1], input[2], input[3]])` or `u32::from_be_bytes(...)` depending on the wire format, and add a bounds check.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_unchecked_indexing\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"Direct indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` with no length guard panics on inputs shorter than 4 bytes.\",\n      \"failure_mode\": \"A caller passing a slice with fewer than 4 elements triggers a bounds panic, turning a recoverable malformed-input case into a process abort.\",\n      \"fix\": \"Check `input.len() >= 4` before indexing, or return a `Result<u32, Error>` and use `input.get(0)..input.get(3)` with `?` propagation.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_transmute_for_type_conversion\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"`std::mem::transmute::<[u8; 4], u32>` is misused for what is fundamentally an endianness-aware byte-to-int conversion, not a bit-for-bit alias.\",\n      \"failure_mode\": \"transmute guarantees identical bit layout but does not encode endianness intent; future readers and static analyzers cannot reason about the byte order contract, and on big-endian architectures the returned value will be byte-swapped relative to any little-endian assumption.\",\n      \"fix\": \"Use `u32::from_le_bytes` or `u32::from_be_bytes` to make the endianness explicit in the type signature and eliminate the `unsafe` block entirely.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_benchmark_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmark, profiler, or allocation evidence exists for `read_len`.\",\n      \"failure_mode\": \"Without evidence the function's performance characteristics (branch on bounds check, cache behavior) are unverified.\",\n      \"fix\": \"Add a `criterion` or `divan` benchmark exercising the short-path (<=3 bytes) and long-path (>=4 bytes) to confirm the bounds-checked variant meets the performance budget.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_command_evidence\",\n      \"file\": \"Cargo.toml\",\n      \"line\": 1,\n      \"problem\": \"No test target, no benchmark target, and no dev-dependencies declared.\",\n      \"failure_mode\": \"The crate has no verifiable test or benchmark harness; no commands can be run to validate behavior or performance claims.\",\n      \"fix\": \"Add `[[test]]` or `[[bench]]` sections and `criterion`/`proptest` under `[dev-dependencies]`.\"\n    }\n  ],\n  \"missing_evidence\": [\"no benchmark exists for `read_len`\", \"no test target in Cargo.toml\", \"no profiler output\", \"no allocation analysis\"],\n  \"residual_risk\": \"static review only; no commands run. The `unsafe transmute` and unchecked indexing are definitive BLOCKERS that must be repaired before any delivery gate.\"\n}\n",
+  "n_turns": 1,
+  "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-smoke-limit4/selection_eval_baseline/predictions/review_unsafe_transmute_header",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/dbe727c829242853/review_unsafe_transmute_header",
+  "grade": {
+    "hard": 0.0,
+    "soft": 0.8,
+    "failures": [
+      [
+        "scalar",
+        "fallback"
+      ]
+    ],
+    "json_valid": true,
+    "matched_groups": 4,
+    "total_groups": 5,
+    "missing_groups": [
+      [
+        "scalar",
+        "fallback"
+      ]
+    ],
+    "execution_errors": [],
+    "mutation_errors": []
+  }
+}

@@ -1,0 +1,2 @@
+The bug: `input[index]` panics on out-of-bounds. The tests expect `None` for out-of-bounds. Fix: use `get()`.
+`/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_byte_at/repair-output.json` — cargo test passed.

@@ -1,0 +1,18 @@
+Now I have full context. The source has multiple Holzman violations and the tests expect a different signature (`Result<Summary, SummaryError>`) plus a `render_summary` function. Let me fix it.
+All 6 tests pass. Now writing the required output JSON.
+Repair complete. All 6 tests pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `summarize_metrics` returned `Result<String, ...>` | Changed to `Result<Summary, ...>` |
+| Missing `render_summary` function | Added pure display function |
+| `.unwrap()` on parse | `map_err(|_| SummaryError::Invalid)` |
+| Unchecked indexing `parts[1]` | `split_once(',')` with `ok_or` |
+| `count += 1` unchecked | `checked_add(1).ok_or(Overflow)` |
+| `total += value` unchecked | `total.checked_add(value).ok_or(Overflow)` |
+| `total / count` unchecked division | `checked_div(count_u64).ok_or(Invalid)` |
+| `count as u32` / `count as u64` lossy casts | `u64::try_from(count)` / `u32::try_from(count)` |
+| No empty-input check | Returns `Err(SummaryError::Empty)` |
+| `split(',').collect()` allocation | `split_once` mandatory pattern |

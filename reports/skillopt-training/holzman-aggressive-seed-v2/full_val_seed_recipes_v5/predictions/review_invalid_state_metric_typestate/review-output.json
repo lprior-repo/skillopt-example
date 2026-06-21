@@ -1,0 +1,98 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_invalid_state",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow uses raw primitives (String status, bool is_validated, bool is_sent, Option<u64> sent_at_epoch_ms) instead of enum-based typestates, allowing callers to construct invalid state combinations such as is_validated=true with status=\"pending\" or is_sent=true with status=\"pending\".",
+      "failure_mode": "Callers can place MetricWorkflow into logically impossible states that are only detectable at runtime; no compile-time guarantee that status, lifecycle booleans, and timestamps are coherent.",
+      "fix": "Replace status: String with an enum (e.g., enum WorkflowStatus { Pending, Validated, Sent }) and is_validated: bool / is_sent: bool with an enum or typestate that makes illegal combinations unrepresentable. Remove or privatize the raw fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are pub raw primitives (String, bool, Option); the struct has no fallible constructor, builder, or parse boundary. Callers can construct invalid states directly without any validation.",
+      "failure_mode": "Every caller bypasses domain invariants by setting struct fields directly, making it impossible to enforce that status matches lifecycle flags or that sent_at_epoch_ms is Some only when is_sent is true.",
+      "fix": "Make all fields private, add a fallible smart constructor (e.g., fn new(id: &str) -> Result<MetricWorkflow, MetricError>) and/or use newtyped IDs and enum variants so invalid states are unrepresentable at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle_booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle flags that can be set to contradictory combinations (e.g., both true, both false, or validated without sent).",
+      "failure_mode": "Runtime logic depending on these booleans will misbehave under invalid combinations (double-sent, sent-but-not-validated, or validated-but-not-marked-sent).",
+      "fix": "Replace both booleans with a single enum WorkflowState { Pending, Validated, Sent } or use a typestate pattern with separate types for each lifecycle phase."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any arbitrary string value (e.g., \"foo\", \"\", \"SENT\"). mark_sent sets it to \"sent\" by string literal, which is fragile and not enforced by the type system.",
+      "failure_mode": "Typos, case mismatches, or unexpected string values break status-dependent logic; no exhaustiveness checking on match arms.",
+      "fix": "Replace with enum WorkflowStatus { Pending, Validated, Sent } and use pattern matching with exhaustive arms."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "id_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive without a domain newtype, making it indistinguishable from other string fields and allowing empty or malformed IDs.",
+      "failure_mode": "Caller can pass an empty string or malformed ID; no domain-level validation at the type level.",
+      "fix": "Introduce a newtype: pub struct WorkflowId(String) or use a parse-boundary constructor that validates and rejects empty/malformed IDs."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_mark_sent_contract",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent blindly overwrites status to \"sent\" and sets is_sent=true regardless of prior state (e.g., it does not check if the workflow was already sent or if it was validated first).",
+      "failure_mode": "Double-send or sending an unvalidated workflow silently succeeds; the function has no precondition checks and no error return.",
+      "fix": "Refactor mark_sent to take an enum-based state and return Result<MetricWorkflow, MetricError> (or a typestate transition) that enforces valid transitions (e.g., only Pending can transition to Sent, or only Validated can transition to Sent)."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow contains two owned String fields (id, status) and mark_sent performs \"sent\".to_string() allocation on every call. No allocation analysis or evidence for this pattern.",
+      "failure_mode": "Repeated mark_sent calls on hot paths cause unnecessary heap allocations; if id is re-settable, it also causes reallocation of the original String.",
+      "fix": "Use Cow<'static, str> for status, or prefer an enum (which has zero heap allocation). If id must be owned, benchmark to confirm the allocation budget is acceptable."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist to establish performance baselines for MetricWorkflow or mark_sent.",
+      "failure_mode": "No evidence that the code meets any performance claim; allocation behavior of String fields is unmeasured.",
+      "fix": "Add a benchmark (e.g., Criterion) for mark_sent to measure allocation and throughput."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence exists to confirm hot paths or allocation patterns.",
+      "failure_mode": "Cannot identify whether the String allocations in mark_sent are actually a performance concern.",
+      "fix": "Run perf or flamegraph on a representative workload to confirm allocation hotspots."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No CLI or second-ring command-layer evidence exists for the MetricWorkflow domain.",
+      "failure_mode": "The imperative shell boundary is not visible; no evidence of how I/O boundaries are handled.",
+      "fix": "Add a shell-layer module with explicit I/O that parses at boundaries into the domain type and performs actions."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent throughput or allocation", "no profiler evidence for String allocation patterns", "no CLI or second-ring command-layer evidence", "no allocation budget evidence for owned String fields"],
+  "residual_risk": "The struct has no typestate enforcement and allows all illegal state combinations at the type level. Without enum-based status and lifecycle state machine, the only defense is manual runtime checks which are error-prone. The code also lacks any parse boundary or smart constructor, meaning every caller can violate domain invariants."
+}

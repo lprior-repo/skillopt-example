@@ -1,0 +1,116 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses two independent bools (is_validated, is_sent) instead of a typestate enum, making all four combinations legal including is_validated=false + is_sent=true",
+      "failure_mode": "a packet can be marked sent without ever being validated, violating the domain invariant that sent packets must be validated",
+      "fix": "replace is_validated: bool and is_sent: bool with a single typestate enum (e.g., PacketState { Pending, Validated, Sent }) that makes the invalid transitions unconstructable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-primitive-domain-types",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String instead of a domain newtype or enum. The string \"sent\" can be any arbitrary value, and mark_sent blindly overwrites it",
+      "failure_mode": "status can hold any string (\"pending\", \"deleted\", \"\"), defeating type-level invariants and making it impossible to enumerate valid states at compile time",
+      "fix": "replace status: String with a domain enum (e.g., PacketState) that is only constructable through its defined variants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-primitive-domain-types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints or newtype wrapper",
+      "failure_mode": "any string including empty, whitespace, or invalid IDs can exist, and there is no compile-time guarantee that id is non-empty or properly formatted",
+      "fix": "wrap in a newtype (e.g., struct PacketId(String)) with a fallible constructor that rejects invalid values, or use a proper ID crate"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-immutable-data",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields on PacketWorkflow are pub mutable, allowing external code to mutate state without any domain enforcement",
+      "failure_mode": "any caller can do item.is_sent = true directly, completely bypassing mark_sent and its (missing) precondition checks",
+      "fix": "make all fields private (no pub), provide a fallible constructor, and expose only domain-safe methods or a pure function API"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed-error-handling",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns PacketWorkflow directly with no Result type, so there is no error path when the packet is not validated or otherwise ineligible to be sent",
+      "failure_mode": "calling mark_sent on an unvalidated packet silently produces an invalid state; callers have no way to detect or handle the precondition failure",
+      "fix": "return Result<PacketWorkflow, SendError> where SendError encodes why the packet cannot be sent (e.g., NotValidated, AlreadySent)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent-preconditions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not check is_validated before allowing the sent transition",
+      "failure_mode": "a packet in invalid state transitions to sent, permanently recording a sent-but-not-validated packet that violates the domain contract",
+      "fix": "check is_validated (or the typestate equivalent) and return Err if the precondition is not met"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "duplicate-state-representation",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Both status: String and is_sent: bool encode overlapping state. is_sent is derived from status being \"sent\", yet both are independently mutable",
+      "failure_mode": "status can be \"sent\" while is_sent is false (or vice versa), creating inconsistent internal state that any consumer cannot trust",
+      "fix": "eliminate the redundancy entirely by using a single typestate enum. If a sent timestamp is needed, keep sent_at_epoch_ms as the only sent-time indicator"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unsanitized-boundary-data",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent hardcodes status = \"sent\".to_string() instead of transitioning through a domain type. The to_string() allocates a new String each call",
+      "failure_mode": "allocates on every call to mark_sent, and the magic string \"sent\" is not validated against any domain enum. Any future caller that sets status to a different string creates an inconsistent state",
+      "fix": "transition through a typestate enum variant (e.g., PacketState::Sent) instead of string assignment. The enum variant carries no allocation overhead for the state itself"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for mark_sent or any performance-sensitive path",
+      "failure_mode": "cannot verify that the allocation-heavy approach (String, to_string, bool flags) meets performance requirements under load",
+      "fix": "add a micro-benchmark in benches/ measuring mark_sent throughput and allocation count with criterion"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No allocation analysis or profiler evidence. mark_sent allocates via .to_string() on every call and uses String (heap) for id and status",
+      "failure_mode": "in a high-throughput path, repeated String allocations on every mark_sent call could become a bottleneck compared to an enum-based approach with zero allocation",
+      "fix": "profile with cargo-flamegraph or alloc counter; if hot path, replace String fields with enum typestates to eliminate all allocations in mark_sent"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No command evidence (cargo fmt, cargo check, cargo clippy, cargo test) was run or reported for this crate",
+      "failure_mode": "cannot verify the crate compiles cleanly, passes clippy, or has any test coverage",
+      "fix": "run cargo fmt --check && cargo check --workspace --all-targets --all-features && cargo clippy --workspace --lib --bins --all-features -- -D warnings && cargo test"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput",
+    "no profiler evidence for allocation count in the hot path",
+    "no cargo check/clippy/test command evidence reported",
+    "no command evidence for release build validation"
+  ],
+  "residual_risk": "The crate compiles but structurally cannot enforce its own domain invariants. All fields are publicly mutable, state is split across redundant primitive fields (status String + is_sent bool), and mark_sent has no precondition checks or error type. A single refactor to a typestate enum with private fields, a fallible constructor, and a Result-returning mark_sent would resolve all BLOCKER findings. The current code is a working but incorrect prototype that permits every invalid state it was designed to prevent."
+}

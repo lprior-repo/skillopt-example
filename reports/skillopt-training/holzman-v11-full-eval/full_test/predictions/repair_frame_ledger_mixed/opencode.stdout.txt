@@ -1,0 +1,9 @@
+Now I see the issues. The source has a lossy `as` cast and no `PayloadTooLarge` check. Let me read the references, then fix.
+Now I'll fix the source. Two violations: lossy `as u32` cast and missing `PayloadTooLarge` guard.
+All clean. Writing the required output.
+Repaired. Two violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` cast** (`payload.len() as u32` → `u32::try_from(payload.len())`)
+2. **Missing `PayloadTooLarge` guard** (added `payload.len() > max_payload` check)
+
+Also added the mandatory frame encoder four-step pattern: checked capacity arithmetic, `try_reserve`, and typed error returns. Both tests pass, `cargo fmt --check` and `cargo clippy -D warnings` clean.

@@ -1,0 +1,15 @@
+Review complete. Written 8 findings to `review-output.json`:
+
+**5 BLOCKERs:**
+- `src/lib.rs:9` — `unwrap()` on file I/O (thread panic on missing/bad file)
+- `src/lib.rs:16` — `println!` hidden I/O inside `.map()` pipeline (violates functional-core separation)
+- `src/lib.rs:19` — `unwrap()` on parse + lossy `as u32 as u16` cast (panics on non-numeric, silently truncates out-of-range values)
+- `src/lib.rs:16` — Unchecked `parts[0]` indexing (panics on empty/malformed lines)
+- `src/lib.rs:19` — Unchecked `parts[1]` indexing (panics on lines with missing fields)
+- `src/lib.rs:12` — Unbounded `collect::<Vec<String>>` with no domain cap or `try_reserve`
+
+**2 WARNINGs:**
+- `src/lib.rs:3` — Raw `String`/`u16` in `Record` with pub fields, no newtypes or invariants
+- `src/lib.rs:1` — Shell (fs::read) and core (parsing) fused in one public function
+
+**5 missing evidence items:** no benchmark, profiler, allocation analysis, cargo gates, or domain cap constant.

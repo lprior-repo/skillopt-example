@@ -1,0 +1,14 @@
+Now I see the issues. The `encode_frame` function:
+1. Missing `max_payload` check (test `rejects_limit` fails)
+2. Lossy `as u32` cast (Holzman law violation)
+3. No checked capacity arithmetic / `try_reserve`
+
+Let me apply the fix:
+Repaired. Changes to `src/lib.rs:8-21`:
+
+- **`max_payload` check** (`:9-11`): rejects when `payload.len() > max_payload`
+- **Checked capacity arithmetic** (`:12-14`): `4usize.checked_add(payload.len())` instead of unchecked addition
+- **Checked conversion** (`:15`): `u32::try_from(payload.len())` replaces lossy `payload.len() as u32`
+- **Fallible allocation** (`:17-18`): `Vec::try_reserve(capacity)` returns `FrameError::Allocation` on failure
+
+`cargo test`: 2/2 passed. `cargo clippy -- -D warnings`: clean.

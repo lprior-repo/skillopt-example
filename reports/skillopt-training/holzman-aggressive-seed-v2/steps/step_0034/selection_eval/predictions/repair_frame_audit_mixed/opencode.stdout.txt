@@ -1,0 +1,12 @@
+Now I understand the issues. The `encode_frame` function has two problems:
+1. It ignores `max_payload` — never checks if payload exceeds the limit
+2. Uses lossy `as u32` conversion instead of `try_from`
+
+Let me fix both:
+All 2 tests pass. Now let me write the output:
+Repaired. Two fixes in `src/lib.rs`:
+
+1. **Added `max_payload` check** — was ignored; now returns `Err(FrameError::PayloadTooLarge)` when payload exceeds the limit
+2. **Replaced lossy `as u32`** — `payload.len() as u32` replaced with `u32::try_from(payload.len())` returning `Err(FrameError::Overflow)` on conversion failure
+
+Both behavior tests pass.

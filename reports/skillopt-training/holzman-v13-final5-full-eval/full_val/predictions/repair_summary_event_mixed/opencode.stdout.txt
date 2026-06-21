@@ -1,0 +1,15 @@
+Now I have the full picture. The source has numerous violations: returns `String` instead of `Summary`, missing `render_summary`, `split(',').collect()`, indexing, `unwrap()`, unchecked `+=`, lossy `as`, division without checked ops.
+All 6 tests pass. Let me verify no Holzman violations remain in the final source.
+**Repair complete.** All 6 behavior tests pass, zero Holzman violations in source.
+
+Changes to `src/lib.rs`:
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary(Summary) -> String` function
+- Replaced `line.split(',').collect()` + `parts[1]` with `line.split_once(',').ok_or(Invalid)?`
+- Replaced `.unwrap()` with `.map_err(|_| Invalid)?`
+- Replaced `total += value` with `checked_add` + `Overflow` error
+- Replaced `count += 1` with `checked_add` + `Overflow` error
+- Replaced `count > max_rows` check after loop with in-loop enforcement before push
+- Replaced `total / count as u64` with `checked_div` + `u64::try_from(count)`
+- Replaced `count as u32` with `u32::try_from(count)`
+- Added early empty-input rejection

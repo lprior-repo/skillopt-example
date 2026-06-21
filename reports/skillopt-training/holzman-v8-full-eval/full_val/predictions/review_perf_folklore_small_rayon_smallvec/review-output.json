@@ -1,0 +1,74 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "performance-claim-without-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment asserts 'use Rayon and SmallVec because it will be faster' with no benchmark, no baseline number, no target hardware, no profiler evidence, and no regression threshold.",
+      "failure_mode": "Unmeasured optimization introduces Rayon overhead (thread pool dispatch, task setup, result aggregation) that exceeds the cost of iterating four bytes, making the code slower while adding a runtime dependency.",
+      "fix": "Remove the speculative TODO. If optimization is needed, add a micro-benchmark with a clear baseline command, measure on target hardware, and only refactor when the measured bottleneck justifies it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "rayon-on-tiny-work",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon for a fixed-size [u8; 4] input. Rayon's thread pool dispatch, task creation, and result collection overhead is orders of magnitude larger than iterating four elements.",
+      "failure_mode": "Rayon overhead dominates execution time; every call spawns or borrows from a thread pool, creating latency worse than the sequential loop for n=4.",
+      "fix": "Do not use Rayon for fixed inputs of size 4. A single sequential loop or unrolled iteration is optimal. Rayon requires large independent worksets with scaling evidence (10^4+ items minimum, measured speedup >2x)."
+    },
+    {
+      "severity": "ADVISORY",
+      "rule": "smallvec-without-benchmark-justification",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes SmallVec without benchmark justification. SmallVec<[&str; 4]> avoids heap allocation for the common case of 4 elements but adds a type dependency and branch on capacity.",
+      "failure_mode": "If the SmallVec branch prediction on the inline capacity fails, or if the dependency adds compile time, the benefit of avoiding one heap allocation may be negated. SmallVec must be justified by distribution data and benchmark proof.",
+      "fix": "For fixed-size [u8; 4] input producing exactly 4 outputs, prefer [&'static str; 4] or SmallVec<[&str; 4]> with benchmark evidence proving the allocation avoidance matters in the measured workload."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "heap-vec-for-fixed-size-output",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "classify_four returns Vec<&'static str> for a fixed 4-element input, guaranteeing one heap allocation per call even though the output size is always exactly 4.",
+      "failure_mode": "Every call to classify_four triggers a heap allocation (malloc + initialization + eventual free). For a hot path processing many 4-byte values, this allocation pressure causes cache pollution and GC pressure (in GC'd FFI contexts) or repeated syscalls.",
+      "fix": "Return [SmallVec<[&str; 4]>; N] for batched input, or change the API to accept a caller-owned buffer (e.g., out: &mut [&mut str; 4]) or return [Option<&'static str>; 4]. For the single-call case, use SmallVec<[&str; 4]> which keeps 4 elements inline on the stack."
+    },
+    {
+      "severity": "ADVISORY",
+      "rule": "functional-core-performance-static-buffer",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Tiny fixed-input function should consider static dispatch and concrete data layout. The function creates intermediate Iterator + collect pipeline with per-element closure allocation.",
+      "failure_mode": "Iterator chain + collect allocates intermediate buffers and creates closure stack frames. For 4 elements, a manual unrolled loop with checked indexing eliminates all intermediate allocations.",
+      "fix": "Rewrite as a manual loop or unrolled iteration: let mut out = SmallVec::with_capacity(4); for byte in bytes.iter() { out.push(if *byte & 1 == 0 { 'even' } else { 'odd' }); } out"
+    },
+    {
+      "severity": "ADVISORY",
+      "rule": "no-test-coverage",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module exists. The public API classify_four has no verified behavior contract for edge cases (all zeros, all 0xFF, mixed parity, etc.).",
+      "failure_mode": "Regression in classification logic or signature change goes undetected. Without tests, any future refactor (e.g., adding Rayon/SmallVec) has no behavioral baseline.",
+      "fix": "Add at least: test for [0u8; 4] (all even), test for [0xFFu8; 4] (all odd), test for mixed parity [0xAA, 0xFF, 0x00, 0x01]. These prove the core logic invariant."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim (baseline, target hardware, regression threshold absent)",
+    "no profiler data (perf, flamegraph, or similar) to identify actual bottlenecks",
+    "no allocation analysis (e.g., afl.rs, alloc counters, or cargo-geiger) to quantify per-call heap pressure",
+    "no second-ring evidence: no Kani proof harness, no Miri UB check, no proptest property for classification invariance",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy, and cargo test were not run (review mode; no execution attempted per rules)",
+    "no tests exist in the crate to provide behavioral baseline or regression safety"
+  ],
+  "residual_risk": "Static review only. No commands executed, no tests compiled or run, no benchmarks measured, no formal verification performed. The code is syntactically valid Rust but makes a performance claim (Rayon + SmallVec = faster) that is almost certainly false for n=4 inputs given Rayon dispatch overhead. The heap allocation on every call is unbounded by domain constraints. All findings require empirical measurement (micro-benchmark on target hardware) to confirm severity."
+}

@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses two boolean flags (is_validated, is_sent) plus a status String to model lifecycle. These are redundant, partially overlapping, and allow illegal combinations such as is_validated=false with is_sent=true, or status=\"sent\" with is_sent=false, or both flags false with no status value.",
+      "failure_mode": "Any code path reading these fields must manually reconcile inconsistent state. A caller may assume the shard is validated because is_validated=true while it was never actually validated (the flags are independently mutable public fields).",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single enum typestate (e.g., enum ShardStage { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }). Make the struct fields private and construct only valid states via a fallible constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type-discipline-status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a free-form String. functional-core-performance.md mandates replacing status strings with typed enums. No domain invariant is enforced at the type level.",
+      "failure_mode": "Any arbitrary string (including empty, garbage, or inconsistent values) can be assigned. String comparison throughout the codebase replaces compile-time guarantees.",
+      "fix": "Replace pub status: String with pub status: ShardStage (an enum). Remove is_validated and is_sent flags entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type-discipline-bool-lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive boolean lifecycle flag. functional-core-performance.md: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.'",
+      "failure_mode": "Boolean lifecycle flags are inherently two-state and composable in ways the domain disallows. They cannot express ordering (must be validated before sent) or capture transition data (sent_at_epoch_ms).",
+      "fix": "Fold the boolean into a typed enum so validated state is a compile-time guarantee, not a runtime boolean."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type-discipline-bool-lifecycle",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a primitive boolean lifecycle flag. Same issue as is_validated.",
+      "failure_mode": "The sent flag can be true independently of any timestamp or status string, and can be flipped without any transition invariant being checked.",
+      "fix": "Fold the sent flag into the same typed enum as status and is_validated, carrying sent_at_epoch_ms as data on the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-imperative-shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a pure function that mutates public fields directly with no error return. Transitioning a shard to 'sent' is inherently fallible (may require validation check, timestamp capture, etc.) but has no Result type.",
+      "failure_mode": "Callers cannot handle failure. If validation is a prerequisite for sending, there is no way to reject the operation — the function silently sends an invalid shard.",
+      "fix": "Return Result<ShardWorkflow, ShardError> from mark_sent. Check domain invariants (e.g., the shard must be in a validated stage) before transitioning. Use the typed enum typestate to make invalid transitions a compile error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-imperative-shell",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses .to_string() allocation to set status. Per functional-core-performance.md: 'Avoid intermediate String allocations in pure pipelines.' The function takes ownership and returns the entire struct, yet still allocates a new String for a literal.",
+      "failure_mode": "Unnecessary heap allocation on every call. If mark_sent is called in a hot path, this allocates per invocation without benefit.",
+      "fix": "With a typed enum typestate, the Sent variant carries the timestamp directly — no String allocation needed. Use enum variants, not string literals, for state transitions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "type-discipline-id-newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive String for a shard identifier. Per functional-core-performance.md: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.' The same principle applies to domain identifiers — a String ID has no domain-level constraints.",
+      "failure_mode": "Empty strings, duplicated IDs, or non-IDs cannot be distinguished at the type level. The compiler provides no guarantee that a valid shard ID was supplied.",
+      "fix": "Introduce a newtype: pub struct ShardId(String). Add a fallible constructor (e.g., ShardId::from_str) that validates the ID format at the boundary."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an Option lifecycle field with no typestate tying it to the is_sent flag. The timestamp can be None while is_sent=true, or Some while is_sent=false.",
+      "failure_mode": "The epoch timestamp may be missing for a shard that is marked as sent, or may exist for a shard not yet sent. Both are domain violations that the compiler cannot detect.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typed enum: Sent { sent_at_epoch_ms: u64 }. The timestamp is then guaranteed to exist whenever the shard is sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero-forbidden-constructs",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are pub. Public fields allow external code to set any combination of fields, making illegal states trivially representable.",
+      "failure_mode": "External code can construct a ShardWorkflow with is_sent=true, status=\"sent\", is_validated=false, and sent_at_epoch_ms=None — a state the domain should never permit.",
+      "fix": "Make all fields private. Provide a private constructor or a builder that only allows valid state combinations."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for mark_sent or ShardWorkflow. Holzman Rust requires measured evidence before claiming any performance characteristic. The struct contains two owned String fields that allocate on every copy.",
+      "failure_mode": "Without benchmarks, there is no evidence that the allocation cost is acceptable. If mark_sent is called in a hot path, the String allocations and cloning could be a bottleneck.",
+      "fix": "Add a benchmark comparing the current approach against a typestate-enum approach with no allocations. Report results before merging."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing-profiler-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation profiling or second-ring command evidence exists. Holzman Rust requires profiler evidence to justify the performance discipline.",
+      "failure_mode": "Without allocation profiling, the actual heap pressure of the owned String fields is unknown.",
+      "fix": "Run allocational profiling (e.g., heaptrack, dhat) on realistic workloads to establish the allocation baseline."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or ShardWorkflow lifecycle operations",
+    "no profiler or allocation evidence for the owned String fields",
+    "no second-ring command evidence (no clippy, no Miri, no test output)"
+  ],
+  "residual_risk": "Static review only; no commands run. The code permits arbitrarily illegal state combinations through independent mutable public booleans and a free-form status string. No benchmarks or profiler evidence exist to justify the allocation cost of owned String fields in the struct and mark_sent function. The fundamental fix is replacing the three primitive lifecycle fields with a single typed enum typestate."
+}

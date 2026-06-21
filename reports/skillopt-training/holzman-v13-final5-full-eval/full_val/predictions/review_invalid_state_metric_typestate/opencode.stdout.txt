@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review JSON.
+Review complete. Written to `review-output.json` with:
+
+- **8 findings** (7 BLOCKER, 1 WARNING)
+- **6 typestate findings** as required by SKILL.md line 48: enum/typestate state machine, status/String, bool/lifecycle, Option invalid-state, newtype/domain ID, parse boundary
+- **1 additional BLOCKER**: mark_sent allows invalid transitions (line 9)
+- **1 WARNING**: missing benchmark evidence
+- **4 missing evidence** items
+- All findings include required fields: severity, rule, file, line, problem, failure_mode, fix
+
+Core issues in `src/lib.rs`:
+- `MetricWorkflow` struct is a data bag — every illegal state is representable
+- `status: String` allows arbitrary values instead of an enum
+- `is_validated: bool` + `is_sent: bool` create 4 unenforced states
+- `sent_at_epoch_ms: Option<u64>` is detached from the lifecycle
+- `id: String` is an unvalidated raw primitive
+- No smart constructor or parse boundary exists
+- `mark_sent()` transitions from any state unconditionally

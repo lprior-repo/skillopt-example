@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**11 findings** (8 BLOCKER, 3 MAJOR), 5 missing evidence items:
+
+**BLOCKERs:**
+- `unwrap()` on `fs::read_to_string` (line 9) — IO panics
+- `unwrap()` on `.parse()` (line 19) — parse panics
+- Lossy `as u16` cast from `u32` (line 19) — silent truncation
+- Unchecked `parts[0]` indexing (line 16) — bounds panic
+- `println!` side effect inside iterator (line 16) — impure core
+- Mixed I/O + parsing in single function (line 8) — no core/shell split
+
+**MAJORs:**
+- No typed domain error enum — all failures are panics
+- `Record` fields are `pub` — illegal states are representable
+- No benchmark/profiler/allocation/command evidence

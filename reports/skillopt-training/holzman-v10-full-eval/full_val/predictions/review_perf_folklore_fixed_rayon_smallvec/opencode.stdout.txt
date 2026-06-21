@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**5 findings** across 2 BLOCKER and 2 WARNING severities:
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | no-benchmark-evidence-for-performance-claim | 2 |
+| 2 | BLOCKER | rayon-not-appropriate-for-trivially-small-data | 2 |
+| 3 | BLOCKER | unnecessary-heap-allocation | 6 |
+| 4 | WARNING | no-workload-contract | 1 |
+| 5 | WARNING | no-test-coverage | 1 |
+
+**5 missing evidence items**: no benchmark, profiler, allocation, second-ring, or command evidence exists.
+
+Core issue: the TODO comment at line 2 encodes performance folklore (Rayon + SmallVec = faster) with zero evidence. For a fixed 4-element array, Rayon pool overhead will almost certainly be a net regression. SmallVec is plausible but unverified.

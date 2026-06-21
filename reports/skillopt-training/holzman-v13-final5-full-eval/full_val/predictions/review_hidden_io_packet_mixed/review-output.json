@@ -1,0 +1,122 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string() performs file I/O directly inside load_packets, which is the data-loading path that should be in the shell. I/O is fused with parsing and domain construction.",
+      "failure_mode": "The function cannot be composed, tested without real files, or swapped for mock/network I/O; side effects leak into the data-loading path.",
+      "fix": "Move fs::read_to_string into a shell-layer function. Accept an iterator of lines or &str input. Core parsing consumes trusted data without file access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) performs logging/stdout I/O inside the parsing logic. Logging is a side effect that belongs exclusively in the shell.",
+      "failure_mode": "Parsing output is non-deterministic, polluted with side effects, and impossible to test or compose without capturing stdout.",
+      "fix": "Remove println!. Log in the shell layer after domain construction returns. Pure parsing returns data only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file-not-found, permission errors, or I/O errors instead of returning a typed error.",
+      "failure_mode": "Untrusted file path crashes the process instead of producing a recoverable error, violating panic freedom.",
+      "fix": "Return Result<Vec<Record>, LoadError>. Use .map_err(|e| LoadError::Io(e))? or match on the Err branch."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on malformed numeric input (non-digit characters, overflow) instead of returning a typed error.",
+      "failure_mode": "Malformed CSV rows crash the process instead of returning a typed ParseError.",
+      "fix": "Use .map_err(|_| RecordError::InvalidValue)? and apply checked conversion to u16."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_access_index_bounds",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked index access on a Vec created by split. If the line has fewer than 2 comma-separated fields, index access panics without bounds checking or get(). This is unchecked index access — the fix is to avoid index access entirely and use line.split_once(',') instead of split().collect().",
+      "failure_mode": "Malformed lines with missing fields (e.g. empty lines, single-field lines) cause index out-of-bounds panic instead of returning a typed error.",
+      "fix": "Replace split().collect() into parts with line.split_once(',').ok_or(RecordError::Malformed)? to get (_name, value_str) safely. Avoid index access and bounds checking on split results."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 performs a lossy as cast from u32 to u16 after unwrap. Values above 65535 silently truncate to u16::MAX or wrap.",
+      "failure_mode": "A valid u32 like 70000 becomes 4416 when cast to u16, silently corrupting data. Lossy as cast violates checked conversion discipline.",
+      "fix": "Use u32::try_from(value).map_err(|_| RecordError::ValueTooLarge)? instead of as u16. This rejects out-of-range values with a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_boundary_parse",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record struct uses raw primitives (String, u16) with pub fields and no smart constructor. Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": "Callers can create Record with empty name strings, negative-like values, or other invalid states that should be impossible.",
+      "fix": "Make Record fields private. Provide a smart constructor like Record::new(name: String, value: u16) -> Result<Self, RecordError> that validates invariants. Consider newtypes for name with rules."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "shell_leakage",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets fuses file I/O (fs::read_to_string), logging (println!), allocation (Vec::with_capacity via collect), parsing (split + parse), and domain construction (Record) into a single function. Data/Calculations/Actions architecture is violated.",
+      "failure_mode": "Cannot test parsing logic without real files, cannot swap I/O sources, cannot reason about pure vs impure behavior.",
+      "fix": "Split into shell function load_packets(path) -> Result<Vec<Record>, LoadError> that reads files, and pure parse_line(line: &str) -> Result<Record, RecordError> that parses one record. Core logic stays pure."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation_try_reserve",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No bounded allocation with try_reserve or domain cap. Collect into Vec without capacity validation or try_reserve. If the file is extremely large, unbounded allocation can exhaust memory.",
+      "failure_mode": "A very large input file causes unbounded heap allocation and potential OOM.",
+      "fix": "Validate a domain cap/max_rows first, create Vec::new(), call values.try_reserve(max_rows).map_err(|_| LoadError::Allocation)?, then enforce max before each push with if values.len() >= max_rows { return Err(LoadError::TooMany); }. Return typed errors for allocation failure."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typed error enum exists. All errors collapse into panics via unwrap(). No error taxonomy for Io, Malformed, InvalidValue, ValueTooLarge, TooMany, or Allocation errors.",
+      "failure_mode": "Callers cannot distinguish between file-not-found, malformed CSV, bad values, or allocation failure. Recovery is impossible.",
+      "fix": "Define an enum LoadError { Io(std::io::Error), Malformed, InvalidValue, ValueTooLarge, TooMany, Allocation } and return Result<Vec<Record>, LoadError> from all fallible paths."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_packets. No performance baseline, no workload specification, no throughput/latency measurement.",
+      "failure_mode": "Cannot verify that this function meets any performance requirement. Allocation pattern and hot-path characteristics are unmeasured.",
+      "fix": "Add a criterion or custom benchmark measuring lines/sec for representative input sizes. Profile with cargo-flamegraph or equivalent. Report ops/sec or bytes/sec."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_packets throughput or latency",
+    "no profiler evidence for allocation patterns in the parsing hot path",
+    "no allocation budget or capacity cap documented",
+    "no command evidence (cargo fmt, cargo clippy, cargo test) was run",
+    "no second-ring evidence for any performance or correctness claims"
+  ],
+  "residual_risk": "Source-level review only with multiple BLOCKER violations: hidden I/O (fs and println), panic surfaces (2x unwrap), unchecked indexing (parts[0], parts[1]), lossy cast (as u16), no typed error taxonomy, no parse boundary, no bounded allocation. The code violates absolute laws of Holzman Rust on unsafe operations (panic = unsafe behavior), bounded resources, and data/calculations/actions separation. Delivery is blocked until all findings are resolved."
+}

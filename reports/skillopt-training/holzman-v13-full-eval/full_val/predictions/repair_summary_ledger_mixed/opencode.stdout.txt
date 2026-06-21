@@ -1,0 +1,18 @@
+I'll start by reading the skill bundle, references, and understanding the task crate structure.
+Now I have a clear picture of all the violations. Let me read the remaining references, then fix the code.
+Now I'll apply the repair. The violations are: wrong return type, no `render_summary`, `split().collect()`, unchecked indexing, `unwrap()`, unchecked `+=`, `count += 1`, lossy `as` casts, unchecked division, missing empty-input check.
+All 6 tests pass. Now I'll write the required output JSON.
+Repair complete. All 6 tests pass. Here's a summary of the 10 violations fixed in `src/lib.rs`:
+
+| # | Violation | Fix |
+|---|-----------|-----|
+| 1 | Wrong return type `Result<String>` | Changed to `Result<Summary>` |
+| 2 | Missing `render_summary` | Added pure formatting function |
+| 3 | `split(',').collect()` | Replaced with `split_once(',')` |
+| 4 | Unchecked indexing `parts[1]` | Eliminated via `split_once` pattern |
+| 5 | `.unwrap()` on parse | Replaced with `.map_err(SummaryError::Invalid)` |
+| 6 | `total += value` (unchecked add) | Replaced with `checked_add` |
+| 7 | `count += 1` | Replaced with `checked_add(1)` |
+| 8 | `count as u32` (lossy cast) | Replaced with `u32::try_from(count)` |
+| 9 | `total / count as u64` (unchecked div + lossy) | Replaced with `checked_div` + `u64::try_from` |
+| 10 | No empty-input check | Added `input.is_empty()` guard |

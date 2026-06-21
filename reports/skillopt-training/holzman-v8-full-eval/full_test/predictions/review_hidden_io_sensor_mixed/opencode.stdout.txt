@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review.
+Review complete. Wrote `review-output.json` with **9 BLOCKER findings** and **5 missing evidence items**.
+
+Key violations found in `src/lib.rs`:
+
+| Line | Rule | Issue |
+|------|------|-------|
+| 9 | zero_forbidden_constructs | `fs::read_to_string().unwrap()` — panics on missing file |
+| 19 | zero_forbidden_constructs | `parse().unwrap()` — panics on malformed CSV |
+| 19 | zero_forbidden_constructs | `as u16` lossy cast — silent truncation of values >65535 |
+| 12 | bounded_resource_policy | Unbounded `collect::<Vec<String>>()` on split — OOM from hostile input |
+| 16 | hidden_io_side_effects | `println!` fused into data-loading function |
+| 8 | error_taxonomy | Returns `Vec<Record>`, not `Result` — all errors are panics |
+| 18 | indexing_safety | `parts[0]`, `parts[1]` unchecked indexing — panics on short lines |
+| 18 | domain_type_safety | No domain validation on `Record` fields |
+| 18 | parse_boundary | Raw `String` passed to Record without validation |
+
+Missing evidence: no benchmarks, no profiler, no allocation audit, no build gate verification, no second-ring evidence.

@@ -1,0 +1,89 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on I/O Result panics on missing/unreadable file",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, io::Error> or a domain error type; propagate with ? instead of unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap() on parse Result panics on invalid integer input",
+      "failure_mode": "malformed CSV row (non-numeric second field) crashes the process instead of yielding a typed parse error",
+      "fix": "use .parse::<u16>().map_err(...) and return Result; never unwrap parse on untrusted input"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexed access into Vec<String> without bounds check; line may have fewer than 2 fields",
+      "failure_mode": "index-out-of-panic on short lines (e.g., a line with only one comma-separated field)",
+      "fix": "use split_once(',') to extract first and second fields; match on the second Option and map_err on None"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexed access into Vec<String>",
+      "failure_mode": "index-out-of-panic on completely empty lines",
+      "fix": "use split_once(',') and pattern-match; empty lines should be skipped or returned as errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',') + collect + indexing instead of split_once for two-field CSV",
+      "failure_mode": "allocates a Vec<String> for every line; split_once avoids allocation and is the prescribed pattern",
+      "fix": "replace split(',')/collect with line.split_once(',').ok_or(ParseError::ShortLine)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "safety",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 — lossy cast from u32 to u16; values > 65535 silently truncate",
+      "failure_mode": "silent data corruption: a parse of \"99999\" as u32 then as u16 yields 34465, not an error",
+      "fix": "parse directly as u16 via .parse::<u16>() and reject overflow via Result; remove the `as u16` cast"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function signature returns Vec<Record> with no error type; all fallible operations (I/O, parse, indexing) are forced into panic path",
+      "failure_mode": "caller cannot distinguish I/O errors, parse errors, or malformed lines — everything collapses to panic",
+      "fix": "signature should be fn load_routes(path: &str) -> Result<Vec<Record>, LoadError> where LoadError is a domain enum covering Io, Parse, and ShortLine"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — logging side effect in a data-loading function",
+      "failure_mode": "impure function cannot be tested deterministically; log output is uncontrolled and not part of any error contract",
+      "fix": "remove println!; if observability is needed, return a separate log/warning type or accept a callback"
+    },
+    {
+      "severity": "INFO",
+      "rule": "performance_discipline",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Missing benchmark evidence — no microbenchmark for load_routes allocation and throughput",
+      "failure_mode": "unknown if per-line Vec allocation and String::to_string are acceptable cost for the workload",
+      "fix": "add a criterion or test::Bencher benchmark measuring lines-per-second and bytes-allocated-per-ops"
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for load_routes throughput or allocation profile", "no profiler data for hot-path analysis", "no second-ring command evidence (clippy, Miri, Kani) for this crate"],
+  "residual_risk": "static review only; no commands run. The function has 6 BLOCKER violations: unwrap on I/O and parse, unchecked indexing, lossy as-cast, split/collect pattern misuse, and no Result return type. All are independently fixable without refactoring the crate structure."
+}

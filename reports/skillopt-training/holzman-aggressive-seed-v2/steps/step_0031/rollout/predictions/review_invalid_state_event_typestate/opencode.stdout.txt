@@ -1,0 +1,14 @@
+Now I have all the information. Let me write the review output.
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**Summary of findings — 8 BLOCKERs across 3 categories:**
+
+| Category | Issues |
+|---|---|
+| **Type discipline** | `status: String` instead of enum, `is_validated: bool` / `is_sent: bool` boolean lifecycle flags, `sent_at_epoch_ms` redundant with `is_sent` |
+| **Illegal states representable** | Any combination of status/bools/timestamp is constructable — no typestate enforcement |
+| **Functional core violations** | `mark_sent` mutates in-place returning the same type, public fields allow external construction |
+
+**Missing evidence:** no benchmark, profiler, allocation, or second-ring command evidence.
+
+**Residual risk:** static review only; the crate requires structural refactoring (typestate enum replacing bool/String fields).

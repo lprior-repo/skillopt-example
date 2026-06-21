@@ -1,0 +1,6 @@
+Now I have all the information needed. The task crate is a minimal struct with multiple Holzman/Functional Rust violations. Let me write the review output.
+Review complete. Wrote `review-output.json` to the required output path with 10 findings.
+
+Key violations found:
+- **6 BLOCKERs** on typestate/state-machine anti-patterns: `status: String` instead of enum, `is_validated`/`is_sent` booleans instead of typed transitions, `Option<u64>` detached from state variant, `id: String` missing newtype, raw primitives crossing parse boundary without smart constructors, and `mark_sent` mutating state without guards
+- **4 WARNINGs** on missing benchmark/profiler/allocation/command evidence and unbounded allocation in `mark_sent`

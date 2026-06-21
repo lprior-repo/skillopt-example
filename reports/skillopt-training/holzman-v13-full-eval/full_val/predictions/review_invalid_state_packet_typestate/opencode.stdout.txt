@@ -1,0 +1,11 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 7 BLOCKER findings and 5 missing evidence items.
+
+Key violations found in `src/lib.rs`:
+- **Typestate state machine** (line 1): Flat booleans and string status instead of an enum — all invalid state combinations are representable
+- **status: String** (line 3): Raw primitive lifecycle encoding, not exhaustively matchable
+- **bool lifecycle** (lines 4-5): `is_validated`/`is_sent` are independent flags with no transition enforcement
+- **Option invalid-state** (line 6): `sent_at_epoch_ms: Option<u64>` is decoupled from sent state, allowing orphaned timestamps
+- **newtype domain IDs** (line 2): `id: String` has no validation or newtype wrapper
+- **parse boundary** (line 1): No smart constructors — hostile inputs construct invalid domain states directly
+- **mark_sent** (line 9): Blindly overwrites fields without transition guards or timestamp assignment

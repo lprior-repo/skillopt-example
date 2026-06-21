@@ -1,0 +1,16 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | `src/lib.rs:1` |
+| 2 | BLOCKER | push_logic_into_core | `src/lib.rs:9` |
+| 3 | BLOCKER | parse_at_boundaries_into_trusted_data | `src/lib.rs:2` |
+| 4 | BLOCKER | replace_bool_lifecycle_flags_with_enums | `src/lib.rs:4` |
+| 5 | MINOR | functional_core_imperative_shell | `src/lib.rs:1` |
+| 6 | MINOR | no_repeated_validation_of_primitives | `src/lib.rs:10` |
+| 7 | MINOR | no_unnecessary_allocation | `src/lib.rs:10` |
+
+**Core issue:** The `BudgetWorkflow` struct uses `String` for status and `bool` flags for `is_validated`/`is_sent`, making every illegal state combination constructible at compile time. The type name itself ("review_invalid_state_budget_typestate") signals the problem -- these fields should be a single `BudgetStatus` enum/typestate, not three independent primitives.

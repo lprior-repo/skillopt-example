@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses raw String for status plus independent bool flags (is_validated, is_sent), allowing illegal state combinations like is_sent=true with status=\"draft\", or is_validated=false but is_sent=true.",
+      "failure_mode": "Any code reading packet fields must re-validate the combination at every call site; the type system enforces zero invariants about packet lifecycle correctness.",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single enum typestate (e.g., PacketStatus { Draft, Validated, Sent { sent_at: Instant } }) that makes invalid combinations unrepresentable at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle_enforcement",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typestate or enum models the packet lifecycle. mark_sent accepts any PacketWorkflow regardless of prior state (e.g., it can mark a draft, unvalidated packet as sent).",
+      "failure_mode": "A packet can transition to sent without ever being validated, violating the domain workflow invariant that validation precedes sending.",
+      "fix": "Model lifecycle with an enum or typestate where the transition to Sent is only reachable from the Validated variant. Remove is_validated and is_sent bool fields. Change mark_sent to accept the prior state type or a reference, returning the next state, so the compiler enforces ordering."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain identity type. Any string (empty, malformed UUID, non-ASCII) is accepted as a valid packet identifier.",
+      "failure_mode": "Empty or malformed IDs silently accepted; no domain validation at construction; string comparisons used instead of typed equality.",
+      "fix": "Introduce a `PacketId` newtype (e.g., `pub struct PacketId(pub [u8; 16]);`) with a fallible constructor that validates the ID format at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes_timestamps",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a raw u64 with no semantic meaning. Any arbitrary epoch milliseconds value is accepted, including zero, future times, or values from uninitialized memory.",
+      "failure_mode": "Timestamp comparison, sorting, or TTL logic operates on values that may be nonsensical; no domain validation of the timestamp.",
+      "fix": "Introduce a `SentAt` newtype wrapping u64 with a constructor that validates the timestamp is non-zero and within a reasonable range, or use a proper time library type."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a pure function operating on a public struct with no invariants. It performs string allocation (\"sent\".to_string()) inside what should be a pure domain operation, but the struct itself has no domain layer to protect.",
+      "failure_mode": "No functional core exists — the struct is a data bag, and mark_sent is a procedural mutation with no validation or domain semantics. There is no separation of inert valid-by-construction data from imperative actions.",
+      "fix": "Create a `PacketStatus` enum as the domain type. Implement `mark_sent` as a method on a prior state (e.g., `impl PacketStatus { fn mark_sent(self) -> PacketStatus { ... } }`) so the transition is pure, validated by construction, and the compiler enforces legality."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_production_unsafe_but_struct_has_no_validity_guarantee",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "While there is no production `unsafe`, the struct lacks `#[derive]` attributes and all fields are `pub`, making it trivially mutable from any crate and impossible to maintain invariants post-construction.",
+      "failure_mode": "Any downstream crate can set all fields to arbitrary values, breaking all intended invariants without any compile-time or runtime guard.",
+      "fix": "Make fields private with a public constructor that enforces invariants (valid-by-construction), or replace with an enum-based typestate where variants carry their own data."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No CLI command API, subcommand structure, or command handling exists. The task name references 'invalid_state_packet_typestate' suggesting a command-driven workflow, but only a data struct is present.",
+      "failure_mode": "No observable command interface means no way to exercise the packet workflow from the imperative shell.",
+      "fix": "If this is a command-driven crate, add a command type with a handler that parses input, validates, transitions state, and returns a typed result."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler data exists to validate allocation patterns",
+    "no allocation audit (try_reserve, checked capacity) is needed for this tiny struct but the pattern is absent from any Vec-producing code",
+    "no command-level evidence (CLI/API handler) exists to demonstrate the packet workflow in action",
+    "no second-ring evidence (integration test, smoke test, or end-to-end exercise) exists for the packet lifecycle"
+  ],
+  "residual_risk": "High. The struct makes all illegal state combinations representable at the type level. No enum, typestate, or domain validation exists. The codebase is effectively a data bag with a single mutation function. Without typestate refactoring, any downstream usage will require manual invariant checks at every call site. Static review only; no commands run."
+}

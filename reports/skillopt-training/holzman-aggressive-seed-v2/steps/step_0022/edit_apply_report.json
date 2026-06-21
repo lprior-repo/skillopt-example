@@ -1,0 +1,9 @@
+[
+  {
+    "op": "replace",
+    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "content_preview": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "status": "applied_replace",
+    "index": 1
+  }
+]

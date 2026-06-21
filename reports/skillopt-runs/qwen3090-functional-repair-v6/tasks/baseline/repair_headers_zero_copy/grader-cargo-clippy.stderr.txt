@@ -1,0 +1,28 @@
+    Checking repair_headers_zero_copy v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_headers_zero_copy)
+error: indexing into a string may panic if the index is within a UTF-8 character
+  --> src/lib.rs:31:20
+   |
+31 |         let name = line[..colon_pos].trim();
+   |                    ^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#string_slice
+   = note: requested on the command line with `-D clippy::string-slice`
+
+error: indexing into a string may panic if the index is within a UTF-8 character
+  --> src/lib.rs:32:21
+   |
+32 |         let value = line[colon_pos + 1..].trim();
+   |                     ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#string_slice
+
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:32:26
+   |
+32 |         let value = line[colon_pos + 1..].trim();
+   |                          ^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+   = note: requested on the command line with `-D clippy::arithmetic-side-effects`
+
+error: could not compile `repair_headers_zero_copy` (lib) due to 3 previous errors

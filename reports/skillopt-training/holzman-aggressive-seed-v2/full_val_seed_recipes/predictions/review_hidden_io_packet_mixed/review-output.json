@@ -1,0 +1,113 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permission denied, etc.)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed error",
+      "fix": "map_err to a typed I/O or ParseError and propagate via Result<Vec<Record>, Error>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input or malformed lines",
+      "failure_mode": "corrupt or user-supplied data crashes the application instead of yielding a typed parse error",
+      "fix": "parse with map_err to a typed Invalid or Parse error; use split_once with get/split for bounded access"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy width cast: .unwrap() as u16 — u32 values outside 0..=65535 silently truncate",
+      "failure_mode": "out-of-range values wrap silently, producing invalid domain data (e.g. 70000 becomes 4464)",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| Error::Overflow) or parse directly as u16"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] — unchecked indexing on a Vec produced by split, no length guard",
+      "failure_mode": "a line with fewer than 2 comma-separated fields panics with index-out-of-bounds",
+      "fix": "use line.split_once(',').ok_or(Error::Invalid) then access fields by index on the 2-element array"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — I/O side effect inside data-parsing logic",
+      "failure_mode": "purity of the core is broken; side effects leak into the data layer making it untestable and non-deterministic",
+      "fix": "move all logging/printing to the imperative shell; the core parser should be a pure function returning Records"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets couples file I/O (fs::read_to_string) with parsing logic in a single function",
+      "failure_mode": "the function cannot be unit-tested for parsing correctness without mocking the filesystem; violates core/shell split",
+      "fix": "split into a pure parse_records(&[RecordInput]) -> Result<Vec<Record>, Error> core function and a shell function that reads the file and delegates"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "collects every split part into Vec<String> with to_string() allocations before extracting two fields",
+      "failure_mode": "unnecessary heap allocations per line; for large files this causes excessive GC pressure and memory churn",
+      "fix": "use split_once(',') then trim each part; borrow &str where possible; avoid intermediate Vec<String>"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no try_reserve — unbounded growth with no allocation-failure handling",
+      "failure_mode": "if the file has many lines the Vec may fail to reallocate; no typed Allocation error is returned",
+      "fix": "estimate line count, call values.try_reserve(estimated).map_err(|_| Error::Allocation)?, then collect"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "domain_contracts",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses pub name: String and pub value: u16 — no newtypes, no domain invariants, no validation at construction",
+      "failure_mode": "any code can create invalid Records (empty name, out-of-range value) because the struct has no invariants",
+      "fix": "use newtype for name (e.g. RecordName(String)) with a smart constructor; add Record::try_new(name, value) that validates invariants"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typed error enum exists — all failures silently panic via unwrap() or indexing",
+      "failure_mode": "consumer cannot distinguish I/O errors, parse errors, overflow, or malformed-line errors",
+      "fix": "define a typed error enum (e.g. enum PacketError { Io(io::Error), Invalid, Overflow, Empty }) and return Result<Vec<Record>, PacketError>"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "borrowed_data_preference",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record owns String for name — always allocates even for short-lived or borrowed data",
+      "failure_mode": "unnecessary allocation overhead; caller cannot pass borrowed data through the type",
+      "fix": "use Cow<'a, str> for name or accept a lifetime-parameterized Record<'a> with &'a str"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_packets throughput or allocation profiling",
+    "no profiler evidence (flamegraph, perf, cargo-flamegraph) for the parsing hot path",
+    "no allocation tracing (e.g. dhat-rs, alloc counters) for Vec growth behavior",
+    "no second-ring test or fuzzing evidence for malformed input handling (would be relevant once typed errors exist)",
+    "no CLI/command invocation evidence — no binary target defined in Cargo.toml"
+  ],
+  "residual_risk": "The crate is a single-file parser with multiple panics on untrusted input (I/O, parse, index, cast). The functional core is not isolated from the imperative shell. Until a typed error taxonomy, split_once-based parsing, checked conversions, and core/shell separation are in place, the failure surface is broad and all failures manifest as panics rather than recoverable errors. Static review only; no commands were run."
+}

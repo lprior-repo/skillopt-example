@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**10 BLOCKER findings** across `src/lib.rs`:
+
+| Rule | Lines | Issue |
+|---|---|---|
+| `no_forbidden_constructs` | 9, 19 | Two `unwrap()` calls on fallible results (fs read + parse) |
+| `no_lossy_casts` | 19 | `as u16` truncates values >= 65536 silently |
+| `no_unchecked_indexing` | 16, 19 | `parts[0]` and `parts[1]` panic on malformed input |
+| `functional_core_no_hidden_io` | 16 | `println!` inside a parsing function — hidden side effect |
+| `no_intermediate_allocation` | 12 | `collect()` into `Vec<String>` for a two-field record |
+| `no_return_without_error_type` | 8 | `Vec<Record>` return with no `Result` wrapper, no error taxonomy |
+| `no_checked_conversions` | 19 | Width-down cast instead of `try_from` |
+
+**5 missing evidence**: no benchmark, profiler, allocation data, command entrypoint, or second-ring proof.
+
+**Residual risk**: Every failure path is a panic. No error types, no tests, no functional/core separation. Full repair required.

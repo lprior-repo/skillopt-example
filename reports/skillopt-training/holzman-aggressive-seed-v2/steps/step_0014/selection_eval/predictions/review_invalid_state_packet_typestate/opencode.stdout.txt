@@ -1,0 +1,14 @@
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/8fbc6963a4ba8448/review_invalid_state_packet_typestate/review-output.json`.
+
+**6 BLOCKER findings:**
+
+| # | Rule | File:Line | Core Problem |
+|---|------|-----------|-------------|
+| 1 | `make_illegal_states_unrepresentable` | `src/lib.rs:1` | `status: String` + `is_validated: bool` + `is_sent: bool` allow contradictory states (e.g., sent with status="pending") |
+| 2 | `functional_core_data_inert_by_construction` | `src/lib.rs:1` | Mutable data bag with public fields; no pure core, no valid-by-construction invariant |
+| 3 | `no_primitive_obsession` | `src/lib.rs:2` | `id: String` with no `PacketId` newtype enforcing domain rules |
+| 4 | `no_primitive_obsession` | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` should be typestate-enforced, not Optional leak |
+| 5 | `functional_core_pure_functions` | `src/lib.rs:9` | `mark_sent` mutates in-place with `.to_string()` instead of returning a new pure value |
+| 6 | `parse_at_boundaries` | `src/lib.rs:1` | No parsing layer; raw primitives accepted directly at construction |
+
+**6 missing evidence items:** no benchmarks, no profiler data, no allocation analysis, no second-ring/integration tests, no command evidence, no test module at all.

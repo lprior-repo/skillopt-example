@@ -1,0 +1,24 @@
+Now I have the full picture. The production code has multiple Holzman violations:
+
+1. **Lossy `as` conversion**: `payload.len() as u32` (line 10)
+2. **Missing `max_payload` enforcement**: parameter accepted but never checked; test `rejects_limit` will fail
+3. **Missing `checked_add`**: required by mandatory repair patterns for frame encoders
+4. **Missing `try_reserve`**: required by mandatory repair patterns for frame encoders
+
+Fixing now.
+All violations removed. Now writing the required output.
+Let me read the remaining reference files I missed.
+All references read. Repair complete.
+
+**Summary of fixes to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `payload.len() as u32` (lossy cast) | `u32::try_from(payload.len()).map_err(...)` |
+| `max_payload` ignored | `if payload.len() > max_payload { return Err(...) }` |
+| Missing `checked_add` | `4usize.checked_add(payload.len()).ok_or(...)` |
+| Missing `try_reserve` | `out.try_reserve(capacity).map_err(...)` |
+
+**Commands:** `cargo fmt` ✓, `cargo clippy -D warnings` ✓, `cargo test` (2/2 pass) ✓
+
+Output written to `repair-output.json`.

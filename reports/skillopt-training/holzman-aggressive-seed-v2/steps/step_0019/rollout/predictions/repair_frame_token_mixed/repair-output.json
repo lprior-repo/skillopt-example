@@ -1,0 +1,30 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/df564ef5477ae64b/repair_frame_token_mixed/.skill/holzman-rust/SKILL.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "max_payload enforced: returns PayloadTooLarge when payload.len() > max_payload",
+    "No lossy 'as' conversion: replaced 'payload.len() as u32' with u32::try_from(payload.len())",
+    "No unsafe/unwrap/expect/panic/todo/unimplemented/unreachable in production source",
+    "try_reserve used instead of Vec::new() for bounded-capacity allocation with Allocation error handling",
+    "Checked conversion: Overflow error returned on u32 overflow path",
+    "Smallest change: added 5 lines to existing function, no API or test changes",
+    "Pure core: encode_frame is deterministic with no I/O side effects"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All Holzman violations (lossy as, unused max_payload, unallocated Vec) resolved. Tests cover both success and rejection paths."
+}

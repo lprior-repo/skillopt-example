@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 findings, 5 missing evidence items, status: reviewed**
+
+Core issues:
+1. **BLOCKER** — `status: String` allows impossible states; should be an enum
+2. **BLOCKER** — `is_validated: bool` makes validated a runtime value, not a compile-time invariant
+3. **BLOCKER** — `is_sent: bool` duplicates status, creating contradiction surface
+4. **BLOCKER** — No typestate pattern; `mark_sent` mutates in place returning the same type
+5. **BLOCKER** — `id: String` with no domain newtype
+6. **WARNING** — `mark_sent` accepts any input state with no precondition validation
+7. **WARNING** — Stringly-typed status prone to typos, no centralized encoding
+8. **WARNING** — `Option<u64>` for `sent_at_epoch_ms` decouples timestamp from sent state
+
+All 8 findings target the same root violation: **illegal states are representable** because the budget lifecycle is encoded as independent mutable primitives (`String`, `bool`, `Option<u64>`) rather than an enum/typestate that the compiler enforces.

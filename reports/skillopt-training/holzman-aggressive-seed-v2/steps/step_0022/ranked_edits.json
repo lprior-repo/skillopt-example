@@ -1,0 +1,12 @@
+{
+  "reasoning": "The agent failed to apply `try_from` for a `usize` to `u32` cast in the repair task. Previous edits emphasized `try_from` generally but did not explicitly mandate it for common index/size conversions in repair mode. This edit reinforces the requirement for `try_from` on all width-reducing casts in the repair checklist.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from` (including `usize` to `u32`/`u64`), unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "source_type": "failure",
+      "support_count": 1
+    }
+  ]
+}

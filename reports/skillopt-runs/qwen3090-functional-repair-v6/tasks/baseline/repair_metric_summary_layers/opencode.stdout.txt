@@ -1,0 +1,4 @@
+Now let me examine the task crate:
+Now I have the full picture. The tests import `summarize_metrics` and `render_summary`, but lib.rs only has `summarize_file`. I need to rewrite lib.rs to match the test contract while fixing all forbidden constructs.
+All 6 tests pass. Let me verify no warnings:
+Repaired `src/lib.rs` — replaced `summarize_file` with `summarize_metrics` and added `render_summary`, removing `unwrap()`, unchecked arithmetic, unchecked indexing, and `fs::read_to_string` — `cargo test` passed all 6 tests, output at `repair-output.json`.

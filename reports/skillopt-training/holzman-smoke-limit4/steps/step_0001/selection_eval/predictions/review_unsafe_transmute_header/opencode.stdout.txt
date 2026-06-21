@@ -1,0 +1,15 @@
+Now I have all the information needed. The crate has a single file with clear violations. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**6 findings across the single source file `src/lib.rs`:**
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | `no_production_unsafe` | 2 |
+| 2 | BLOCKER | `no_unchecked_indexing` | 2 |
+| 3 | BLOCKER | `no_transmute_for_safe_alternatives` | 2 |
+| 4 | WARNING | `endianness_ambiguity` | 2 |
+| 5 | WARNING | `missing_benchmark_evidence` | 1 |
+| 6 | INFO | `missing_doc` | 1 |
+
+**Core issues:** The `read_len` function uses `unsafe transmute` where `u32::from_ne_bytes`/`from_le_bytes`/`from_be_bytes` would be safe and zero-cost, and it reads `input[0..4]` with no length guard — both are Holzman BLOCKERS.

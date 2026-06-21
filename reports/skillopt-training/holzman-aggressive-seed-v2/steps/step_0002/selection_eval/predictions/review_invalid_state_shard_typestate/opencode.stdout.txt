@@ -1,0 +1,16 @@
+Now I have all the source. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**6 findings across 7 lines of `src/lib.rs`:**
+
+| # | Severity | Rule | Line | Issue |
+|---|----------|------|------|-------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | 1 | Primitive `String` status + `bool` flags allow illegal state combinations |
+| 2 | BLOCKER | no_primitive_obsession | 2 | `id: String` has no domain newtype |
+| 3 | BLOCKER | no_public_mutable_fields | 1 | All fields pub, bypassing lifecycle transitions |
+| 4 | BLOCKER | functional_core_imperative_shell | 9 | `mark_sent` has no precondition check, mutates directly |
+| 5 | BLOCKER | typed_domain_errors | 9 | No error type for invalid transitions |
+| 6 | WARNING | sent_at_epoch_ms_type | 6 | Bare `u64` timestamp, no newtype |
+| 7 | INFO | missing_benchmark_evidence | 1 | No benchmarks/profiler/allocation evidence |
+
+The core architectural failure: `ShardWorkflow` makes illegal states fully representable. The fix is an enum typestate (`New` → `Validated` → `Sent{epoch_ms}`) with private fields and transition methods returning `Result`.

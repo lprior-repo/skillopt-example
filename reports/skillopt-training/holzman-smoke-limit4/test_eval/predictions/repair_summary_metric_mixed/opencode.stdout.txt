@@ -1,0 +1,22 @@
+Now let me explore the task crate structure and read the key files.
+Good. I can see all the violations clearly:
+
+1. `unwrap()` on line 12
+2. Unchecked `total += value` (overflow)
+3. Unchecked `parts[1]` indexing
+4. Division by zero when count=0
+5. Returns `String` instead of `Summary`
+6. Missing `render_summary` function
+7. No empty-input check
+
+Let me fix this:
+All 6 tests pass. Now writing the output JSON.
+Done. All 6 tests pass. Changes to `src/lib.rs`:
+
+- **Changed return type** `Result<String, SummaryError>` → `Result<Summary, SummaryError>` (matching test contract)
+- **Added `render_summary`** function for the string representation
+- **Removed `unwrap()`** → proper `map_err` for parse failures
+- **Removed unchecked indexing** `parts[1]` → `split_once(',')` with `ok_or`
+- **Added overflow detection** → `checked_add` instead of `+=`
+- **Guarded division by zero** → `if count == 0` check before `/`
+- **Added empty-input rejection** → `trim().is_empty()` early return

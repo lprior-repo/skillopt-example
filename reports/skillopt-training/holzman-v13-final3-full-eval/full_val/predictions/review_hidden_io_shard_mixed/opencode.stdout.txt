@@ -1,0 +1,11 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 12 findings (10 BLOCKERs, 2 WARNINGs) across these categories:
+
+- **Panic surfaces** — `unwrap()` on `fs::read_to_string` (line 9) and `parse()` (line 19)
+- **Hidden I/O** — `println!` (line 16) and `fs::read_to_string` (line 9) fused into core logic
+- **Lossy cast** — `as u16` (line 19) silently truncates values >65535
+- **Unchecked indexing** — `parts[0]`, `parts[1]` (lines 16, 19) panic on malformed CSV
+- **Parse boundary** — raw `String`/`u16`/`&str` fields with no newtypes, smart constructors, or typed error returns
+- **Unbounded allocation** — no `try_reserve`, no domain cap, no bounded allocation
+- **Architecture** — fused I/O + parsing + logging + domain construction, violating Data/Calculations/Actions
+- **Missing evidence** — no benchmarks, no cargo command evidence, no error taxonomy

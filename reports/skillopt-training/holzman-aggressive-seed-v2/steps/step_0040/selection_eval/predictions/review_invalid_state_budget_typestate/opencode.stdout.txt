@@ -1,0 +1,11 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written `review-output.json` to the required output path with:
+
+- **11 findings** across the crate (5 BLOCKER, 3 WARNING, 3 INFO)
+- **5 missing evidence** items
+- **Core violations:**
+  1. `BudgetWorkflow` represents illegal states (String status + bool flags are inconsistent)
+  2. Lifecycle flags (`is_validated`, `is_sent`) should be enums/typestates
+  3. `id` and `sent_at_epoch_ms` use primitives instead of domain newtypes
+  4. `mark_sent` lacks validation preconditions — can send non-validated budgets
+  5. `.to_string()` allocation in what should be a pure core function

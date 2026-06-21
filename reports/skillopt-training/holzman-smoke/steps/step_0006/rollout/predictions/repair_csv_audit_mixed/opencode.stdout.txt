@@ -1,0 +1,9 @@
+Now I see the issues: `unwrap()`, no `Empty`/`Invalid`/`TooMany` checks, ignores `max_items`. Let me fix `lib.rs`.
+All 4 tests pass. Writing the repair output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Removed** `unwrap()` on `parse::<u16>()` — replaced with `.map_err(|_| ParseError::Invalid)?`
+- **Added** `Empty` check for empty input (and empty trimmed parts from split)
+- **Added** `TooMany` check: `parts.len() > max_items`
+- **Added** `try_reserve` for allocation safety instead of unbounded `with_capacity`
+- All 4 behavior tests pass: `parses_values`, `rejects_empty`, `rejects_invalid`, `rejects_too_many`

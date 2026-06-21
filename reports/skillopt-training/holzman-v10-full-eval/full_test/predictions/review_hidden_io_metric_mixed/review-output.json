@@ -1,0 +1,126 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() - unwrap() on I/O result panics on missing file, permission errors, or invalid UTF-8",
+      "failure_mode": "untrusted or missing file path aborts the entire process instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, LoadError> and use .map_err(|e| LoadError::Io(e))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() - unwrap() on numeric parse panics on non-numeric or out-of-range input",
+      "failure_mode": "malformed CSV data like 'foo,bar' crashes the program instead of producing a typed parse error",
+      "fix": "return Result and use .map_err(|_| ParseError::InvalidValue) on the parse result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 - lossy as cast from u32 to u16 silently truncates values above 65535",
+      "failure_mode": "a valid 32-bit value like 70000 silently wraps to 4444, corrupting domain data without any error",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::ValueTooLarge) after parsing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] - unchecked indexing into split result with no length guard",
+      "failure_mode": "empty line or line without comma panics with index-out-of-bounds",
+      "fix": "use split_once(',') and pattern match on (name, value) with .ok_or(ParseError::InvalidLine)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] - unchecked indexing into split result with no length guard",
+      "failure_mode": "line with only one comma-separated field panics with index-out-of-bounds",
+      "fix": "use split_once(',') and pattern match on (name, value) with .ok_or(ParseError::InvalidLine)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) - stdout I/O inside data-loading function that should be pure parsing",
+      "failure_mode": "side-effectful logging embedded in data pipeline corrupts stdout for consumers, makes function non-deterministic, and couples domain logic to concrete output mechanism",
+      "fix": "remove println! entirely; if metrics are needed, return them separately from the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path) - file I/O fused with parsing in a single public function",
+      "failure_mode": "pure parsing logic cannot be unit-tested without real files; shell concerns (I/O) leak into domain",
+      "fix": "split into load_metrics_text(path) -> Result<String, IoError> (shell) and parse_records(text) -> Result<Vec<Record>, ParseError> (pure core)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "load_metrics returns Vec<Record> with no error type; all failures panic instead of returning typed errors",
+      "failure_mode": "callers cannot distinguish IO failures from parse failures from validation failures; no structured error handling",
+      "fix": "define enum LoadError { Io(std::io::Error), InvalidLine, InvalidValue, ValueTooLarge, Allocation } and return Result<Vec<Record>, LoadError>"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unbounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No max_items cap, no try_reserve before collecting into Vec - unbounded heap allocation on untrusted file size",
+      "failure_mode": "an attacker or misconfigured system can supply a massive CSV file causing OOM or resource exhaustion",
+      "fix": "accept max_items: usize parameter, call values.try_reserve(max_items).map_err(|_| LoadError::Allocation) after validating cap, and reject lines beyond the cap"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "raw_primitive_domain_state",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses name: String - raw primitive for a domain identifier with no invariants",
+      "failure_mode": "empty names, whitespace-only names, and invalid names are all representable; no smart constructor validates at boundary",
+      "fix": "use a Name newtype with a smart constructor that validates non-empty and returns a typed error"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmarks exist for load_metrics; performance characteristics of CSV parsing are unmeasured",
+      "failure_mode": "allocations, parse latency, and memory scaling are unknown; no baseline for regression detection",
+      "fix": "add criterion or similar benchmark with realistic CSV workloads measuring throughput and memory"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_allocation_reserve",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::collect() without prior try_reserve - double allocation pattern on known-size input",
+      "failure_mode": "unnecessary reallocations as Vec grows, increasing memory pressure and GC cost",
+      "fix": "count lines first or use try_reserve with a trusted cap before collecting"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_metrics throughput or memory usage",
+    "no profiler data showing allocation profile of CSV parsing",
+    "no allocation audit - Vec::collect() without try_reserve",
+    "no command evidence: cargo fmt --check, cargo clippy, cargo test have not been run"
+  ],
+  "residual_risk": "Multiple BLOCKER violations of absolute laws: unwrap() panic surfaces on lines 9 and 19, lossy as cast on line 19, unchecked indexing on lines 16 and 19, hidden I/O on lines 9 and 16, functional core/shell violation on line 9, unbounded allocation on line 12, missing typed error taxonomy, and raw primitive domain state on line 4. Static review only; no commands executed."
+}

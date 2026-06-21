@@ -1,0 +1,12 @@
+{
+  "candidate": "holzman-rust-candidate-v13-final2",
+  "skill_sha256": "f789c9a7bcf7c776309f04fdf6fc9d4fd242a0af09bd84a38f1d5a7d748393f7",
+  "split": "val",
+  "n": 21,
+  "hard": 0.9523809523809523,
+  "soft": 0.9523809523809523,
+  "passed": 20,
+  "failed": [
+    "review_invalid_state_packet_typestate"
+  ]
+}

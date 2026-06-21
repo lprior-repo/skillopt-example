@@ -1,0 +1,74 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TelemetryWorkflow uses flat booleans (is_validated, is_sent) instead of a typestate enum. Callers can create states where is_sent=true but is_validated=false, or toggle sent back to unsent. No lifecycle invariants are enforced at the type level.",
+      "failure_mode": "Invalid telemetry lifecycle states are representable, causing downstream consumers to process unsent telemetry as sent, or re-sent telemetry that was never validated.",
+      "fix": "Replace is_validated and is_sent with a single TelemetryStage enum (e.g., Pending, Validated, Sent) where each variant encodes only the valid lifecycle points. Remove the boolean fields entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string_to_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String field set to arbitrary values. mark_sent hardcodes `item.status = \"sent\".to_string()` but nothing prevents a caller from setting status to \"deleted\", \"\", or any other value unrelated to the lifecycle.",
+      "failure_mode": "Downstream match/logic on status string cannot be exhaustive. Typos or unexpected values silently bypass state checks, leading to lost or double-processed telemetry.",
+      "fix": "Replace `status: String` with a sealed TelemetryStage enum and remove the redundant is_validated/is_sent booleans. The enum variant carries the lifecycle state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_fields",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated (line 4) and is_sent (line 5) are standalone booleans that encode lifecycle state. Four combinations exist: (false,false)=new, (true,false)=validated, (false,true)=invalid, (true,true)=ambiguous. Only two of four are valid lifecycle steps.",
+      "failure_mode": "Constructors and mutable access can reach the (false, true) invalid state where telemetry is marked sent but never validated, or the (true, true) ambiguous state where validation and send are both true with no ordering guarantee.",
+      "fix": "Collapse both booleans into a single TelemetryStage enum with explicit variants (Pending, Validated, Sent). Remove both fields from the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> living outside the lifecycle typestate. A TelemetryWorkflow can have is_sent=true with sent_at_epoch_ms=None (missing timestamp), or is_sent=false with sent_at_epoch_ms=Some(...) (timestamp without send). The Option is not owned by the variant that needs it.",
+      "failure_mode": "Consumers that check is_sent then read sent_at_epoch_ms get None on the sent path, causing silent data loss or requiring unwrap/expect on a field that should be guaranteed by type.",
+      "fix": "Move the timestamp into the Sent variant of the TelemetryStage enum, e.g., `Sent { sent_at_epoch_ms: u64 }`. Make Option unnecessary and guaranteed by the type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints. Any string including empty, whitespace-only, or malformed identifiers can be stored. No validation, length bounds, or format checks are enforced.",
+      "failure_mode": "Invalid telemetry IDs can propagate through the system, causing collisions, indexing errors, or silent data corruption when downstream systems assume valid IDs.",
+      "fix": "Create a TelemetryId newtype with a smart constructor that validates format (e.g., non-empty, bounded length, allowed characters) and returns a typed error. Replace `id: String` with `id: TelemetryId`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are public raw primitives (String, bool, Option<u64>) with no smart constructors. There is no parse boundary: callers can construct TelemetryWorkflow with any combination of invalid values, so raw primitives cross the parse boundary without fallible smart constructors, allowing invalid domain states to be created directly.",
+      "failure_mode": "No factory or constructor enforces domain invariants. Any caller in any crate can instantiate TelemetryWorkflow with is_sent=true, is_validated=false, status=\"\", sent_at_epoch_ms=None, producing an invalid domain state that propagates silently.",
+      "fix": "Make all fields private. Provide a single TelemetryWorkflow::new(id: TelemetryId) -> TelemetryWorkflow smart constructor that creates the Pending state. Provide fallible constructors (e.g., TelemetryWorkflow::from_validated) or transition methods (e.g., .validate(), .mark_sent(epoch_ms: u64) -> Result<Self, TelemetryError>) that enforce valid transitions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent path performance",
+    "no profiler evidence for struct layout or cache behavior",
+    "no allocation analysis: String id and status each heap-allocate on every TelemetryWorkflow construction",
+    "no second-ring evidence for struct size or field layout optimization"
+  ],
+  "residual_risk": "Struct exposes raw primitives with no typestate enforcement, no parse boundary, and no smart constructors. Invalid lifecycle states are directly constructible. Without enum-based typestate, newtype for ID, and fallible transition methods, the API cannot prevent callers from creating invalid domain states. Static review only; no commands run."
+}

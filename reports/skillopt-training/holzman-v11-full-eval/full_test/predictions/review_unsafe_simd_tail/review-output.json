@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "functional-core-performance.md", "hardening-checklist.md", "review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "absolute-no-unsafe",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Production unsafe block wrapping the entire sum function body using inline SIMD intrinsics",
+      "failure_mode": "unsafe code with no verified safety invariants can cause UB; violates absolute no-unsafe law",
+      "fix": "Remove unsafe entirely. Either use a safe scalar fallback, use a safe SIMD crate (e.g., stdarch crates with safe wrappers, or a library like simba), or return a typed error indicating SIMD is unavailable on this platform."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounds-checking",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Loop condition `i < input.len()` with stride 4 does not guard against partial lanes. When input.len() is not a multiple of 4, `_mm_loadu_ps` reads 4 f32s past the valid slice end",
+      "failure_mode": "out-of-bounds memory read (UB) on non-aligned-length inputs; causes undefined behavior including potential segfaults or silent data corruption",
+      "fix": "Process full lanes with `chunks_exact`, then handle the remainder with a safe scalar loop over the remaining elements. Only read full 16-byte chunks."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-architecture-gated-omission",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function is gated to x86_64 only with no scalar fallback path. On non-x86_64 targets the symbol is entirely absent",
+      "failure_mode": "compile-time linking failure on ARM, AArch64, RISC-V, or any non-x86_64 platform; breaks portability",
+      "fix": "Provide an unconditional public API with a conditional SIMD inner function and a safe scalar fallback path for non-x86_64 targets."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-safe-scalar-path",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No safe scalar reference implementation exists. The function has no fallback to verify SIMD output correctness",
+      "failure_mode": "SIMD results cannot be validated against a known-correct scalar path; incorrect results go undetected, especially for edge cases like NaN propagation or denormals",
+      "fix": "Implement a pure `input.iter().sum()` scalar path and use it in tests to verify SIMD output matches to within float tolerance."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-simd-without-benchmark",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SIMD optimization claim without any benchmark, baseline measurement, or performance evidence",
+      "failure_mode": "Performance optimization may regress throughput on real workloads; SIMD overhead (setup, remainder handling) can exceed scalar for small inputs",
+      "fix": "Add a benchmark comparing SIMD vs scalar across input sizes (small, medium, large). Report workload, hardware, baseline number, threshold, and variance."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "alignment-assumption",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Uses `_mm_loadu_ps` (unaligned load) which is correct for safety but the code documents no alignment contract, and the remainder bug still exists",
+      "failure_mode": "Even with unaligned loads, the out-of-bounds read on partial lanes remains UB. The unaligned load does not fix the bounds bug.",
+      "fix": "Fix the bounds bug first (chunks_exact + remainder). Consider `_mm_load_ps` only if alignment is guaranteed and verified."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-remainder-handling",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "No remainder handling after the SIMD loop. Elements at indices `input.len() - (input.len() % 4)` to `input.len() - 1` are either read out-of-bounds (current UB) or skipped (incorrect result)",
+      "failure_mode": "Either UB from out-of-bounds read or incorrect sum from skipped elements depending on how the loop is fixed",
+      "fix": "Use `input.chunks_exact(4)` for full lanes and iterate the remainder slice `input.trailing()` with a scalar `f32` loop."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the SIMD sum claim",
+    "no profiler evidence showing SIMD hot path execution",
+    "no allocation analysis (this function does heap allocate but no evidence confirms allocation pattern)",
+    "no second-ring evidence (no assembly listing proving vectorization, no SBOM for intrinsics dependency)",
+    "no baseline comparison number (SIMD vs scalar throughput on target hardware)"
+  ],
+  "residual_risk": "CRITICAL: Three BLOCKER violations of absolute laws (unsafe, out-of-bounds UB, missing scalar fallback) make this code completely unfit for review approval. The function has undefined behavior on any input whose length is not divisible by 4. Safe SIMD is required per Holzman Rust doctrine; unsafe intrinsics are not waivable."
+}

@@ -1,0 +1,10 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `review-output.json` with 5 BLOCKER findings:
+
+1. **no_production_unsafe** (line 3) — Raw SIMD intrinsics in `unsafe` block violate the absolute law.
+2. **simd_must_have_scalar_fallback** (line 1) — `#[cfg(target_arch = "x86_64")]` with no fallback; function vanishes on ARM/other arches.
+3. **simd_tail_undefined_behavior** (line 8) — `_mm_loadu_ps` on partial last chunk loads uninitialized memory into SIMD lanes, causing UB and silently wrong sums.
+4. **no_benchmark_evidence** (line 2) — SIMD implies performance claims with zero benchmark, baseline, workload spec, or target hardware documentation.
+5. **no_test_suite** (line 1) — Zero tests; no coverage for empty input, tail remainder, NaN/inf, or large inputs.
+
+Missing evidence: no benchmarks, no profiler, no allocation analysis, no assembly verification, no test suite.

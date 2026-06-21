@@ -1,0 +1,13 @@
+Now I have all the context. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 9 findings, 3 BLOCKERs, 3 MAJOR, 3 MINOR**
+
+The crate's core architectural problem is that `ShardWorkflow` (`src/lib.rs:1-7`) uses a `String` status plus independent `bool` flags — the textbook case of "illegal states are representable." The type system permits every possible combination, including contradictions (e.g., `status="sent"` with `is_sent=false`, validated-but-not-sent, sent-without-timestamp, etc.).
+
+Key violations:
+- **Typestate absent** — `ShardStatus` enum needed instead of `String` + `bool` flags
+- **`mark_sent` has no transition guard** — any shard can go directly to `Sent`, skipping `Validated`
+- **All fields `pub`** — external code can bypass all invariants via direct construction
+- **`id: String`** — no domain newtype for shard identifiers
+- **Missing evidence** — no benchmarks, behavior tests, or command evidence

@@ -1,0 +1,26 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    { "command": "cargo fmt", "status": "passed" },
+    { "command": "cargo test", "status": "passed" }
+  ],
+  "rules_satisfied": [
+    "no lossy as casts — replaced payload.len() as u32 with u32::try_from(payload.len())",
+    "no production unwrap/expect/panic — all fallible paths return typed FrameError",
+    "checked arithmetic — capacity uses checked_add, map overflow to FrameError::Overflow",
+    "bounded allocation — try_reserve(capacity) before Vec growth, map allocation failure to FrameError::Allocation",
+    "payload length gate — rejects payload exceeding max_payload with FrameError::PayloadTooLarge",
+    "functional core — encode_frame is pure, deterministic, no I/O or side effects",
+    "tests unchanged — behavior contract preserved, both encodes and rejects_limit pass"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "none — crate compiles clean, all tests pass, no forbidden constructs remain in production source"
+}

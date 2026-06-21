@@ -1,0 +1,17 @@
+Now I have all the source. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings** (6 BLOCKER, 2 WARNING), **5 missing evidence** items.
+
+Key violations in `src/lib.rs:1-23`:
+
+| Line | Severity | Rule | Issue |
+|------|----------|------|-------|
+| 9 | BLOCKER | no_panic_surfaces | `fs::read_to_string().unwrap()` |
+| 19 | BLOCKER | no_panic_surfaces | `.parse().unwrap()` on CSV field |
+| 16 | BLOCKER | no_hidden_io | `println!()` inside data-parsing logic |
+| 16 | BLOCKER | unchecked_access | `parts[0]`/`parts[1]` index without bounds, should use `split_once` |
+| 19 | BLOCKER | no_lossy_casts | `parse::<u32>() as u16` silently truncates values >65535 |
+| 8 | BLOCKER | shell_leakage | I/O + parsing + domain construction + println fused in one function |
+| 8 | WARNING | bounded_allocation | No `try_reserve`, no domain cap on rows |
+| 4 | WARNING | parse_boundary | Raw `String` and `u16` fields with no smart constructor validation |

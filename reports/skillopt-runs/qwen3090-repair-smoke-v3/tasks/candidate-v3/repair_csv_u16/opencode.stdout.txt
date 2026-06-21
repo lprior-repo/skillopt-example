@@ -1,0 +1,2 @@
+Now I have the full picture. Let me fix `src/lib.rs` - the function uses `.unwrap()`, doesn't check empty input, doesn't enforce `max_items`, and doesn't handle parse errors.
+Repaired `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v3/tasks/candidate-v3/repair_csv_u16/repair-output.json` and `cargo test` passed (4/4).

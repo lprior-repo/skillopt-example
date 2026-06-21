@@ -1,0 +1,110 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-rayon-on-tiny-fixed-input",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "TODO: use Rayon and SmallVec because it will be faster.",
+      "problem": "Proposes Rayon parallelism for a 4-byte input. Rayon task creation, scheduling, and synchronization overhead dwarfs any per-element work on 4 items. This is a well-known folklore anti-pattern.",
+      "failure_mode": "Measurable slowdown vs sequential iteration; thread pool contention; wasted allocations for task metadata. On a 4-element input, Rayon will be 100-1000x slower than the current sequential code.",
+      "fix": "Remove the TODO. Do not introduce Rayon. If performance matters, use a fixed output buffer like [u8; 4] (or [u8; N] with a known bound) and avoid heap allocation entirely. Measure first if unsure."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-smallvec-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "TODO: use Rayon and SmallVec because it will be faster.",
+      "problem": "Proposes SmallVec for a function that always produces exactly 4 elements. SmallVec introduces branch prediction overhead (stack vs heap check) on every push. For a known-fixed-size output, a stack array or caller-owned buffer is strictly superior.",
+      "failure_mode": "Unnecessary branch on every element push; extra indirection vs raw array; wasted code size and compile time for a tool that cannot improve throughput on fixed-size output.",
+      "fix": "Return [u8; 4] or [u8; N] directly. If caller wants a Vec, let them collect. Never use SmallVec without benchmark evidence proving the inline capacity matches the typical workload.",
+      "fix": "Change signature to fn classify_four(bytes: &[u8; 4]) -> [u8; 4] where each output byte encodes the classification (e.g., 0 for even, 1 for odd), eliminating heap allocation entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-performance-claim-without-benchmark",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "TODO: use Rayon and SmallVec because it will be faster.",
+      "problem": "Asserts 'it will be faster' without any workload description, baseline measurement, target hardware, variance notes, or regression threshold. This violates the Performance Discipline gate.",
+      "failure_mode": "Team ships a change that measurably degrades performance. No regression threshold means the change cannot be validated or rolled back reliably.",
+      "fix": "Remove the claim. If a performance change is needed, add a microbenchmark with a clear baseline, measure on target hardware with warm-up, and report numbers with variance before making any change."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unnecessary-vec-allocation-fixed-size-output",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "Returns a heap-allocated Vec for exactly 4 known elements. The input size is fixed at compile time. Every call performs a heap allocation + deallocation for 4 pointers (24-32 bytes on 64-bit) when a stack array suffices.",
+      "failure_mode": "Allocation failure (OOM) on constrained targets. Unnecessary heap pressure in hot paths. The return type leaks implementation detail (Vec) that constrains callers to heap-owned output.",
+      "fix": "Use [u8; 4] as return type with a compact encoding (0=even, 1=odd), or use a caller-owned output buffer pattern. For this specific function: fn classify_four(bytes: &[u8; 4]) -> [u8; 4] with each byte = (bytes[i] & 1)."
+    },
+    {
+      "severity": "MEDIUM",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "No benchmark exists for this function. The function processes 4 bytes and returns strings - the only measurable bottleneck is allocation. No baseline number, target, or measurement framework exists.",
+      "failure_mode": "Cannot validate that any future change improves or maintains performance. No regression detection.",
+      "fix": "Add a simple criterion or custom microbenchmark measuring allocate+fill time for classify_four over 1M iterations. Compare against [u8; 4] return variant."
+    },
+    {
+      "severity": "MEDIUM",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "No profiler evidence exists showing where time is spent. For a 4-element function, the dominant cost is almost certainly allocation, not iteration. Without profiler data, optimization targets are guesses.",
+      "failure_mode": "Optimizing the wrong thing. Team may spend effort on Rayon/SmallVec when the real fix is eliminating Vec entirely.",
+      "fix": "Run with perf or flamegraph on a realistic workload calling classify_four millions of times. Confirm allocation is the bottleneck before changing anything."
+    },
+    {
+      "severity": "MEDIUM",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub fn classify_four(bytes: &[u8; 4]) -> Vec<&'static str>",
+      "problem": "No allocation tracking evidence exists. Every call to classify_four allocates a Vec (capacity 4 minimum). In a hot path processing N inputs, this means N heap allocations + N deallocations.",
+      "failure_mode": "Heap allocator pressure, potential fragmentation, allocation-induced latency spikes. Under allocation pressure, this function can trigger OOM even for trivial input.",
+      "fix": "Instrument with jemalloc profiling or Rust allocator API to measure per-call allocation cost. Compare against a no-allocation variant."
+    },
+    {
+      "severity": "LOW",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "Full crate review without running cargo commands",
+      "problem": "This is a static review only. No cargo check, cargo clippy, cargo test, or cargo fmt --check was run. The SKILL.md verification gate requires these commands.",
+      "failure_mode": "Undetected compilation errors, clippy warnings, or formatting violations. Review findings may reference code paths that do not compile or have been modified.",
+      "fix": "Run cargo fmt --check, cargo check --workspace --all-targets --all-features, and cargo clippy with strict lint gates before finalizing the review."
+    },
+    {
+      "severity": "LOW",
+      "rule": "missing-second-ring-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "classify_four function with no verification artifacts",
+      "problem": "No formal specification, property test, or fuzz test exists. The function has a simple contract (classify each byte as even/odd) that could be verified with proptest.",
+      "failure_mode": "Regressions in classification logic go undetected. No mutation testing evidence for test quality.",
+      "fix": "Add property tests: for all [u8; 4] input, classify_four(input)[i] is 'even' iff input[i] & 1 == 0."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four or any performance claim",
+    "no profiler data showing where time is spent",
+    "no allocation tracking evidence for Vec allocation per call",
+    "no cargo fmt --check, cargo clippy, cargo check, or cargo test evidence",
+    "no proptest or property test for the classification contract"
+  ],
+  "residual_risk": "Static review only. No commands were run. The code compiles but has no tests. The TODO comment indicates intent to add Rayon+SmallVec which would measurably degrade performance on 4-byte input. The recommended fix is to change the return type to a fixed-size array [u8; 4] eliminating allocation entirely, but this requires authoring changes which is outside review scope. Residual risk: the TODO will likely be acted on, causing performance regression."
+}

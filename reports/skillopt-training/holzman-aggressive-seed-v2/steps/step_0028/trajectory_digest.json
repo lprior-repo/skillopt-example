@@ -1,0 +1,34 @@
+{
+  "step": 28,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 1,
+  "failure_patterns": [
+    {
+      "pattern": "missing_try_reserve: Agent consistently uses Vec::with_capacity instead of try_reserve for bounded allocations.",
+      "count": 1,
+      "task_ids": [
+        "repair_csv_quote_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.8,
+  "score_after": 0.3,
+  "rejected_edits": [
+    {
+      "op": "replace",
+      "content": "## Verification\n\nFor real repositories, use the strongest repo gate. For isolated eval crates, obey the prompt-scoped gate and do not self-expand into audit/deny/vet/geiger/machete/hack/mutants/bench/doc/nightly gates unless asked.\n\n## Holzman Safety Checklist (Repair & Review)\n\nBefore finalizing any repair or review, verify:\n1. **Allocation:** All bounded `Vec` constructions use `try_reserve` with error handling.\n2. **Arithmetic:** All accumulators use `checked_add`/`checked_mul`; all divisions use `checked_div` with non-zero check.\n3. **Casts:** All width-reducing casts use `try_from`/`TryInto::try_into`, never `as`.\n4. **Parsing:** All delimiter extraction uses `split_once` or `get`, never `split`+`collect`+indexing.\n5. **Safety:** No `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `unsafe`, or unchecked indexing.\n6. **Claims:** All command status claims (fmt, test, clippy) match actual output.",
+      "target": "## Verification\n\nFor real repositories, use the strongest repo gate. For isolated eval crates, obey the prompt-scoped gate and do not self-expand into audit/deny/vet/geiger/machete/hack/mutants/bench/doc/nightly gates unless asked."
+    },
+    {
+      "op": "replace",
+      "content": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.\n- **Holzman Safety Rules (Non-Negotiable):**\n  1. **Allocation:** All bounded `Vec` constructions MUST use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.\n  2. **Arithmetic:** All accumulators MUST use `checked_add`/`checked_mul`. All division MUST use `checked_div` with a non-zero check. All width-reducing casts MUST use `try_from`/`TryInto::try_into`. Never use `as` for width changes.\n  3. **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.",
+      "target": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.\n- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.\n- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.\n- **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`."
+    },
+    {
+      "op": "replace",
+      "content": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.",
+      "target": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.\n\nBefore reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+    }
+  ]
+}

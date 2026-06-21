@@ -1,0 +1,16 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 10 findings across the task crate:
+
+**6 BLOCKER findings:**
+- `status: String` permits illegal states (line 3)
+- `is_validated: bool` lifecycle flag not typestate (line 4)
+- `is_sent: bool` lifecycle flag not typestate (line 5)
+- `sent_at_epoch_ms: Option<u64>` as separate optional field (line 6)
+- `id: String` missing domain newtype (line 2)
+- `mark_sent` parse boundary violation — no preconditions or typed errors (line 9)
+- Hidden allocation via `.to_string()` in core logic (line 10)
+- No Functional Core / Imperative Shell separation (line 1)
+
+**2 MAJOR findings:**
+- Missing benchmark/profiler/allocation evidence
+- Missing cargo check/clippy/test command evidence

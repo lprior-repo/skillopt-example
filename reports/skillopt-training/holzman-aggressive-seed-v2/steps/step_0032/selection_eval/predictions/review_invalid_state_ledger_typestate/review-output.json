@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "status is a free-form String instead of a typed enum typestate. Any string value ('sent', 'pending', 'INVALID', \"\") is constructible, making illegal states representable.",
+      "failure_mode": "A caller can construct a LedgerWorkflow with status=\"\" or status=\"sent\" without going through mark_sent, bypassing invariants. Serialization round-trips can produce arbitrary status strings that the domain does not recognize.",
+      "fix": "Replace `status: String` with a sealed enum `LedgerStatus { Pending, Sent }` and provide a fallible or total constructor that enforces the legal transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent boolean flags that can be in inconsistent combinations (e.g., is_sent=true but is_validated=false, or both false when one must be true).",
+      "failure_mode": "The domain requires sent items to be validated, but the type system permits is_sent=true with is_validated=false. A ledger entry can be 'sent' without ever being validated, violating the workflow invariant.",
+      "fix": "Replace both booleans with a single typestate enum or a workflow state machine enum that encodes the legal state transitions, e.g. `enum LedgerState { Unvalidated, Validated, Sent }`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "id is a plain `String` with no domain constraints. No validation, no newtype wrapper to distinguish LedgerId from arbitrary strings.",
+      "failure_mode": "Callers can pass empty strings, malformed IDs, or confuse LedgerId with other string fields. No compile-time guarantee that id follows domain rules.",
+      "fix": "Introduce `pub struct LedgerId(String)` with a private inner field and a fallible constructor `fn new(s: String) -> Result<LedgerId, InvalidIdError>` that enforces format rules."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any LedgerWorkflow regardless of current state, including already-sent or unvalidated entries. The function mutates status to \"sent\" and sets is_sent=true without checking invariants.",
+      "failure_mode": "Double-sending is possible (calling mark_sent twice on the same item). Unvalidated items can be sent, violating the validated-then-sent invariant. The function silently overwrites any status string.",
+      "fix": "Change mark_sent to accept a validated state (e.g. a typestate wrapper like `ValidatedLedger`) and return an error or a new typestate `SentLedger`. Reject already-sent items."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> — a raw u64 with no domain meaning. The unit (milliseconds since epoch) should be encoded in the type.",
+      "failure_mode": "Callers could mix up epoch milliseconds with seconds or other time units. No compile-time protection against passing a different u64 value from another domain concept.",
+      "fix": "Introduce a `TimestampMs(u64)` newtype with a constructor that validates the range (e.g., non-zero, within expected epoch bounds)."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of LedgerWorkflow are public, so any caller can construct an invalid LedgerWorkflow by setting fields independently, completely bypassing mark_sent and domain invariants.",
+      "failure_mode": "Constructing `LedgerWorkflow { id: \"x\".to_string(), status: \"x\", is_validated: false, is_sent: true, sent_at_epoch_ms: None }` is trivially valid Rust but represents an impossible domain state.",
+      "fix": "Make all fields private or replace the struct with a typestate pattern where construction goes through a single constructor or typestate-wrapping types."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for any performance claim. The crate has no benches/ directory, no criterion or simple benchmark, and no allocation analysis.",
+      "failure_mode": "Performance claims cannot be verified. Adding dependencies or changing data structures could silently degrade performance.",
+      "fix": "Add a criterion or simple benchmark suite measuring mark_sent allocation behavior (current code does one `.to_string()` allocation per call)."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No evidence of cargo fmt, cargo clippy, or cargo test execution. No test files exist in the crate.",
+      "failure_mode": "No behavioral contract is verified. The mark_sent function has no tests confirming it produces the expected state.",
+      "fix": "Add behavior tests and run cargo fmt, cargo clippy --all-targets, and cargo test, capturing command evidence."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation behavior",
+    "no test files or test execution evidence",
+    "no cargo clippy output for source compliance",
+    "no allocation profiler data for .to_string() hotspot on line 10",
+    "no second-ring evidence (property tests or formal models) for typestate transitions"
+  ],
+  "residual_risk": "The type system does not encode any domain invariants. All state transitions are unchecked, and illegal states (sent-but-not-validated, double-sent, arbitrary status strings) are trivially constructible via public fields. This is a structural correctness failure, not a runtime crash risk. Remediation requires a full typestate refactor. Static review only; no commands were run."
+}

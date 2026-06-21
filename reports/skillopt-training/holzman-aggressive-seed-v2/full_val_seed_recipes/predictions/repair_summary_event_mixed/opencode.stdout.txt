@@ -1,0 +1,15 @@
+Now I have a clear picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a separate `render_summary` function. The current code has multiple Holzman violations: `unwrap()`, unchecked arithmetic, unchecked indexing, wrong return type, and missing `render_summary`.
+All 6 tests pass. Now writing the repair output.
+Repair complete. All 6 tests pass.
+
+**Changes to `src/lib.rs`:**
+
+1. **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` — pure core returns domain data
+2. **`render_summary`**: New pure function for string formatting — functional core / imperative shell split
+3. **`split_once`**: Replaced `collect` + `parts[1]` unchecked indexing with `split_once(',').ok_or(SummaryError::Invalid)`
+4. **`checked_add`**: Replaced `total += value` (unchecked) with `total.checked_add(value).ok_or(Overflow)`
+5. **`checked_div`**: Replaced `total / count` (zero-div crash) with `total.checked_div(count)`
+6. **`u32::try_from`**: Replaced lossy `count as u32` cast
+7. **Early empty rejection**: `if input.is_empty()` before iteration
+8. **`TooMany` during iteration**: Checked `count > max_rows` after each row, not after all rows
+9. **Removed `unwrap()`**: Parse errors mapped to `SummaryError::Invalid` via `map_err`

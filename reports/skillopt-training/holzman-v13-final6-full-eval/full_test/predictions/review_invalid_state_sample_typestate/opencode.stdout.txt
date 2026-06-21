@@ -1,0 +1,12 @@
+Review complete. Written 6 findings to `review-output.json`, all BLOCKER severity:
+
+| # | Rule | Line | Problem |
+|---|------|------|---------|
+| 1 | `holzman-typestate` | 1 | No typestate machine; any workflow can be marked sent regardless of validation |
+| 2 | `holzman-status-string` | 3 | `status: String` allows arbitrary values instead of closed enum |
+| 3 | `holzman-lifecycle-bools` | 4 | Independent `is_validated`/`is_sent` booleans permit inconsistent combinations |
+| 4 | `holzman-option-invalid-state` | 6 | `sent_at_epoch_ms: Option<u64>` decoupled from lifecycle state |
+| 5 | `holzman-newtype-domain-ids` | 2 | `id: String` raw primitive, no smart constructor or validation |
+| 6 | `holzman-parse-boundary` | 9 | Raw primitives cross parse boundary without fallible smart constructors |
+
+Residual risk: HIGH — all illegal state combinations are representable at the type level.

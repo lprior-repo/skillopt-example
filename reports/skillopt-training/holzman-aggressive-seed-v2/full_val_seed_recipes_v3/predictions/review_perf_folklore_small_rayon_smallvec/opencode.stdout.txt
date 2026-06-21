@@ -1,0 +1,13 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (6 total):**
+
+- **2 BLOCKERs** — Cargo-cult performance: the comment at `src/lib.rs:2` advocates Rayon + SmallVec for a 4-byte fixed-size input, directly violating the Holzman rule "For tiny fixed-size inputs, avoid parallelism and heap collections unless measured." Rayon overhead dwarfs any benefit on 4 elements.
+- **1 BLOCKER** — Missing benchmark evidence for the stated performance claim.
+- **1 MINOR** — `Vec` allocation for 4 elements without measured justification.
+- **2 MINORs** — Missing profiler and allocation tracking evidence.
+
+**Missing evidence:** No benchmark, profiler, allocation, or second-ring command evidence exists.
+
+**Residual risk:** Code is functionally correct with no safety violations (no unsafe/unwrap/panic). Risk is that future edits may add Rayon/SmallVec based on folk belief rather than measurement, causing regression.

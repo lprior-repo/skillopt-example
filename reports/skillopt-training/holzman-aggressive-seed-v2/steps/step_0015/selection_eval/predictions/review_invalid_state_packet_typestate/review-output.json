@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any arbitrary string value (e.g. \"sent\", \"deleted\", \"f00b4r\"), making illegal packet states constructible at compile time.",
+      "failure_mode": "Downstream code can branch on status == \"sent\" but the struct could hold any string, causing undefined workflow behavior or silent data corruption.",
+      "fix": "Replace `status: String` with a sealed enum `PacketStatus { Pending, Validated, Sent }` so only valid states are representable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive flag that can be set independently of status, allowing contradictory states (e.g. status=\"sent\" with is_validated=false).",
+      "failure_mode": "Invalid state combinations are constructible; the workflow invariant (validated before sent) cannot be enforced by the type system.",
+      "fix": "Collapse bool flags into a single typestate enum (e.g. `PacketStatus`) where the valid progression is encoded in the type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a primitive flag that duplicates information from status and can diverge (is_sent=true with status!=\"sent\").",
+      "failure_mode": "Contradictory state (e.g. is_sent=true but status=\"pending\") is representable, causing inconsistent downstream decisions.",
+      "fix": "Remove `is_sent` entirely; derive send status from the `PacketStatus` enum (e.g. `PacketStatus::Sent`). If a timestamp is needed, attach it as a field on the enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a bare primitive with no domain invariants (length, format, uniqueness).",
+      "failure_mode": "Invalid IDs (empty, duplicate, malformed) propagate through the workflow without detection at the boundary.",
+      "fix": "Introduce a newtype `PacketId(String)` with a fallible constructor that validates format/length, and use it in `PacketWorkflow`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes and returns PacketWorkflow by value, mutating the struct in place rather than returning a new immutable state.",
+      "failure_mode": "No immutable-by-default guarantees; callers can hold a mutable reference and create inconsistent intermediate states.",
+      "fix": "Change to `fn mark_sent(item: &PacketWorkflow) -> Result<PacketWorkflow, TransitionError>` that returns a new validated state, enforcing the transition invariant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a heap String on every call for a value that is always the same literal.",
+      "failure_mode": "Unnecessary heap allocation on every state transition; violates the performance discipline to avoid cargo-culted allocations.",
+      "fix": "After converting `status` to an enum, no allocation is needed. The variant is a zero-cost compile-time constant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow exposes all fields as pub with no constructor, so any code can instantiate it with arbitrary values bypassing invariants.",
+      "failure_mode": "The structural invariant (id present, status in valid set, validated before sent) cannot be enforced; callers bypass all domain rules.",
+      "fix": "Make fields private, provide a `PacketWorkflow::new(id: PacketId) -> Self` constructor, and expose only read-only accessors. Use a transition method or builder for state changes."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied performance characteristics",
+    "no profiler data to measure allocation patterns in mark_sent",
+    "no allocation audit for the to_string() path under load",
+    "no command-line entry point or CLI demonstration of the workflow",
+    "no behavior tests covering state transitions or invalid state rejection"
+  ],
+  "residual_risk": "The struct represents illegal states freely (any status string, independent bool flags, no constructor). Without enum-based typestates and a closed constructor, the domain model cannot guarantee workflow invariants at compile time. Static review only; no commands run."
+}

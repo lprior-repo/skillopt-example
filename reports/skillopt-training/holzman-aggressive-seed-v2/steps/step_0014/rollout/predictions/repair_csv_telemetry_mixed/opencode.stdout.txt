@@ -1,0 +1,14 @@
+Now I have full understanding of the crate. Let me read the skill references, then repair.
+Clear. The production code has three violations: `.unwrap()` on parse, ignores `max_items`, and never checks for empty input. Fixing now.
+All 4 tests pass. Let me verify formatting and run clippy, then write the output.
+All gates pass. Writing the output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+| Issue | Before | After |
+|---|---|---|
+| `.unwrap()` | `.parse::<u16>().unwrap()` | `.parse::<u16>().map_err(\|_\| ParseError::Invalid)?` |
+| Empty input | Not checked | Returns `ParseError::Empty` |
+| `max_items` | Ignored entirely | Returns `ParseError::TooMany` when count exceeds limit |
+| Trailing empty fields | Silently parsed | Returns `ParseError::Empty` |
+
+All 4 behavior tests pass, clippy clean, no production `unsafe`/`unwrap`/`panic`.

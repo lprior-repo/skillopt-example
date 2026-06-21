@@ -1,0 +1,13 @@
+Now I see the issues clearly. The production code returns `String` but tests expect `Summary`, and it has multiple Holzman violations (`unwrap`, unchecked indexing, unchecked arithmetic, lossy `as`, missing `checked_div`). Also `render_summary` is missing entirely. Let me fix it.
+All 6 tests pass. Let me write the repair output.
+Repair complete. All 6 behavior tests pass.
+
+**Violations removed:**
+- `unwrap()` on `parse` → `map_err(|_| SummaryError::Invalid)`
+- Unchecked indexing `parts[1]` → `split_once(',')` with `ok_or`
+- Unchecked `total += value` → `checked_add` with `ok_or(SummaryError::Overflow)`
+- Lossy `count as u32` → `u32::try_from(count)` with fallback
+- Missing `checked_div` → `checked_div` with non-zero guard
+- Missing `render_summary` → pure formatting function added
+
+**Contract fix:** `summarize_metrics` now returns `Result<Summary, SummaryError>` matching the test contract, and `render_summary` is a separate pure function.

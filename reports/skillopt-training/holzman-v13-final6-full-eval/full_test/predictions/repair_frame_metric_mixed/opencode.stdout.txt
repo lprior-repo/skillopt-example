@@ -1,0 +1,62 @@
+[16:03:42.579] ERROR (#12354): failed {
+  ref: "err_2e489f42",
+  error: {
+    reason: {
+      cause: 49 | 			hash text NOT NULL,
+50 | 			created_at numeric,
+51 | 			name text,
+52 | 			applied_at TEXT
+53 | 		)
+54 | 	`);let G=yield*Y.all(O`SELECT id, hash, created_at, name FROM ${O.identifier(X)}`);if(typeof $==="object"&&$.init){if(G.length)return yield*new u8({exitCode:"databaseMigrations"});if(_.length>1)return yield*new u8({exitCode:"localMigrations"});let[U]=_;if(!U)return;yield*Y.run(O`insert into ${O.identifier(X)} ("hash", "created_at", "name", "applied_at") values(${U.hash}, ${U.folderMillis}, ${U.name}, ${new Date().toISOString()})`);return}let W=w0({localMigrations:_,dbMigrations:G});if(W.length===0)return;yield*Y.transaction((U)=>P_(function*(){for(let J of W){for(let N of J.sql)yield*U.run(O.raw(N));yield*U.run(O`insert into ${O.identifier(X)} ("hash", "created_at", "name", "applied_at") values(${J.hash}, ${J.folderMillis}, ${J.name}, ${new Date().toISOString()})`)}}))});class HX extends n8{client;relations;options;static[z]="EffectSQLiteSession";constructor(_,Y,$,X){super(Y);this.client=_;this.relations=$;this.options=X}prepareQuery(_,Y,$,X,H,G){return new XX((W,U)=>this.execute(_,W,U),_,this.options.logger
+
+SQLiteError: database is locked
+      errno: 5,
+ byteOffset: -1,
+       code: "SQLITE_BUSY"
+
+      at all (unknown:1:1)
+      at /$bunfs/root/chunk-fdj0gg67.js:54:29058
+      at runLoop (/$bunfs/root/chunk-624361m2.js:25:2045)
+      at evaluate (/$bunfs/root/chunk-624361m2.js:25:1435)
+      at /$bunfs/root/chunk-624361m2.js:25:5664
+      at /$bunfs/root/chunk-1nd8bv6q.js:6:69458
+      at node:fs:225:13
+      at processTicksAndRejections (native:7:39)
+,
+      message: "Failed to execute statement",
+      operation: "execute",
+      _tag: "LockTimeoutError",
+      "~effect/sql/SqlError/Reason": "~effect/sql/SqlError/Reason",
+    },
+    _tag: "SqlError",
+    "~effect/sql/SqlError": "~effect/sql/SqlError",
+    cause: {
+      cause: 49 | 			hash text NOT NULL,
+50 | 			created_at numeric,
+51 | 			name text,
+52 | 			applied_at TEXT
+53 | 		)
+54 | 	`);let G=yield*Y.all(O`SELECT id, hash, created_at, name FROM ${O.identifier(X)}`);if(typeof $==="object"&&$.init){if(G.length)return yield*new u8({exitCode:"databaseMigrations"});if(_.length>1)return yield*new u8({exitCode:"localMigrations"});let[U]=_;if(!U)return;yield*Y.run(O`insert into ${O.identifier(X)} ("hash", "created_at", "name", "applied_at") values(${U.hash}, ${U.folderMillis}, ${U.name}, ${new Date().toISOString()})`);return}let W=w0({localMigrations:_,dbMigrations:G});if(W.length===0)return;yield*Y.transaction((U)=>P_(function*(){for(let J of W){for(let N of J.sql)yield*U.run(O.raw(N));yield*U.run(O`insert into ${O.identifier(X)} ("hash", "created_at", "name", "applied_at") values(${J.hash}, ${J.folderMillis}, ${J.name}, ${new Date().toISOString()})`)}}))});class HX extends n8{client;relations;options;static[z]="EffectSQLiteSession";constructor(_,Y,$,X){super(Y);this.client=_;this.relations=$;this.options=X}prepareQuery(_,Y,$,X,H,G){return new XX((W,U)=>this.execute(_,W,U),_,this.options.logger
+
+SQLiteError: database is locked
+      errno: 5,
+ byteOffset: -1,
+       code: "SQLITE_BUSY"
+
+      at all (unknown:1:1)
+      at /$bunfs/root/chunk-fdj0gg67.js:54:29058
+      at runLoop (/$bunfs/root/chunk-624361m2.js:25:2045)
+      at evaluate (/$bunfs/root/chunk-624361m2.js:25:1435)
+      at /$bunfs/root/chunk-624361m2.js:25:5664
+      at /$bunfs/root/chunk-1nd8bv6q.js:6:69458
+      at node:fs:225:13
+      at processTicksAndRejections (native:7:39)
+,
+      message: "Failed to execute statement",
+      operation: "execute",
+      _tag: "LockTimeoutError",
+      "~effect/sql/SqlError/Reason": "~effect/sql/SqlError/Reason",
+    },
+  },
+  cause: "effect/sql/SqlError: Failed to execute statement\n    at <anonymous> (/$bunfs/root/chunk-fdj0gg67.js:54:29095)\n    at runLoop (/$bunfs/root/chunk-624361m2.js:25:2045)\n    at evaluate (/$bunfs/root/chunk-624361m2.js:25:1435)\n    at <anonymous> (/$bunfs/root/chunk-624361m2.js:25:5664)\n    at <anonymous> (/$bunfs/root/chunk-1nd8bv6q.js:6:69458)\n    at <anonymous> (node:fs:225:13)\n    at processTicksAndRejections (native:7:39)\n    at Session.updatePart (/$bunfs/root/chunk-hrqfynxs.js:21:10966)\n    at SessionPrompt.createUserMessage (/$bunfs/root/chunk-ra03028e.js:1030:363)\n    at SessionPrompt.createUserMessage (definition) (/$bunfs/root/chunk-ra03028e.js:1029:1983)\n    at SessionPrompt.prompt (/$bunfs/root/chunk-y4g75bcg.js:3:13187)\n    at SessionPrompt.prompt (definition) (/$bunfs/root/chunk-ra03028e.js:1030:247)\n    at SessionHttpApi.prompt (/$bunfs/root/chunk-y4g75bcg.js:2:79221)\n    at SessionHttpApi.prompt (definition) (/$bunfs/root/chunk-y4g75bcg.js:3:13099) {\n  [cause]: effect/sql/SqlError/LockTimeoutError: Failed to execute statement\n      at c0 (/$bunfs/root/chunk-fdj0gg67.js:54:28295)\n      at <anonymous> (/$bunfs/root/chunk-fdj0gg67.js:54:29106)\n      at runLoop (/$bunfs/root/chunk-624361m2.js:25:2045)\n      at evaluate (/$bunfs/root/chunk-624361m2.js:25:1435)\n      at <anonymous> (/$bunfs/root/chunk-624361m2.js:25:5664)\n      at <anonymous> (/$bunfs/root/chunk-1nd8bv6q.js:6:69458)\n      at <anonymous> (node:fs:225:13)\n      at processTicksAndRejections (native:7:39) {\n    [cause]: SQLiteError: database is locked\n        at all (unknown)\n        at <anonymous> (/$bunfs/root/chunk-fdj0gg67.js:54:29058)\n        at runLoop (/$bunfs/root/chunk-624361m2.js:25:2045)\n        at evaluate (/$bunfs/root/chunk-624361m2.js:25:1435)\n        at <anonymous> (/$bunfs/root/chunk-624361m2.js:25:5664)\n        at <anonymous> (/$bunfs/root/chunk-1nd8bv6q.js:6:69458)\n        at <anonymous> (node:fs:225:13)\n        at processTicksAndRejections (native:7:39)\n  }\n}",
+}

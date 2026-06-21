@@ -1,0 +1,2 @@
+    Checking repair_summary_ledger_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/fef263c61c77810b/repair_summary_ledger_mixed)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s

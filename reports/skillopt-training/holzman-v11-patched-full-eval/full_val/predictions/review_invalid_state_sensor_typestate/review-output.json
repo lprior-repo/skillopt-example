@@ -1,0 +1,72 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_required",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SensorWorkflow has no typestate enum or state machine; any combination of status string, validated boolean, and sent boolean is allowed, including logically impossible states like is_sent=false with status=\"sent\".",
+      "failure_mode": "Callers can construct a SensorWorkflow with contradictory lifecycle markers, making downstream logic silently incorrect and impossible to reason about statically.",
+      "fix": "Define a SensorState enum (e.g. Unvalidated, Validated, Sent) that owns the lifecycle. Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single SensorState field. Smart constructor validates initial state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string_to_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub status: String, allowing any arbitrary string value (\"sent\", \"SENT\", \"sentry\", \"\", \"deleted\") to represent the workflow state instead of a closed set of domain states.",
+      "failure_mode": "Pattern matching on status is impossible; string comparison is error-prone and case-sensitive; callers can set status to any value breaking all lifecycle invariants without compile-time detection.",
+      "fix": "Replace pub status: String with a domain enum: pub status: SensorStatus where enum variants encode the lifecycle stages. Match on enum variants instead of string comparison."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_to_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool encode lifecycle state as independent flags. These two booleans plus the status string create 2^2 * N possible combinations, most of which are invalid (e.g. validated=false, sent=true, status=\"sent\").",
+      "failure_mode": "mark_sent only sets is_sent=true and status=\"sent\" but never touches is_validated, leaving the struct in a state where sent=true but validated=false. Callers cannot enforce ordering without runtime checks.",
+      "fix": "Consolidate is_validated and is_sent into a single enum with ordered variants (Unvalidated -> Validated -> Sent). Transition functions return the next enum variant or a typed error, making invalid transitions a compile-time impossibility."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate field from the lifecycle booleans. It can be Some(timestamp) while is_sent=false, or None while is_sent=true, representing logically impossible states that the type system cannot prevent.",
+      "failure_mode": "Code checking is_sent cannot trust that sent_at_epoch_ms is Some, and code checking sent_at_epoch_ms is Some cannot trust is_sent is true. Both must do runtime double-checks, and even then the state could be inconsistent between checks.",
+      "fix": "Move the timestamp into the typestate enum variant that owns it: e.g. Sent { sent_at_epoch_ms: u64 }. Only the Sent variant carries the timestamp, making it impossible for the timestamp to exist without the sent state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain semantics. Any string is a valid ID, including empty strings, strings with whitespace, or strings that are not identifiers at all.",
+      "failure_mode": "Downstream code cannot assume the id is a valid sensor identifier. Empty IDs, duplicate IDs, or malformed IDs pass through without validation, leading to silent data corruption or lookup failures.",
+      "fix": "Define a newtype: pub struct SensorId(String) or better pub struct SensorId { inner: NonEmptyString }. Provide a smart constructor that validates the id format and returns a typed error. Use the newtype everywhere instead of bare String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives cross the parse boundary without fallible smart constructors: SensorWorkflow accepts String id, String status, and bare bools directly. No constructor validates or constrains input at the boundary, so callers can construct invalid domain states directly.",
+      "failure_mode": "Every caller bypasses validation entirely. mark_sent mutates status and is_sent without checking preconditions (e.g. must be validated before sent). The parse boundary that should turn hostile/untrusted input into trusted domain values is absent.",
+      "fix": "Add SensorWorkflow::new(id: &str, ...) -> Result<SensorWorkflow, ParseError> as a fallible smart constructor. Add SensorWorkflow::transition_to_sent(self) -> Result<SensorWorkflow, TransitionError> that enforces preconditions. Replace pub fields with a private struct and pub-only constructors."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or SensorWorkflow lifecycle transitions",
+    "no profiler evidence that typestate enum vs bool+string approach is measured for any performance claim",
+    "no allocation evidence: status.to_string() allocates on every mark_sent call; no try_reserve or bounded allocation analysis",
+    "no command evidence: no cargo clippy, cargo check, or cargo test run against this crate"
+  ],
+  "residual_risk": "The entire domain model is represented as raw primitives with no type-driven invariants. Six independent fields allow O(2^3 * N) invalid states where only a linear lifecycle chain is valid. No smart constructors, no typestate enum, no parse boundary. This is a structural architectural violation that cannot be patched incrementally; the type system must be restructured to make illegal states unrepresentable."
+}

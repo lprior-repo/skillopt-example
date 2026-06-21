@@ -1,0 +1,91 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/zero-cost-abstractions.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "arithmetic_side_effects",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Plain `start + len as usize` uses unchecked addition. On 32-bit targets, `u32::MAX + u32::MAX` fits in usize64 but wrapping on usize32; on any target, if `offset` and `len` are adversarial, the addition can overflow `usize` silently in release builds (wrapping) or panic in debug. Power of Ten numeric semantics rule requires every integer operation to name its overflow behavior (checked_, saturating_, or wrapping_).",
+      "failure_mode": "Silent data corruption via wrapping on 32-bit platforms; panic in debug; out-of-bounds slice access in release after wrapping wraps `end` to a small value, returning a wrong slice rather than an error.",
+      "fix": "Use `offset as usize + len as usize` only after `let (start, end) = (offset as usize).checked_add(len as usize).ok_or(Error::OutOfBounds)?;` or clamp with saturating_add and validate end <= buf.len()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "indexing_slicing",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Slice indexing `buf[start..end]` panics when `start > buf.len()` or `end > buf.len()`. No bounds check precedes the index operation. External u32 inputs `offset` and `len` are not validated. clippy::indexing_slicing is denied by the zero-slippage gate.",
+      "failure_mode": "Unrecoverable panic on out-of-bounds access. A caller passing `offset > buf.len()` or `offset + len > buf.len()` triggers a panic, not a typed error. This violates the panic-free standard for production-reachable code.",
+      "fix": "Validate bounds before slicing: `if end > buf.len() { return Err(Error::OutOfBounds); }` or return `Option<&[u8]>` and let the caller handle it. Use `buf.get(start..end).ok_or(Error::OutOfBounds)?` for a single safe accessor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "as_conversions",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`offset as usize` is a lossy cast flagged by clippy::as_conversions. While u32->usize is value-preserving on all current Rust targets (usize >= 32 bits), the cast is unchecked and clippy denies it by default in the zero-slippage gate.",
+      "failure_mode": "Future porting risk: if the API evolves to accept u64 offset, a plain `as usize` truncation would silently corrupt the index. The cast pattern is a maintenance hazard.",
+      "fix": "Use `u32::try_into().unwrap()` in a `from` context (acceptable for validated conversion) or keep `as usize` only if the type contract guarantees no loss, and suppress with a documented allow attribute. Better: accept `usize` directly to eliminate the cast entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function signature `pub fn read_window(buf: &[u8], offset: u32, len: u32) -> &[u8]` returns a raw slice with no fallible result type. It cannot signal out-of-bounds, overflow, or invalid input — it must panic instead. Every function accepting external parameters must validate them and return typed errors, not panic.",
+      "failure_mode": "All error conditions are panic paths. No caller can recover from invalid offset/len combinations.",
+      "fix": "Change the signature to `pub fn read_window(buf: &[u8], offset: u32, len: u32) -> Result<&[u8], ReadWindowError>` and define `ReadWindowError` as an enum with `OutOfBounds`, `Overflow`, and/or `InvalidLength` variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_simple_control_flow",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function has no input validation at all. It blindly trusts `offset` and `len` from the caller, performs unchecked arithmetic, and uses unchecked slice indexing. This violates the invariant density rule (Rule 5) — there are zero assertions or boundary checks in a function whose entire purpose is bounded access.",
+      "failure_mode": "Any caller, including untrusted input, can trigger panics or return wrong data without any guard.",
+      "fix": "Add input validation: check `len == 0` is allowed or rejected, verify `offset <= buf.len()`, verify `offset + len <= buf.len()` using checked arithmetic, and return a typed error on failure."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "benchmark_proof",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for this function. The zero-cost-abstractions reference requires that every hot path has measurement evidence. A windowing/read function is a likely hot path in any buffered I/O or data-processing system, yet no benchmark, profiler, or latency target exists.",
+      "failure_mode": "Cannot verify that this function meets latency, throughput, or allocation targets. No regression guard exists.",
+      "fix": "Add a named `#[bench]` target or criterion benchmark that measures read_window under realistic buffer sizes, offset distributions, and edge cases. Report p50/p95/p99 latency."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `rust-toolchain.toml` exists in the crate. The holzman-rust doctrine requires a checked-in pinned nightly toolchain with rustfmt, clippy, rust-src, llvm-tools-preview, and x86_64 target for the zero-slippage nightly gate.",
+      "failure_mode": "Reproducible builds and zero-slippage gate cannot execute without pinned toolchain.",
+      "fix": "Add `rust-toolchain.toml` with pinned nightly channel, minimal profile, and required components."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function takes two raw u32 parameters with no documentation of valid ranges, no `#[must_use]` consideration, and no invariant encoding. A function named `read_window` implies bounded access that must enforce `start >= 0`, `end <= buf.len()`, and `start <= end` — none of these are checked.",
+      "failure_mode": "Callers have no compile-time or runtime guarantee that their inputs are valid. The function's preconditions are undocumented and unenforced.",
+      "fix": "Add doc comments specifying preconditions, use a validated constructor or `try_new` pattern for window parameters, or accept `std::ops::Range<usize>` which encodes start <= end at the type level."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmarks exist — cannot verify latency, throughput, or allocation behavior for this windowing function",
+    "No profiler evidence (perf stat, cargo bloat, llvm-lines) — cannot verify branch predictability or code size",
+    "No rust-toolchain.toml — zero-slippage nightly gate cannot execute",
+    "No tests exist — no behavior verification for valid windows, out-of-bounds, overflow, and edge cases",
+    "No allocation analysis — while this function returns a borrowed slice (zero allocation), this is unproven without review of the full call site",
+    "No assembly/IR evidence — cannot verify that LLVM produces optimal bounds-check removal or branch elimination",
+    "No `cargo clippy` or `cargo check` evidence — lint compliance is unverified"
+  ],
+  "residual_risk": "The function is a pure hot-path accessor with unchecked arithmetic and unchecked indexing. On release builds with adversarial inputs, it can wrap indices and return incorrect slices rather than errors, or panic on out-of-bounds. Without input validation, a typed error signature, overflow-checked arithmetic, bounds validation, benchmarks, tests, and a pinned toolchain, this function cannot pass the Holzman Rust zero-slippage gate. All failures are BLOCK_LOCAL and must be repaired before acceptance."
+}

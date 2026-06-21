@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SampleWorkflow uses a flat struct with independent fields instead of a typed state machine enum. The state space is the cartesian product of String x String x bool x bool x Option<u64>, most of which represents invalid combinations.",
+      "failure_mode": "Callers can construct or mutate to any combination (e.g. status=\"sent\" with is_sent=false, or is_sent=true with sent_at_epoch_ms=None). Illegal states are not represented as compile-time errors.",
+      "fix": "Replace the struct fields with a WorkflowState enum (e.g. Pending, Validated, Sent) that encodes valid transitions. Use enum variants to carry per-state data (e.g. Sent { sent_at: u64 })."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any arbitrary string value. The domain only has a finite set of workflow statuses (e.g. Pending, Validated, Sent). Raw strings cannot enforce the valid state space.",
+      "failure_mode": "A caller can set status to any value (\"\", \"SENT\", \"cancelled\", \"pending\"), bypassing the finite state machine and making it impossible to exhaustively pattern-match on states.",
+      "fix": "Replace `status: String` with a `WorkflowStatus` enum using serde-friendly variants. Every valid status becomes a variant; there are no invalid string values at all."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent booleans that represent lifecycle stages. They can be in contradictory states (e.g. is_sent=true but is_validated=false, meaning sent before validation).",
+      "failure_mode": "The boolean combination space has 4 states but the workflow only has a linear lifecycle (Pending -> Validated -> Sent). Invalid combinations are silently allowed and no invariant check exists.",
+      "fix": "Replace `is_validated` and `is_sent` with a single `WorkflowState` enum that encodes the linear lifecycle as ordered variants. The enum makes invalid combinations unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from the boolean is_sent. When is_sent=true, sent_at_epoch_ms must be Some, but there is no type-level enforcement of this invariant.",
+      "failure_mode": "A workflow can have is_sent=true with sent_at_epoch_ms=None (sent but no timestamp) or is_sent=false with sent_at_epoch_ms=Some(...) (not sent but has a timestamp). Both are logically impossible states.",
+      "fix": "Move the timestamp into the enum variant: `enum WorkflowState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`. The timestamp only exists when the state is Sent, making the invalid combination unrepresentable."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive that carries domain meaning (a workflow identifier). No newtype wraps it, so there is no compile-time distinction between a workflow ID and any other string.",
+      "failure_mode": "A function expecting a workflow ID can accidentally accept any String, leading to ID confusion, cross-workflow bugs, and inability to add ID-level invariants (format, length, prefix checks) at the type level.",
+      "fix": "Replace `id: String` with a `WorkflowId(String)` newtype. Provide a fallible constructor `WorkflowId::try_from(s: String)` for format/prefix validation. This makes the ID a first-class domain concept."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The struct has no constructor or smart factory. Raw primitives (String, bool, Option) cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": "Every caller can write `SampleWorkflow { id: \"\".into(), status: \"\".into(), is_validated: false, is_sent: false, sent_at_epoch_ms: None }` or any other nonsensical combination. The parse boundary provides no enforcement, and the domain core consumes values that violate invariants.",
+      "fix": "Add a `SampleWorkflow::try_new` or `SampleWorkflow::pending` smart constructor that requires valid initial values. Make all fields private and expose state transitions via methods on an enum-based typestate. The constructor should validate and return a typed error for invalid input."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "unbounded_state_transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates any SampleWorkflow to sent regardless of current state. There is no check that the workflow is validated before sending, and no state machine enforces the Pending -> Validated -> Sent transition order.",
+      "failure_mode": "A workflow can be marked as sent directly from any state (even invalid ones), bypassing the validation step. This violates the linear lifecycle invariant and allows logically incorrect workflows to reach the sent state.",
+      "fix": "Replace the function with a method on the typestate enum: impl WorkflowState { fn validate(self) -> Result<WorkflowState, TransitionError>, fn send(self) -> Result<WorkflowState, TransitionError> }. Each transition only accepts the valid predecessor state."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "pub_fields_no_encapsulation",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All struct fields are pub, allowing any external code to modify any field directly. This bypasses any intended encapsulation and allows arbitrary mutation of domain invariants.",
+      "failure_mode": "External code can mutate item.status, item.is_sent, item.is_validated, and item.sent_at_epoch_ms to arbitrary values at any time, invalidating the workflow state without any transition logic or validation.",
+      "fix": "Make all fields private. Expose state via enum methods and immutable accessors. State changes must go through typed transition methods that enforce the state machine."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any hot path",
+    "no profiler evidence for allocation or hot-path analysis",
+    "no allocation audit: mark_sent performs .to_string() allocation on every call",
+    "no second-ring evidence for zero-cost claims",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy, cargo test were not executed"
+  ],
+  "residual_risk": "The struct encodes no domain invariants at the type level. Illegal states are fully representable (e.g. status=\"sent\" with is_sent=false, is_sent=true with sent_at_epoch_ms=None, is_validated=false with is_sent=true). The mark_sent function ignores the current state entirely. Without typestate enum refactoring, any consumer of this API can construct and mutate to logically impossible workflow states. This is a fundamental architectural violation that cannot be fixed by linting or tests alone."
+}

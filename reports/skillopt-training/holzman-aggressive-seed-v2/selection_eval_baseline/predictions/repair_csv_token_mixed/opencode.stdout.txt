@@ -1,0 +1,8 @@
+Repair complete. Changes to `src/lib.rs`:
+
+- **Removed `unwrap()`** on `parse::<u16>()` — replaced with explicit `match` returning `Err(ParseError::Invalid)`
+- **Added empty input check** — returns `Err(ParseError::Empty)`
+- **Added max_items enforcement** — returns `Err(ParseError::TooMany)` when count exceeds limit
+- **Skipped blank tokens** from split (handles edge cases like trailing commas)
+
+All 4 tests pass. JSON report written to `repair-output.json`.

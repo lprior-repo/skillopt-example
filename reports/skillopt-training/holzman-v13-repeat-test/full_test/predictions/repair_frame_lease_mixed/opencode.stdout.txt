@@ -1,0 +1,8 @@
+Repair complete. Changes to `src/lib.rs:8-21`:
+
+1. **Added payload size check** — returns `PayloadTooLarge` when `payload.len() > max_payload`
+2. **Removed lossy `as` conversion** — replaced `payload.len() as u32` with `u32::try_from(payload.len()).map_err(...)`
+3. **Added checked capacity arithmetic** — `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?`
+4. **Added fallible reserve** — `out.try_reserve(capacity).map_err(|_| FrameError::Allocation)?`
+
+All gates passed: `cargo fmt`, `cargo test` (2/2), strict `cargo clippy` (zero warnings).

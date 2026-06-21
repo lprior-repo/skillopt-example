@@ -1,0 +1,32 @@
+Now I have the full picture. Let me apply the repairs.
+
+**Issues found:**
+1. `summarize_metrics` returns `Result<String, SummaryError>` but tests expect `Result<Summary, SummaryError>`
+2. `render_summary` function missing entirely
+3. `parts[1]` - unchecked indexing
+4. `.unwrap()` on parse - panic surface
+5. `total += value` / `count += 1` - unchecked arithmetic
+6. `count as u32` / `count as u64` - lossy casts
+7. `total / count` - unchecked division
+8. `split(',').collect()` instead of `split_once(',')`
+9. No `try_reserve` (mandatory CSV pattern)
+10. No `Allocation` error variant (mandatory CSV pattern)
+Let me simplify the TooMany check to be cleaner:
+All 6 tests pass. Let me verify the final source and run clippy:
+All checks pass. Now writing the required JSON output:
+**Repair complete.** All 6 tests pass, zero clippy warnings.
+
+**Changes made to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `summarize_metrics` returned `Result<String, _>` | Returns `Result<Summary, _>` per test contract |
+| `render_summary` missing | Added pure formatting function |
+| `parts[1]` unchecked indexing | `line.split_once(',')` destructuring |
+| `.unwrap()` on parse | `.map_err(|_| SummaryError::Invalid)` |
+| `total += value` unchecked add | `total.checked_add(v).ok_or(Overflow)?` |
+| `count += 1` unchecked add | `count.checked_add(1).ok_or(Overflow)?` |
+| `count as u32` / `count as u64` | `u32::try_from(count)` / `u64::try_from(count)` |
+| `total / count` unchecked div | `total.checked_div(count_u64).ok_or(Invalid)?` |
+| `split(',').collect()` into Vec | `split_once(',')` with `Vec::new()` + `try_reserve` |
+| No allocation error variant | Added `SummaryError::Allocation` |

@@ -1,0 +1,101 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics when the file is missing, unreadable, or the path is empty",
+      "failure_mode": "untrusted file path causes thread panic instead of returning a typed error the caller can handle",
+      "fix": "return Result<Vec<Record>, PacketError> and use map_err to convert io::Error into a typed PacketError::Io"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is logging inside what should be pure calculation logic",
+      "failure_mode": "side effect in core logic makes the function non-deterministic, breaks idempotency, and leaks I/O into the data layer",
+      "fix": "move all logging to the shell/action layer; return parsed records as pure data and let the caller log"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are raw index accesses on a Vec with no bounds check",
+      "failure_mode": "malformed lines with fewer than two comma-separated fields cause a panic at runtime",
+      "fix": "use parts.get(0).ok_or(ParseError::Invalid)? and parts.get(1).ok_or(ParseError::Invalid)? with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() - unwrap on parse plus no bounds guard on parts[1]",
+      "failure_mode": "non-numeric second field or missing field causes a panic instead of a typed parse error",
+      "fix": "use parts.get(1).ok_or(ParseError::Invalid)?.trim().parse::<u16>().map_err(|_| ParseError::Invalid)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 - lossy as cast from u32 to u16 silently truncates values above 65535",
+      "failure_mode": "a valid u32 value like 70000 silently wraps to 4444, corrupting data with no error indication",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::Overflow)? or parse directly as u16"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_separation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets fuses file I/O (fs::read_to_string), parsing (split/collect), logging (println), and domain construction (Record) into a single function",
+      "failure_mode": "pure calculation cannot be tested independently of filesystem state; side effects make the function non-deterministic and untestable in isolation",
+      "fix": "split into a pure parse_packet(line: &str) -> Result<Record, ParseError> and a shell function load_packets(path: &str) -> Result<Vec<Record>, PacketError> that handles I/O and delegates to the parser"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_dont_validate_split_once",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() allocates a full Vec<String> instead of using split_once for a two-field grammar",
+      "failure_mode": "unnecessary allocation per line, and the shape is not enforced at compile time - callers cannot tell whether 1 field, 2 fields, or more were expected",
+      "fix": "use let (_name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)?; to parse exactly two fields with zero intermediate allocation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses raw String for name and raw u16 for value with no domain invariants or newtype wrappers",
+      "failure_mode": "any caller can construct a Record with an empty name, negative-when-signed, or out-of-range value; the type carries no rules",
+      "fix": "use smart constructors or newtypes like PacketName(String) with a constructor that validates non-empty, and ensure value respects its domain bounds"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_ignored_fallible_results",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "part.trim().to_string() - trim returns &str but the result is consumed into String; combined with split().collect() this discards structural validation",
+      "failure_mode": "empty or whitespace-only fields silently become valid entries in the Vec, producing semantically invalid records",
+      "fix": "after split_once, trim the value field and check it is non-empty before parsing, returning ParseError::Invalid for empty values"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for packet parsing throughput or latency",
+    "no profiler evidence identifying the hot path in packet loading",
+    "no allocation analysis (no valgrind/heaptrack/timing evidence for per-line Vec<String> allocation cost)",
+    "no command-truth evidence - this is a static review with no cargo commands executed"
+  ],
+  "residual_risk": "Static review only - no cargo check, clippy, or test execution was performed. All 9 findings are independently verifiable from source inspection but a cargo clippy run with strict lint flags would confirm the full scope of compiler-level violations. The function load_packets has every Holzman absolute law violation pattern present: unwrap, unchecked indexing, lossy cast, hidden I/O, no typed errors, no split_once, unbounded allocation, no parse boundary, and no functional core/shell separation."
+}

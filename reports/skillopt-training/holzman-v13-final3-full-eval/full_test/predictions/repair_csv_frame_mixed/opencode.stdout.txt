@@ -1,0 +1,12 @@
+Now I'll fix the production source. The current code violates every Holzman rule: `.unwrap()`, `.collect()`, no empty check, no max_items enforcement, no `try_reserve`.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `.parse::<u16>().unwrap()` | `.parse::<u16>().map_err(\|_\| ParseError::Invalid)?` |
+| `.collect()` into Vec | `Vec::new()` + explicit `for` loop |
+| No empty-input guard | `if input.is_empty() { return Err(ParseError::Empty) }` |
+| No max_items enforcement | `if values.len() >= max_items { return Err(ParseError::TooMany) }` before push |
+| No bounded allocation | `try_reserve(max_items).map_err(\|_\| ParseError::Allocation)?` after empty check |
+
+Commands: `cargo fmt` ✓, `cargo test` ✓ (4/4), `cargo fmt --check` ✓, `cargo clippy` ✓ (zero warnings). Output written to `repair-output.json`.

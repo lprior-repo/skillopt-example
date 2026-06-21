@@ -1,0 +1,15 @@
+Review complete. Written to `review-output.json`.
+
+**Summary: 7 findings**
+
+| Severity | Rule | File:Line |
+|----------|------|-----------|
+| BLOCKER | `make_illegal_states_unrepresentable` | `src/lib.rs:1` — `status: String` + `bool` flags allow contradictory states |
+| BLOCKER | `primitive_obsession_newtypes` | `src/lib.rs:2` — `id: String` with no domain constraints |
+| BLOCKER | `functional_core_mark_sent_mutation` | `src/lib.rs:9` — `mark_sent` mutates core data without preconditions |
+| MAJOR | `no_unnecessary_allocation` | `src/lib.rs:10` — `.to_string()` allocates unnecessarily |
+| MAJOR | `missing_benchmark_evidence` | `src/lib.rs:1` — No benchmarks |
+| MAJOR | `missing_benchmarks` | `src/lib.rs:1` — No profiler/allocation analysis |
+| MAJOR | `missing_second_ring_evidence` | `src/lib.rs:1` — No command evidence at all |
+
+**Root cause:** The `BudgetWorkflow` struct uses primitive fields (`String`, `bool`) instead of typed domain enums/typestates, making illegal states (e.g., `is_sent=true` with `status="pending"`) fully representable by the compiler. Fix: replace primitives with `enum` lifecycle states and typestate-gated methods.

@@ -1,0 +1,11 @@
+Now I understand the issues. Two Holzman violations in `src/lib.rs`:
+
+1. **Missing `max_payload` check** - `rejects_limit` test expects `Err(FrameError::PayloadTooLarge)` but code never checks it
+2. **Lossy `as` conversion** - `payload.len() as u32` must use `try_from`
+All 2 tests pass. Writing the output JSON.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added payload limit check** (line 9-11): `payload.len() > max_payload` returns `Err(FrameError::PayloadTooLarge)` — satisfies `rejects_limit` test
+2. **Removed lossy `as` conversion** (line 13): `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?` — satisfies Holzman constraint
+
+Commands: `cargo fmt` passed, `cargo test` passed (2/2). Output written to `repair-output.json`.

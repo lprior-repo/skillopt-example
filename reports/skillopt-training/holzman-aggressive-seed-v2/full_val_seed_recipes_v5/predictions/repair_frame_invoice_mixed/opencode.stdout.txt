@@ -1,0 +1,7 @@
+Repair complete. Three Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** (line 10 original): `payload.len() as u32` replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)`
+2. **Missing payload-size validation** (line 9): Added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge`
+3. **No allocation safety** (line 16-18): Added `try_reserve` with `checked_add` for capacity computation
+
+All 2 tests pass. `cargo fmt --check`, `cargo clippy -D warnings`, and forbidden-construct scan all clean.

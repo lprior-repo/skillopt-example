@@ -1,0 +1,17 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/d794e21935e98088/review_invalid_state_sensor_typestate/review-output.json`.
+
+**5 BLOCKER findings:**
+
+| Rule | File:Line | Problem |
+|---|---|---|
+| `status-string-must-be-enum` | `src/lib.rs:3` | `status: String` allows arbitrary illegal states |
+| `lifecycle-bools-must-be-typestate` | `src/lib.rs:4` | `is_validated: bool` + `is_sent: bool` allow impossible combos |
+| `option-invalid-state-combination` | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` redundant with `is_sent: bool` |
+| `raw-primitive-domain-id` | `src/lib.rs:2` | `id: String` has no domain validation |
+| `no-typestate-state-machine` | `src/lib.rs:9` | `mark_sent` unconditionally transitions without validation |
+
+**2 MAJOR findings:** public mutable fields, missing command evidence.
+**1 MINOR finding:** missing benchmark evidence.
+
+**Residual risk:** No compile-time guarantees against illegal states. mark_sent bypasses all validation. Typestate refactoring required.

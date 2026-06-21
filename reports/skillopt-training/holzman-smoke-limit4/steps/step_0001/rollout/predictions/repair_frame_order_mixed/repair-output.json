@@ -1,0 +1,9 @@
+{
+  "status": "repaired",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "changed_files": ["src/lib.rs"],
+  "commands": [{"command": "cargo fmt && cargo test", "status": "passed"}],
+  "rules_satisfied": ["payload_length_checked_against_max_payload", "no_lossy_as_conversion", "no_unused_variables", "no_unsafe_in_production", "smallest_change_satisfies_all_tests", "functional_core_pure_deterministic", "pre_allocated_buffer"],
+  "skipped_gates": [],
+  "residual_risk": "Allocation error variant exists but Vec panics on OOM; acceptable for this crate scope"
+}

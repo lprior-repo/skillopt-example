@@ -1,0 +1,73 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "QuoteWorkflow has no typestate or enum-based lifecycle; any caller can construct a QuoteWorkflow in any state with no invariants enforced by the type system.",
+      "failure_mode": "A quote can be sent without being validated, or marked sent multiple times, because the type carries no information about which transitions are legal.",
+      "fix": "Replace QuoteWorkflow with a typestate enum or generic parameter (e.g. QuoteWorkflow<S: QuoteState>) that encodes lifecycle phases (Draft, Validated, Sent) as distinct types, making invalid transitions unreachable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String, allowing arbitrary values like \"sent\", \"SENT\", \"\", \"cancelled\", \"pending2\" with no validation at the type level.",
+      "failure_mode": "Callers can set status to any string, including typos or invalid transitions; pattern matching on status requires exhaustive string comparison at every use site and cannot catch invalid values at compile time.",
+      "fix": "Replace `status: String` with a domain enum `QuoteStatus { Draft, Validated, Sent }` and use smart constructors that accept no input for each variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are separate booleans that can exist in inconsistent combinations: both false (no lifecycle info), both true (validated and sent without tracking order), is_validated=false and is_sent=true (sent without validation).",
+      "failure_mode": "The boolean pair admits 4 states but the domain only has 3 meaningful states (Draft, Validated, Sent); the invalid combination is_validated=false && is_sent=true silently represents a quote that was sent without validation.",
+      "fix": "Replace both booleans with a single typestate enum or typestate parameter. The enum owns the lifecycle state and excludes the invalid combination by construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> independent of the lifecycle booleans; it can be Some(epoch) when is_sent=false (ghost timestamp), None when is_sent=true (missing timestamp), or Some/None in the invalid both-true state.",
+      "failure_mode": "The Option field is decoupled from the lifecycle state, allowing timestamps on non-sent quotes or missing timestamps on sent quotes, creating inconsistent domain state that no invariant can enforce.",
+      "fix": "Bake sent_at_epoch_ms into the Sent variant of the typestate enum: e.g. `Sent { sent_at_epoch_ms: u64 }`. The timestamp is mandatory for the Sent state and invisible in Draft/Validated, making invalid combinations unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain semantics; it can be empty, contain arbitrary whitespace, duplicates, or non-ASCII characters with no validation at construction.",
+      "failure_mode": "Any code accepting or returning a QuoteWorkflow can pass an empty string, whitespace-only string, or duplicate ID without any compile-time or runtime guard, violating the 'parse at boundaries' law.",
+      "fix": "Create a newtype `QuoteId(String)` or `QuoteId(u64)` with a smart constructor `QuoteId::from_str(s) -> Result<QuoteId, ParseError>` that validates non-empty, bounded length, and any domain rules at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts a fully constructed QuoteWorkflow with raw String fields and booleans; it mutates status and is_sent directly without any parse boundary validation or fallible smart constructor. Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": "A caller can pass a QuoteWorkflow with status=\"draft\" and is_sent=false, and mark_sent will set status=\"sent\" and is_sent=true without ever validating that the quote was valid to send. The parse boundary (where hostile input becomes trusted domain values) is absent entirely.",
+      "fix": "Replace mark_sent with a method on a typestate-aware QuoteWorkflow that takes the validated state as a type parameter and returns the sent state. Validation happens at construction via a fallible smart constructor; mark_sent becomes a state transition that is type-enforced."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any performance claim",
+    "no profiler data for QuoteWorkflow construction or transition costs",
+    "no allocation analysis for String id allocation patterns",
+    "no command evidence (cargo fmt, cargo check, cargo clippy) was run",
+    "no behavior tests exist to verify state transitions"
+  ],
+  "residual_risk": "The QuoteWorkflow struct admits every illegal state combination (sent without validated, ghost timestamps, invalid status strings) with zero compile-time or runtime guards. The typestate, enum, and newtype laws are completely violated. The code compiles but provides no domain safety whatsoever."
+}

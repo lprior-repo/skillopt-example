@@ -1,0 +1,37 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    "Cargo.toml",
+    "src/lib.rs",
+    "tests/behavior.rs"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {
+      "command": "cargo fmt",
+      "status": "passed"
+    },
+    {
+      "command": "cargo test",
+      "status": "passed"
+    }
+  ],
+  "rules_satisfied": [
+    "No production unwrap/expect/panic/todo/unimplemented/unreachable",
+    "No unsafe blocks",
+    "No lossy as conversions",
+    "No unchecked indexing",
+    "Empty input returns Err(ParseError::Empty)",
+    "Parse failures return Err(ParseError::Invalid)",
+    "Excess items return Err(ParseError::TooMany)",
+    "Functional core: pure deterministic parsing, no I/O",
+    "Smallest source change to satisfy all 4 tests",
+    "Cargo.toml not modified"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "Allocation variant exists but is not exercised; Vec::with_capacity used instead of try_reserve since allocation failure is not part of the test contract and input length is already bounded by split count."
+}

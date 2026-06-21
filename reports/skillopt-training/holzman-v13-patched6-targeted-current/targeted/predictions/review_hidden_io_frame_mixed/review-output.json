@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "File I/O (std::fs) is imported and used inside a function that also does parsing and domain construction. I/O, parsing, allocation, and domain construction are fused together in a single function, making it impossible to test core logic without real filesystem access.",
+      "failure_mode": "Cannot reason about or unit-test parsing logic in isolation; every call requires a real file on disk; side effects are unpredictable and untestable.",
+      "fix": "Split into a shell function that reads the file and a pure parsing function that accepts &str or &[String]. Move fs::read_to_string into the shell; keep the core logic pure and deterministic."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on a fallible file read. Panics if the file is missing, unreadable, or too large.",
+      "failure_mode": "Untrusted input (file path) causes the entire process to abort instead of returning a typed, recoverable error.",
+      "fix": "Return Result<Vec<Record>, LoadError> and use .map_err(|e| LoadError::Io(e))? instead of unwrap()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_or_panic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap() on a fallible parse. Panics if the value field is not a valid integer.",
+      "failure_mode": "Malformed CSV data causes a panic instead of returning a typed ParseError, violating panic freedom.",
+      "fix": "Use .map_err(|_| ParseError::Invalid)? and return a typed error enum instead of unwrap()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 — lossy cast from u32 to u16. Values outside 0..=65535 silently truncate.",
+      "failure_mode": "Out-of-range values silently wrap to incorrect domain values, producing invalid records with no error or diagnostic.",
+      "fix": "Use u16::try_from(value).map_err(|_| ParseError::Overflow)? for a checked, fallible conversion."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] — unchecked indexing into a Vec produced by split+collect. If a line has fewer than 2 comma-separated fields, this panics with an index out of bounds panic.",
+      "failure_mode": "Malformed input lines (empty, single-field, or whitespace-only) panic at runtime via bounds check failure instead of returning a typed error.",
+      "fix": "Use line.split_once(',').ok_or(ParseError::Invalid)? to parse two-field records without indexing. Bind as (_name, value_str) and parse value_str directly."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "raw_primitive_domain_state",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record{name: String, value: u16} — raw primitive String and u16 fields. No domain invariants enforced at the type level. Any caller can construct a Record with an empty name, negative-appearing value (via overflow), or otherwise invalid state.",
+      "failure_mode": "Illegal domain states are representable; name and value constraints are invisible to the type system, so callers can create invalid Records directly.",
+      "fix": "Replace with a parse-boundary smart constructor: newtype Name(String) validated at construction (non-empty, bounded length), and use a bounded u16 or a value enum. Provide Record::new(name: Name, value: Value) -> Result<Record, ParseError> as the only constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_in_pure_calculation",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — logging/side effect embedded inside the data-parsing closure. Pure calculation code must not produce I/O.",
+      "failure_mode": "Parsing logic has observable side effects, making it impossible to call deterministically; output ordering and presence affect test results and downstream behavior.",
+      "fix": "Remove println! entirely from the parsing logic. If logging is needed, the shell layer should log after calling the pure parser, or the parser should return a result the shell can log."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unbounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "let parts: Vec<String> = line.split(',').map(...).collect() — allocates a Vec of Strings for every line without any capacity bound or domain cap. Additionally uses split+collect instead of split_once for a two-field record, and the outer collect() into Vec<Record> has no try_reserve or max-items validation.",
+      "failure_mode": "Malicious or extremely large input files cause unbounded memory allocation with no cap, leading to OOM or denial of service.",
+      "fix": "Validate a domain cap (max lines) before allocation, use Vec::new() then values.try_reserve(max_items).map_err(|_| Error::Allocation)?, and use line.split_once(',') per line to avoid per-line Vec allocations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell_violation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "The entire function load_frames performs file I/O (fs::read_to_string), parsing (split/parse), logging (println!), domain construction (Record {..}), and result collection (collect()) in one monolithic function. There is no Data/Calculations/Actions separation.",
+      "failure_mode": "Cannot test pure parsing logic without a filesystem; cannot reason about side effects; violates the mandatory functional-core imperative-shell architecture.",
+      "fix": "Extract a pure fn parse_lines(input: &str, max_items: usize) -> Result<Vec<Record>, ParseError> for calculations. The shell fn load_frames(path: &str) -> Result<Vec<Record>, LoadError> handles only I/O and delegates to the pure parser."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "The function returns Vec<Record> with no Result type. All fallible operations (file read, parse, bounds check, allocation) are collapsed into panics via unwrap() instead of a typed error enum.",
+      "failure_mode": "Callers have no way to distinguish between IO failures, parse errors, overflow, allocation failures, or malformed input — all manifest as panics.",
+      "fix": "Define enum LoadError { Io(std::io::Error), Invalid(String), Overflow, Allocation } and return Result<Vec<Record>, LoadError>. Map each fallible operation to the appropriate variant."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists — no baseline measurement for any performance claim",
+    "no profiler data — no hot-path identification or CPU profile evidence",
+    "no allocation analysis — no allocation count, heap bytes, or dropshot evidence",
+    "no second-ring evidence — no compiler artifact, IR, or disassembly proof",
+    "no command evidence — no cargo fmt/check/clippy/test commands were run",
+    "no command-truth evidence — function signature references filesystem paths as strings with no validation"
+  ],
+  "residual_risk": "Static review only — no commands run, no tests executed, no benchmarks, no profiler data. The crate contains 10 BLOCKER-level violations including panic surfaces (unwrap), lossy casts (as u16), unchecked indexing (parts[0], parts[1]), hidden I/O (fs::read, println), unbounded allocation, raw primitive domain state, no typed error taxonomy, and complete absence of functional-core imperative-shell separation. This crate is not deliverable in its current state."
+}

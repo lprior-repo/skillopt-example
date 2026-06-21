@@ -1,0 +1,57 @@
+{
+  "task_id": "review_unbounded_parser",
+  "kind": "review",
+  "bundle": "baseline",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/smoke3/tasks/baseline/review_unbounded_parser",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke3/tasks/baseline/review_unbounded_parser",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": null,
+  "grade": {
+    "kind": "review",
+    "hard": 0.0,
+    "soft": 0.375,
+    "matched_groups": 3,
+    "total_groups": 4,
+    "missing_groups": [
+      [
+        "external input",
+        "untrusted input",
+        "boundary"
+      ]
+    ],
+    "json_valid": true,
+    "json_errors": [],
+    "mutation_errors": [
+      "added:Cargo.lock",
+      "added:target/.rustc_info.json",
+      "added:target/CACHEDIR.TAG",
+      "added:target/debug/.cargo-build-lock",
+      "added:target/debug/.cargo-lock",
+      "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/dep-lib-review_unbounded_parser",
+      "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/invoked.timestamp",
+      "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/lib-review_unbounded_parser",
+      "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/lib-review_unbounded_parser.json",
+      "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/dep-test-lib-review_unbounded_parser",
+      "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/invoked.timestamp",
+      "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/test-lib-review_unbounded_parser",
+      "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/test-lib-review_unbounded_parser.json",
+      "added:target/debug/deps/libreview_unbounded_parser-1d65dba4dc395e52.rmeta",
+      "added:target/debug/deps/libreview_unbounded_parser-f7e588900e84b211.rmeta",
+      "added:target/debug/deps/review_unbounded_parser-1d65dba4dc395e52.d",
+      "added:target/debug/deps/review_unbounded_parser-f7e588900e84b211.d",
+      "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08-3lnxev9p3g3zhr0gmfbkrh4c9/dep-graph.bin",
+      "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08-3lnxev9p3g3zhr0gmfbkrh4c9/query-cache.bin",
+      "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08-3lnxev9p3g3zhr0gmfbkrh4c9/work-products.bin",
+      "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08.lock",
+      "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/dep-graph.bin",
+      "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/metadata.rmeta",
+      "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/query-cache.bin",
+      "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/work-products.bin",
+      "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict.lock",
+      "added:target/flycheck0/stderr",
+      "added:target/flycheck0/stdout"
+    ],
+    "execution_errors": []
+  }
+}

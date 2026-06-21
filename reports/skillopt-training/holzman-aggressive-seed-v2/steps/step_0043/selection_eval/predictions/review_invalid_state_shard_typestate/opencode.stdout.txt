@@ -1,0 +1,14 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 10 findings, all stemming from one architectural problem.**
+
+The `ShardWorkflow` struct violates Holzman Rust core principles:
+
+- **6 BLOCKERs** on `make_illegal_states_unrepresentable` — `status: String`, `is_validated: bool`, `is_sent: bool`, and `sent_at_epoch_ms: Option<u64>` together allow any combination of values, including semantically impossible states like "sent but not flagged as sent" or "validated with empty status".
+- **2 BLOCKERs** on `no_primitive_obsession` — raw `String` for both `id` and `status` with no domain constraints.
+- **1 BLOCKER** on `functional_core_imperative_shell` — `mark_sent` accepts any state and mutates in place with no invariant guards.
+- **2 WARNINGs** on unnecessary allocations — `String` for id/status + `.to_string()` on every call.
+- **1 INFO** on missing benchmark evidence.
+
+The fix is a full typestate redesign: fold all lifecycle fields into an enum, replace raw strings with domain newtypes, and make `mark_sent` operate on a validated-only typestate returning a sent typestate.

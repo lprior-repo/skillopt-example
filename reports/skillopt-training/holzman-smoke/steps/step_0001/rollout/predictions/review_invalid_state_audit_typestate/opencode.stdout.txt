@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review output.
+Review complete. Found 8 findings across the crate:
+
+**4 BLOCKERs:**
+- `AuditWorkflow` uses `String` + `bool` flags instead of a typestate enum, making illegal/inconsistent states constructible (line 1-6)
+- `id: String` lacks domain newtyping (line 2)
+- `is_validated` and `is_sent` booleans encode lifecycle in a composable way the domain doesn't allow (line 4)
+- `mark_sent` transitions draft->sent without validation gate (line 9)
+
+**2 MAJORs:**
+- No functional core — pure validation boundary missing (line 9)
+- Unnecessary `.to_string()` allocation on status (line 10)
+
+**2 MINORs:**
+- No benchmark/profiler/allocation evidence
+- No command evidence (cargo test/fmt/clippy)
+
+Written to `review-output.json`.

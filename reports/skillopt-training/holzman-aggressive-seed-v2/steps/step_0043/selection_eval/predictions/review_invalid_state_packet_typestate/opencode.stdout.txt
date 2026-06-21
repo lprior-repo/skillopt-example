@@ -1,0 +1,14 @@
+Review complete. Found 6 findings (5 BLOCKER, 2 MAJOR) written to `review-output.json`:
+
+**Key violations:**
+
+| Rule | Severity | File:Line |
+|---|---|---|
+| `make_illegal_states_unrepresentable` | BLOCKER | `src/lib.rs:1` — `String` status + `bool` flags allow contradictory states |
+| `primitive_obsession` | BLOCKER | `src/lib.rs:2` — `id: String` and `status: String` are raw primitives |
+| `functional_core_imperative_shell` | BLOCKER | `src/lib.rs:9` — `mark_sent` mutates in place with no preconditions |
+| `parse_at_boundaries` | BLOCKER | `src/lib.rs:10` — magic string `"sent"` hardcoded in core |
+| `pub_fields_invariant_enforcement` | MAJOR | `src/lib.rs:1` — all fields pub, no constructor |
+| `sent_at_epoch_ms_should_be_typed` | MAJOR | `src/lib.rs:6` — raw `u64` for domain timestamp |
+
+**Missing evidence:** no benchmarks, no profiler/allocation data, no behavior tests, no CI command evidence.

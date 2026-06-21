@@ -1,0 +1,98 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "type_discipline_primitive_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String instead of a typed enum. Any string value is accepted, including impossible/invalid states like status='sent' with is_sent=false, or status='pending' with is_validated=true.",
+      "failure_mode": "Domain invariant that status must be in a finite set of valid values is unenforceable. Callers can set status to arbitrary strings, making runtime validation or state-machine enforcement impossible.",
+      "fix": "Replace `pub status: String` with a sealed enum: `pub status: LeaseStatus` where `LeaseStatus` has variants like `Pending`, `Validated`, `Sent`. Remove redundant `is_sent` and `is_validated` booleans."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow allows contradictory state: e.g. status='sent', is_sent=false, is_validated=false, sent_at_epoch_ms=None. Multiple redundant boolean flags (is_validated, is_sent) create combinatorial explosion of illegal states.",
+      "failure_mode": "A caller can construct a LeaseWorkflow in any of the 2^4 = 16 combinations of status/is_validated/is_sent/sent_at fields, most of which are semantically invalid. This makes correctness reasoning about the struct impossible without external documentation or runtime checks.",
+      "fix": "Model the workflow as a typestate or single-status enum. Remove `is_validated` and `is_sent` bools entirely. Use `sent_at_epoch_ms: Option<EpochMs>` only in the Sent variant. Example: `enum LeaseStatus { Pending, Validated, Sent { sent_at: EpochMs } }`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_primitives",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id` is a pub String with no domain newtype. Any string (empty, whitespace, malformed) is accepted as a valid lease ID.",
+      "failure_mode": "Downstream code must repeatedly validate the ID string. No compile-time guarantee that the ID meets domain requirements (non-empty, format, uniqueness).",
+      "fix": "Replace `pub id: String` with `pub id: LeaseId` where `LeaseId` is a newtype with a fallible constructor that validates the ID at the boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_primitives",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` uses a raw primitive without a domain newtype. The u64 has domain meaning (epoch milliseconds) but no type-level constraint.",
+      "failure_mode": "Callers can pass arbitrary u64 values (nanoseconds, timestamps from wrong epoch, negative values via underflow). No compile-time distinction between epoch-ms and other u64 fields.",
+      "fix": "Replace with `sent_at_epoch_ms: Option<EpochMs>` where `EpochMs` is a newtype wrapping u64 with a constructor that validates the range."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_mutation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates the struct in place (`mut item`), instead of returning a new immutable value. This is imperative-shell style logic in the core.",
+      "failure_mode": "In-place mutation makes the function unsuitable for a pure functional core. It prevents composition with other state transitions and makes reasoning about ownership/aliasing harder.",
+      "fix": "Make mark_sent pure: `fn mark_sent(item: &LeaseWorkflow) -> Result<LeaseWorkflow, TransitionError>` that returns a new struct with validated state transitions. Or better, return the new status/epoch directly."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_transition_validation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no preconditions or transition validation. It sets status='sent' and is_sent=true regardless of the current state — even if already sent, or if not yet validated.",
+      "failure_mode": "A lease can be marked sent without being validated, or marked sent multiple times. State machine transitions are not enforced, leading to incorrect business logic.",
+      "fix": "Add transition validation: reject if already sent, require validated state before sending. Return a typed error on invalid transitions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "redundant_representation",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Both `status: String` and `is_sent: bool` encode the same information redundantly. is_sent is a derived boolean from whether status is 'sent', creating inconsistency risk.",
+      "failure_mode": "If status is set to 'sent' but is_sent remains false (or vice versa), the struct is inconsistent with no way to resolve the contradiction.",
+      "fix": "Remove `is_sent: bool` and `is_validated: bool`. Encode all workflow state in a single `LeaseStatus` enum. The 'is_*' derived booleans become methods on the enum."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for mark_sent or any performance claim. The crate has zero performance evidence.",
+      "failure_mode": "Cannot verify that the struct layout, field types, or function signature meet any performance budget or latency SLO.",
+      "fix": "Add a benchmark crate with microbenchmarks for mark_sent, struct construction, and state transition checks."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_test_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests exist for LeaseWorkflow or mark_sent. Zero test coverage of state transitions, invalid transitions, or edge cases.",
+      "failure_mode": "No behavioral contract is verified. Adding or changing mark_sent has no regression guard.",
+      "fix": "Add behavior tests: valid transition (validated->sent), invalid transition (pending->sent rejected), double-send rejected, state consistency invariants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any performance claim",
+    "no behavior tests exist for state transitions or invariants",
+    "no allocation analysis for LeaseWorkflow struct size or mark_sent allocations",
+    "no command evidence (cargo test, cargo bench, cargo clippy) was run — static review only"
+  ],
+  "residual_risk": "High. The struct violates the fundamental Holzman principle of making illegal states unrepresentable by using primitive String and bool fields that allow any combination of values. The mark_sent function has no transition validation, enabling invalid state machines. Static review only; no commands were executed. The entire domain model needs to be replaced with typed newtypes, a status enum with typestates, and validated transition functions."
+}

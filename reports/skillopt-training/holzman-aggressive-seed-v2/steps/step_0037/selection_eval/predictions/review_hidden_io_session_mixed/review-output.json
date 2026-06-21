@@ -1,0 +1,99 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file-not-found, permission-denied, or I/O errors",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed IoError",
+      "fix": "return Result<Vec<Record>, io::Error> and use ? to propagate the error from fs::read_to_string"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the Vec by unchecked index after collect()-ing split results; malformed lines with zero commas cause a panic",
+      "failure_mode": "malformed input line (no comma) produces a Vec of length 1, and parts[0] panics or silently skips data",
+      "fix": "replace split+collect+indexing with split_once(',') and match the Some((left, right)) / None branches, returning a typed parse error on None"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses the Vec by unchecked index; lines with only one field cause a panic",
+      "failure_mode": "malformed input line (missing second comma-separated field) triggers index-out-of-bounds panic",
+      "fix": "use split_once(',') and destructure into left/right parts; access second element only via the matched pair"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or out-of-range string in the second CSV field",
+      "failure_mode": "corrupt or adversarial data in the value column aborts the session loader instead of returning a ParseError",
+      "fix": "replace .unwrap() with ? (propagating through a Result return type) or map_err to a domain ParseError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "'as u16' silently truncates u32 values > 65535 with no bounds check",
+      "failure_mode": "a valid u32 value of 70000 silently becomes 4425, silently corrupting domain data",
+      "fix": "use u16::try_from(value) and propagate the error with ? or map_err to a domain OverflowError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_split_collect_index",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a full Vec of Strings only to index into it; split_once is the prescribed pattern",
+      "failure_mode": "unnecessary allocation and heap pressure on every line; also invites unchecked indexing bugs",
+      "fix": "replace with line.split_once(',') and handle left/right directly without collect"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! inside load_sessions is a hidden I/O side effect in a data-loading function; callers cannot suppress or test it",
+      "failure_mode": "logging is baked into the data-loading path, making the function impossible to compose without stdout pollution and preventing test isolation",
+      "fix": "remove the println!; pass a logger or callback abstraction from the shell layer, or make logging a separate shell-only concern"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell_boundary",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes file I/O (fs::read_to_string), parsing, domain construction, and console logging in a single public function with no clear boundary",
+      "failure_mode": "the pure parsing and domain logic cannot be unit-tested in isolation from file system and stdout side effects",
+      "fix": "split into (1) a pure fn parse_session_line(&str) -> Result<Record, ParseError> for the core, and (2) an imperative shell fn load_sessions(path: &str) -> Result<Vec<Record>, IoError> that reads the file, delegates to parse_session_line, and handles logging at the shell layer"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses raw String and u16 instead of typed domain newtypes (e.g., SessionName, SessionValue)",
+      "failure_mode": "callers can construct Record with invalid names or values that the domain rules should forbid at compile time",
+      "fix": "introduce newtype wrappers with fallible constructors that encode domain invariants, e.g., SessionName(String) with validation in try_from"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler or allocation analysis evidence",
+    "no second-ring evidence (no rayon/smallvec/cow decisions to justify)",
+    "no command evidence: cargo test, cargo fmt, cargo clippy not run",
+    "no tests exist for the crate"
+  ],
+  "residual_risk": "High. All six Holzman BLOCKER rules are violated: unwrap on I/O and parse, unchecked indexing, lossy as cast, split+collect+index anti-pattern, hidden println! side effect, and no functional-core/shell boundary. The code is a single 23-line function that panics on any malformed input, silently truncates values, allocates unnecessarily, and cannot be tested in isolation. Static review only; no commands run. The crate requires a full rewrite to a typed, Result-returning, pure-core design before any delivery gate."
+}

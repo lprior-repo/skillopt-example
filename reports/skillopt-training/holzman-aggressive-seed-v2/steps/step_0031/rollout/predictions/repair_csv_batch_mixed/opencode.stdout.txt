@@ -1,0 +1,8 @@
+Now I understand the issues. The function uses `unwrap()`, ignores `max_items`, and doesn't check for empty input. Let me fix it.
+All 4 tests pass. Now writing the output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Removed `unwrap()`** — replaced `.parse().unwrap()` with `.parse().map_err(|_| ParseError::Invalid)?`
+2. **Added empty-input check** — returns `Err(ParseError::Empty)` when `input.is_empty()`
+3. **Added `max_items` enforcement** — uses `checked_add(1)` to compare count against `max_items`, returning `Err(ParseError::TooMany)`
+4. **Added empty-trimmed check** — returns `Err(ParseError::Invalid)` for empty trimmed segments (e.g. `"1,,3"`)

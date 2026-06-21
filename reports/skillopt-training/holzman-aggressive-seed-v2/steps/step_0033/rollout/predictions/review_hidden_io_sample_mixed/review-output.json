@@ -1,0 +1,122 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on I/O result panics on missing/unreadable file",
+      "failure_mode": "untrusted or absent file path aborts the entire program instead of returning a typed domain error",
+      "fix": "return Result<Vec<Record>, Error> and propagate io::Error via ? or explicit map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "I/O (fs::read_to_string) is embedded directly in the same function as parsing and domain construction — no separation of imperative shell from pure core",
+      "failure_mode": "cannot unit-test parsing logic without involving the filesystem; side effects are hidden inside what looks like a data-processing function",
+      "fix": "split into: (1) shell fn load_samples(path) -> Result<Vec<Record>, E> that does I/O, and (2) pure fn parse_records(text: &str) -> Result<Vec<Record>, ParseErr> that processes lines"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — hidden I/O side effect (logging) inside a mapping function that should be pure data transformation",
+      "failure_mode": "pure core code emits side effects, making behavior non-deterministic and non-testable; output order depends on iteration order and may interleave in parallel contexts",
+      "fix": "remove println! from the core pipeline; move all logging to the imperative shell boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap() on numeric parse panics on non-numeric input",
+      "failure_mode": "malformed CSV data (e.g., \"abc\" in value field) crashes the program instead of returning a typed parse error",
+      "fix": "return Result and use map_err to convert ParseIntError into a domain error type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing into parts Vec without bounds check",
+      "failure_mode": "a line with fewer than 2 comma-separated fields panics with IndexOutOfBoundsException",
+      "fix": "use get(1).ok_or(ParseErr::MissingField) or split_once(',') and handle the None case"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexing into parts Vec without bounds check",
+      "failure_mode": "an empty line or line with no comma panics with IndexOutOfBoundsException",
+      "fix": "use get(0).ok_or(ParseErr::MissingField) or split_once(',')"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() — uses split + collect + indexing when split_once suffices for the two-field CSV grammar",
+      "failure_mode": "allocates a full Vec of all fields unnecessarily; also masks the two-field constraint because any split count silently proceeds until unchecked index access",
+      "fix": "use split_once(',') for first-delimiter extraction, trim each half, and handle the None case"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(u32) as u16 — lossy cast from u32 to u16 silently truncates values outside 0..=65535",
+      "failure_mode": "a value like 70000 silently wraps to 4464, producing incorrect data with no error signal",
+      "fix": "use u16::try_from(u32_val) and return a domain error on overflow; or parse directly as u16: parts[1].trim().parse::<u16>()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_samples performs I/O, parsing, validation, logging, and domain construction in a single function — no functional core / imperative shell separation",
+      "failure_mode": "every caller must handle IO errors; pure logic cannot be tested in isolation; hidden side effects make the function non-deterministic",
+      "fix": "extract: shell fn load_samples(path: &str) -> Result<Vec<Record>, LoadError>; pure fn parse_records(text: &str) -> Result<Vec<Record>, ParseError>; move println! to shell"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec<String> allocated for every line with no try_reserve or capacity planning — each line allocates a new Vec plus multiple String allocations",
+      "failure_mode": "unnecessary heap allocations on every line; in high-throughput or memory-constrained contexts this causes allocation pressure and potential OOM",
+      "fix": "use split_once(',') to avoid Vec allocation; use &str references with trim; only allocate Strings for the final Record fields"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark, profiler, or allocation evidence exists for any performance claims or allocation behavior of load_samples",
+      "failure_mode": "undetermined whether this function meets throughput, latency, or memory-budget requirements; cargo-cult patterns may be hiding inefficiencies",
+      "fix": "add a Criterion benchmark measuring allocations, throughput, and latency for typical and adversarial CSV inputs"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No domain error type defined — raw io::Error, ParseIntError, and IndexError propagate through unwrap() with no typed error taxonomy",
+      "failure_mode": "callers cannot pattern-match on specific failure modes; no railway-oriented error handling; all errors are opaque panics",
+      "fix": "define a domain Error enum (e.g., LoadError { Io(io::Error), Parse(ParseError), MissingField { line: usize } }) and return Result<Vec<Record>, LoadError>"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_samples throughput or allocation",
+    "no profiler data for hot-path analysis",
+    "no allocation audit (no try_reserve or capacity planning evidence)",
+    "no second-ring evidence (no Miri, Kani, or UB checks)",
+    "no command-level evidence that clippy or cargo fmt passes"
+  ],
+  "residual_risk": "Static review only; no commands run. Multiple BLOCKER violations: forbidden unwrap() on I/O and parse, hidden println! I/O side effect in core pipeline, unchecked indexing, lossy as cast, split+collect+indexing pattern instead of split_once, no functional core/shell separation, no domain error type, no allocation handling, and no performance evidence. This code would fail all Holzman Rust gates."
+}

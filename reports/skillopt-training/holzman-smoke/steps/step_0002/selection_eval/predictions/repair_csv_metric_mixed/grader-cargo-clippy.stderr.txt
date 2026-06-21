@@ -1,0 +1,3 @@
+    Blocking waiting for file lock on package cache
+    Checking repair_csv_metric_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/ea5f2f53a42b58da/repair_csv_metric_mixed)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s

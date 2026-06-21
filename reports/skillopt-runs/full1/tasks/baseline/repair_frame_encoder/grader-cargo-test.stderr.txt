@@ -1,0 +1,5 @@
+   Compiling repair_frame_encoder v0.1.0 (/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_frame_encoder)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/repair_frame_encoder-734b553b4f1c615a)
+     Running tests/behavior.rs (target/debug/deps/behavior-a0542f815f9c462f)
+   Doc-tests repair_frame_encoder

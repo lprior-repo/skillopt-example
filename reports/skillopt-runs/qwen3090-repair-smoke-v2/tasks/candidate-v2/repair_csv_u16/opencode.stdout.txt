@@ -1,0 +1,1 @@
+Repaired `src/lib.rs` by removing `unwrap()` and adding proper error handling for empty input, invalid parse, and max_items enforcement; `cargo test` passed (4/4). Output written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v2/tasks/candidate-v2/repair_csv_u16/repair-output.json`.

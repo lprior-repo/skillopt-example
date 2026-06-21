@@ -1,0 +1,24 @@
+Now I understand the issues. The production code has multiple Holzman violations and doesn't match the test contract. Let me repair it.
+
+Issues found:
+1. `summarize_metrics` returns `Result<String, ...>` but tests expect `Result<Summary, ...>`
+2. `render_summary` function is missing
+3. `unwrap()` on parse (line 12)
+4. Unchecked indexing `parts[1]`
+5. Unchecked `+=` arithmetic (overflow)
+6. No empty input check
+7. No invalid line detection
+8. Division by zero risk
+All 6 tests pass. Now writing the output.
+Repair complete. All 6 tests pass. Here's what was fixed in `src/lib.rs`:
+
+| Issue | Before | After |
+|---|---|---|
+| Return type | `Result<String, SummaryError>` | `Result<Summary, SummaryError>` |
+| Missing function | `render_summary` absent | Pure `render_summary(Summary) -> String` |
+| `unwrap()` | `parts[1].parse().unwrap()` | `.map_err(\|_\| SummaryError::Invalid)` |
+| Unchecked indexing | `parts[1]` directly | `parts.len() < 2` guard |
+| Overflow | `total += value` | `total.checked_add(value).ok_or(...)` |
+| Division by zero | `total / count` unguarded | Validates `count > 0` first |
+| Empty input | No check | Returns `Err(Empty)` for empty/whitespace |
+| Invalid lines | No validation for missing comma | Returns `Err(Invalid)` |

@@ -1,0 +1,51 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/hardening-checklist.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead Cargo.toml
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/a8a405f178c1e304/review_invalid_state_budget_typestate/review-output.json'); d=json.load(f); print('Valid JSON, {} findings'.format(len(d['findings']))); f.close()"
+Valid JSON, 9 findings
+[0m
+[0m$ [0mpython3 -c "
+import json
+f=open('/tmp/opencode/holzman-skillopt-train/a8a405f178c1e304/review_invalid_state_budget_typestate/review-output.json')
+d=json.load(f)
+required=['severity','rule','file','line','problem','failure_mode','fix']
+for i,f in enumerate(d['findings']):
+    missing=[k for k in required if k not in f]
+    if missing: print(f'Finding {i} missing: {missing}')
+    else: print(f'Finding {i}: {f[\"severity\"]} {f[\"rule\"]}:{f[\"file\"]}:{f[\"line\"]} OK')
+print(f'Status: {d[\"status\"]}')
+print(f'Missing evidence: {len(d[\"missing_evidence\"])}')
+print(f'Residual risk: {len(d[\"residual_risk\"])} chars')
+f.close()
+"
+Traceback (most recent call last):
+  File "<string>", line 13, in <module>
+    f.close()
+    ^^^^^^^
+AttributeError: 'dict' object has no attribute 'close'
+Finding 0: BLOCKER typestate_state_machine:src/lib.rs:1 OK
+Finding 1: BLOCKER status_String:src/lib.rs:3 OK
+Finding 2: BLOCKER bool_lifecycle:src/lib.rs:4 OK
+Finding 3: BLOCKER bool_lifecycle:src/lib.rs:5 OK
+Finding 4: BLOCKER option_invalid_state:src/lib.rs:6 OK
+Finding 5: BLOCKER newtype_domain_id:src/lib.rs:2 OK
+Finding 6: BLOCKER parse_boundary:src/lib.rs:9 OK
+Finding 7: BLOCKER public_fields_encapsulation:src/lib.rs:2 OK
+Finding 8: BLOCKER mark_sent_no_guard:src/lib.rs:9 OK
+Status: reviewed
+Missing evidence: 6
+Residual risk: 381 chars
+[0m

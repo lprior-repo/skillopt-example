@@ -1,0 +1,7 @@
+Done. All 4 behavior tests pass. The `src/lib.rs` repair:
+
+- Replaced `.unwrap()` with `.map_err(|_| ParseError::Invalid)` for fallible parsing
+- Added empty-input check returning `Err(ParseError::Empty)`
+- Enforced `max_items` cap before each push, returning `Err(ParseError::TooMany)`
+- Added `try_reserve` for allocation discipline
+- No `unsafe`, `unwrap`, `expect`, `panic`, lossy casts, or unchecked access remain

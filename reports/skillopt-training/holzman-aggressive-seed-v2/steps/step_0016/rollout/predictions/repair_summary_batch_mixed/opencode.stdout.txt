@@ -1,0 +1,9 @@
+Now I have a clear picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. Let me fix the production source.
+All 6 tests pass. Let me clean up the unused variable warning.
+All 6 tests pass, zero warnings. Now writing the output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Signature change**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` (matching test contract)
+- **Removed**: `unwrap()` on parse, unchecked `parts[1]` indexing, unchecked `+` on total/count, unchecked `/` for average
+- **Added**: `split_once` for safe delimiter extraction, `checked_add`/`checked_div` for overflow-safe arithmetic, empty-input guard, `render_summary` function
+- **All 6 behavior tests pass**, zero compiler warnings

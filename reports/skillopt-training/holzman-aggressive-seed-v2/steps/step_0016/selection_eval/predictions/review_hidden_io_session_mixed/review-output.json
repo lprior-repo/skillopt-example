@@ -1,0 +1,126 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, oversized file)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> and propagate fs::read_to_string(path).map_err(|e| ...)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is hidden I/O side effect inside a data-loading function",
+      "failure_mode": "functional core leaks imperative shell concerns; callers cannot suppress logging; pure tests see spurious stdout",
+      "fix": "remove println! entirely from core logic; logging belongs in the imperative shell at the call site"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are unchecked indexing into a Vec with no bounds check",
+      "failure_mode": "empty lines, lines with a single comma-less field, or malformed CSV panics with index out of bounds at runtime",
+      "fix": "use parts.get(0) and parts.get(1) with ok_or_else to return a typed ParseError for malformed lines"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on parse failure and lossy cast via as u16",
+      "failure_mode": "non-numeric or out-of-range input in the value field panics; values >65535 silently truncate via as u16",
+      "fix": "use get(1) with ok_or_else, then u32::from_str with map_err, then u16::try_from(value) with map_err to return a typed ParseError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "arithmetic_safety",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy width cast that silently truncates values above 65535",
+      "failure_mode": "a valid u32 value like 70000 becomes 4416 in the Record, corrupting data with no error signal",
+      "fix": "replace `as u16` with `u16::try_from(parsed_u32)?` or `try_into().map_err(...)` to fail on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string, println!) with data parsing in a single public function with no Result return type",
+      "failure_mode": "function signature `-> Vec<Record>` cannot express any failure; callers have no way to handle errors; functional core contract is violated",
+      "fix": "change signature to `pub fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError>` and move all I/O into a shell-level adapter"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_conventions",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a full Vec<String> for a two-field record; SKILL.md mandates split_once for first-delimiter extraction",
+      "failure_mode": "unnecessary heap allocation per line, worse performance, and more memory pressure on large files",
+      "fix": "use line.split_once(',') to get (name_part, value_part) without collecting; trim each part individually"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": ".map(|part| part.trim().to_string()) creates intermediate String allocations for every field",
+      "failure_mode": "excess heap allocations per line; with split_once you can keep &str throughout the parsing pipeline",
+      "fix": "use split_once(',') and work with &str slices; only allocate the final Record String fields"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist to measure load_sessions throughput, allocation count, or memory profile",
+      "failure_mode": "performance claim is unsubstantiated; allocation-heavy implementation has no measured baseline",
+      "fix": "add criterion or similar benchmarks measuring lines-per-second, allocations-per-line, and peak memory for representative file sizes"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No try_reserve on the Vec before collecting; no checked capacity arithmetic for expected line count",
+      "failure_mode": "repeated reallocations as Vec grows; if line count is known or bounded, unbounded growth is wasteful and allocation failure is unhandled",
+      "fix": "compute expected capacity with checked_mul/checked_add, call results.try_reserve(capacity)? before the iterator chain, and remove Vec::with_capacity"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_test_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test modules or test files exist for this crate",
+      "failure_mode": "no behavior contract exists; regression coverage is zero; all invariants are unproven by automated means",
+      "fix": "add tests covering: valid two-field CSV, empty lines, single-field lines, non-numeric value fields, values exceeding u16 max, missing file, and permission denied"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "domain_type_discipline",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "value is a bare u16 with no domain constraint; any u16 value is accepted including meaningless ones",
+      "failure_mode": "illegal values are representable; domain invariants are not enforced at the type level",
+      "fix": "wrap u16 in a newtype `SessionValue(u16)` with a fallible constructor that validates domain constraints"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for stated performance claims",
+    "no profiler data (criterion, perf, or flamegraph) for load_sessions throughput or allocation profile",
+    "no allocation tracking (tracing, dhat-rs, or cargo-bench with --bench-args) for bounded allocation handling",
+    "no behavior tests exist for any function in this crate",
+    "no command evidence (cargo test, cargo clippy) was executed; static review only"
+  ],
+  "residual_risk": "Multiple BLOCKER violations: unwrap on I/O and parse (panic on untrusted input), unchecked indexing (panic on malformed lines), lossy as cast (silent data corruption), hidden println! I/O in functional core, split+collect instead of split_once, no Result return type, no try_reserve, no allocation checks. The function as written will panic on any malformed input, missing file, or values outside u16 range. All unsafe constructs must be eliminated and the function must return Result with typed errors before this code is safe for any use."
+}

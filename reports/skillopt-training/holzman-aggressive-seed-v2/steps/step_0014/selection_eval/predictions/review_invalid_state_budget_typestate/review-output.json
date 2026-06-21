@@ -1,0 +1,67 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses status: String, is_validated: bool, and is_sent: bool as separate mutable fields. This allows illegal states such as status=\"draft\" && is_sent=true, or status=\"sent\" && is_sent=false. These are constructable with zero compiler enforcement.",
+      "failure_mode": "Any caller can place a BudgetWorkflow into an inconsistent state, making the type contract meaningless and forcing runtime invariant checks everywhere the struct is consumed.",
+      "fix": "Replace status: String with a BudgetStatus enum. Replace is_sent: bool and is_validated: bool with a typestate enum or monotonic state machine. Make fields private with a fallible constructor that validates the state machine transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a bare String with no domain semantics. There is no BudgetId newtype to enforce formatting rules, length bounds, or uniqueness at the type level.",
+      "failure_mode": "Any string can be used as a budget ID. Typos, empty strings, and malformed IDs are accepted with no compile-time guard.",
+      "fix": "Introduce `pub struct BudgetId(String)` with a fallible constructor `BudgetId::new(s: &str) -> Result<BudgetId, ParseError>` that validates the ID format. Replace `id: String` with `id: BudgetId`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> uses a raw u64 with no domain meaning. No Timestamp or EpochMs newtype constrains the value or provides domain operations.",
+      "failure_mode": "No domain operations (comparison, formatting, timezone handling) are available on the timestamp. Any u64 is accepted including zero, overflow, or nonsensical values.",
+      "fix": "Introduce `pub struct SentAtEpochMs(u64)` with a constructor and domain methods. Replace with `sent_at: Option<SentAtEpochMs>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs string allocation (\"sent\".to_string()) inside the core. The status should be an enum variant, eliminating the allocation entirely. The function also takes ownership and returns the mutated struct instead of transitioning through a typestate.",
+      "failure_mode": "Unnecessary heap allocation on every state transition. The function does not prevent the caller from then mutating the struct back to an invalid state via pub fields.",
+      "fix": "Replace status String with a BudgetStatus enum. Change mark_sent to accept the current state and return the next state enum variant (no allocation). Make struct fields private behind typestate transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes Ownership of BudgetWorkflow and returns it mutated — this is imperative shell logic masquerading as a pure function. There is no typestate to encode valid transitions.",
+      "failure_mode": "Callers can bypass mark_sent entirely and set fields directly, or call mark_sent multiple times with no idempotency check.",
+      "fix": "Define a state machine enum (e.g., BudgetState { Draft, Validated, Sent }). mark_sent should be a pure function that takes BudgetState::Validated and returns BudgetState::Sent. Struct fields become private."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BudgetWorkflow are pub and mutable (no &mut self, but the struct itself is passed mutably). There is no encapsulation — any code can modify status, is_validated, is_sent independently.",
+      "failure_mode": "No enforcement of state machine invariants at any call site. The struct cannot guarantee any domain constraint.",
+      "fix": "Make all fields private. Provide constructors and state-transition methods that enforce invariants. Use enum typestates instead of bool/String flags."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for allocation patterns in mark_sent",
+    "no allocation audit (try_reserve is not applicable here but no allocation analysis exists)",
+    "no command evidence (cargo test / cargo clippy not run)"
+  ],
+  "residual_risk": "Static review only — no commands run. The crate has fundamental architectural violations: no typestates, no domain newtypes, no encapsulation, and unnecessary string allocation in the core. All six findings are BLOCKERs because the type system cannot enforce any domain invariant. The code is functionally correct for its narrow scope but architecturally non-compliant with Holzman Rust doctrine."
+}

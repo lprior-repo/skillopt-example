@@ -1,0 +1,30 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo clippy -- -D warnings", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No unsafe, FFI, raw pointers, or unchecked access in production source",
+    "Lossy cast `payload.len() as u32` replaced with `u32::try_from(payload.len())`",
+    "Checked capacity arithmetic via `checked_add` before allocation",
+    "Fallible allocation via `try_reserve` mapped to typed `FrameError::Allocation`",
+    "Payload limit check added: `payload.len() > max_payload` returns `FrameError::PayloadTooLarge`",
+    "No unwrap/expect/panic/todo/unimplemented/unreachable/assert in production source",
+    "No ignored fallible results",
+    "Pure core logic with no hidden I/O",
+    "All tests pass without editing",
+    "No Cargo.toml edits required"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None identified. Source is clean under `cargo clippy -D warnings`, formatting is correct, and both behavior tests pass."
+}

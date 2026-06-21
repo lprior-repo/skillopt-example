@@ -1,0 +1,14 @@
+Now I have full understanding of the crate. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a separate `render_summary` function. The current code has many Holzman violations: `unwrap()`, unchecked arithmetic, no overflow detection, incorrect return type, missing `render_summary`, and wrong parsing approach.
+All 6 tests pass. There's an unused import warning — let me clean that up.
+Clean build, zero warnings, all 6 tests pass. Writing the repair output.
+**Repair complete.** All 6 tests pass with zero warnings.
+
+**Changes in `src/lib.rs`:**
+- Fixed return type from `Result<String, SummaryError>` to `Result<Summary, SummaryError>`
+- Added `render_summary(Summary) -> String` function
+- Replaced `unwrap()` with proper error mapping for parse failures
+- Replaced `split`+`collect`+unchecked indexing with `split_once`
+- Replaced unchecked `total += value` with `checked_add` for overflow detection
+- Added empty-input guard (`Empty` error)
+- Added non-zero line guard
+- Removed all Holzman-violating patterns (`unwrap`, unchecked arithmetic, unchecked indexing)

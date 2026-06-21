@@ -1,0 +1,11 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Wrote `review-output.json` with 6 BLOCKER findings:
+
+1. **typestate_machine** (line 1) — No typestate enum; any field combination is constructible, enabling inconsistent lifecycle states.
+2. **status_to_enum** (line 3) — `status: String` allows arbitrary values; no exhaustive match possible.
+3. **bool_to_typestate** (line 4) — `is_validated` and `is_sent` are independent booleans allowing impossible combinations (e.g., sent without validated).
+4. **option_invalid_state_combinations** (line 6) — `sent_at_epoch_ms: Option<u64>` is detached from the Sent state; can be None while `is_sent=true`.
+5. **newtype_domain_ids** (line 2) — `id: String` has no domain constraints; empty/invalid IDs are representable.
+6. **parse_boundary** (line 1) — Raw `String` fields cross the parse boundary without fallible smart constructors.
+
+Missing evidence: no benchmarks, profiler data, allocation analysis, or command-truth evidence for any cargo commands.

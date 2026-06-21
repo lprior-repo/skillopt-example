@@ -1,0 +1,35 @@
+{
+  "task_id": "repair_remove_unsafe_copy",
+  "kind": "repair",
+  "bundle": "baseline",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_remove_unsafe_copy",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/full1/tasks/baseline/repair_remove_unsafe_copy",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": 0,
+  "grade": {
+    "kind": "repair",
+    "hard": 0.0,
+    "soft": 0.7250000000000001,
+    "cargo_fmt_returncode": 0,
+    "cargo_clippy_returncode": 101,
+    "cargo_test_returncode": 0,
+    "fmt_passed": true,
+    "clippy_passed": false,
+    "tests_passed": true,
+    "forbidden_matches": [],
+    "protected_changed": [],
+    "json_valid": true,
+    "json_errors": [],
+    "execution_errors": [],
+    "initial_failed": false,
+    "matched_groups": 1,
+    "total_groups": 2,
+    "missing_groups": [
+      [
+        "get",
+        "split_at"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+Now let me write the review output.
+Review complete. Wrote `review-output.json` with 8 findings (6 BLOCKER, 2 MINOR) and 5 missing evidence items.
+
+Key issues in `src/lib.rs`:
+
+1. **`status: String`** (`line 3`) — Free-form string allows invalid states. Should be `ShardStatus` enum.
+2. **`is_validated: bool`** (`line 4`) — Boolean flag provides no type-level guarantee. Replace with enum typestate.
+3. **`is_sent: bool`** (`line 5`) — Redundant boolean with `status`, creates three sources of truth. Remove once enum is introduced.
+4. **`mark_sent` has no validation guard** (`line 9`) — Can send a non-validated shard. Should return `Result` and enforce transition from Validated state.
+5. **`id: String`** (`line 2`) — Domain primitive with no type-level validation. Use `ShardId` newtype.
+6. **`sent_at_epoch_ms: Option<u64>`** (`line 6`) — Raw u64 for timestamp. Use `TimestampMs` newtype.
+7. **`.to_string()` allocation** (`line 10`) — Unnecessary heap allocation on static literal. Zero-cost with enum.
+8. **Imperative mutation** (`line 9`) — Should be a pure transition function returning next state or error.

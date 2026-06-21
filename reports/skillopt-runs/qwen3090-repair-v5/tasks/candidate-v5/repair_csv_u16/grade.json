@@ -1,0 +1,32 @@
+{
+  "task_id": "repair_csv_u16",
+  "kind": "repair",
+  "bundle": "candidate-v5",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-repair-v5/tasks/candidate-v5/repair_csv_u16",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-v5/tasks/candidate-v5/repair_csv_u16",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": 101,
+  "bundle_digest": "e43300a081a26e869944ce4cc417c3e2707c84fd20c337ac3001b67d0316b826",
+  "task_digest": "9d58636a934294c84622dc0e68f2378381dabed50ae5fc324ed979fa8a73da97",
+  "grade": {
+    "kind": "repair",
+    "hard": 0.0,
+    "soft": 0.9000000000000002,
+    "cargo_fmt_returncode": 1,
+    "cargo_clippy_returncode": 0,
+    "cargo_test_returncode": 0,
+    "fmt_passed": false,
+    "clippy_passed": true,
+    "tests_passed": true,
+    "forbidden_matches": [],
+    "protected_changed": [],
+    "json_valid": true,
+    "json_errors": [],
+    "execution_errors": [],
+    "initial_failed": true,
+    "matched_groups": 3,
+    "total_groups": 3,
+    "missing_groups": []
+  }
+}

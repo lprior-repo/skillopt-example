@@ -1,0 +1,23 @@
+Issues found in `src/lib.rs`:
+1. Returns `String` instead of `Summary` struct (test contract)
+2. `unwrap()` on parse
+3. Unchecked `+=` (overflow)
+4. Unchecked `/` and lossy `as` cast
+5. Unchecked `parts[1]` indexing
+6. Missing `render_summary` function
+7. No empty-input handling
+I need to fix the remaining `count as u64` lossy cast. Let me rewrite cleanly:
+All 6 tests pass. Now writing the output.
+Repair complete. Changes to `src/lib.rs`:
+
+| Forbidden Construct | Fix |
+|---|---|
+| `parts[1].parse().unwrap()` | `.get(1).ok_or(Invalid)?.parse().map_err(Invalid)` |
+| `total += value` (unchecked) | `total.checked_add(value).ok_or(Overflow)?` |
+| `total / count as u64` (lossy cast) | `u64::try_from(count)?` then `total / count_u64` |
+| `count as u32` (lossy cast) | `u32::try_from(count).map_err(Overflow)?` |
+| No empty-input check | Added `count == 0` early return |
+| Wrong return type (`String`) | Changed to `Result<Summary, SummaryError>` |
+| Missing `render_summary` | Implemented as separate pure function |
+
+All 6 behavior tests pass. Output written to `repair-output.json`.

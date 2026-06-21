@@ -1,0 +1,66 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-fixed-input-allocation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns Vec for a fixed 4-element input, forcing a heap allocation on every call for data that fits in the stack.",
+      "failure_mode": "Unnecessary heap allocation per call increases tail latency, fragmentations the allocator, and defeats zero-cost design for a known-size output.",
+      "fix": "Return [\\&'static str; 4] or take a caller-owned output buffer; the input is exactly 4 bytes so the output is statically sized."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore-rayon-smallvec",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment asserts Rayon and SmallVec 'will be faster' without any workload, baseline, or measurement evidence. For a 4-element input, Rayon parallel overhead (thread dispatch, work partitioning, join synchronization) dominates any throughput gain. SmallVec is unnecessary overhead for a 4-element fixed output.",
+      "failure_mode": "Introducing Rayon for 4 elements will measurably degrade latency and throughput. SmallVec bloats the hot struct or function with unnecessary inline-buffer bookkeeping for a fixed 4-element result.",
+      "fix": "Remove the TODO. Use a fixed array output. Rayon is only justified for large independent pure transforms with scaling evidence; SmallVec requires measured small-common-case justification. Neither applies to [u8; 4] -> 4-element output."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-performance-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, baseline command, baseline number, target hardware, workload definition, or profiler evidence exists anywhere in the crate. The TODO comment makes an unmeasured performance claim.",
+      "failure_mode": "Optimization decisions are based on folklore rather than measured bottlenecks, risking regression of both latency and throughput while adding complexity.",
+      "fix": "Add a benchmark comparing [u8; 4] -> [\\&'static str; 4] vs Vec return, run with cargo bench on the target hardware, and report operations/sec with variance. Until then, the simplest correct design wins."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation-discipline",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Iterator .collect() on a 4-element iterator forces a heap-allocated Vec. The output type is fully known at compile time.",
+      "failure_mode": "Every call to classify_four allocates on the heap, which dominates total cost for such a small operation and makes the function unsuitable for allocation-free hot paths.",
+      "fix": "Return [\\&'static str; 4] with a simple indexed assignment loop, or accept a &mut [\\&'static str; 4] output buffer from the caller."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "todo-in-production-source",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment in production source encodes a wrong optimization direction (Rayon + SmallVec for 4 elements), which misleads future reviewers and implementers.",
+      "failure_mode": "Future implementers follow the TODO and introduce Rayon/SmallVec, degrading performance and violating Holzman folklore-rejection rules.",
+      "fix": "Replace the TODO with a factual comment explaining why fixed array output is correct for [u8; 4] input, or remove it entirely and let measurement-driven design guide future changes."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim",
+    "no profiler data showing the hot path",
+    "no allocation evidence (e.g., cargo-flamegraph, heaptrack, or miri allocation tracing)",
+    "no second-ring evidence (no assembly output, no cache-miss counters, no target-hardware metrics)",
+    "no baseline command or baseline number for any performance comparison"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate compiles but uses folklore-driven optimization directions. The fixed-array return pattern is the correct Holzman choice for [u8; 4] fixed input, but without benchmarks there is no proof that the current Vec return or any proposed fix is the fastest on target hardware."
+}

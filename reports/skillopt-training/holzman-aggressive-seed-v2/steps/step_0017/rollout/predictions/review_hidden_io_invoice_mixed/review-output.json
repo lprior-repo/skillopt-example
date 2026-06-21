@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O errors",
+      "failure_mode": "missing file, permission denied, or disk full aborts the entire request instead of returning a typed error the caller can handle",
+      "fix": "return Result<Vec<Record>, std::io::Error> and propagate with ? or explicit map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_instead_of_split_collect_index",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "splits on ',' then collects all parts into Vec<String> then indexes by position; skill mandates split_once when only one delimiter extraction is needed",
+      "failure_mode": "allocates a Vec of Strings for every line, then indexes with unchecked indexing — both allocation and bounds-unsafe",
+      "fix": "use line.split_once(',') to get (name, value) directly, then trim and parse each half"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked array indexing — no bounds check before access",
+      "failure_mode": "an empty line or line with zero commas causes index-out-of-bounds panic",
+      "fix": "use split_once(',') which returns Option<(>&str, &str)> and handle None via map_err or early return"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", ...) is a side effect inside a data-loading function that should be pure",
+      "failure_mode": "core logic leaks logging into what should be a deterministic calculation; breaks testability and purity of the functional core",
+      "fix": "remove println! from the core; logging belongs in the imperative shell at the boundary where the result is consumed"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] is unchecked array indexing — no bounds check before access",
+      "failure_mode": "a line with only one comma-separated field causes index-out-of-bounds panic",
+      "fix": "use split_once(',') and match on the Option<(name, value)> tuple instead of indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input",
+      "failure_mode": "malformed invoice data (e.g. non-numeric value field) aborts the program instead of returning a typed parse error",
+      "fix": "use .parse::<u32>().map_err(|e| ... ) and propagate the error through a Result return type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy width-cast from u32 — values > 65535 silently wrap",
+      "failure_mode": "a value of 70000 stored as u16 becomes 4465 without any error, corrupting invoice data silently",
+      "fix": "use u16::try_from(value) and handle TryFromIntError with map_err, or parse directly as u16 if domain guarantees fit"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_invoices mixes I/O (fs::read_to_string) with data parsing and transformation — should be split into pure parse function and imperative shell caller",
+      "failure_mode": "the core transformation logic cannot be unit-tested in isolation; every test requires file-system access",
+      "fix": "extract a pure fn parse_invoice(line: &str) -> Result<Record, InvoiceError> and have load_invoices call it with map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record struct uses pub fields with String — allows mutation from any caller, violating immutability of domain data by construction",
+      "failure_mode": "any crate consumer can mutate name or value after construction, breaking the invariant that parsed records are immutable",
+      "fix": "make Record fields private with a constructor fn new(name: String, value: u16) -> Self, or use #[derive(Accessor)] pattern"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_invoices throughput or memory usage",
+    "no profiler evidence (perf/flamegraph) for allocation hotspots in the parsing path",
+    "no allocation audit — Vec<String> per line via collect() should be measured against a zero-allocation split_once approach",
+    "no second-ring evidence: no Miri run, no Kani harness, no property tests for invoice parsing invariants",
+    "no command evidence that cargo fmt, cargo clippy, or cargo test were run on this crate"
+  ],
+  "residual_risk": "static review only; multiple BLOCKER violations including unwrap panics, unchecked indexing, lossy casts, hidden logging, and no functional-core separation. The crate cannot be safely deployed — every line of the parse path can panic or silently corrupt data on malformed input."
+}

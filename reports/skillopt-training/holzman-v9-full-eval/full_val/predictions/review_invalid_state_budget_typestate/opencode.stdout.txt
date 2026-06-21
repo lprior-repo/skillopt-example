@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote 9 findings to `review-output.json`. Key violations found:
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | `domain-model-status-enum` | `src/lib.rs:3` |
+| 2 | BLOCKER | `typestate-lifecycle-booleans` | `src/lib.rs:4` |
+| 3 | BLOCKER | `typestate-lifecycle-booleans` | `src/lib.rs:5` |
+| 4 | BLOCKER | `typestate-invalid-transitions` | `src/lib.rs:9` |
+| 5 | BLOCKER | `domain-model-newtype-id` | `src/lib.rs:2` |
+| 6 | MAJOR | `domain-model-lifecycle-data-in-variant` | `src/lib.rs:6` |
+| 7 | MAJOR | `smart-constructor-boundary` | `src/lib.rs:1` |
+| 8 | MAJOR | `no-typed-errors` | `src/lib.rs:9` |
+| 9 | MAJOR | `hardcoded-string-literal` | `src/lib.rs:10` |
+
+Core problem: `BudgetWorkflow` is a bag of raw primitives (`String` id/status, `bool` flags, `Option<u64>`) with zero compile-time enforcement of domain invariants. `mark_sent` accepts any state and mutates blindly. This is the exact anti-pattern the skill bundle targets.

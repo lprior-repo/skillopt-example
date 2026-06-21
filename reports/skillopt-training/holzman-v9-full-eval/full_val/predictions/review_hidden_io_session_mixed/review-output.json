@@ -1,0 +1,146 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing/unreadable file",
+      "failure_mode": "entire process aborts instead of returning a typed IO error, giving no caller recovery path",
+      "fix": "Return Result<Vec<Record>, Error> and use fs::read_to_string(path).map_err(|e| Error::Io(e))? with a typed Error enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds stdout side-effect inside the parsing/decoding path",
+      "failure_mode": "pure domain logic leaks I/O into the shell, breaking functional-core separation; stdout pollution breaks consumers that pipe/redirect output",
+      "fix": "Remove println! entirely. If logging is required, pass a logger trait or callback injected from the shell layer; the parser must be I/O-free"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the split result by index with no length check",
+      "failure_mode": "malformed line (no comma or single field) panics at runtime via index-out-of-bounds",
+      "fix": "Use let (name, rest) = line.split_once(',').ok_or(Error::Invalid)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses the split result by index with no length check",
+      "failure_mode": "line with extra commas or fewer fields panics at runtime",
+      "fix": "Use let (_, value_str) = line.split_once(',').ok_or(Error::Invalid)? and parse value_str"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() panics on non-numeric field value",
+      "failure_mode": "malformed numeric field aborts the entire session list instead of returning a typed parse error for that record",
+      "fix": ".parse::<u32>().map_err(|_| Error::InvalidValue)?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(…) as u16 silently truncates u32 values > 65535",
+      "failure_mode": "a valid u32 like 70000 silently wraps to 34464, corrupting domain data with no error or warning",
+      "fix": "Use u16::try_from(value).map_err(|_| Error::Overflow)? to fail on out-of-range values"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no domain cap, no try_reserve, and no line-count bound",
+      "failure_mode": "hostile input (e.g. a huge file) can allocate unbounded memory, triggering OOM or DoS",
+      "fix": "Add a max_records: usize parameter, validate it before allocation, call try_reserve(validated_cap).map_err(|_| Error::Allocation)?, and enforce the cap on push; return Err(TooMany) if exceeded"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": ".split(',').map(|part| part.trim().to_string()).collect() allocates a Vec<String> for a two-field CSV line",
+      "failure_mode": "unnecessary heap allocation and string copies per line; defeats the split_once repair pattern",
+      "fix": "Replace the entire split/collect block with let (name, value_str) = line.split_once(',').ok_or(Error::Invalid)?; then parse name and value_str directly"
+    },
+    {
+      "severity": "HIGH",
+      "rule": "domain_model_no_error_type",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "No Error enum is defined; the function returns Vec<Record> (not Result) with no failure encoding",
+      "failure_mode": "all failure modes are collapsed into panic, violating typed-error discipline",
+      "fix": "Define pub enum Error { Io(std::io::Error), Invalid, InvalidValue, Overflow, TooMany, Allocation } and return Result<Vec<Record>, Error>"
+    },
+    {
+      "severity": "HIGH",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is a raw String; any string including empty, whitespace-only, or untrusted values is valid",
+      "failure_mode": "illegal domain states (empty name, malformed name) are representable; no smart constructor validates at the boundary",
+      "fix": "Introduce a newtype: pub struct Name(String); impl Name { fn new(s: &str) -> Result<Self, Error>; } and use Name in Record"
+    },
+    {
+      "severity": "HIGH",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions fuses file I/O (fs::read_to_string) with parsing and domain construction in one function",
+      "failure_mode": "cannot test the parsing logic in isolation; the function is not composable; shell duties leak into the core",
+      "fix": "Split into: fn read_text(path: &str) -> Result<String, Error> (shell) and fn parse_records(text: &str, max: usize) -> Result<Vec<Record>, Error> (core)"
+    },
+    {
+      "severity": "MEDIUM",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_sessions; performance characteristics are unknown",
+      "failure_mode": "unmeasured allocation patterns hide potential bottlenecks; cannot verify whether the Vec allocation is justified",
+      "fix": "Add a criterion or minicargo benchmark with input size workload, baseline allocation counts, and a regression threshold"
+    },
+    {
+      "severity": "MEDIUM",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No cargo check, clippy, or test execution evidence is available; code may not compile or pass lint gates",
+      "failure_mode": "undiscovered compilation errors or clippy warnings could mask deeper issues",
+      "fix": "Run cargo fmt --check, cargo check --workspace --all-targets --all-features, cargo clippy with strict lint flags, and cargo test"
+    },
+    {
+      "severity": "MEDIUM",
+      "rule": "missing_second_ring_command_evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No Miri, Kani, or property-based test evidence exists to verify absence of UB, panic paths, and arithmetic safety",
+      "failure_mode": "unchecked panic surfaces and lossy casts are not verified by formal or bounded-model checking",
+      "fix": "Add proptest properties for parse_records, run cargo miri test, and add Kani proof harnesses for arithmetic boundaries"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions allocation/throughput",
+    "no profiler data (perf, flamegraph) for CPU-bound portion",
+    "no allocation tracking (dlmalloc stats, jemalloc profiler) evidence",
+    "no second-ring evidence: Miri, Kani, proptest, or property tests",
+    "no command evidence: cargo fmt --check, cargo clippy, cargo test not executed",
+    "no typed Error enum defined in source"
+  ],
+  "residual_risk": "Static review only; zero commands executed. The crate contains 6 BLOCKER violations (panics on unwrap, unchecked indexing, lossy cast, hidden I/O, unbounded allocation, missing error type) that must be fixed before any further work. No benchmarks, profiler data, or formal/test evidence exists. The code must be refactored into a functional core / imperative shell split with typed errors, newtype domain values, checked arithmetic, try_reserve with a domain cap, and split_once parsing before it is review-approvable."
+}

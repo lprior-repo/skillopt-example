@@ -1,0 +1,15 @@
+Now I have full context. The production code has multiple Holzman violations: `.unwrap()`, no empty check, no too-many check, no `try_reserve`, uses `.collect()`, and missing `Overflow` error variant. Let me apply the mandatory CSV parser repair pattern.
+All 4 tests pass. Let me also verify with clippy and format check.
+Clippy clean. Now writing the required output JSON.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| ParseError::Invalid)?` |
+| No empty check | Early `input.trim().is_empty()` → `Err(ParseError::Empty)` |
+| No too-many enforcement | `count > max_items` check before each push |
+| `Vec::with_capacity` + `.collect()` | `Vec::new()` + `try_reserve(max_items)` + bounded loop |
+| No checked arithmetic | `count.checked_add(1).ok_or(ParseError::Overflow)` |
+| Missing `Overflow` variant | Added to `ParseError` enum |
+
+All 4 tests pass, clippy clean, JSON output at required path.

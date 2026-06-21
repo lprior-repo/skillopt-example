@@ -1,0 +1,11 @@
+Now I have full context. The production code has multiple Holzman violations: `unwrap()`, no empty check, no `max_items` enforcement, no parse error handling. Let me fix it.
+All 4 tests pass. Let me verify the final source and write the output.
+Repair complete. Changes made to `src/lib.rs`:
+
+- Removed `unwrap()` — all parse errors now return `ParseError::Invalid` via `map_err`
+- Added empty-input check → `ParseError::Empty`
+- Added `max_items` enforcement → `ParseError::TooMany`
+- Added `try_reserve` for bounded allocation → `ParseError::Allocation` on failure
+- Replaced `.map().collect()` with explicit `for` loop for checked iteration
+
+All 4 behavior tests pass.

@@ -1,0 +1,9 @@
+Now I'll repair the production source. The issues: `unwrap()` on parse, no empty check, no `max_items` enforcement, no `try_reserve`.
+All 4 tests pass. Now writing the required output.
+Repair complete. Changes to `src/lib.rs`:
+
+- **Removed** `.unwrap()` on `parse::<u16>()` — replaced with `map_err(|_| ParseError::Invalid)`
+- **Added** empty-input check → `Err(ParseError::Empty)`
+- **Added** `max_items` enforcement with `try_reserve` and per-item count check → `Err(ParseError::TooMany)`
+- **Added** `Allocation` error mapping on `try_reserve` failure
+- All 4 behavior tests pass

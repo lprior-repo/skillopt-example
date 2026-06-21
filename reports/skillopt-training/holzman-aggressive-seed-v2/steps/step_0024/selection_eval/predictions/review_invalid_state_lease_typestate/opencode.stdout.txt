@@ -1,0 +1,18 @@
+Now I have all the context. Let me write the review findings.
+Review complete. Written to `review-output.json`.
+
+**Summary: 7 findings (6 BLOCKER, 1 MAJOR), 5 missing evidence items**
+
+Key issues in `src/lib.rs`:
+
+| # | Severity | Rule | Issue |
+|---|----------|------|-------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | `status: String` + `is_sent: bool` are independent — invalid states are representable |
+| 2 | BLOCKER | replace_bool_lifecycle_flags_with_typestates | `is_validated: bool` should be a typestate enum |
+| 3 | BLOCKER | replace_bool_lifecycle_flags_with_typestates | `is_sent: bool` should be folded into typed state |
+| 4 | MAJOR | parse_at_boundaries_into_trusted_data | `id: String` has no domain newtype |
+| 5 | MAJOR | functional_core_pure_transform | `mark_sent` mutates in-place instead of pure transform |
+| 6 | MAJOR | push_logic_into_pure_deterministic_core | `"sent".to_string()` allocates on every call |
+| 7 | MAJOR | invalid_states_unconstructable_or_rejected | `sent_at_epoch_ms: Option<u64>` is independent of sent status |
+
+The fundamental problem: the struct makes illegal states representable. Every inconsistent combination (status="sent" with is_sent=false, etc.) compiles and runs. The fix is a typed `LeaseStatus` enum with variants encoding the full state including timestamp.

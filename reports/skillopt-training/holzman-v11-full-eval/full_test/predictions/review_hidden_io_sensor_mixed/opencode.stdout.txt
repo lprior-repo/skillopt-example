@@ -1,0 +1,10 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/6c789d54426544fe/review_hidden_io_sensor_mixed/review-output.json`.
+
+**Summary of findings across 14 findings:**
+
+- **8 BLOCKERs:** `unwrap()` on I/O (line 9), `unwrap()` on parse (line 19), hidden file I/O (line 9), hidden stdout I/O via `println!` (line 16), unchecked `parts[0]` (line 16), unchecked `parts[1]` (line 19), lossy `as u16` cast (line 19), unbounded Vec allocation (line 12)
+- **4 WARNINGs:** raw `String` name (line 4), no typed error taxonomy (line 8), no `try_reserve` (line 12), fused shell/domain boundary (line 8)
+- **2 INFOs:** missing benchmark evidence, missing command evidence
+
+**Residual risk:** High -- 8 blocker violations of Holzman Rust absolute laws remain. No commands were run, no tests exist.

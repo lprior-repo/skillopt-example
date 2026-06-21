@@ -1,0 +1,14 @@
+Now I have all context. Let me write the review.
+Review complete. Wrote `review-output.json` with 5 findings:
+
+1. **BLOCKER - folklore-performance-claim** (lib.rs:2): TODO asserts Rayon+SmallVec "will be faster" with zero measurement. Rayon on 4 elements is provably slower due to thread-pool overhead.
+
+2. **BLOCKER - unbounded-allocation-tiny-input** (lib.rs:1): Returns `Vec<&'static str>` for fixed `[u8; 4]` input, causing unavoidable heap allocation per call.
+
+3. **BLOCKER - missing-benchmark-evidence**: No benchmark, baseline, or profiler evidence exists for any performance claim.
+
+4. **BLOCKER - todo-in-production-source** (lib.rs:2): TODO encodes anti-patterns into the codebase as an open obligation.
+
+5. **WARNING - iterator-idiom-vs-explicit-loop** (lib.rs:3): `.iter().map().collect()` creates iterator state machine + Vec allocation; an indexed loop to `[&'static str; 4]` eliminates all overhead.
+
+Recommended fix: Return `[&'static str; 4]` with an explicit `for` loop, remove the TODO, and add benchmarks only if the function proves to be a real bottleneck.

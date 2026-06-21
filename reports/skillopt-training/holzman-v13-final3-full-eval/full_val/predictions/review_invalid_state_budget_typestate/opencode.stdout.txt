@@ -1,0 +1,16 @@
+Now I have the skill, references, and source. Writing the review.
+Review complete. Written to `review-output.json`.
+
+7 findings, all BLOCKER severity:
+
+| # | Rule | File:Line |
+|---|---|---|
+| 1 | `invalid_states_not_unrepresentable` | `src/lib.rs:1` — struct allows impossible lifecycle combos |
+| 2 | `no_status_string` | `src/lib.rs:3` — `status: String` enables typos, no exhaustiveness |
+| 3 | `no_bool_lifecycle` | `src/lib.rs:4` — `is_validated: bool` independent of other fields |
+| 4 | `no_bool_lifecycle` | `src/lib.rs:5` — `is_sent: bool` independent of other fields |
+| 5 | `option_invalid_state` | `src/lib.rs:6` — `Option<u64>` lifecycle data outside owning variant |
+| 6 | `no_newtype_domain_id` | `src/lib.rs:2` — `id: String` with no validation |
+| 7 | `parse_boundary` | `src/lib.rs:1` — raw primitives cross boundary, no smart constructors |
+
+5 missing-evidence items (benchmarks, profiler, allocation analysis, second-ring evidence, command evidence).

@@ -1,0 +1,16 @@
+Now I have all the context. Writing the review output.
+Review complete. Written to `review-output.json`.
+
+**Key findings (7 total):**
+
+| Severity | Rule | Issue |
+|----------|------|-------|
+| BLOCKER | `make_illegal_states_unrepresentable` | ShardWorkflow allows any combination of `status: String`, `is_validated: bool`, `is_sent: bool` — including impossible states |
+| BLOCKER | `newtype_domain_ids` | `id: String` is a raw primitive with no domain validation |
+| BLOCKER | `enum_typestate_state_machine` | No typestate enum; lifecycle should be a single `ShardStatus` enum (Created→Validated→Sent) |
+| MAJOR | `no_mutable_side_effects_in_core` | `mark_sent` mutates in-place instead of returning a new valid state |
+| MAJOR | `functional_core_purity` | No separation between inert data and side-effecting actions |
+| MAJOR | `no_parse_boundary_smart_constructors` | No fallible constructor; direct struct literals are the only way to create instances |
+| MINOR | `missing_benchmark_evidence` / `missing_allocation_evidence` | No benchmarks, profiling, or allocation evidence |
+
+**Residual risk:** Static review only. The dominant risk is arbitrary invalid shard states being constructible and transitioned without compiler enforcement.

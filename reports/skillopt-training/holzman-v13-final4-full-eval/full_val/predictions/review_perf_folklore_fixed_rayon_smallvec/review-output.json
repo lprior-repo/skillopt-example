@@ -1,0 +1,87 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "holzman-perf-claims-require-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims Rayon and SmallVec will be faster without workload, hardware, baseline, or benchmark evidence. Rayon parallel overhead is well-known to exceed sequential cost for 4-element inputs.",
+      "failure_mode": "Invisible performance regression: Rayon task dispatch and thread-pool synchronization dwarf the actual work on 4 bytes, making the function slower than the sequential baseline.",
+      "fix": "Remove the Rayon/SmallVec TODO. Return `[&'static str; 4]` directly with no heap allocation. If Rayon/SmallVec is insisted, require benchmark evidence proving speedup on a relevant workload before accepting."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "holzman-allocation-discipline",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Fixed `[u8; 4]` input produces `Vec<&'static str>` via `.collect()`, forcing a heap allocation for a known-size output of 4 pointers.",
+      "failure_mode": "Every call to `classify_four` allocates on the heap, increasing GC pressure and tail latency for what is a tiny, fixed-size computation. The allocation is unnecessary because the output shape is known at compile time.",
+      "fix": "Return `[&'static str; 4]` directly. Replace `.collect()` with a fixed-size array construction: `let mut out = [\"even\"; 4];` then fill by index, or use array destructuring with `let [a, b, c, d] = bytes;` and `Ok([a_tag, b_tag, c_tag, d_tag])` returning a Result or array."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "holzman-functional-core-performance",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Iterator pipeline `.iter().map(...).collect()` creates an intermediate allocation. For fixed `[u8; 4]` this is a hot-path allocation that could be eliminated entirely.",
+      "failure_mode": "Intermediate Vec allocation per call. No measurable benefit over a fixed array; adds cache misses and allocator contention.",
+      "fix": "Use indexed array construction with no intermediate collection. Example: `let mut result = [\"even\"; 4]; for i in 0..4 { result[i] = if bytes[i] & 1 == 0 { \"even\" } else { \"odd\" }; }; result;`"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "black-hat-rayon-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Rayon is suggested for 4-element data. Rayon's minimum work unit and thread-pool overhead makes it unsuitable for tiny inputs regardless of algorithmic complexity.",
+      "failure_mode": "Rayon dispatch cost (task submission, worker scheduling, result aggregation) exceeds the total work for 4 elements, guaranteeing regression on any realistic workload.",
+      "fix": "Remove Rayon suggestion entirely. For 4 elements, sequential indexed access or `bytes.iter().enumerate()` into a fixed array is faster. Rayon is only justified for large independent transforms with scaling evidence."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "black-hat-smallvec-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SmallVec is suggested as a faster alternative to Vec for 4 elements, but the stack-allocated SmallVec capacity bump still adds type complexity without measurable benefit when a fixed `[T; 4]` array exists.",
+      "failure_mode": "Type complexity and API surface increase for no gain. SmallVec is for variable-size collections with a known small common case; here the size is always exactly 4, so `[T; 4]` is strictly simpler and equally zero-allocation.",
+      "fix": "Use `[&'static str; 4]` as the return type. No SmallVec, no Vec, no heap allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "holzman-missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for `classify_four`. Performance claims (implicit in the TODO and inherent in the allocation pattern) cannot be validated or refuted without baseline measurement.",
+      "failure_mode": "Unmeasured optimization direction: the code may be slower than a fixed-array version, but there is no evidence to prove or disprove it. Future changes lack a regression baseline.",
+      "fix": "Add a criterion or basic benchmark comparing `classify_four` returning `Vec<&'static str>` vs returning `[&'static str; 4]` with representative inputs. Until measured, assume the Vec version is slower for this fixed-size case."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "holzman-function-size-clarity",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function `classify_four` name encodes fixed size 4, but the input type `[u8; 4]` already guarantees this. The name is redundant and the single-iteration iterator pattern obscures the fixed-size intent.",
+      "failure_mode": "Caller may assume variable input despite `[u8; 4]` guaranteeing 4 elements. The TODO comment further muddles intent by suggesting dynamic collection strategies.",
+      "fix": "Rename to `classify_bytes` or remove the size from the name entirely. Change return type to `[&'static str; 4]` and fill directly. Remove the Rayon/SmallVec TODO."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four - no baseline for the stated performance direction",
+    "no profiler evidence showing current allocation hotness",
+    "no allocation evidence (e.g., `cargo +nightly bench --benches` or `--profile-time`) for the Vec vs array comparison",
+    "no second-ring evidence tying Rayon/SmallVec claims to actual symbols or benchmarks",
+    "no workload description specifying input distribution, call frequency, or latency requirements",
+    "no baseline command or baseline number against which any improvement could be measured"
+  ],
+  "residual_risk": "Static review only. No commands run (no cargo check, clippy, test, or benchmark). The TODO comment suggests Rayon/SmallVec optimization without evidence. The function allocates a Vec for fixed-size output. Without running benchmarks or profiler, the exact performance delta between Vec and fixed-array return types is unmeasured. The allocation pattern is a confirmed Holzman violation regardless of measured delta."
+}

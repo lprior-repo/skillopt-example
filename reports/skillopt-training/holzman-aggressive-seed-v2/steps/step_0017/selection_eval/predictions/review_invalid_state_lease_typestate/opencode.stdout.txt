@@ -1,0 +1,15 @@
+Now I have all the information needed. Writing the review output.
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**6 BLOCKER findings**, all centered on the same root cause: `LeaseWorkflow` uses primitive types (`String` for status, `bool` for flags, `Option<u64>` for timestamp) instead of a typestate enum, making every illegal state constructable at runtime:
+
+| # | Rule | Line | Core Issue |
+|---|------|------|------------|
+| 1 | `make_illegal_states_unrepresentable` | 1 | All 4 fields independently mutable — impossible combinations (sent but not validated, sent but no timestamp) |
+| 2 | `typestate_lifecycle` | 3 | `status: String` accepts any literal; no closed set of states |
+| 3 | `no_bool_lifecycle_flags` | 4 | `is_validated: bool` has no directionality or ordering |
+| 4 | `no_bool_lifecycle_flags` | 5 | `is_sent: bool` duplicates status with divergence risk |
+| 5 | `functional_core_imperative_shell` | 9 | `mark_sent` mutates in-place with no preconditions or typed errors |
+| 6 | `no_string_identity_fields` | 2 | `id: String` has no newtype or validation |
+
+**5 missing evidence items**: no benchmarks, profiler data, allocation tracing, second-ring evidence, or command evidence.

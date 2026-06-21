@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enums_over_primitives",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses String for status and bool flags (is_validated, is_sent) instead of domain enums or typestates. This makes illegal states representable - e.g. status=sent with is_sent=false, or status=sent with is_validated=false.",
+      "failure_mode": "Any code can construct LeaseWorkflow with contradictory status/flag combinations, enabling workflows that violate domain invariants such as marking a lease as sent before validation or having ambiguous intermediate states.",
+      "fix": "Replace status: String with a sealed enum LeaseStatus { Pending, Validated, Sent }. Replace is_validated: bool and is_sent: bool with the enum - the status enum encodes the full lifecycle. Use a typed constructor that only allows valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is an unvalidated primitive. Domain IDs should be represented as a newtype (e.g. LeaseId(String)) with a fallible constructor that enforces format/length rules at the boundary.",
+      "failure_mode": "Empty strings, malformed IDs, or non-lease-IDs can flow through the system, causing silent logical errors or downstream failures. No parsing/validation boundary is enforced.",
+      "fix": "Introduce pub struct LeaseId(String) with fn new(s: String) -> Result<LeaseId, LeaseError> and use LeaseId in the struct instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates LeaseWorkflow in place with direct field assignment (item.status = \"sent\".to_string()). This is imperative mutation inside the core with no validation, no domain error, and no typestate guard.",
+      "failure_mode": "The function can be called on any LeaseWorkflow regardless of its current state, allowing transitions like Pending to Sent skipping Validated. No invariant checking occurs.",
+      "fix": "Replace with a pure function mark_sent(status: LeaseStatus) -> Result<LeaseStatus, LeaseTransitionError> that only permits Validated to Sent, returning a typed error for invalid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsed_data_valid_by_construction",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> stores raw epoch milliseconds without any newtype or validation. The domain may have range or monotonicity constraints on timestamps.",
+      "failure_mode": "Zero, negative (via overflow), or nonsensical timestamps can be stored, leading to incorrect ordering, sorting, or lease-expiry calculations.",
+      "fix": "Introduce pub struct SentAtEpochMs(u64) with a constructor that rejects zero and enforces domain constraints, then use it instead of Option<u64>."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LeaseWorkflow are pub, allowing external code to mutate fields directly without any domain logic or validation.",
+      "failure_mode": "External code can bypass mark_sent and any future validation by directly assigning to item.status or item.is_sent, making all core invariants voidable.",
+      "fix": "Make fields private or remove the struct entirely in favor of an immutable typestate model where transitions produce new values rather than mutating existing ones."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "string_status_vs_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary strings (e.g. SENT, sent!, empty, cancelled, deleted) that have no meaning in the domain. String comparison is error-prone and case-sensitive.",
+      "failure_mode": "Typo bugs, case mismatches, and unrecognized status values cause silent failures or panics in downstream code that assumes a closed set of status values.",
+      "fix": "Replace with enum LeaseStatus { Pending, Validated, Sent } - a closed, exhaustive set that the compiler enforces at match/transition points."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim on LeaseWorkflow or mark_sent",
+    "no profiler data for allocation patterns of LeaseWorkflow construction",
+    "no allocation analysis for String allocations in status/id fields",
+    "no command evidence (cargo test, cargo clippy, cargo fmt) was run - static review only"
+  ],
+  "residual_risk": "Static review only; no commands run. The code is fundamentally broken at the type-system level - illegal states are fully representable, the functional core is imperative mutation, and all domain invariants are voidable by external code. The codebase needs a typestate redesign before any correctness or performance claims are meaningful."
+}

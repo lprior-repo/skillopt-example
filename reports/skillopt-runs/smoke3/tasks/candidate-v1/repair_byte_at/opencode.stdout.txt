@@ -1,0 +1,5 @@
+The issue is clear: `input[index]` panics on out-of-bounds, but the test expects `None`. Let me fix it with the smallest change using `get()`:
+Now let me write the required JSON output:
+**Summary:** Replaced `input[index]` (panic-on-bounds) with `input.get(index).copied()` (returns `None` on out-of-bounds). Tests pass.
+
+`/tmp/opencode/holzman-skillopt/smoke3/tasks/candidate-v1/repair_byte_at/repair-output.json` — cargo test passed.

@@ -1,0 +1,93 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow lifecycle is encoded as independent booleans (is_validated, is_sent) instead of a typestate enum, so callers can construct and mutate states that violate the workflow ordering (e.g., is_sent=true with is_validated=false, or transitioning from sent back to validated).",
+      "failure_mode": "illegal state combinations are representable and reachable; any caller can set is_sent=true and is_validated=false simultaneously, producing a metric that was sent before being validated.",
+      "fix": "Replace is_validated: bool and is_sent: bool with a single Status enum (e.g., Pending, Validated, Sent) and remove the booleans entirely. Construction should only produce Pending; transitions go through explicit functions that return the next typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String field that allows arbitrary string values (e.g., \"sent\", \"foo\", \"\", null-like empties). The mark_sent function on line 10 sets it via .to_string() instead of a typed transition, making the status field both externally mutable and unconstrained.",
+      "failure_mode": "callers can assign any string to status (\"pending\", \"deleted\", \"\", \"SENT\"), breaking protocol invariants; no compile-time guarantee that status matches a known lifecycle state.",
+      "fix": "Replace pub status: String with a Status enum variant inside the typestate enum. Remove the status field entirely and encode lifecycle state in the enum type so only valid states are representable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle flags that can be toggled in any combination. A struct with is_validated=false and is_sent=true is a valid Rust value but an invalid workflow state. The mark_sent function on line 9 only sets is_sent and status without checking or enforcing validated-first ordering.",
+      "failure_mode": "workflow invariants are not enforced by the type system. Callers can create MetricWorkflow with is_validated=false and is_sent=true directly via struct literal, or via mark_sent which does not check is_validated before marking sent.",
+      "fix": "Collapse both booleans into a Status enum with ordered variants (Pending -> Validated -> Sent). The enum type itself enforces that only one state is active at a time and transitions are explicit."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an optional lifecycle field that can exist in multiple invalid combinations: Some timestamp with status not 'sent', None timestamp with is_sent=true, or Some timestamp with is_validated=false. Optional lifecycle data should be owned by the variant that needs it.",
+      "failure_mode": "sent_at_epoch_ms can be Some(12345) while the workflow is still in Pending (validated=false, sent=false), producing a metric with a sent timestamp that never actually sent. Or is_sent=true with None timestamp, losing provenance.",
+      "fix": "Move the timestamp into the Sent variant of the Status enum: enum Status { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }. This makes illegal combinations (timestamp without sent state, sent flag without timestamp) unrepresentable at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a pub String with no validation, no domain wrapper, and no uniqueness or format constraints. Raw primitive domain identifiers are passed through the entire system without any type-level guarantees about format, length, or validity.",
+      "failure_mode": "empty strings, excessively long strings, or non-identifier strings can flow through the metric pipeline. No compile-time distinction between a metric ID and any other string, risking ID confusion across domains.",
+      "fix": "Create a newtype MetricId(String) or MetricId(u64) with a private inner field and a fallible smart constructor (e.g., fn try_from(s: &str) -> Result<MetricId, IdError>). Use MetricId as the field type and require construction through the constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String for id and status, bool for flags, Option<u64> for timestamp) cross the parse boundary without fallible smart constructors. The struct's pub fields allow external callers to construct invalid domain states directly, and mark_sent on line 9 mutates status with .to_string() instead of a typed transition at the parse boundary.",
+      "failure_mode": "external callers bypass all domain validation by constructing MetricWorkflow via struct literals with arbitrary String values, inconsistent boolean combinations, and orphaned timestamps. No parse-once-into-trusted pattern exists.",
+      "fix": "Remove all pub fields. Define a DTO struct with primitive fields and a fallible fn try_from(dto: &MetricDto) -> Result<MetricWorkflow, WorkflowError> that parses once into trusted domain types. Make MetricWorkflow fields private with only a Status enum, newtype MetricId, and variant-owned timestamp."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark, profiler, or allocation evidence exists for mark_sent or any metric workflow path. The function allocates a String via .to_string() on the status field on line 10, but there is no evidence this allocation cost is bounded or measured.",
+      "failure_mode": "unbounded allocation in what may be a hot metric-processing path. String allocation on every mark_sent call creates hidden heap pressure with no measured impact.",
+      "fix": "Add a benchmark for mark_sent. Replace String status with an enum (which eliminates the allocation entirely). If the path is hot, report p50/p99 latency and allocation count with measured baseline evidence."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "hidden-mutation-at-boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes MetricWorkflow by value and mutates it in place with mut, performing I/O-side effects (status string allocation) inside what should be a pure calculation. The function does not return a Result or indicate failure.",
+      "failure_mode": "side effects are embedded in a function that appears to be a domain transition. If this function is called in a hot path, the String allocation and mutation are untracked and unbounded.",
+      "fix": "Refactor mark_sent to return a Result<Status, WorkflowError> or Status::Sent with the timestamp, and move the status mutation into the enum variant construction. The function should take &self and return the new state rather than mutating in place."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any workflow transition",
+    "no profiler data showing hot paths or allocation profiles",
+    "no allocation budget or try_reserve evidence for metric processing",
+    "no second-ring evidence for any performance claim",
+    "no command-truth evidence (cargo check/clippy/test not run)"
+  ],
+  "residual_risk": "This is a static-only review of an empty/structural task crate. The core issue is architectural: MetricWorkflow uses raw primitives (String status, bool flags, Option timestamp) instead of typestate enums and newtypes, making illegal states fully representable. Without refactoring to an enum-based typestate machine and newtype domain IDs, no amount of runtime testing can prevent invalid state construction. Additionally, no verification commands were executed; cargo fmt/check/clippy/test are required gates that remain unverified."
+}

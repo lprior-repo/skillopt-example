@@ -1,0 +1,6 @@
+The test expects overflow detection when the u32 sum overflows (even if the average fits). Let me fix to use u32 arithmetic:
+The test wants sum overflow at u32 precision, not average overflow. Let me use u32 checked_add:
+All tests pass. Now I need to remove the `as u32` cast (Holzman bans lossy `as`):
+Remove the `expect` panic path:
+All 3 tests pass. Let me verify with clippy:
+Repaired `src/lib.rs` (empty-slice guard, checked arithmetic, no lossy `as` conversions) and wrote `repair-output.json`; `cargo test` passed all 3 tests.

@@ -1,0 +1,12 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with 5 findings:
+
+| # | Severity | Rule | Line | Core Issue |
+|---|----------|------|------|------------|
+| 1 | BLOCKER | folklore-performance-rayon-smallvec | 2 | TODO proposes Rayon+SmallVec for `[u8; 4]` — parallel overhead dwarfs any gain for 4 elements |
+| 2 | BLOCKER | vec-for-fixed-size-result | 6 | Returns `Vec` for known-4 output, forcing heap alloc every call |
+| 3 | BLOCKER | no-benchmark-baseline | 1 | "will be faster" claim with zero evidence |
+| 4 | BLOCKER | no-tests | 1 | Zero tests on public API |
+| 5 | WARNING | functional-core-performance | 3 | `collect()` triggers Vec double-capacity (1→2→4) for 4 elements |
+
+The primary Holzman violation: folklore performance tuning on tiny fixed-input. The fix is to return `[&'static str; 4]` and drop the Rayon/SmallVec TODO entirely unless benchmark evidence demands otherwise.

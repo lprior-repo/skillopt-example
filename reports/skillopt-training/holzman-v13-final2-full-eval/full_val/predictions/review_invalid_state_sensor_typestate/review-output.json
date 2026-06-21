@@ -1,0 +1,82 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/review-output-contract.md",
+    "references/hardening-checklist.md",
+    "references/functional-core-performance.md",
+    "references/claim-traceability.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SensorWorkflow has no typestate or enum-based lifecycle. Any caller can construct a SensorWorkflow in any state combination (validated=false, sent=true, etc.), violating the state-machine contract.",
+      "failure_mode": "Callers bypass lifecycle transitions, creating logically inconsistent states like a sensor reported as sent but never validated.",
+      "fix": "Replace `is_validated: bool`, `is_sent: bool`, and `sent_at_epoch_ms: Option<u64>` with a single `SensorState` enum (e.g. `Pending`, `Validated`, `Sent { at_epoch_ms: u64 }`) that encodes the legal transitions as variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-to-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` stores lifecycle as a free-form string. `mark_sent` hard-codes `\"sent\"` but no validation ensures `status` matches the actual lifecycle fields `is_validated`/`is_sent`.",
+      "failure_mode": "A caller can set `status` to any string (e.g. \"sent\" while `is_sent = false`), producing contradictory state that silently passes through downstream logic.",
+      "fix": "Replace `status: String` with an enum `SensorStatus { Pending, Validated, Sent }` owned by a typestate variant. Remove `is_validated` and `is_sent` booleans."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-fields",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` and `is_sent: bool` are separate lifecycle booleans. They can be in invalid combinations: (true, false) = validated but not sent, (true, true) = validated and sent, (false, true) = sent but never validated, (false, false) = never validated and not sent. No invariant enforcement.",
+      "failure_mode": "The (false, true) combination represents a sensor reported as sent without ever being validated — a silent data integrity violation that propagates to consumers.",
+      "fix": "Replace both booleans with a single `SensorState` enum typestate where each variant represents exactly one legal state (Pending, Validated, Sent { at_epoch_ms: u64 }). Make all fields private."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` exists independently of `is_sent: bool`. A sensor can be sent (`is_sent = true`) with `sent_at_epoch_ms = None`, or have `sent_at_epoch_ms = Some(...)` with `is_sent = false`. These are contradictory states with no type-level guarantee.",
+      "failure_mode": "Downstream code reading `sent_at_epoch_ms` cannot trust the timestamp exists when the sensor is marked sent; code must defensively handle None even when logically it should be Some, leading to missed errors or silent data loss.",
+      "fix": "Bake the timestamp into the typestate: `SensorState::Sent { at_epoch_ms: u64 }`. The `Option` disappears because the timestamp is mandatory when in the Sent state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive. There is no validation, format enforcement, or type-level guarantee that the ID is a valid sensor identifier. Any string is accepted.",
+      "failure_mode": "Callers can construct a SensorWorkflow with an empty string, malformed ID, or IDs from different namespaces, causing downstream lookups to fail silently or match the wrong sensor.",
+      "fix": "Introduce a `SensorId` newtype with a smart constructor that validates format (e.g. `SensorId::try_from(String) -> Result<SensorId, ParseError>`). Make the field private."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String, bool, Option<u64>) cross the parse boundary without fallible smart constructors. Any caller can directly construct `SensorWorkflow { id: \"\" , status: \"\", is_validated: false, is_sent: true, sent_at_epoch_ms: None }` — an invalid domain state. The `parse` boundary exists only in name; no validation occurs at construction.",
+      "failure_mode": "Invalid domain states are representable and constructible by any caller, breaking all invariants that downstream logic (including `mark_sent`) assumes hold.",
+      "fix": "Replace the public struct with private fields and a single smart constructor `SensorWorkflow::try_new(id: String) -> Result<Self, ParseError>` that parses and validates at the boundary. Use a typestate enum for lifecycle, a newtype for ID, and bake optional lifecycle data into enum variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "public-fields-mutation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `SensorWorkflow` are `pub`. Any code in the crate (or extern crate) can mutate fields directly, bypassing `mark_sent` and any future validation logic.",
+      "failure_mode": "A caller can set `is_sent = true` without ever calling `mark_sent`, or change `status` to an arbitrary string, completely sidestepping the intended workflow.",
+      "fix": "Make all fields private (`id`, `status`, `is_validated`, `is_sent`, `sent_at_epoch_ms`). Provide methods with typed signatures for allowed transitions. With typestate, only the correct variant exposes the right operations."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for hot-path analysis",
+    "no allocation analysis (String allocations on every construction)",
+    "no command-truth evidence (no commands were run; strict source lint gates not executed)"
+  ],
+  "residual_risk": "Static review only — no commands run. The source crate contains pervasive violations of Holzman absolute laws: no typestate, raw primitive domain state (String status, bool lifecycle flags), public mutable fields, no parse boundary, and no smart constructors. These are architectural BLOCKERS that must be repaired with enum-based typestates, newtype IDs, private fields, and fallible constructors before any delivery gate passes."
+}

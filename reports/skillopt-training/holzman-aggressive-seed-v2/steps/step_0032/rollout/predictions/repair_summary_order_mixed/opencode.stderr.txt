@@ -1,0 +1,182 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+[0m
+[0m→ [0mSkill "holzman-rust"
+[0m→ [0mRead .
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src
+[0m→ [0mRead src/lib.rs
+[0m→ [0mRead tests
+[0m→ [0mRead tests/behavior.rs
+[0m→ [0mRead .skill
+[0m→ [0mRead .skill/holzman-rust
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m
+[0m← [0mEdit src/lib.rs
+Index: /tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed/src/lib.rs
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed/src/lib.rs
++++ /tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed/src/lib.rs
+@@ -12,26 +12,34 @@
+     pub total: u64,
+     pub average: u64,
+ }
+ 
+-pub fn summarize_metrics(input: &str, max_rows: usize) -> Result<String, SummaryError> {
+-    let mut total = 0u64;
+-    let mut count = 0usize;
++pub fn summarize_metrics(input: &str, max_rows: usize) -> Result<Summary, SummaryError> {
++    if input.is_empty() {
++        return Err(SummaryError::Empty);
++    }
++    let mut total: u64 = 0;
++    let mut count: usize = 0;
+     for line in input.lines() {
+-        let parts: Vec<String> = line
+-            .split(',')
+-            .map(|part| part.trim().to_string())
+-            .collect();
+-        let value = parts[1].parse::<u64>().unwrap();
+-        total += value;
++        let trimmed = line.trim();
++        let (_, value_str) = trimmed.split_once(',').ok_or(SummaryError::Invalid)?;
++        let value: u64 = value_str.trim().parse().map_err(|_| SummaryError::Invalid)?;
++        total = total.checked_add(value).ok_or(SummaryError::Overflow)?;
+         count += 1;
+     }
+     if count > max_rows {
+         return Err(SummaryError::TooMany);
+     }
+-    Ok(format!(
+-        "count={} total={} average={}",
+-        count as u32,
++    let average = total.checked_div(count as u64).unwrap_or(0);
++    Ok(Summary {
++        count: count as u32,
+         total,
+-        total / count as u64
+-    ))
++        average,
++    })
+ }
++
++pub fn render_summary(s: Summary) -> String {
++    format!(
++        "count={} total={} average={}",
++        s.count, s.total, s.average
++    )
++}
+
+[0m
+[0m$ [0mcargo fmt
+(no output)
+[0m
+[0m$ [0mcargo test --workspace --all-features
+Compiling repair_summary_order_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/2f2a2fada335d9f2/debug/deps/repair_summary_order_mixed-9c5cf5b7b820c00f)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/2f2a2fada335d9f2/debug/deps/behavior-db8afaf630bb23b8)
+   Doc-tests repair_summary_order_mixed
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test detects_overflow ... ok
+test rejects_empty ... ok
+test rejects_too_many ... ok
+test renders ... ok
+test rejects_invalid ... ok
+test summarizes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[0m
+[0m$ [0mcargo fmt --check && cargo check --workspace --all-targets --all-features
+Checking repair_summary_order_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s
+[0m
+[0m$ [0mrg -n '(^|[^A-Za-z0-9_])(assert!|assert_eq!|assert_ne!|unreachable!)' --glob '*.rs' --glob '!**/tests/**' --glob '!**/benches/**' --glob '!**/examples/**' --glob '!build.rs'
+(no output)
+[0m
+[0m$ [0mrg -n '\.(unwrap|expect|panic|todo|unimplemented|unreachable)\s*\(' --include '*.rs' --exclude-dir=tests src/
+rg: unrecognized flag --include
+
+similar flags that are available: --include-zero
+[0m
+[0m$ [0mrg -n '\.(unwrap|expect|panic|todo|unimplemented|unreachable)\s*\(' src/
+(no output)
+[0m
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m
+[0m$ [0mrg -n '\.(unwrap|expect|panic|todo|unimplemented|unreachable)\s*\(' src/
+(no output)
+[0m
+[0m$ [0mrg -n 'unsafe|as u32|as u64|as usize' src/
+src/lib.rs:35:    let average = total.checked_div(count as u64).unwrap_or(0);
+src/lib.rs:37:        count: count as u32,
+[0m
+[0m← [0mEdit src/lib.rs
+Index: /tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed/src/lib.rs
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed/src/lib.rs
++++ /tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed/src/lib.rs
+@@ -31,11 +31,12 @@
+     }
+     if count > max_rows {
+         return Err(SummaryError::TooMany);
+     }
+-    let average = total.checked_div(count as u64).unwrap_or(0);
++    let average = total.checked_div(u64::try_from(count).unwrap_or(0)).unwrap_or(0);
++    let count_u32: u32 = u32::try_from(count).unwrap_or(u32::MAX);
+     Ok(Summary {
+-        count: count as u32,
++        count: count_u32,
+         total,
+         average,
+     })
+ }
+
+[0m
+[0m$ [0mcargo fmt && cargo test --workspace --all-features && cargo fmt --check
+Compiling repair_summary_order_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/45a5ed4b3d628663/repair_summary_order_mixed)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/2f2a2fada335d9f2/debug/deps/repair_summary_order_mixed-9c5cf5b7b820c00f)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/2f2a2fada335d9f2/debug/deps/behavior-db8afaf630bb23b8)
+   Doc-tests repair_summary_order_mixed
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test rejects_empty ... ok
+test renders ... ok
+test detects_overflow ... ok
+test rejects_too_many ... ok
+test summarizes ... ok
+test rejects_invalid ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+[0m
+[0m$ [0mrg -n 'unsafe|\.as\(| as u32| as u64| as usize' src/
+(no output)
+[0m
+[0m→ [0mRead src/lib.rs
+[0m
+[0m← [0mWrite repair-output.json
+Wrote file successfully.
+[0m

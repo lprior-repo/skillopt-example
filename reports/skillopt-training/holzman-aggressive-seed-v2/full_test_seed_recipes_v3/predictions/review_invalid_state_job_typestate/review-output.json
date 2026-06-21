@@ -1,0 +1,69 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "JobWorkflow combines status: String, is_validated: bool, is_sent: bool, and sent_at_epoch_ms: Option<u64>. Status string can diverge from lifecycle booleans (e.g. status=\"sent\" with is_sent=false, or status=\"invalid\" with is_sent=true). No typestate or enum-based state machine enforces the lifecycle.",
+      "failure_mode": "External or internal callers can construct or mutate JobWorkflow into logically impossible states, breaking invariants that the domain model should guarantee at compile time.",
+      "fix": "Replace status: String and lifecycle booleans with a sealed JobStatus enum (e.g. Pending, Validated, Sent) and a typestate wrapper or constructor that enforces valid transitions. Remove is_validated, is_sent, and sent_at_epoch_ms as flat fields; encode sent_at_epoch_ms inside the Sent variant if needed."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive domain ID with no domain rules enforced. Any string is accepted, including empty, whitespace-only, or malformed identifiers.",
+      "failure_mode": "Invalid or colliding IDs can be created or mutated, leading to incorrect job lookups, duplicate processing, or silent data corruption.",
+      "fix": "Introduce a JobId newtype (e.g. pub struct JobId(String)) with a fallible constructor (JobId::from_str) that rejects empty/whitespace input. Use it as the struct field type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are pub, allowing external code to mutate status, booleans, and timestamp directly. This bypasses any smart constructor or transition logic.",
+      "failure_mode": "External callers can set is_sent=true without updating status, set status to an arbitrary string, or null sent_at_epoch_ms after marking sent, creating invariant violations that cannot be caught by the compiler.",
+      "fix": "Make all fields private (no pub). Provide a public smart constructor (e.g. JobWorkflow::new) and state-transition methods. The mark_sent function should be a method on JobWorkflow or take a by-value JobWorkflow and return a typed result."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs string allocation (\"sent\".to_string()) and boolean mutation without a typed error return. There is no error taxonomy, no validation of preconditions, and no distinction between pure core and imperative shell.",
+      "failure_mode": "The function silently succeeds or could be extended with unhandled allocation failure. There is no way for the caller to distinguish a failed transition from a successful one if validation is added later.",
+      "fix": "Define a JobError enum (e.g. { InvalidState, Allocation }). Make mark_sent return Result<JobWorkflow, JobError>. Move allocation into the shell boundary; if the core must allocate, use try_from/try_reserve patterns. The pure transition logic should return a new value or error."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns JobWorkflow with no error type. The error taxonomy from the skill requires typed errors (ParseError, FrameError, Allocation, InvalidState, etc.) for all fallible operations.",
+      "failure_mode": "Callers cannot handle errors programmatically. Any future validation or allocation failure must be communicated via panic/unwrap, violating the no-panic rule.",
+      "fix": "Define a typed JobError enum and change the signature to pub fn mark_sent(item: JobWorkflow) -> Result<JobWorkflow, JobError>. Map any allocation or validation failure to the appropriate variant."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "repair_recipe_typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 34,
+      "problem": "The struct exactly matches the repair recipe trigger: status: String + lifecycle booleans + optional timestamp. The skill requires enum/typestate state machine, invalid state combinations, newtype/domain IDs, and parse-boundary smart constructors.",
+      "failure_mode": "All four required elements are missing. The state machine is not enforced, invalid combinations like (status=\"sent\", is_sent=false) are constructible, id is not a newtype, and there is no smart constructor.",
+      "fix": "Implement: (1) sealed JobStatus enum with transition rules, (2) typestate or validated constructor, (3) JobId newtype with fallible constructor, (4) smart constructor JobWorkflow::new that validates invariants before construction."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition",
+    "no profiler evidence for any claimed performance characteristic",
+    "no allocation analysis (no try_reserve, no capacity planning on String/Vec growth)",
+    "no second-ring evidence (no behavior tests, no integration tests, no contract tests)",
+    "no command evidence (no cargo test, cargo fmt, cargo clippy output reported)",
+    "no error taxonomy documentation or error-handling contract"
+  ],
+  "residual_risk": "High. The struct is a data bag with public mutable fields and no typestate enforcement. All lifecycle invariants are enforced at runtime only, if at all. The mark_sent function is a pure mutation with no error handling. Without enum-based state machine, newtype IDs, typed errors, and at least behavior tests, illegal states are freely representable and the functional core / imperative shell boundary is undefined. Static review only; no commands run."
+}

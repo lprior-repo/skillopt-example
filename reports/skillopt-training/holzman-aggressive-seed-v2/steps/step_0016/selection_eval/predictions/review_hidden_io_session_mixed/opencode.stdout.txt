@@ -1,0 +1,10 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with **12 findings**:
+
+| Severity | Count | Key Issues |
+|----------|-------|------------|
+| BLOCKER | 7 | `unwrap()` on I/O + parse, unchecked indexing, lossy `as u16`, hidden `println!` I/O, no `Result` return, `split+collect` instead of `split_once` |
+| MAJOR | 3 | No benchmarks, no `try_reserve`, no tests |
+| MINOR | 1 | Bare `u16` instead of domain newtype |
+
+All violations of the Holzman Rust constraints in `src/lib.rs` are documented with concrete failure modes and minimal fixes.

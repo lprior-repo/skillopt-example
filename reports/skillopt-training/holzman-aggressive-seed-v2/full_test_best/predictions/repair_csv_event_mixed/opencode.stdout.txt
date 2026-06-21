@@ -1,0 +1,11 @@
+Now I see the issues. The production code has `unwrap()` on parse, ignores `max_items`, and doesn't check for empty input. Let me fix it.
+Exit code 1 from `rg` means no matches found in production files - that's exactly what we want (no assert/unreachable macros in source). Now let me write the output.
+**Repair complete.** All 4 behavior tests pass, no Holzman violations remain in production source.
+
+**Changes made to `src/lib.rs`:**
+- Replaced `.unwrap()` on parse with explicit `Err(ParseError::Invalid)` path
+- Added empty-input check → `Err(ParseError::Empty)`
+- Added `max_items` enforcement → `Err(ParseError::TooMany)`
+- Added empty trimmed-part check → `Err(ParseError::Empty)`
+
+**Verification gates passed:** `cargo fmt`, `cargo fmt --check`, `cargo test` (4/4), `cargo clippy` (no warnings).

@@ -1,0 +1,17 @@
+Let me read the skill bundle and task crate structure directly.
+Now let me explore the task crate:
+Now I have full understanding. The production code has these violations:
+1. `.unwrap()` on parse (banned)
+2. Ignores `max_items` parameter
+3. No empty-input check
+4. No parse-error handling
+All 4 tests pass. Let me verify the final source and write the output:
+Repair complete. All 4 behavior tests pass.
+
+**Changes made to `src/lib.rs`:**
+- Removed `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)?` for parse failures
+- Added empty-input check → `ParseError::Empty`
+- Added `max_items` enforcement → `ParseError::TooMany` (checked before each push)
+- Replaced `.collect()` with explicit loop for error handling and capacity gating
+
+**Violations removed:** `unwrap()`, unused `max_items` parameter, missing `Empty`/`TooMany` error paths.

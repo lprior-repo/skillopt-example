@@ -1,0 +1,15 @@
+Now I have all the context needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (6 BLOCKERs):**
+
+1. **perf-folklore-rayon-tiny-input** (line 2) — Rayon thread-pool overhead dwarfs 4-element parallelism; will be slower, not faster.
+2. **perf-folklore-smallvec-tiny-fixed** (line 2) — SmallVec adds branch-on-capacity overhead for known-size 4-element output; irrelevant stack-bucket benefit.
+3. **no-performance-claim-without-evidence** (line 2) — "it will be faster" claim has no baseline, workload, or benchmark.
+4. **allocation-discipline-tiny-output** (line 1) — `Vec<&'static str>` forces heap allocation for 4 elements that fit in `['static str; 4]`.
+5. **todo-in-production-code** (line 2) — TODO encoding incorrect optimization plan risks future regression by copy-paste.
+6. **missing-benchmark-evidence** (line 1) — No benchmark, profiler, allocation analysis, or second-ring evidence exists.
+
+**Missing evidence:** No benchmark, profiler, allocation counters, assembly output, or command evidence.
+
+**Residual risk:** Static review only. Source is otherwise clean (no forbidden constructs). The core defect is performance folklore — Rayon + SmallVec for 4 elements is directionally certain to regress, but exact magnitude is unquantified without running benchmarks.

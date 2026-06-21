@@ -1,0 +1,18 @@
+Review complete. Written to `review-output.json`.
+
+**Summary: 10 BLOCKER findings across the crate.**
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | zero_forbidden_constructs | 9 | `unwrap()` on `fs::read_to_string` |
+| 2 | zero_forbidden_constructs | 19 | `unwrap()` on `.parse::<u32>()` |
+| 3 | zero_forbidden_constructs | 19 | `as u16` lossy cast from u32 |
+| 4 | parsing_and_access | 12 | `split`+`collect`+indexing instead of `split_once` |
+| 5 | parsing_and_access | 16 | `parts[0]` unchecked indexing |
+| 6 | parsing_and_access | 19 | `parts[1]` unchecked indexing |
+| 7 | functional_core_shell | 16 | `println!` hidden I/O in parsing layer |
+| 8 | functional_core_shell | 8 | I/O + parsing + domain construction conflated |
+| 9 | allocation | 8 | No `try_reserve`, unbounded Vec growth |
+| 10 | domain_type_discipline | 5 | `u16` raw primitive, no domain newtype |
+
+**Missing evidence:** no benchmarks, profiler data, allocation audit, or second-ring analysis.

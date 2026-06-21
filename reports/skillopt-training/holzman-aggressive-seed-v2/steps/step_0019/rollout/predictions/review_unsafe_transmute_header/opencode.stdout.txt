@@ -1,0 +1,11 @@
+Review complete. Written to `review-output.json`.
+
+**5 BLOCKER findings** in `src/lib.rs:2`:
+
+1. **no_production_unsafe** — `unsafe` block with `transmute` violates the explicit "no production unsafe" rule
+2. **no_unchecked_indexing** — `input[0]..input[3]` panics on slices < 4 bytes
+3. **no_unsafe_transmute** — `transmute::<[u8;4], u32>` silently produces wrong values on big-endian targets
+4. **missing_domain_type** — raw `u32` return with no endianness contract
+5. **missing_fallible_return** — no `Result` type to signal short-input failures
+
+**5 missing evidence** items: no benchmarks, profiler data, allocation analysis, UB-detection (Miri/Kani), or sanitizer runs.

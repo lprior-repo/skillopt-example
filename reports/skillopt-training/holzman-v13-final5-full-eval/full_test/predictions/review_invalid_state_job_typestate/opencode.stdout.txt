@@ -1,0 +1,15 @@
+Now I have all the information needed. Let me write the review.
+Review complete. Written 6 findings to `review-output.json`.
+
+All 6 findings are BLOCKERs covering the required typestate review categories:
+
+| # | Rule | Line | Core Issue |
+|---|---|---|---|
+| 1 | `typestate_enum_state_machine` | 1 | No state machine enum; any field combination is representable |
+| 2 | `status_string_to_enum` | 3 | `status: String` allows arbitrary strings |
+| 3 | `bool_lifecycle_to_typestate` | 4 | Two independent lifecycle booleans with no ordering |
+| 4 | `option_invalid_state_combinations` | 6 | `Option<u64>` decoupled from lifecycle flags |
+| 5 | `newtype_domain_id` | 2 | `id: String` raw primitive, no constraints |
+| 6 | `parse_boundary` | 1 | Raw primitives cross boundary without fallible smart constructors |
+
+Missing evidence flagged: no benchmarks, profiler data, allocation evidence, second-ring evidence, or command-truth evidence.

@@ -1,0 +1,128 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file-not-found, permission denied, or I/O errors",
+      "failure_mode": "entire program crashes on missing or inaccessible metrics file instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, LoadError>, use map_err on fs::read_to_string, and define a typed LoadError::Io variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_parsing_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is I/O (stdout logging) fused inside the data-parsing map closure",
+      "failure_mode": "parsing logic has a visible side effect; output becomes polluted with log lines, and the function is no longer pure or testable without capturing stdout",
+      "fix": "remove println! entirely from the parser; move any logging to the shell layer outside load_metrics, passing results through a Result with typed diagnostics"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value strings",
+      "failure_mode": "malformed CSV row aborts the entire batch instead of returning a typed parse error for that row",
+      "fix": "use map_err with a typed ParseError::InvalidValue variant, and handle the Option from parts.get(1) with map_err returning ParseError::MissingField"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 performs a lossy cast; values 65536+ silently truncate",
+      "failure_mode": "a valid u32 value silently wraps to an incorrect u16, corrupting metric data without any error signal",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| ParseError::ValueOverflow) after parse, or parse directly as u16 with parts[1].parse::<u16>().map_err(...)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] uses unchecked indexing on a Vec built from split; a line with no comma produces parts with length 1",
+      "failure_mode": "index out of bounds panic on any CSV line missing the comma separator",
+      "fix": "use line.split_once(',').ok_or(ParseError::InvalidLine) and destructure into (_name, value_str) for the one-separator grammar"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] uses unchecked indexing; a line with only one comma-separated field (empty value) or no comma will panic",
+      "failure_mode": "index out of bounds panic on malformed input rows with missing second field",
+      "fix": "use parts.get(1).ok_or(ParseError::MissingValue) or restructure with split_once to guarantee at most two fields with a clear error on extra commas"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_raw_primitive",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is pub String — raw primitive domain state. parse_boundary is violated: raw unvalidated String crosses the parse boundary without a fallible smart constructor, so callers can construct invalid domain states directly",
+      "failure_mode": "any code can create a Record with an empty, whitespace-only, or otherwise illegal name string, bypassing all validation",
+      "fix": "define a newtype Name(String) with a private constructor and a smart constructor Name::new(s: &str) -> Result<Name, ParseError> that validates non-empty and character constraints"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "shell_leakage",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics fuses file I/O (fs::read_to_string), parsing (split/collect/map), and domain construction (Record) in a single function with no boundary separation",
+      "failure_mode": "cannot test parsing logic without a real file on disk; cannot reuse parsing without triggering filesystem access; violates Data/Calculations/Actions architecture",
+      "fix": "split into (a) parse_records(lines: &[&str]) -> Result<Vec<Record>, ParseError> as pure logic and (b) load_metrics(path: &str) -> Result<Vec<Record>, LoadError> as the shell that reads the file and delegates to (a)"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics returns Vec<Record> with no error type; all failures surface through panic via unwrap",
+      "failure_mode": "callers cannot distinguish file-not-found from malformed data from value overflow; no recovery or retry logic is possible",
+      "fix": "define enum LoadError { Io(io::Error), Parse(ParseError) } and enum ParseError { InvalidLine, MissingField, InvalidValue, ValueOverflow } with From<io::Error> for automatic conversion"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::new with no try_reserve or line-count cap; unbounded input file causes unbounded memory allocation",
+      "failure_mode": "an attacker or misconfigured system can supply a gigabyte CSV, causing OOM kill or severe memory pressure",
+      "fix": "accept a max_items parameter, call values.try_reserve(max_items).map_err(|_| LoadError::Allocation) after cap validation, and reject lines exceeding the cap with ParseError::TooMany"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_intermediate_vec_materialization",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts: Vec<String> allocates a Vec of trimmed String copies per line before constructing Record",
+      "failure_mode": "unnecessary double allocation (Vec<String> then Record::name clone); hot-path allocation budget violated",
+      "fix": "use split_once to get two &str slices directly, then pass them to Record construction or a builder without intermediate Vec<String>"
+    },
+    {
+      "severity": "MISSING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "no benchmark, profiler, or allocation evidence exists for load_metrics throughput or memory characteristics",
+      "failure_mode": "cannot verify that the function meets latency, throughput, or memory-budget requirements under any workload",
+      "fix": "add a criterion or custom benchmark measuring lines/sec and bytes-allocated per line across small, medium, and large input files"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_metrics throughput or allocation",
+    "no profiler data to identify hot paths in the parsing pipeline",
+    "no allocation budget or capacity analysis for unbounded file input",
+    "no command evidence (cargo fmt, cargo clippy, cargo test) was executed — static review only"
+  ],
+  "residual_risk": "Static review identified 10 findings (7 BLOCKER, 3 MAJOR, 1 MINOR, 1 MISSING) across panic surfaces, unchecked indexing, lossy casts, hidden I/O, raw primitives, shell leakage, unbounded allocation, and missing error taxonomy. No commands were executed; residual risk includes unverified lint/test compliance and absence of performance evidence. The code must be repaired to return Result types, eliminate all unwrap/panic surfaces, replace split/collect with split_once, add typed error taxonomy, newtype the Name field, cap and try_reserve allocations, and remove the println! before any delivery gate."
+}

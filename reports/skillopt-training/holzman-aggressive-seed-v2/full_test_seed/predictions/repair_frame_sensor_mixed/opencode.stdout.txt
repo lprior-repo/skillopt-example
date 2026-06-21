@@ -1,0 +1,13 @@
+Now I can see the issues. The current code has two problems:
+
+1. **Missing `max_payload` check**: The `rejects_limit` test expects `PayloadTooLarge` error when payload exceeds `max_payload`, but the code ignores this parameter entirely.
+2. **Lossy `as` cast**: `payload.len() as u32` violates Holzman constraints.
+
+Let me fix both:
+All tests pass. Now writing the output:
+Repair complete. Changes made to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `FrameError::PayloadTooLarge` when `payload.len() > max_payload`
+2. **Removed lossy `as` cast** — replaced `payload.len() as u32` with `u32::try_from(payload.len())` mapped to `Overflow` error
+3. **Added checked capacity arithmetic** — `checked_add` for `4 + payload.len()` mapped to `Overflow`
+4. **Added `try_reserve` before extending** — allocation failure mapped to `FrameError::Allocation`

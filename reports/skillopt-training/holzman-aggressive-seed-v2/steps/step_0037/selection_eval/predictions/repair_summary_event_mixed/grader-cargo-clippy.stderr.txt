@@ -1,0 +1,21 @@
+    Checking repair_summary_event_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/783c934b06b6d4e4/repair_summary_event_mixed)
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:32:16
+   |
+32 |     if count > max_rows as u64 {
+   |                ^^^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:37:16
+   |
+37 |         count: count as u32,
+   |                ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: could not compile `repair_summary_event_mixed` (lib) due to 2 previous errors

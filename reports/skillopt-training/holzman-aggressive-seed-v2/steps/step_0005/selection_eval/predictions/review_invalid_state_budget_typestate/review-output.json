@@ -1,0 +1,112 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [".skill/holzman-rust/SKILL.md", ".skill/holzman-rust/references/functional-core-performance.md", ".skill/holzman-rust/references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any arbitrary string value (e.g. \"sent\" when is_sent=false, \"\" , null-equivalent). The domain invariant that status must be a controlled set of lifecycle values is not enforced by the type system.",
+      "failure_mode": "Caller can construct a BudgetWorkflow with status=\"unknown\" or status=\"sent\" paired with is_sent=false, violating the workflow invariant. String is mutable at any call site.",
+      "fix": "Replace `pub status: String` with `pub status: BudgetStatus` where `BudgetStatus` is an enum with explicit variants (e.g. `Pending`, `Validated`, `Sent`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-bool-lifecycle-flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive lifecycle flag. It can be true while is_sent is also true, or both false indefinitely. The boolean provides no state-transition discipline.",
+      "failure_mode": "A caller can set is_validated=true and then skip validation, or set is_sent=true on an invalid budget. The bool gives zero protection against illegal state combinations.",
+      "fix": "Replace the pair (`status: String`, `is_validated: bool`, `is_sent: bool`) with a single `BudgetStatus` enum that encodes the valid lifecycle (e.g. `Pending`, `Validated`, `Sent`). The enum variants carry no room for illegal combinations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-bool-lifecycle-flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a second primitive lifecycle flag. Combined with the bool on line 4 and the String on line 3, there are 2^2 * infinite string values of illegal state that the compiler cannot prevent.",
+      "failure_mode": "A caller can construct BudgetWorkflow { is_validated: false, is_sent: true, ... } which is semantically impossible — a budget cannot be sent before validation. The compiler allows this.",
+      "fix": "Eliminate both `is_validated: bool` and `is_sent: bool`. Replace them with a single `BudgetStatus` enum where `Sent` is a distinct variant reachable only through a typed transition function."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-at-boundaries-into-trusted-data",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain identity type. Budget IDs have formatting, uniqueness, and length requirements that are not captured or enforced.",
+      "failure_mode": "Any code that accepts or produces a BudgetWorkflow can pass an empty string, malformed UUID, or duplicate as the id. There is no constructor-level validation.",
+      "fix": "Replace `pub id: String` with `pub id: BudgetId`, a newtype wrapping a validated representation (e.g. `NonEmptyString` or `Uuid`). Provide a fallible constructor `BudgetId::new(s: &str) -> Result<BudgetId, ParseError>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-pure-deterministic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes a mutable BudgetWorkflow by value and mutates its fields directly. It has no validation gate — it will mark any budget as sent regardless of is_validated status. There is no typed error return.",
+      "failure_mode": "A caller can send a budget that was never validated. The function silently succeeds, returning a BudgetWorkflow with is_sent=true and status=\"sent\" even when the workflow invariant requires prior validation.",
+      "fix": "Change the signature to `pub fn mark_sent(item: BudgetWorkflow) -> Result<BudgetWorkflow, BudgetError>` (or return the new BudgetStatus enum variant). Reject with an error when the budget is not in a validatable state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-raw-field-mutation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "Direct assignment `item.status = \"sent\".to_string()` mutates a raw String field. Any caller with a mutable reference can do the same, bypassing any domain discipline.",
+      "failure_mode": "A caller in the imperative shell could write `bw.status = \"deleted\";` — a value the domain never intended. The String field is publicly mutable with no constructor gate.",
+      "fix": "Make `status` a private field of type `BudgetStatus` (enum). Provide transition methods like `BudgetWorkflow::mark_sent(self) -> Result<Self, BudgetError>` that enforce lifecycle rules. Never expose raw field mutation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-raw-field-mutation",
+      "file": "src/lib.rs",
+      "line": 11,
+      "problem": "Direct assignment `item.is_sent = true` mutates a raw bool. Same issue as line 10 — no type-level protection.",
+      "failure_mode": "Any caller can flip is_sent independently of status or validation state.",
+      "fix": "Eliminate `is_sent` as a separate field. The BudgetStatus enum variant is the single source of truth."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed-domain-errors",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns BudgetWorkflow directly. There is no error type. Transition failures (e.g. sending an unvalidated budget) must propagate as typed errors, not panics or silent accepts.",
+      "failure_mode": "Either the function silently accepts illegal transitions (current behavior) or — if patched to check conditions — would need to panic with unwrap/expect. Both are non-compliant with Holzman Rust.",
+      "fix": "Define `pub enum BudgetError { InvalidState, Allocation, ... }` and return `Result<BudgetWorkflow, BudgetError>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-panic-in-production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "The current API has no failure path. If validation is added later, the most natural fix (checking is_validated) would use `assert!` or `expect` on an Option, which are forbidden in production code per Holzman Rust.",
+      "failure_mode": "Future maintainers will add checks using panic-inducing constructs instead of returning typed errors, creating denial-of-service on invalid input.",
+      "fix": "Proactively define BudgetError and return Result. Document that all transition functions must return Result<BudgetWorkflow, BudgetError>."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler data, or allocation analysis exists for this crate. The mark_sent function allocates via \"sent\".to_string() on every call.",
+      "failure_mode": "If mark_sent is called on a hot path, the per-call String allocation adds unnecessary heap pressure. No evidence exists to prove this is acceptable.",
+      "fix": "Add a micro-benchmark measuring mark_sent allocation rate. Replace `\"sent\".to_string()` with a pre-allocated enum variant or `&'static str` if status becomes an enum. Run `cargo bench` before and after any change."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for any performance claim. Holzman Rust requires workload, hot path, target hardware, baseline command, baseline number, threshold, and variance before optimizing.",
+      "failure_mode": "Without evidence, performance decisions are cargo-culted. The to_string() call and String fields may be acceptable or wasteful depending on the workload — no one knows.",
+      "fix": "Add a benchmark in benches/ that measures mark_sent throughput and allocation rate under realistic BudgetWorkflow payloads."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any function in this crate",
+    "no profiler data for allocation hot paths",
+    "no allocation analysis (e.g. cargo-flamegraph, alloc counter) for BudgetWorkflow lifecycle",
+    "no second-ring evidence for zero-cost claims (none made, but structural review shows String::to_string on every mark_sent call)"
+  ],
+  "residual_risk": "The BudgetWorkflow type is fundamentally untyped — status is a mutable String, lifecycle flags are unenforced bools, and mark_sent has no validation gate. This allows construction of any illegal state combination at zero compiler cost. The crate compiles and runs trivially, but offers zero domain safety. All findings are structural type-level violations that require enum/newtype refactoring, not patch-level fixes. Risk is unbounded until typestates replace primitives."
+}

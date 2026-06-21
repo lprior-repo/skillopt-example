@@ -1,0 +1,27 @@
+Now I understand all the violations. Let me fix the production source.
+
+**Issues found:**
+- Returns `String` instead of `Summary` (test contract)
+- Missing `render_summary` function
+- Uses `split(',').map(...).collect()` instead of mandated `split_once(',')`
+- `parts[1]` - unchecked indexing
+- `.unwrap()` on parse - absolute law violation
+- `total += value` - unchecked arithmetic
+- `count += 1` - unchecked arithmetic
+- `count as u64` - lossy cast
+- `total / count as u64` - unchecked division + lossy cast
+- No empty-input check, no max_rows cap during iteration
+Repair complete. All 6 tests pass, formatting clean, no absolute law violations.
+
+**Changes to `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary(Summary) -> String` function
+- Replaced `split(',').map(...).collect()` with mandated `split_once(',')`
+- Replaced `parts[1]` unchecked indexing with `split_once` destructuring
+- Removed `.unwrap()` - uses `map_err` for typed errors
+- Replaced `total += value` with `checked_add` + typed error
+- Replaced `count += 1` with `checked_add` + typed error
+- Replaced lossy `count as u64` with `u64::try_from(count)`
+- Replaced `total / count` (unchecked division) with `checked_div`
+- Added empty-input rejection at top
+- Enforces `max_rows` cap during iteration (not after)

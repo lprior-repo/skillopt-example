@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on unreadable or missing file",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed I/O or Parse error",
+      "fix": "Return a Result<Record, MetricError> with an I/O variant; use ? or map_err to propagate fs::read_to_string errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or out-of-range field",
+      "failure_mode": "malformed CSV line aborts the entire load_metrics call instead of returning a typed Parse error for that record",
+      "fix": "Return Result<Record, MetricError> with a Parse variant; use .parse::<u32>().map_err(|_| ParseError)? instead of unwrap()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 lossy cast from parsed u32: any value > 65535 silently truncates",
+      "failure_mode": "a valid 32-bit metric value silently wraps into an incorrect u16, producing wrong data without any error signal",
+      "fix": "Use u16::try_from(parsed_u32) and propagate Allocation/Parse error on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] unchecked indexing into a Vec produced by split(',') — empty lines or lines with fewer than 2 commas panic",
+      "failure_mode": "a single empty line or trailing newline in the file causes a bounds panic",
+      "fix": "Skip empty lines with .filter(|l| !l.trim().is_empty()), then use line.split_once(',') or check parts.len() >= 2 with .get(0)/.get(1) before indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() call inside load_metrics: logging is a hidden side effect embedded in a data-loading function",
+      "failure_mode": "side effects in a function that purports to load structured data break purity expectations, make the function untestable in isolation, and produce unwanted console output in library consumers",
+      "fix": "Remove println! entirely; if metrics/logging are needed, pass a callback or return a debug metadata field separate from the core data, or move all logging to the imperative shell layer"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses public String and u16 fields with no domain invariants — name can be empty, value can be zero with no semantic meaning",
+      "failure_mode": "callers can construct semantically invalid Records (e.g. name=\"\", value=0 for a counter that should be >0) without compiler enforcement",
+      "fix": "Make fields private, add a Record::new(name: NonEmptyString, value: MetricValue) constructor that enforces invariants, and use newtype wrappers for domain-constrained types"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_intermediate_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "collecting all split parts into Vec<String> with per-part .to_string() allocates a heap vector and clones every field — unnecessary for a simple two-field record",
+      "failure_mode": "increased allocation pressure and memory usage on each line; the intermediate Vec is discarded after one iteration",
+      "fix": "Use line.split_once(',') to get (&str, &str) in one shot, then trim and clone only the two needed values; avoid Vec allocation entirely"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_return_type",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics returns Vec<Record> with no error type — all failures (I/O, parse, index) are silently converted to panics via unwrap()",
+      "failure_mode": "the caller has no way to distinguish between file-not-found, malformed data, and type-conversion errors; all manifest as runtime panics",
+      "fix": "Define a MetricError enum (Io, Parse, Truncation) and change the return type to Result<Vec<Record>, MetricError>"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to support any stated performance claim",
+    "no profiler output (flamegraph, perf, or similar) is present",
+    "no allocation analysis (e.g., cargo-bench with --bench, or allocation tracing) is present",
+    "no second-ring test or integration test evidence exists",
+    "no command evidence (cargo test, cargo clippy) is present"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate contains 4 BLOCKER violations (unwrap on I/O, unwrap on parse, lossy as cast, unchecked indexing) and 3 WARNING violations (no domain newtypes, unnecessary Vec allocation, no error return type). All unwrap and as-cast paths are recoverable with Result-returning constructors and checked conversions. The code is a single-file crate with no benchmarks, no tests, and no CI."
+}

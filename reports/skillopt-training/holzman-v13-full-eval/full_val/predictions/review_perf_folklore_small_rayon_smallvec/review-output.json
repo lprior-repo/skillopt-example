@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_folklore_parallelism",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon for a 4-element input. Rayon thread-pool scheduling, task distribution, and result-joining overhead vastly exceeds any parallelism benefit for four bytes.",
+      "failure_mode": "Adding Rayon would add 10-50 microseconds of scheduling overhead per call on a single 4-byte input, making it orders of magnitude slower than the current sequential iterator pipeline.",
+      "fix": "Remove the Rayon suggestion entirely. The sequential .iter().map().collect() is already optimal for four elements. If parallelism is ever needed, it must be justified by benchmark evidence showing the dataset scale exceeds the parallelism break-even threshold (typically thousands of elements)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_folklore_smallvec",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes SmallVec for a function that always produces exactly 4 elements from a fixed-size [u8; 4] input. SmallVec's stack capacity is wasted on a known-constant size and its bounds-checking logic adds branching overhead.",
+      "failure_mode": "SmallVec introduces a capacity check on every push and an extra heap-allocation path. For a function with a fixed output cardinality of 4, this adds code size, branch complexity, and potential double-allocation compared to a simple Vec or fixed array.",
+      "fix": "Use a fixed-size array [u8; 4] -> [&'static str; 4] to eliminate all allocation, or keep the current Vec if dynamic size is needed. SmallVec is not justified without evidence that the stack-capacity path is exercised in the common case."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unnecessary_allocation_tiny_input",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Function collects 4 elements into a Vec, forcing a heap allocation for a fixed-size input [u8; 4]. Every call allocates on the heap for a result of exactly 4 pointers.",
+      "failure_mode": "Heap allocation per call adds allocator lock contention, cache pollution, and allocation failure risk. For a hot path processing many 4-byte inputs, this causes sustained allocation pressure with zero benefit over a fixed array output.",
+      "fix": "Change the return type to [&'static str; 4] and populate a local array with indexed access. This eliminates all heap allocation while preserving the same semantic output. If variable output size is required, use a caller-owned buffer parameter instead of internal allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unmeasured_performance_claim",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO makes a definitive performance claim ('it will be faster') about Rayon + SmallVec without any baseline measurement, target hardware specification, input distribution analysis, or benchmark infrastructure.",
+      "failure_mode": "Implementing this unverified claim will introduce Rayon and SmallVec dependencies, increase code complexity, and likely degrade performance. Without measured evidence, the claim is pure folklore that contradicts the known overhead characteristics of parallelism on tiny datasets.",
+      "fix": "Remove the performance claim from the TODO. If performance work is required, first establish a baseline with a proper benchmark (criterion or similar), measure current Vec allocation overhead, then evaluate alternatives with the same workload. Never propose parallelism without scaling evidence."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark module exists for classify_four. No profiler evidence exists. No allocation evidence exists. No second-ring evidence (assembly listing, cache profiling) exists. The performance TODO is entirely ungrounded.",
+      "failure_mode": "Any subsequent optimization work proceeds blind. Without benchmarks, there is no regression threshold. Without profiler data, the actual bottleneck is unknown. Without allocation analysis, Vec vs array trade-offs are guessed rather than measured.",
+      "fix": "Add a benchmark module (e.g., benches/classify.rs using criterion) that measures the current sequential implementation with realistic input distributions. Include allocation tracking (criterion's plot_config or similar). Only after baseline measurement should any optimization be attempted."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "data_calculations_actions_separation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function returns Vec<&'static str> (owned collection) instead of a domain-appropriate type. The return type exposes implementation detail (heap allocation) and prevents callers from reusing storage. The function name 'classify_four' is clear but the output type is generic.",
+      "failure_mode": "Callers cannot avoid allocation when using this API. The function forces heap allocation on every call regardless of caller intent. This leaks the imperative allocation decision into the data layer, violating Data/Calculations separation.",
+      "fix": "Change return type to [&'static str; 4] so the function is allocation-free. If the caller needs a Vec, they collect themselves. This gives callers control over allocation strategy while the calculation layer remains pure and allocation-free."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark module or benchmark commands exist for classify_four",
+    "no profiler evidence (flamegraph, perf, cachegrind) for the current implementation",
+    "no allocation evidence (valgrind massif, heapshot, criterion allocation tracking) to quantify Vec allocation cost per call",
+    "no second-ring evidence (cargo asm, rustc -C opt-level=3 assembly listing) to verify the compiler's bounds-check elimination and loop unrolling for the 4-element case",
+    "no baseline measurement to evaluate whether any proposed change is actually faster"
+  ],
+  "residual_risk": "Static review only; no commands run. The code has no unsafe, no panics, no unchecked arithmetic, and no fallible-result discards, which are positive. However, the performance folklore in the TODO will likely drive an implementer toward worse performance (Rayon on 4 elements) without measurement. The Vec allocation for fixed-size output is a sustained runtime cost that can be eliminated by returning a fixed array. Without benchmark evidence, all optimization claims remain unverified."
+}

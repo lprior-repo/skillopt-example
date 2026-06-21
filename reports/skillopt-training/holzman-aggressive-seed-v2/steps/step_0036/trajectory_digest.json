@@ -1,0 +1,30 @@
+{
+  "step": 36,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 2,
+  "failure_patterns": [
+    {
+      "pattern": "unchecked_arithmetic: Agents repeatedly use unchecked integer operations (+, /, as) instead of checked variants.",
+      "count": 2,
+      "task_ids": [
+        "repair_summary_job_mixed",
+        "repair_summary_packet_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.8,
+  "score_after": 0.5,
+  "rejected_edits": [
+    {
+      "op": "replace",
+      "content": "- **Arithmetic:** ALL integer arithmetic involving totals, counts, or capacity MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. Never use `+`, `-`, `*`, `/`, or `as` for these operations. Division MUST use `checked_div` with error propagation.",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals."
+    },
+    {
+      "op": "replace",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Never use `Vec::with_capacity` in production code.",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`."
+    }
+  ]
+}

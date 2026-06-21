@@ -1,0 +1,53 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production `unsafe` block using `std::mem::transmute` to convert a `[u8; 4]` array into a `u32`. SKILL.md explicitly forbids all production `unsafe`.",
+      "failure_mode": "transmute bypasses endianness semantics and memory-layout assumptions; on big-endian targets the returned `u32` will be byte-swapped relative to little-endian callers, producing silently wrong numeric values without any error path.",
+      "fix": "Replace with `u32::from_le_bytes([input[0], input[1], input[2], input[3]])` (or `from_be_bytes` / `from_ne_bytes` with explicit documentation). Remove the `unsafe` block entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Direct array indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` with no bounds check on the `&[u8]` slice.",
+      "failure_mode": "Any call with a slice shorter than 4 bytes will panic at runtime with an index-out-of-bounds panic, violating the Holzman rule forbidding `panic!` and `unwrap`-style failures in production code.",
+      "fix": "Use `input.get(0).and_then(|a| input.get(1).and_then(|b| input.get(2).and_then(|c| input.get(3).map(|d| u32::from_le_bytes([*a, *b, *c, *d])))))` or return a typed error type for short input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_transmute",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`std::mem::transmute::<[u8; 4], u32>` is used for byte-to-integer conversion. Transmute is a raw memory reinterpret cast with no semantic guarantees.",
+      "failure_mode": "On big-endian architectures the transmute produces a different numeric value than intended by a little-endian caller. The function signature provides no endianness contract, so callers cannot reason about correctness.",
+      "fix": "Use `u32::from_le_bytes` (or document endianness explicitly and use `from_ne_bytes` with a wrapper type). Eliminate `unsafe`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_domain_type",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw `u32` return from a byte-slice reader with no domain type or endianness marker. The function parses bytes into a primitive without any type-level contract.",
+      "failure_mode": "Callers cannot distinguish between LE, BE, or native-endian reads at the type level. A caller expecting LE may accidentally feed the result into a BE context, causing silent data corruption.",
+      "fix": "Return a newtyped domain value (e.g., `struct ReadLen(u32)`) or an enum like `enum EndianU32 { Little(u32), Big(u32) }` to enforce endianness awareness at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_fallible_return",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`read_len` returns `u32` directly with no way to signal short input or parse failure. All fallible parsing must return a typed error per the error taxonomy.",
+      "failure_mode": "Short inputs either panic (unchecked indexing) or, if bounds-checked, the function signature still cannot communicate the failure, forcing callers to catch panics instead of handling typed errors.",
+      "fix": "Return `Result<ReadLen, ReadLenError>` where `ReadLenError` includes a `ShortInput(usize)` variant for slices shorter than 4 bytes."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for any performance claim about byte-to-u32 conversion", "no profiler data for the unsafe transmute path vs safe alternative", "no allocation analysis (function itself avoids heap but has no allocation evidence documented)", "no second-ring evidence (no Miri, Kani, or UB-detection run on the unsafe transmute)", "no command evidence that the crate was compiled or tested under any sanitizer"],
+  "residual_risk": "Static review only; no commands run. The `unsafe transmute` on line 2 of src/lib.rs is a BLOCKER that must be eliminated before any delivery. The function has no tests, no benchmarks, no fuzzing, and no formal verification. Any use of this function on non-little-endian targets is guaranteed to produce incorrect results."
+}

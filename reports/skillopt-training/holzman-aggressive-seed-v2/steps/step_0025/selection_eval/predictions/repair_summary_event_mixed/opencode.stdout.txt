@@ -1,0 +1,21 @@
+Now I have a clear picture. Let me identify all violations and fix them:
+
+1. `unwrap()` on line 24
+2. Unchecked `parts[1]` indexing
+3. Unchecked `total += value` (overflow)
+4. Unchecked `total / count` (division by zero)
+5. `collect()` + indexing instead of `split_once`
+6. Returns `String` instead of `Summary` struct
+7. Missing `render_summary` function
+All 6 tests pass. Let me write the repair output.
+Repair complete. All 6 tests pass. Violations fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `.map_err(|_| SummaryError::Invalid)` |
+| Unchecked `parts[1]` | `split_once(',')` with `Option` pattern match |
+| Unchecked `total += value` | `checked_add` → `Overflow` |
+| Unchecked `total / count` | `checked_div` → `Empty` |
+| `collect()` + indexing | `split_once` (no Vec allocation) |
+| Returned `String` from core | Returns `Summary` struct; `render_summary` handles formatting in shell |
+| `count as u32` cast | `u32::try_from(count)` |

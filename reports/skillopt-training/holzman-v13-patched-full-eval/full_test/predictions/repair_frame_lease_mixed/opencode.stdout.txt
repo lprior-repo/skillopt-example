@@ -1,0 +1,8 @@
+Now I see the issues. The `encode_frame` function has a lossy `as u32` cast, doesn't check `max_payload`, and is missing `checked_add` and `try_reserve` per the mandatory frame encoder pattern. Let me apply the minimal fix.
+Repair complete. Three fixes applied to `src/lib.rs`:
+
+1. **Payload size check** — Added `payload.len() > max_payload` guard returning `FrameError::PayloadTooLarge` (test `rejects_limit` requirement)
+2. **Lossy cast removal** — Replaced `payload.len() as u32` with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)` (Holzman absolute law)
+3. **Frame encoder mandatory pattern** — Added `checked_add` for capacity arithmetic and `try_reserve` for bounded allocation per skill line 30
+
+All 2 tests pass, zero clippy warnings, zero formatting drift.

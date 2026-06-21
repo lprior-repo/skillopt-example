@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String, allowing any arbitrary string value including illegal state combinations (e.g., status=\"sent\" but is_sent=false, status=\"\" or status=\"invalidated\" with no domain meaning)",
+      "failure_mode": "A caller can put LeaseWorkflow into an inconsistent state where the status string does not match the is_sent/is_validated flags, making runtime invariant checks necessary instead of compile-time guarantees",
+      "fix": "Replace `status: String` with a domain enum `pub enum LeaseStatus { New, Validated, Sent }` and make is_sent/is_validated derived from the enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a standalone bool, orthogonal to status, allowing states like is_validated=false with status=\"sent\" or is_validated=true with status=\"\"",
+      "failure_mode": "Lease can appear validated in one field while the status says otherwise, or vice versa. Logic branches on one flag may contradict the other, causing silent data corruption",
+      "fix": "Remove `is_validated: bool` and encode validation as part of the LeaseStatus enum, e.g. `LeaseStatus::Validated`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a standalone bool, orthogonal to status, allowing states like is_sent=true with status=\"new\"",
+      "failure_mode": "The sent flag can diverge from the status string, making it impossible to determine the true lifecycle position of a lease without expensive runtime consistency checks",
+      "fix": "Remove `is_sent: bool` and encode sent as `LeaseStatus::Sent`, deriving sent_at_epoch_ms from that variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain newtype, allowing empty strings, duplicate IDs, or non-identifier values",
+      "failure_mode": "No compile-time guarantee that id is a valid lease identifier. Downstream code must re-validate on every use instead of trusting the type",
+      "fix": "Introduce `pub struct LeaseId(String)` with a fallible constructor that rejects empty/invalid values, or use `newtype!` / `define_newtype!` pattern"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64>, a raw epoch milliseconds value with no domain wrapper, allowing negative/invalid timestamps and no timezone/clarity",
+      "failure_mode": "Callers cannot distinguish between a missing timestamp and a zero timestamp. The raw u64 provides no domain semantics, making misuse easy",
+      "fix": "Introduce `pub struct SentAtEpochMs(u64)` with a constructor, and use `Option<SentAtEpochMs>` in the struct"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates a mutable parameter in-place (item.status = ..., item.is_sent = ...) instead of returning a new immutable value, and the struct fields are all pub allowing external mutation",
+      "failure_mode": "The function name implies a pure transformation but it mutates its input. External code can also mutate fields directly (e.g., item.status = \"anything\"), bypassing the intended workflow",
+      "fix": "Make struct fields private, introduce a fallible `try_mark_sent(&self) -> Result<LeaseWorkflow, LeaseError>` that returns a new immutable value derived from a typestate-aware transition"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typestate pattern on LeaseWorkflow. Any code can call mark_sent on any LeaseWorkflow regardless of its prior state (e.g., a lease can be sent without being validated, or sent twice)",
+      "failure_mode": "The lifecycle has no compile-time ordering guarantees. A lease can transition from New->Sent without Validated, or Sent->Sent again, violating the domain workflow invariant",
+      "fix": "Use typestates: `LeaseWorkflow<LeaseStateNew>`, `LeaseWorkflow<LeaseStateValidated>`, `LeaseWorkflow<LeaseStateSent>` with transition methods that consume the prior state and produce the next, making illegal transitions a compile error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No constructor or validation on LeaseWorkflow. All fields are pub and constructible, meaning invalid data can flow into the core freely",
+      "failure_mode": "Callers can construct LeaseWorkflow with empty id, nonsense status, mismatched flags, or missing timestamps. The core receives untrusted data as if it were valid",
+      "fix": "Make all fields private and provide `LeaseWorkflow::try_new(id: &str) -> Result<Self, LeaseError>` that validates and constructs the initial typestate"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for allocation patterns",
+    "no allocation analysis for String allocations in hot path (id, status both allocate)",
+    "no second-ring review evidence (no black-hat review, no proof plan, no formal verification)",
+    "no command evidence (cargo test, cargo fmt, cargo clippy not run)"
+  ],
+  "residual_risk": "Critical architectural violations: no typestate, no domain newtypes, no encapsulation, all fields pub with raw primitives, no validation constructor. The struct admits every illegal state. mark_sent mutates in-place instead of transforming immutably. Without typestate enforcement, the domain lifecycle has zero compile-time guarantees. This crate would be rejected for any delivery pipeline."
+}

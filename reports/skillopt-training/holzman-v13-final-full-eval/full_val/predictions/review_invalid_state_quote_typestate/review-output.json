@@ -1,0 +1,109 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/claim-traceability.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "QuoteWorkflow has no enum-based typestate; any combination of status/is_validated/is_sent is reachable including invalid ones like status='sent' with is_sent=false",
+      "failure_mode": "callers can construct or mutate QuoteWorkflow into logically inconsistent states (e.g. sent but not marked is_sent, validated but invalid status string)",
+      "fix": "Replace QuoteWorkflow with a newtype enum `QuoteState { New { id: QuoteId }, Validated { id: QuoteId }, Sent { id: QuoteId, sent_at: SentTimestamp } }` with no public field setters"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_strings",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary status values (e.g. 'foo', 'SENT', '') instead of a closed set of domain states",
+      "failure_mode": "pattern matching on status is impossible; typos produce silent logical errors; state transitions cannot be validated at the type level",
+      "fix": "Replace `status: String` with `status: QuoteStatus` where `QuoteStatus` is an enum with exactly the legal states (e.g. `New`, `Validated`, `Sent`)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are lifecycle booleans that can contradict each other and the status string",
+      "failure_mode": "is_validated=true, is_sent=false, status='validated' is valid; is_validated=false, is_sent=true, status='new' is also valid; no single source of truth for workflow lifecycle",
+      "fix": "Replace both booleans with a single typestate enum that owns the lifecycle; each variant represents one valid lifecycle step with no redundant flags"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an optional lifecycle field that can be None while is_sent=true and status='sent', or Some while is_sent=false",
+      "failure_mode": "sent workflow with no timestamp is silently incomplete; non-sent workflow with a timestamp is logically wrong; the Option decouples the data from the lifecycle invariant",
+      "fix": "Move `sent_at` into the `Sent` variant of the typestate enum: `Sent { id: QuoteId, sent_at: SentTimestamp }` so the timestamp exists only when the workflow is in the sent state"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "raw_primitive_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain constraints; any string (empty, too long, invalid format) is accepted as a quote ID",
+      "failure_mode": "empty-string quote IDs, duplicate IDs, non-unique IDs all silently accepted; no validation at construction",
+      "fix": "Introduce `pub struct QuoteId(String)` (or a parsed struct from a fixed format like UUID/ulid) with a private constructor that validates the ID format; make the field `id: QuoteId`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "QuoteWorkflow accepts raw primitives (String, bool, Option<u64>) directly with no parse boundary; callers can construct invalid domain states without any smart constructor or validation",
+      "failure_mode": "parse boundary is violated - hostile or malformed input reaches core logic without fallible smart constructors, so callers can construct invalid domain states directly",
+      "fix": "Define a DTO/shell layer that parses raw primitives once via fallible constructors into trusted domain types; core logic consumes the domain types only"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unenforced_transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent unconditionally forces status='sent' and is_sent=true regardless of the prior state; it does not check whether the quote was validated first",
+      "failure_mode": "A QuoteWorkflow in 'new' state can be marked sent without ever being validated, violating the workflow invariant that quotes must be validated before sending",
+      "fix": "Replace `mark_sent` with a state-method on the typestate enum: `QuoteState::Validated.mark_sent() -> QuoteState::Sent` so transition invariants are enforced by the type system"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for mark_sent or any hot-path operation; performance characteristics are unmeasured",
+      "failure_mode": "Performance claims cannot be validated; allocation patterns in mark_sent (String::to_string on line 10) are unprofiled",
+      "fix": "Add a criterion or custom benchmark measuring mark_sent allocation count, latency, and memory under realistic QuoteWorkflow sizes"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No profiler evidence exists; `\"sent\".to_string()` allocates a new String on every call to mark_sent",
+      "failure_mode": "Repeated allocation of the same string literal in a hot path wastes memory and CPU; no measurement to prove this is acceptable",
+      "fix": "Profile mark_sent under benchmark load; if hot path, replace `\"sent\".to_string()` with `let status = QuoteStatus::Sent;` (enum variant, zero allocation)"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No canonical gate, clippy run, or test execution evidence is present; the crate has no tests directory",
+      "failure_mode": "Zero confidence in correctness; no test suite to verify domain invariants or regression coverage",
+      "fix": "Add a tests/ module with invariant tests (e.g. typestate transitions, invalid-state rejection) and run cargo fmt --check, cargo clippy, and cargo test"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any operation",
+    "no profiler output or allocation analysis",
+    "no test suite or test execution evidence",
+    "no clippy or cargo check execution evidence",
+    "no command-truth evidence (no commands were run)"
+  ],
+  "residual_risk": "CRITICAL: The entire domain model uses raw primitives instead of typestate enums. Illegal states are fully representable. No tests, benchmarks, or static analysis were executed. The typestate/parse-boundary violations are architectural blockers that prevent any form of safety guarantee."
+}

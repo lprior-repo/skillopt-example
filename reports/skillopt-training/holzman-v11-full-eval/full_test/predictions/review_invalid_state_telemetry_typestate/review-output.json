@@ -1,0 +1,119 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-not-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "pub status: String",
+      "problem": "TelemetryWorkflow status is a free-form String, allowing any value including invalid combinations with other fields",
+      "failure_mode": "Any string (e.g. \"sent\", \"deleted\", \"\") can be assigned to status, enabling states like status=\"sent\" with is_sent=false or is_validated=false, breaking invariants",
+      "fix": "Replace `status: String` with a domain enum `TelemetryStatus { Pending, Validated, Sent }` that encodes legal transitions"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-not-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub is_validated: bool",
+      "problem": "Lifecycle flag `is_validated` is a bare boolean separate from status, enabling contradictory states",
+      "failure_mode": "A telemetry item can have status=\"sent\" and is_validated=false, or status=\"pending\" and is_validated=true, both of which are logically contradictory and undetectable at compile time",
+      "fix": "Eliminate `is_validated` and `is_sent` booleans; encode lifecycle in the variant of a `TelemetryStatus` enum (e.g. `TelemetryStatus::Sent { validated: bool, sent_at_epoch_ms: u64 }`)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-not-typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "construct": "pub is_sent: bool",
+      "problem": "Lifecycle flag `is_sent` is a bare boolean, creating the same illegal-state problem as `is_validated`",
+      "failure_mode": "Status and sent flags can diverge: status=\"pending\" with is_sent=true is indistinguishable from a valid sent state by any invariant check",
+      "fix": "Remove `is_sent`; encode the sent state as an enum variant that owns lifecycle data"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option-invalid-state-combination",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "pub sent_at_epoch_ms: Option<u64>",
+      "problem": "Optional lifecycle data stored as a separate `Option` field, independent of whether the item is actually in a sent state",
+      "failure_mode": "sent_at_epoch_ms can hold Some value while status != \"sent\" and is_sent = false, leaking lifecycle data outside its proper state scope; or None while sent=true, losing required metadata",
+      "fix": "Move `sent_at_epoch_ms: u64` into a `TelemetryStatus::Sent { sent_at_epoch_ms: u64 }` variant so it is only present when the item is actually sent"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-missing-domain-id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub id: String",
+      "problem": "Telemetry ID is a free-form `String` with no domain semantics, validation, or newtype protection",
+      "failure_mode": "Empty strings, duplicate IDs, malformed IDs, and string-sized IDs all pass through without domain-level enforcement; callers cannot distinguish TelemetryWorkflow IDs from other string IDs at the type level",
+      "fix": "Introduce `struct TelemetryId(String)` or `struct TelemetryId([u8; N])` with a smart constructor that validates format, non-emptiness, and returns a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary-violation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: TelemetryWorkflow) -> TelemetryWorkflow",
+      "problem": "parse boundary is not enforced: mark_sent accepts the raw struct and sets status via a raw string literal, allowing parse failures and invalid transitions to be silent",
+      "failure_mode": "Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly and mark_sent silently overwrites state without validating preconditions (e.g. must be validated before sent)",
+      "fix": "Change signature to `fn mark_sent(item: TelemetryWorkflow) -> Result<TelemetryWorkflow, TelemetryError>` with a smart constructor that validates the item is in a valid pre-sent state before transitioning"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden-allocation-in-core",
+      "file": "src/lib.rs",
+      "line": 10,
+      "construct": "item.status = \"sent\".to_string()",
+      "problem": "String allocation via `.to_string()` in what should be pure core logic; string literal is also a magic string not tied to a domain enum",
+      "failure_mode": "Allocation failure in a hot path causes panic via `.to_string()` unwrapping internally; also entangles string allocation with domain state transitions",
+      "fix": "Replace `status` field with an enum; enum variant selection is zero-cost with no allocation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-imperative-shell-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub struct TelemetryWorkflow { ... } pub fn mark_sent ...",
+      "problem": "Domain model and state transition logic are fused together with no shell layer separation; no error taxonomy exists for transition failures",
+      "failure_mode": "Invalid state transitions silently succeed or are silently lost; callers cannot distinguish between \"already sent\", \"not validated\", and \"unknown status\" errors",
+      "fix": "Separate domain enum and pure transition function from shell; introduce `enum TelemetryError { AlreadySent, NotValidated }` and return `Result<TelemetryWorkflow, TelemetryError>`"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "no [bench] section or benches/ directory",
+      "problem": "No benchmark, profiler, or allocation evidence exists for this crate",
+      "failure_mode": "No measurement baseline exists to verify that the typestate refactor or any future optimization improves or maintains performance",
+      "fix": "Add a `[package.metadata.cargo-miri]` or `[[bench]]` section with criterion-based benchmarks measuring the current String-based vs enum-based transitions"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "no cargo check, clippy, or test execution",
+      "problem": "No verification commands were run; `cargo check`, `cargo clippy`, and `cargo test` evidence is absent",
+      "failure_mode": "The crate may have compilation errors, clippy violations, or failing tests that go undetected",
+      "fix": "Run `cargo check --all-targets --all-features` and `cargo clippy -- -D warnings` to verify the crate compiles and passes strict lint"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence exists for hot-path analysis",
+    "no allocation evidence exists for .to_string() usage in mark_sent",
+    "no second-ring evidence exists for any zero-cost claim",
+    "no cargo check/clippy/test command evidence exists"
+  ],
+  "residual_risk": "The TelemetryWorkflow struct permits all illegal state combinations (status/is_validated/is_sent independently mutable). mark_sent has no preconditions or error returns. No newtypes protect domain IDs. No benchmarks, profiler data, or allocation evidence exist. The crate is structurally unable to enforce its own invariants. All violations of the absolute laws (status-string, bool-lifecycle, missing-typestate, parse-boundary) require repair before delivery."
+}

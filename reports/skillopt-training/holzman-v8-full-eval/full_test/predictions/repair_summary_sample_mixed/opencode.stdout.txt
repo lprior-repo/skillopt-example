@@ -1,0 +1,13 @@
+Now I have full context. Let me fix the production code.
+All 6 tests pass. Now writing the required output.
+Repair complete. All 6 tests pass.
+
+**Changes to `src/lib.rs`:**
+
+1. **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` — the domain struct is the pure core return type.
+2. **Added `render_summary`**: Pure formatting function that takes `Summary` and returns `String` — shell boundary concern, separate from core logic.
+3. **Removed `unwrap()`**: Replaced `.unwrap()` on `.parse()` with `.map_err(|_| SummaryError::Invalid)`.
+4. **Removed unchecked indexing**: Added `parts.len() != 2` guard before accessing `parts[1]`, returning `SummaryError::Invalid`.
+5. **Overflow detection**: Replaced `total += value` with `total.checked_add(value).ok_or(SummaryError::Overflow)`.
+6. **Empty input**: Added `count == 0` check returning `SummaryError::Empty` before division.
+7. **Removed division by zero**: Empty check precedes `total / count` division.

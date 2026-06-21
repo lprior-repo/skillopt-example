@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics if the file is missing, empty, or unreadable",
+      "failure_mode": "untrusted or missing file path causes thread panic instead of returning a typed I/O error",
+      "fix": "Return Result<Vec<Record>, io::Error> or a domain error type; use fs::read_to_string(path).map_err(...) and propagate"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric field values",
+      "failure_mode": "malformed CSV data (non-numeric second field) causes panic instead of returning a typed parse error",
+      "fix": "Use .map_err() on .parse() to return a domain ParseError; do not unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses index 1 without bounds check after split + collect",
+      "failure_mode": "a CSV line with fewer than 2 comma-separated fields causes index-out-of-bounds panic",
+      "fix": "Use split_once(',') to split into at-most-two parts, then .get(1) or match on the tuple; handle missing second field with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_as_conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() as u16 truncates values > 65535 silently",
+      "failure_mode": "a valid u32 in [65536, u32::MAX] silently truncates to a wrong u16, corrupting data without any error",
+      "fix": "Use u16::try_from(value) after parsing to detect overflow and return a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_preferred",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() allocates a Vec<String> via collect for a two-field record",
+      "failure_mode": "unnecessary heap allocation per line; also defeats the split_once rule which is designed for single-delimiter extraction",
+      "fix": "Use line.split_once(',').map_err(|_| MissingDelimiter)? to get (&str, &str) without allocation, then trim and parse each side"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side effect inside the parsing/collection pipeline",
+      "failure_mode": "logging/IO in the core data-processing function makes it non-deterministic, untestable in isolation, and mixes shell concerns into the core",
+      "fix": "Remove println! from the core pipeline; move all I/O/logging to the imperative shell layer outside this function"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "load_audits performs synchronous fs::read_to_string blocking the caller with no Result wrapper",
+      "failure_mode": "blocks the calling thread on disk I/O with no error handling; async callers are poisoned",
+      "fix": "Return impl IntoIterator or Vec<Record> from a pure core function; wrap the fs call in the shell layer with proper error propagation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_ignored_fallible_results",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": "part.trim().to_string() result is used but the intermediate String allocation is wasteful; trimmed &str is parsed directly on line 19 but the collect on line 15 already owned copies",
+      "failure_mode": "double-allocation per field: one from to_string() in collect, then another from .clone() on line 18",
+      "fix": "Avoid collect entirely; use split_once, then .trim() on &str slices directly and parse from &str without intermediate String allocations"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_audits throughput or allocation behavior",
+    "no profiler evidence for hot-path analysis of the parsing pipeline",
+    "no allocation tracking (e.g., mimalloc/jemalloc profiling) for per-record Vec<String> allocations",
+    "no second-ring evidence (assembly inspection) for bounds-check elimination on parts[1] access",
+    "no command-layer documentation for expected CSV format, delimiter count, or field validation contract"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate contains 6 distinct BLOCKER-class violations across unwrap usage, unchecked indexing, lossy as-conversions, split abuse, hidden I/O in the core, and allocation waste. All unwrap/panic/unchecked patterns must be repaired with typed error returns, split_once, get/match access, and try_from before the crate can be considered Holzman-compliant. No benchmark or profiler evidence exists to validate any performance claims."
+}

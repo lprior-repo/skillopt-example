@@ -1,0 +1,11 @@
+Now I have all the information needed. Let me write the review.
+Review complete. Written to `review-output.json` with **7 findings** and **6 missing evidence items**.
+
+Key findings:
+- **BLOCKER** — Production `unsafe` block at `src/lib.rs:3` violates the no-unsafe contract
+- **BLOCKER** — No safe scalar fallback for the SIMD path
+- **BLOCKER** — Silent tail-element dropping when `len % 4 != 0` (correctness bug)
+- **BLOCKER** — Out-of-bounds memory read via `_mm_loadu_ps` on non-multiple-of-4 inputs
+- **MAJOR** — No benchmarks, profiler, or command evidence
+- **MAJOR** — Zero test files
+- **MINOR** — x86_64-only gating with no fallback for other architectures

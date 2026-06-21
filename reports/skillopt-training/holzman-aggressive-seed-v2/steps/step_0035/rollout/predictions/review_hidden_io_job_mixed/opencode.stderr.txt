@@ -1,0 +1,111 @@
+[0m
+> build · Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf
+[0m
+[0m→ [0mSkill "holzman-rust"
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/functional-core-performance.md
+[0m→ [0mRead .skill/holzman-rust/references/review-output-contract.md
+[0m→ [0mRead .
+[0m→ [0mRead src
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src/lib.rs
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json'); d=json.load(f); print('Valid JSON. Findings:', len(d['findings']), 'Missing evidence:', len(d['missing_evidence'])); f.close()"
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json; f=open('/tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json'); d=json.load(f); print('Valid JSON. Findings:', len(d['findings']), 'Missing evidence:', len(d['missing_evidence'])); f.close()
+                                                                                                                                  ~~~~~~~~~^^^
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/__init__.py", line 298, in load
+    return loads(fp.read(),
+        cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Expecting ',' delimiter: line 40 column 17 (char 1820)
+[0m
+[0m→ [0mRead review-output.json[90m [offset=35, limit=15][0m
+[0m
+[0m← [0mEdit review-output.json
+Index: /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
++++ /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+@@ -36,9 +36,9 @@
+ {
+   "severity": "BLOCKER",
+   "rule": "parsing_and_access",
+   "file": "src/lib.rs",
+-  "line": 12-18,
++  "line": 12,
+   "problem": "Uses line.split(',').map(...).collect() then accesses parts[0] and parts[1] by unchecked index",
+   "failure_mode": "split + collect allocates a full Vec for every line, then parts[0] and parts[1] are unchecked indexing — either index may panic on short lines",
+   "fix": "Replace with split_once(',') to extract the first delimiter-only pair, then .map(|(name, val)| ...) without collect or indexing"
+ },
+
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json'); d=json.load(f); print('Valid JSON. Findings:', len(d['findings']), 'Missing evidence:', len(d['missing_evidence'])); f.close()"
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json; f=open('/tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json'); d=json.load(f); print('Valid JSON. Findings:', len(d['findings']), 'Missing evidence:', len(d['missing_evidence'])); f.close()
+                                                                                                                                  ~~~~~~~~~^^^
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/__init__.py", line 298, in load
+    return loads(fp.read(),
+        cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, object_pairs_hook=object_pairs_hook, **kw)
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/lewis/.local/share/mise/installs/python/3.14.6/lib/python3.14/json/decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+json.decoder.JSONDecodeError: Expecting ',' delimiter: line 58 column 16 (char 2980)
+[0m
+[0m→ [0mRead review-output.json[90m [limit=15, offset=53][0m
+[0m
+[0m$ [0mrg -n '"line": [0-9]+-[0-9]+' /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+58:      "line": 8-22,
+67:      "line": 12-15,
+[0m
+[0m← [0mEdit review-output.json
+Index: /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+===================================================================
+--- /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
++++ /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+@@ -54,9 +54,9 @@
+ {
+   "severity": "BLOCKER",
+   "rule": "functional_core_imperative_shell",
+   "file": "src/lib.rs",
+-  "line": 8-22,
++  "line": 8,
+   "problem": "The function mixes I/O (fs::read_to_string, println!) with data parsing in a single monolithic function",
+   "failure_mode": "Cannot unit-test the parsing logic in isolation; every test requires filesystem access and handles I/O errors that are not part of the domain contract",
+   "fix": "Split into two functions: (1) parse_records(line: &str) -> Result<Record, ParseError> — pure and testable, (2) load_jobs(path: &str) -> Result<Vec<Record>, JobError> — shell that handles I/O and delegates to (1)"
+ },
+
+[0m
+[0m$ [0mrg -n '"line": [0-9]+-[0-9]+' /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+67:      "line": 12-15,
+[0m
+[0m$ [0msed -i 's/"line": 12-15/"line": 12/' /tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json
+(no output)
+[0m
+[0m$ [0mpython3 -c "import json; f=open('/tmp/opencode/holzman-skillopt-train/6e932a7af44686c3/review_hidden_io_job_mixed/review-output.json'); d=json.load(f); print('Valid JSON. Findings:', len(d['findings']), 'Missing evidence:', len(d['missing_evidence'])); f.close()"
+Valid JSON. Findings: 9 Missing evidence: 5
+[0m

@@ -1,0 +1,30 @@
+[
+  {
+    "op": "replace",
+    "target": "- For `Vec`-producing parsers/encoders with a known maximum, compute capacity with checked arithmetic, call `try_reserve` (not `Vec::with_capacity`) before pushing/extending, and map allocation failur",
+    "content_preview": "- For `Vec`-producing parsers/encoders with a known maximum, compute capacity with `checked_add`/`checked_mul` (never unchecked `+`/`*`), call `try_reserve` (not `Vec::with_capacity`) before pushing/e",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "- For frame encoders, summaries, and counters: use `checked_add` for sizes/totals, use `checked_div` after proving the divisor is nonzero, and use `u32::try_from`/`usize::try_from` instead of lossy wi",
+    "content_preview": "- For frame encoders, summaries, and counters: use `checked_add`/`checked_mul` for sizes/totals/accumulators, use `checked_div` after proving the divisor is nonzero, and use `u32::try_from`/`usize::tr",
+    "status": "applied_replace",
+    "index": 2
+  },
+  {
+    "op": "insert_after",
+    "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the f",
+    "content_preview": "- **Parsing:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `pa",
+    "status": "applied_insert_after",
+    "index": 3
+  },
+  {
+    "op": "replace",
+    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "content_preview": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+`/`*` in capacity/length/summary math (use `checked_add`/`checke",
+    "status": "applied_replace",
+    "index": 4
+  }
+]

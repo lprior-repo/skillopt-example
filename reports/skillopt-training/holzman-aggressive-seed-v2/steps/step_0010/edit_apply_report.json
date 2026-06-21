@@ -1,0 +1,30 @@
+[
+  {
+    "op": "replace",
+    "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+    "content_preview": "- **Allocation:** For `Vec` with known/bounded capacity, compute capacity with `checked_add`/`checked_mul` (never unchecked `+`/`*`). Call `try_reserve` (not `Vec::with_capacity`) before pushing/exten",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` fo",
+    "content_preview": "- **Arithmetic:** Use `checked_add`/`checked_mul` for all accumulators, sizes, totals, and capacity calculations. Use `checked_div` for division (with non-zero check). Use `try_from` for all width cas",
+    "status": "applied_replace",
+    "index": 2
+  },
+  {
+    "op": "replace",
+    "target": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing",
+    "content_preview": "- **Parsing & Access:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing",
+    "status": "applied_replace",
+    "index": 3
+  },
+  {
+    "op": "replace",
+    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "content_preview": "Before reporting a repair as done, check the source for these recurring misses:\n- `Vec::with_capacity` without `try_reserve` (always use `try_reserve` for bounded capacity).\n- Unchecked `+`/`*` in cap",
+    "status": "applied_replace",
+    "index": 4
+  }
+]

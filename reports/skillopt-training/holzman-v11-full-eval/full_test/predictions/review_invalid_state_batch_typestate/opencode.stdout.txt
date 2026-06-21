@@ -1,0 +1,9 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 11 findings (8 BLOCKER, 3 MAJOR, 1 MINOR) covering:
+
+- `status: String` instead of enum (line 3)
+- Lifecycle booleans `is_validated`/`is_sent` instead of typestate (lines 4-5)
+- `sent_at_epoch_ms: Option<u64>` decoupled from lifecycle (line 6)
+- `parse_boundary` — raw `String` id, no smart constructor (line 1)
+- `mark_sent` silently accepts unvalidated batches (line 9)
+- No typed error taxonomy, no benchmarks, no command evidence

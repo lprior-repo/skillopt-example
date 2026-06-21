@@ -1,0 +1,17 @@
+Now I have the full picture. Let me write the review output.
+Review complete. 9 findings written to `review-output.json`:
+
+**BLOCKER (4):**
+- **Rayon on 4-byte input** — parallel overhead dwarfs work for 4 elements; will be 100-1000x slower
+- **SmallVec folklore** — unnecessary branch overhead for known-fixed output size
+- **Performance claim without benchmark** — "it will be faster" with zero measurement evidence
+- **Unnecessary Vec allocation** — heap allocation for 4 known elements; should return `[u8; 4]`
+
+**MEDIUM (3):**
+- Missing benchmark, profiler, and allocation evidence
+
+**LOW (2):**
+- No cargo commands run (static review only)
+- No property tests for classification contract
+
+**Core recommendation:** Replace `Vec<&'static str>` return with `[u8; 4]` (0=even, 1=odd), eliminating all allocation and removing the Rayon/SmallVec TODO entirely.

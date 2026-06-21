@@ -1,0 +1,15 @@
+I've read all references and the task crate source. Now I'll write the review output.
+Review complete. Valid JSON written to the required output path.
+
+**Summary of findings (6 BLOCKERs):**
+
+| # | Rule | Line | Problem |
+|---|------|------|---------|
+| 1 | `illegal_state_representable` | 1 | Independent `bool` fields + `String` status allow logically impossible state combinations |
+| 2 | `status_string_should_be_enum` | 3 | `status: String` accepts any value; `mark_sent` uses `.to_string()` on a literal |
+| 3 | `bool_lifecycle_should_be_typestate` | 4-5 | `is_validated` + `is_sent` as independent bools have no ordering constraint |
+| 4 | `option_invalid_state_combinations` | 6 | `sent_at_epoch_ms: Option<u64>` can be Some while `is_sent=false` or vice versa |
+| 5 | `raw_primitive_domain_id` | 2 | `id: String` has no validation, format checks, or uniqueness enforcement |
+| 6 | `parse_boundary_violation` | 1 | Raw primitives at domain boundary with no smart constructor or fallible parse |
+
+**Missing evidence:** No benchmark, profiler, allocation data, second-ring evidence, or command execution evidence.

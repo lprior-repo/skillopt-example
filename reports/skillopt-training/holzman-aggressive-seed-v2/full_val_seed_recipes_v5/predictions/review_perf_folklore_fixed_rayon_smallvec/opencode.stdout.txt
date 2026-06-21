@@ -1,0 +1,9 @@
+Now I have all the context. Let me write the review.
+Review complete. Written to `review-output.json` with 5 findings:
+
+- **2 BLOCKERs**: Cargo-culted Rayon/SmallVec for 4-element fixed input; heap Vec return instead of fixed array
+- **1 MAJOR**: Iterator chain `.collect()` allocation for statically-sized output
+- **1 MAJOR**: Comment endorsing anti-patterns as a TODO
+- **1 MINOR**: Bitwise parity less idiomatic than `% 2`
+
+5 missing evidence items (no benchmarks, profiler, allocation, or command evidence).

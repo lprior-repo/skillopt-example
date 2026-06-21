@@ -1,0 +1,7 @@
+Review complete. Written to `review-output.json` with:
+
+- **3 BLOCKERs**: `LedgerWorkflow` allows illegal states — `status: String` + `is_sent: bool` are independent (line 1-3), `sent_at_epoch_ms: Option<u64>` decoupled from `is_sent` (line 6), `is_validated: bool` standalone without workflow typestate (line 4)
+- **2 WARNINGs**: `mark_sent` doesn't enforce validated precondition (line 9), no benchmarks exist
+- **2 INFOs**: No tests/behavior specs, unmeasured allocation pattern on `to_string()` call
+
+All 7 findings have independent severity, rule, file, line, problem, failure_mode, and fix fields per the review-output-contract.

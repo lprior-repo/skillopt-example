@@ -1,0 +1,88 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-status-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "pub status: String",
+      "problem": "Status field is a raw String instead of a domain enum, allowing any invalid string value (e.g. \"sent\" without is_sent=true, empty string, \"deleted\") and making state transitions unchecked.",
+      "failure_mode": "Callers can set status to any string, creating illegal states like status=\"sent\" with is_sent=false, or status=\"\" with no meaningful lifecycle meaning.",
+      "fix": "Replace with `pub status: TelemetryStatus` enum with explicit variants (e.g. `Pending`, `Validated`, `Sent`) so only valid states exist."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-lifecycle-booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub is_validated: bool",
+      "problem": "Lifecycle boolean on its own cannot express the state machine. It is independent of status, so is_validated could be true while status=\"pending\", or both booleans could be true in contradictory combinations.",
+      "failure_mode": "Invalid state combinations like is_validated=true, is_sent=false, status=\"sent\" are representable and indistinguishable from correct states.",
+      "fix": "Fold lifecycle booleans into the TelemetryStatus enum variants. For example: `Validated { sent_at_epoch_ms: Option<u64> }` owns the validated flag and its associated data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-lifecycle-booleans",
+      "file": "src/lib.rs",
+      "line": 5,
+      "construct": "pub is_sent: bool",
+      "problem": "Lifecycle boolean is independent from status and sent_at_epoch_ms. is_sent=true with status=\"pending\" is a contradictory but representable state.",
+      "failure_mode": "A telemetry item appears sent (is_sent=true) but the status field says \"pending\", causing downstream consumers to duplicate sends or miss sends.",
+      "fix": "Merge into the typestate enum: the `Sent` variant owns is_sent implicitly and carries sent_at_epoch_ms."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-optional-lifecycle",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "pub sent_at_epoch_ms: Option<u64>",
+      "problem": "Optional lifecycle data is a free-floating field, not owned by the variant that needs it. sent_at_epoch_ms=Some(123) is possible even when status=\"pending\" and is_sent=false.",
+      "failure_mode": "Ghost timestamp data on non-sent items; consumers cannot trust that sent_at_epoch_ms implies the item was actually sent.",
+      "fix": "Move into the typestate enum variant: `Sent { sent_at: InstantLike }` or similar, where the timestamp only exists when the item is in the sent state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub id: String",
+      "problem": "Telemetry ID is a raw String with no domain identity enforcement. Any string is valid; there is no format validation, uniqueness guarantee, or type safety against passing a non-ID string.",
+      "failure_mode": "Empty ID, malformed ID, or a non-ID string (e.g. a status value) can be passed where a telemetry ID is expected, causing silent data corruption.",
+      "fix": "Introduce `pub struct TelemetryId(String)` with a smart constructor that validates format, or use an existing domain ID type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-state-machine",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: TelemetryWorkflow) -> TelemetryWorkflow",
+      "problem": "mark_sent accepts any TelemetryWorkflow regardless of current state and unconditionally sets status=\"sent\" and is_sent=true. There is no pre-condition check (e.g. item must be validated first) and the function mutates state through a plain struct instead of a typestate transition.",
+      "failure_mode": "A telemetry item that was never validated can be marked as sent, skipping the validation gate entirely. The function also leaks the imperative shell pattern by mutating a struct instead of returning a new typed state.",
+      "fix": "Make mark_sent generic over the pre-state typestate: `fn mark_sent(item: TelemetryWorkflow<Validated>) -> TelemetryWorkflow<Sent>`. Replace the struct's String status and booleans with a typestate enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub struct TelemetryWorkflow { ... }",
+      "problem": "The struct has 5 independent public fields (String id, String status, bool is_validated, bool is_sent, Option<u64>) producing 2*2*2*2*2=32 boolean combinations times unbounded status strings. No constructor envariants hold.",
+      "failure_mode": "Every possible combination of these fields is constructible, including wildly contradictory ones (status=\"sent\", is_sent=false, is_validated=true, sent_at_epoch_ms=None, id=\"\").",
+      "fix": "Replace with a typestate enum where each variant encodes exactly the valid fields for that lifecycle phase. Provide smart constructors and no public field accessors that bypass the invariant."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent performance",
+    "no profiler evidence for hot-path analysis of TelemetryWorkflow lifecycle",
+    "no allocation evidence for String-based id and status (two heap allocations per struct, one per method call)",
+    "no second-ring evidence for any performance claim"
+  ],
+  "residual_risk": "Static review identifies 7 BLOCKER findings: status is a String instead of an enum, two lifecycle booleans are independent and contradictory, optional lifecycle data is unowned, ID is a raw String, mark_sent has no pre-condition guards, and the struct makes every illegal state representable. No commands were run. The crate has no tests, benchmarks, or clippy gating. Full repair requires typestate enum redesign, smart constructors, and typed error boundaries."
+}

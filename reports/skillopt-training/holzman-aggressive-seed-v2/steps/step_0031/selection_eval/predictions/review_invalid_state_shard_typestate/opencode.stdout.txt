@@ -1,0 +1,14 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings: 8 findings (6 BLOCKER, 2 MAJOR)**
+
+The crate has a fundamental architectural failure — `ShardWorkflow` uses primitive fields (`String` status, `bool` flags) that make all illegal states representable. Specifically:
+
+- **BLOCKER** (lines 1-7): No typestate — `status: String` + `is_validated: bool` + `is_sent: bool` allow 8 states but only a subset is valid. Callers can construct impossible combinations like `is_sent=true` with `status="draft"`.
+- **BLOCKER** (line 9): `mark_sent` mutates raw primitives without any state-gate check — no transition validation, no error taxonomy.
+- **BLOCKER** (line 10): `.to_string()` on every call allocates heap for a constant literal.
+- **MAJOR** (line 1): All fields are `pub` — zero encapsulation.
+- **MAJOR** (line 6): `Option<u64>` timestamp is independently mutable from the sent flag.
+
+**Missing evidence**: no benchmarks, no profiler data, no allocation audit, no CI/test commands run.

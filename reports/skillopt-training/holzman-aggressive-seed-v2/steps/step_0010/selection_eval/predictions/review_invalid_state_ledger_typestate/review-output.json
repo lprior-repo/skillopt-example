@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses pub status: String and pub is_validated: bool / is_sent: bool instead of enum typestates. Any combination of these fields is constructible, including contradictory states like is_sent=true with status=\"pending\" or is_sent=true with sent_at_epoch_ms=None.",
+      "failure_mode": "Caller can place the ledger into logically impossible states at any time by directly mutating public fields. No constructor enforces domain invariants.",
+      "fix": "Replace status: String with an enum (e.g., LedgerStatus { Pending, Sent { sent_at: u64 } }). Replace is_validated: bool and is_sent: bool with a single typed state enum or typestate struct. Make all fields private with a fallible constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a bare primitive with no domain semantics. No newtype enforces format, length, or uniqueness constraints.",
+      "failure_mode": "Callers can pass empty strings, duplicates, or malformed identifiers. Invalid IDs propagate silently into the core.",
+      "fix": "Introduce a newtype struct LedgerId(String) with a private constructor that validates format/length on construction. Use LedgerId everywhere instead of bare String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates the struct in-place via `mut item` and assigns `.to_string()` for status. This is imperative mutation inside what should be a pure functional-core transition. The function takes ownership and returns the mutated struct, which is a code smell for missing typestate encoding.",
+      "failure_mode": "The transition is not enforced by the type system. Callers can call mark_sent on already-sent ledgers, or bypass it entirely by setting fields directly.",
+      "fix": "Encode the transition as a typestate: `fn mark_sent(self) -> Result<LedgerSent, TransitionError>` returning a distinct type. The transition should be fallible and type-enforced."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pub_fields_expose_internal_state",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of LedgerWorkflow are public (pub). External code can bypass any intended invariants by directly reading and writing fields without going through constructors or transitions.",
+      "failure_mode": "Any caller can set is_sent=true, status=\"pending\", and sent_at_epoch_ms=None simultaneously, creating an inconsistent ledger that violates domain invariants.",
+      "fix": "Make all fields private (no pub). Provide immutable getters or derive Display/Debug as needed. All mutations go through typed constructors and transitions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_type_enforcement",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from is_sent: bool. The epoch can be None while is_sent is true, or Some value while is_sent is false. Both fields should be co-located in a single state representation.",
+      "failure_mode": "Ledger can be marked sent without a timestamp (causing downstream failures) or have a timestamp without being marked sent (stale data).",
+      "fix": "Merge into a single enum variant: `LedgerSent { sent_at_epoch_ms: u64 }` as part of a typestate enum, eliminating the Option + bool pair entirely."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_fallible_constructor",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No constructor exists for LedgerWorkflow. The struct can be instantiated with arbitrary field values via struct literal syntax.",
+      "failure_mode": "Invalid ledgers are constructed at every call site without any validation, polluting the functional core with invalid data.",
+      "fix": "Add `impl LedgerWorkflow { pub fn new(id: LedgerId) -> Self { ... } }` or equivalent that sets initial valid state and rejects invalid inputs."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "bool_flags_instead_of_enum",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are two independent booleans that should form a joint state machine (e.g., Pending -> Validated -> Sent). Using separate bools creates 4 states instead of a proper 3-state workflow.",
+      "failure_mode": "States like (validated=false, sent=true) and (validated=true, sent=true) are both representable but semantically invalid or ambiguous.",
+      "fix": "Replace both bools with a single enum: `enum LedgerState { Pending, Validated, Sent { sent_at: u64 } }`."
+    }
+  ],
+  "missing_evidence": ["no benchmarks exist for the stated or implied performance claims", "no profiler or allocation evidence for mark_sent path", "no behavior tests for state transitions or invariant enforcement", "no second-ring evidence (proptest, fuzz, Kani) for typestate correctness", "no command evidence (no cargo fmt/test/clippy run)"],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental type-level violations that allow every illegal state to be constructed at compile time. No tests or benchmarks exist to validate any behavior. The entire domain model is a data POD with no invariants."
+}

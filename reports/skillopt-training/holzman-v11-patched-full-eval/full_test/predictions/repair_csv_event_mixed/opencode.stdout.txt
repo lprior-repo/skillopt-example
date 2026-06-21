@@ -1,0 +1,12 @@
+Now let me examine the task crate:
+Now I understand the issues. The current `parse_events` uses `.unwrap()`, has no empty check, no invalid handling, no max_items enforcement. Let me fix it per the Mandatory Repair Patterns:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+**Problems fixed:**
+1. `.unwrap()` on parse → `.map_err(|_| ParseError::Invalid)`
+2. No empty input check → returns `Err(ParseError::Empty)`
+3. No invalid value handling → `map_err` on parse
+4. No max_items enforcement → count guard before push, returns `Err(ParseError::TooMany)`
+5. No bounded allocation → `try_reserve(max_items)` with `Err(ParseError::Allocation)` on failure
+
+**Verification:** `cargo test` — 4/4 passed, `cargo fmt --check` — clean, `cargo clippy` strict lint — clean.

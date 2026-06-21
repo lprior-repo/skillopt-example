@@ -1,0 +1,17 @@
+Now I have all references. Let me write the review output based on the findings.
+Review complete. Written to `review-output.json`.
+
+**6 BLOCKER, 2 WARNING, 1 INFO findings:**
+
+| # | Severity | Rule | Line | Summary |
+|---|----------|------|------|---------|
+| 1 | BLOCKER | make-illegal-states-unrepresentable | 1 | `status: String` + `is_validated: bool` + `is_sent: bool` permits impossible combinations (status="new" with is_sent=true, etc.) |
+| 2 | BLOCKER | no-public-mutable-domain-fields | 2 | All fields are `pub`, breaking encapsulation and allowing external invalid-state construction |
+| 3 | BLOCKER | mark-sent-must-enforce-preconditions | 9 | `mark_sent` has no validation precondition — invalid/unvalidated shards can be marked sent |
+| 4 | BLOCKER | no-redundant-state-fields | 4 | `is_sent` duplicates status='sent' info, creating divergence risk |
+| 5 | BLOCKER | id-should-be-checked-newtype | 2 | `id: String` has no domain constraints or newtype wrapper |
+| 6 | WARNING | functional-core-pure-data | 1 | No functional-core/imperative-shell split; free-function mutation |
+| 7 | WARNING | no-benchmark-profiler-evidence | 1 | No benchmarks, profiler data, or allocation analysis |
+| 8 | INFO | no-command-evidence | 1 | No cargo commands executed |
+
+**Core issue:** The struct is fundamentally incompatible with the Holzman contract. Replace `status: String`, `is_validated: bool`, `is_sent: bool` with a single typestate enum (e.g., `enum ShardStage { New, Validated, Sent { sent_at_epoch_ms: u64 } }`), make all fields private, and use typestate-based method signatures to enforce valid transitions at compile time.

@@ -1,0 +1,141 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/references/nasa-jpl-standards.md",
+    ".skill/holzman-rust/references/simd-patterns.md",
+    ".skill/holzman-rust/references/latency-throughput-playbook.md",
+    ".skill/holzman-rust/references/runtime-performance-architecture.md",
+    ".skill/holzman-rust/references/zero-cost-abstractions.md",
+    ".skill/holzman-rust/references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "unsafe_forbidden_by_default / safe_simd_only",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Unsafe block uses std::arch::x86_64 intrinsics (_mm_setzero_ps, _mm_loadu_ps, _mm_add_ps, _mm_storeu_ps) without explicit prior user waiver. Holzman Rust forbids unsafe by default; any unsafe SIMD requires named waiver before code is written.",
+      "failure_mode": "Unreviewed unsafe boundary with undefined-behavior risk from missing bounds, aliasing, or initialization proofs.",
+      "fix": "Stop and obtain explicit user waiver naming the waived rule, or replace with safe portable_simd (#![feature(portable_simd)]) or a safe crate API."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_simple_control_flow / power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "Incorrect semantics: the while loop advances i by 4 each iteration but only processes floor(len/4) * 4 elements. For any input whose length is not a multiple of 4, trailing elements are silently dropped, producing a wrong sum. Example: sum(&[1.0, 2.0, 3.0, 4.0, 5.0]) returns 10.0 instead of 15.0.",
+      "failure_mode": "Silent data truncation produces incorrect results without error, violating checked_returns and invariant_density.",
+      "fix": "Handle remainder with chunks_exact(N).remainder() pattern: process full SIMD chunks then scalar-accumulate trailing elements."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_patterns_rejection / power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No remainder handling. The loop uses raw pointer arithmetic (input.as_ptr().add(i)) with fixed stride of 4 but never processes trailing elements. chunks_exact remainder must be handled per simd-patterns.md alignment rules.",
+      "failure_mode": "Data loss on non-aligned inputs; the function silently returns partial sums.",
+      "fix": "Use chunks_exact(4) and accumulate remainder via a scalar path: let chunks = input.chunks_exact(4); let remainder = chunks.remainder(); chunk_sum + remainder.iter().copied().sum()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_patterns_rejection",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No scalar reference implementation (oracle). simd-patterns.md rejects SIMD without scalar correctness oracle. No scalar sum function exists for comparison or fallback.",
+      "failure_mode": "Cannot verify SIMD correctness; bugs go undetected by property tests.",
+      "fix": "Add fn sum_f32_scalar(input: &[f32]) -> f32 { input.iter().copied().sum() } and write property tests comparing SIMD output to scalar output across edge cases."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_patterns_rejection",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No scalar fallback for unsupported targets. The function is gated only by #[cfg(target_arch = \"x86_64\")] with no runtime CPU feature detection or #[target_feature]. On non-x86_64 platforms the function is entirely absent.",
+      "failure_mode": "Function unavailable on ARM, aarch64, or other architectures; no fallback path exists.",
+      "fix": "Add runtime feature detection (e.g., std::is_x86_feature_detected!(\"sse\")) or #[target_feature(enable = \"sse\")] with a scalar fallback function for unsupported targets."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_patterns_rejection",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Missing SAFETY comment. Unsafe blocks in generated or modified code require an invariant comment stating CPU feature proof, bounds, alignment, aliasing, remainder handling, and drop safety per simd-patterns.md unsafe waiver invariant template.",
+      "failure_mode": "Unsafe boundary is not auditable; reviewers cannot verify preconditions or postconditions.",
+      "fix": "Add a // SAFETY: comment block naming each invariant: CPU feature proven by runtime detection, bounds guaranteed by chunks_exact, alignment via loadu, aliasing (read-only input, unique output), remainder handled by scalar path."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_invariant_density",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests. No unit tests, property tests, or edge-case tests exist. Tests must cover empty, one element, LANES-1, LANES, LANES+1, non-multiple-of-LANES, and large inputs per simd-patterns.md.",
+      "failure_mode": "Incorrectness from truncated inputs and missing remainder path cannot be detected.",
+      "fix": "Add #[cfg(test)] module with property tests: for any input, assert_eq!(simd_sum(input), scalar_sum(input)) across edge-case sizes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "benchmark_proof / placeholder_commands_forbidden",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No benchmark target defined. Cargo.toml has no [[bench]] section, no dev-dependency on criterion or similar, and no benchmark source file. Performance claims require a named benchmark with before/after evidence.",
+      "failure_mode": "Cannot measure whether SIMD wins over scalar; optimization claims are unverifiable.",
+      "fix": "Add criterion dev-dependency, a benches/ directory with a benchmark comparing scalar vs SIMD across sizes [16, 256, 4096, 65536], and report p50/p95/p99 numbers."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_patterns_rejection",
+      "file": "src/lib.rs",
+      "line": 7,
+      "problem": "Missing remainder tests. No test for inputs where len % 4 != 0. Without these, the truncation bug cannot be caught by tests.",
+      "failure_mode": "Property tests may pass on multiples-of-4 inputs while silently dropping data on other sizes.",
+      "fix": "Add tests for input lengths 0, 1, 2, 3, 4, 5, 7, 8, 9, 12, 13 to verify scalar==SIMD across all remainder classes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No rust-toolchain.toml present. Nightly SIMD work requires a checked-in rust-toolchain.toml with pinned dated nightly, minimal profile, and allowed components. Without it, the build toolchain is floating.",
+      "failure_mode": "Non-deterministic compiler versions; portable_simd API may change between nightly releases.",
+      "fix": "Add rust-toolchain.toml with channel = nightly-YYYY-MM-DD, profile = minimal, components = [rustfmt, clippy, rust-src, llvm-tools-preview]."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "mechanical_empathy_order / assembly_ir_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No assembly or IR evidence for the SIMD path. Claims about vectorization performance require cargo asm or cargo llvm-ir tied to the actual symbol review_unsafe_simd::sum.",
+      "failure_mode": "Cannot verify that LLVM emits vectorized instructions for the SIMD code path; the function may not be inlined or vectorized as expected.",
+      "fix": "Run cargo asm --lib review_unsafe_simd::sum and cargo llvm-ir --lib review_unsafe_simd::sum to verify SIMD instruction emission in release profile."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "latency_throughput / storage_placement",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Stack allocation of accumulator: let mut acc = _mm_setzero_ps() and let mut out = [0.0; 4] use the stack for SIMD registers and output array. While small arrays are fine on stack, no measurement justifies this placement choice for the workload.",
+      "failure_mode": "Suboptimal register allocation pressure if compiler cannot keep acc in XMM registers across the loop.",
+      "fix": "Measure with perf stat to verify acc stays in registers; profile shows no stack spill of acc or out."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Uses [0.0; 4] with as_mut_ptr() for store, which relies on uninitialized array then immediately writes. The [0.0; 4] default initialization is wasted work and the pattern relies on immediate overwrite.",
+      "failure_mode": "Unnecessary zero-init before store; on architectures with penalized unaligned stores, this could affect throughput.",
+      "fix": "Use MaybeUninit<[f32; 4]> to avoid unnecessary zero-init, or accept the cost if benchmark shows no measurable impact."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmark target exists (criterion/iai-callgrind/hyperfine) to measure SIMD vs scalar performance.",
+    "No profiler evidence (perf stat, cargo flamegraph, samply) for cycles, instructions, cache-misses, or branch-misses.",
+    "No assembly/IR evidence (cargo asm, cargo llvm-ir) verifying the SIMD path emits vectorized instructions.",
+    "No rust-toolchain.toml with pinned nightly for deterministic build reproducible with portable_simd or std::arch.",
+    "No property tests comparing SIMD output to scalar output across edge cases (empty, 1, LANES-1, LANES, LANES+1, non-multiple).",
+    "No second-ring evidence (cargo bloat, cargo llvm-lines, cargo semver-checks) for binary size or API compatibility.",
+    "No safety audit via Kani, Miri, or dedicated UB tooling for the unsafe SIMD boundary.",
+    "No dependency audit (cargo audit, cargo deny, cargo geiger) artifacts."
+  ],
+  "residual_risk": "CRITICAL: The function has incorrect semantics (truncates non-multiple-of-4 inputs to produce wrong sums), uses unsafe SIMD intrinsics without explicit user waiver, lacks scalar oracle and tests, has no benchmark evidence, and has no rust-toolchain.toml. The code cannot be accepted in any form until: (1) explicit user waiver for unsafe/std::arch or replacement with safe portable_simd, (2) correctness fix for remainder handling, (3) scalar oracle plus property tests, (4) benchmark proving SIMD wins, and (5) SAFETY invariant comment. Without all five, this code violates multiple Power of Ten rules and SIMD discipline requirements."
+}

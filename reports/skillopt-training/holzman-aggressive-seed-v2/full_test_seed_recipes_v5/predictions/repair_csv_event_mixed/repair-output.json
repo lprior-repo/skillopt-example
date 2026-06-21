@@ -1,0 +1,29 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_csv_event_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_csv_event_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_csv_event_mixed/.skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock", "status": "passed"},
+    {"command": "rg -n '(assert!|assert_eq!|assert_ne!|unreachable!)' prod check", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap() - replaced with map_err(|_| ParseError::Invalid)",
+    "No production unsafe - none present",
+    "Empty input rejected with ParseError::Empty before parsing",
+    "Max-items enforcement via online count check returning ParseError::TooMany",
+    "Parse errors mapped to typed ParseError::Invalid via map_err",
+    "No assert!/unreachable! macros in production source",
+    "No lossy as conversions, unchecked indexing, or unchecked arithmetic",
+    "Functional core: pure deterministic parse_events with no I/O",
+    "Tests are the behavior contract - not edited"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "No allocation handling (try_reserve) because inputs are tiny CSV u16 lists and the error taxonomy has no Allocation-producing test path; max_items bound is enforced online so unbounded growth is impossible. If allocation failure becomes part of the contract, add try_reserve before the push loop."
+}

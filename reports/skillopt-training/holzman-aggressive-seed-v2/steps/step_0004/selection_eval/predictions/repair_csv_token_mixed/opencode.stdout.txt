@@ -1,0 +1,9 @@
+Now I understand the issues. The production code has: `unwrap()` (unsafe), no max_items enforcement, no empty check, no invalid/error handling. Let me fix it.
+All 4 tests pass. Now writing the output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Removed `unwrap()`** — replaced with proper `Result` propagation via `map_err`
+- **Added empty-input check** — returns `Err(ParseError::Empty)` for `""` or whitespace-only parts
+- **Added `max_items` enforcement** — returns `Err(ParseError::TooMany)` when token count exceeds limit
+- **Added `try_reserve`** — handles allocation errors for bounded `Vec` growth
+- **Added `Invalid` error path** — parse failures return `Err(ParseError::Invalid)`

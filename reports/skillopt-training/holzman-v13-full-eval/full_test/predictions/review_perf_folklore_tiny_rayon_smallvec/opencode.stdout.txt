@@ -1,0 +1,14 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written `review-output.json` with 7 findings:
+
+| # | Rule | Severity | File:Line |
+|---|------|----------|-----------|
+| 1 | `tiny_fixed_input_rayon_folklore` | BLOCKER | `src/lib.rs:2` |
+| 2 | `tiny_fixed_input_smallvec_folklore` | BLOCKER | `src/lib.rs:2` |
+| 3 | `allocation_discipline_vec_for_fixed_size` | BLOCKER | `src/lib.rs:6` |
+| 4 | `performance_claim_without_evidence` | BLOCKER | `src/lib.rs:2` |
+| 5 | `missing_benchmark_evidence` | BLOCKER | `src/lib.rs:1` |
+| 6 | `parse_boundary_raw_primitive` | BLOCKER | `src/lib.rs:1` |
+| 7 | `missing_command_evidence` | BLOCKER | `src/lib.rs:1` |
+
+Core issues: TODO comment proposes Rayon+SmallVec folklore for a 4-element function (will regress performance), returns `Vec` on fixed-size input (unnecessary heap allocation per call), raw primitive input with no parse boundary validation, and zero test/benchmark/command evidence. Recommended fix: return `[&'static str; 4]` stack array.

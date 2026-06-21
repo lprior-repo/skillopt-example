@@ -1,0 +1,8 @@
+Now I understand the issues. The production code has `unwrap()`, ignores `max_items`, doesn't check empty input, and doesn't handle invalid parse errors. Let me fix it.
+All 4 tests pass. Now writing the output JSON.
+Repair complete. Summary of changes to `src/lib.rs:9-20`:
+
+- **Removed** `unwrap()` on parse — replaced with `.map_err(|_| ParseError::Invalid)`
+- **Added** empty-input check returning `Err(ParseError::Empty)`
+- **Added** `max_items` enforcement returning `Err(ParseError::TooMany)` when exceeded
+- **All 4 tests pass**: `parses_values`, `rejects_empty`, `rejects_invalid`, `rejects_too_many`

@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-type-discipline",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status field is pub String instead of a typed enum or typestate. Any string value (\"pending\", \"deleted\", \"\") is representable, making illegal states constructible.",
+      "failure_mode": "Caller can set status to any arbitrary string, breaking domain invariants. Downstream code must string-compare rather than exhaustively match, enabling silent bugs on unknown states.",
+      "fix": "Replace `pub status: String` with `pub status: BudgetStatus` where `BudgetStatus` is an enum with exactly the domain-valid variants (e.g., `Pending`, `Validated`, `Sent`, `Rejected`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-type-discipline",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive boolean lifecycle flag. Combined with is_sent: bool and status: String, the three fields are redundant and can be in conflict (e.g., is_sent=true but status=\"pending\").",
+      "failure_mode": "State inconsistency: boolean flags and string status can disagree, leading to undefined workflow behavior. The type system cannot enforce that the state is one coherent value.",
+      "fix": "Collapse is_validated and is_sent into the BudgetStatus enum typestate. Use an enum with variants that encode the full lifecycle (e.g., `Pending`, `Validated`, `Sent { sent_at_epoch_ms: u64 }`). Remove both bool fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-type-discipline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id field is pub String instead of a domain newtype. Any 0-length, whitespace-only, or invalid string is representable.",
+      "failure_mode": "Downstream code must manually validate every ID usage. Empty or malformed IDs silently propagate, causing hard-to-diagnose bugs in queries, logs, and persistence.",
+      "fix": "Replace `pub id: String` with `pub id: BudgetId` where `BudgetId` is a newtype wrapping a non-empty string (e.g., `&'static str` or a validated `String` via a fallible constructor). Remove pub on the inner field."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-type-discipline",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a primitive boolean lifecycle flag that should be part of a typestate enum.",
+      "failure_mode": "Duplicate state representation alongside status field and sent_at_epoch_ms. Cannot enforce that sent_at_epoch_ms is Some only when sent=true via the type system.",
+      "fix": "Remove is_sent entirely. Encode the sent state in the BudgetStatus enum (e.g., `Sent { sent_at_epoch_ms: u64 }`) so the compiler enforces sent_at_epoch_ms is always present when sent."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-immutable-data",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates the struct in place (mut item). Combined with pub fields, the function relies on caller-enforced invariants rather than type-level guarantees.",
+      "failure_mode": "No type-level enforcement that mark_sent can only be called in a valid pre-state. The function could be called on an already-sent workflow, creating duplicate/silent state transitions.",
+      "fix": "Use the typestate enum to constrain transitions. mark_sent should take a BudgetStatus::Validated variant and return BudgetStatus::Sent, or the struct should be immutable with a constructor that produces the new variant."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional-core-allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a new String on every call to mark_sent. Status is a constant literal that should not require heap allocation.",
+      "failure_mode": "Unnecessary allocation on every state transition. If mark_sent is called in a hot path, this creates measurable GC pressure and allocation overhead.",
+      "fix": "Once status is replaced with an enum (BudgetStatus::Sent), the variant construction is zero-allocation. No String allocation is needed."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional-core-architecture",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an Option field on the struct but should be scoped to the sent state only via a typestate enum variant.",
+      "failure_mode": "sent_at_epoch_ms can be None while is_sent=true, or None while status=\"sent\", creating contradictory state that the type system cannot catch.",
+      "fix": "Move sent_at_epoch_ms into the BudgetStatus enum: `Sent { sent_at_epoch_ms: u64 }`. When not in the Sent variant, the timestamp does not exist at all."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent performance or allocation characteristics",
+    "no profiler data for allocation hotspots in BudgetWorkflow lifecycle",
+    "no allocation audit confirming zero-allocation guarantees of the typestate enum design",
+    "no second-ring review or black-hat review artifacts for this crate",
+    "no formal proof or behavior test evidence for state transition invariants"
+  ],
+  "residual_risk": "The current code is functionally minimal but architecturally fragile. All state invariants are runtime-checked at best (not at all currently). The primitive bool/String fields make illegal states representable, violating the core Holzman Rust doctrine. Without the typestate enum refactor, any future additions to the workflow will compound the inconsistency risk. Static review only; no commands run. No benchmark or profiler evidence exists to validate performance claims."
+}

@@ -1,0 +1,31 @@
+    Checking repair_summary_session_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/2545db0adf6bec0c/repair_summary_session_mixed)
+error: indexing may panic
+  --> src/lib.rs:25:21
+   |
+25 |         let value = parts[1]
+   |                     ^^^^^^^^
+   |
+   = help: consider using `.get(n)` or `.get_mut(n)` instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#indexing_slicing
+   = note: requested on the command line with `-D clippy::indexing-slicing`
+
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:30:9
+   |
+30 |         count += 1;
+   |         ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+   = note: requested on the command line with `-D clippy::arithmetic-side-effects`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:42:22
+   |
+42 |         .checked_div(count as u64)
+   |                      ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: could not compile `repair_summary_session_mixed` (lib) due to 3 previous errors

@@ -1,0 +1,13 @@
+Now I understand the issues. Let me fix `src/lib.rs`:
+
+1. Missing `payload.len() > max_payload` check (test `rejects_limit` expects it)
+2. Lossy `payload.len() as u32` conversion
+3. Missing `checked_add` and `try_reserve` (mandatory frame encoder pattern)
+Done. Repaired `src/lib.rs` with minimal changes:
+
+- Added `payload.len() > max_payload` bound check → `PayloadTooLarge` error
+- Replaced lossy `payload.len() as u32` with `u32::try_from(...).map_err(...)`
+- Added `checked_add` for capacity arithmetic → `Overflow` error
+- Added `try_reserve` for bounded allocation → `Allocation` error
+
+All 2 behavior tests pass. Clippy clean with strict warnings. Output JSON written to required path.

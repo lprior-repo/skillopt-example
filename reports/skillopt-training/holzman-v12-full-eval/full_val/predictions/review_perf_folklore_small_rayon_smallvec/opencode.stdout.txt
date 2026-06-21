@@ -1,0 +1,14 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+5 findings across the crate, all in `src/lib.rs`:
+
+1. **BLOCKER - tiny-fixed-input-allocation** (line 1): Returns `Vec` for 4 elements — should use fixed array.
+2. **BLOCKER - unmeasured-performance-claim** (line 2): TODO claims Rayon+SmallVec "will be faster" — folklore optimization with no evidence, and Rayon on 4 items is strictly slower.
+3. **BLOCKER - no-benchmark-evidence**: Zero benchmarks, profiler data, or allocation evidence for any performance claim.
+4. **WARNING - intermediate-Vec-materialization** (line 3): Iterator pipeline allocates a heap Vec for fixed 4 items.
+5. **WARNING - todo-suggests-violation** (line 2): The TODO directly invites violating Holzman anti-folklore rules.
+
+Key doctrine violations: SKILL.md line 82 (tiny fixed-input performance review), line 87 (performance claims without evidence), and claim-traceability.md (Rayon only for large transforms with scaling evidence).

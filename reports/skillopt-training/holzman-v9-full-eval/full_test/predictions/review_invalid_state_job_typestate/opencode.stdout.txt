@@ -1,0 +1,14 @@
+Review complete. Written 8 findings (all BLOCKER severity) to `review-output.json`:
+
+| # | Rule | Line | Defect |
+|---|------|------|--------|
+| 1 | enums-over-strings | :3 | `status: String` - free-form lifecycle phase |
+| 2 | typestate-lifecycle | :4 | `is_validated: bool` - decoupled from status |
+| 3 | typestate-lifecycle | :5 | `is_sent: bool` - redundant sentinel |
+| 4 | typestate-invalid-combination | :6 | `sent_at_epoch_ms: Option<u64>` - optional data not owned by variant |
+| 5 | newtype-ids | :2 | `id: String` - no domain wrapper for job IDs |
+| 6 | newtype-timestamps | :6 | raw `u64` epoch - no domain wrapper |
+| 7 | smart-constructor-absent | :1 | all public fields, no validation gate |
+| 8 | invalid-state-transition | :9 | `mark_sent` unconditionally overwrites state from any prior value |
+
+5 missing evidence items flagged (no benchmarks, profiler, allocation analysis, command-truth, or behavior tests).

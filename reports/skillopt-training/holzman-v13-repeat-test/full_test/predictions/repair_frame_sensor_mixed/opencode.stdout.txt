@@ -1,0 +1,9 @@
+The test `rejects_limit` fails because `max_payload` is never checked. Also has lossy `as u32` conversion. Fixing both.
+All 2 tests pass. Running full Holzman verification gate:
+All gates pass. Writing output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added `max_payload` validation** — returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`
+2. **Replaced lossy `as u32`** with `u32::try_from(payload.len())` mapped to `Err(FrameError::Overflow)` — eliminates unchecked conversion
+
+Both behavior tests now pass: `encodes` and `rejects_limit`. All Holzman verification gates (fmt, check, clippy with strict deny lints, test) pass clean.

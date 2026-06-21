@@ -1,0 +1,23 @@
+Now I have the full picture. Let me analyze the violations:
+
+1. `unwrap()` on parse (line 24) — unsafe
+2. `total += value` — unchecked arithmetic, overflow
+3. `total / count as u64` — division by zero, lossy `as`
+4. `parts[1]` — unchecked indexing
+5. Returns `String` but tests expect `Result<Summary, SummaryError>`
+6. Missing `render_summary` function
+All 6 tests pass. Let me run clippy for completeness:
+All gates pass. Writing the repair output:
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Before | After |
+|---|---|---|
+| `unwrap()` on parse | `parts[1].parse().unwrap()` | `.map_err(\|_\| SummaryError::Invalid)` |
+| Unchecked indexing | `parts[1]` | Iterator `.next()` with `ok_or` |
+| Unchecked add | `total += value` | `total.checked_add(value).ok_or(Overflow)` |
+| Division by zero | `total / count as u64` | `total.checked_div(count_u64)` |
+| Lossy `as` cast | `count as u32` | `count.try_into()` via `TryInto` |
+| Wrong return type | `Result<String, ...>` | `Result<Summary, ...>` |
+| Missing function | — | `render_summary(Summary) -> String` |
+
+All 6 behavior tests pass, clippy clean.

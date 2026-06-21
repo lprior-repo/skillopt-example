@@ -1,0 +1,9 @@
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+**Violations removed:**
+- `.unwrap()` on `parse::<u16>()` — replaced with `map_err(|_| ParseError::Invalid)`
+- Ignored `max_items` parameter — now enforces cap via `ParseError::TooMany`
+- No empty-input check — now returns `ParseError::Empty`
+- Unbounded allocation — replaced `Vec::with_capacity`-style collect with `try_reserve` + `map_err(|_| ParseError::Allocation)`
+
+**All 4 tests pass**, clippy clean, no Holzman law violations remain.

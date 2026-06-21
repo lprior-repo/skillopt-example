@@ -1,0 +1,17 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling repair_frame_shard_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/2ab2e5b9feae10de/repair_frame_shard_mixed)
+warning: unused variable: `max_payload`
+ --> src/lib.rs:8:37
+  |
+8 | pub fn encode_frame(payload: &[u8], max_payload: usize) -> Result<Vec<u8>, FrameError> {
+  |                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_max_payload`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `repair_frame_shard_mixed` (lib) generated 1 warning (1 duplicate)
+warning: `repair_frame_shard_mixed` (lib test) generated 1 warning (run `cargo fix --lib -p repair_frame_shard_mixed --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/d48061a08b646062/debug/deps/repair_frame_shard_mixed-69a6a0f0d1a2faf1)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/d48061a08b646062/debug/deps/behavior-8ce8459c8692a8c2)
+error: test failed, to rerun pass `--test behavior`

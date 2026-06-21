@@ -1,0 +1,3 @@
+Done. All 4 behavior tests pass. The repair:
+
+- **`src/lib.rs`**: Removed `unwrap()`, added empty-input check, `max_items` enforcement via `try_reserve` + count guard, and `map_err` for parse failures — matching the `ParseError` taxonomy (`Empty`, `Invalid`, `TooMany`, `Allocation`).

@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permissions, etc.)",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed I/O or parse error",
+      "fix": "return Result<Vec<Record>, _> and use .map_err(|e| MyError::Io(e)) or an equivalent typed error; never call unwrap on fallible I/O"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on any non-numeric payload or out-of-range value",
+      "failure_mode": "malformed CSV row aborts the program instead of returning a typed Invalid/Parse error for the offending record",
+      "fix": "use .parse::<u32>().map_err(|_| MyError::Invalid) and propagate through a Result return type; remove unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast: any u32 value > 65535 silently truncates",
+      "failure_mode": "out-of-range value silently wraps to an incorrect u16, producing a corrupted Record with no error signal",
+      "fix": "use u16::try_from(value).map_err(|_| MyError::Invalid) or check range explicitly before constructing Record"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked indexing into a Vec produced by split(',').map().collect()",
+      "failure_mode": "empty line or line with no comma produces Vec with length < 2, panicking on index access instead of returning a typed error",
+      "fix": "use split_once(',') and .ok_or(MyError::Invalid) or iterator-based access with .nth(0)/.nth(1) plus checked indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side effect inside the mapping closure of a data-parsing function",
+      "failure_mode": "pure-looking function has observable I/O side effects, breaking determinism, testability, and the functional-core imperative-shell boundary",
+      "fix": "move all I/O (println, file reads, network calls) into a separate shell layer; the parsing core should be a pure function returning a Result or Option"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_separation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames combines file I/O (fs::read_to_string) with data parsing and domain construction in a single function",
+      "failure_mode": "cannot unit-test parsing logic in isolation; any test must touch the filesystem; violations of the pure-core / imperative-shell boundary",
+      "fix": "split into (a) a pure parse_line(line: &str) -> Result<Record, _> function and (b) a shell function load_frames(path: &str) -> Result<Vec<Record>, _> that reads the file, delegates to parse_line, and handles I/O errors"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No try_reserve on the output Vec; every intermediate line also allocates a Vec<String> via collect()",
+      "failure_mode": "large input files can OOM; intermediate per-line Vec allocations are unnecessary overhead",
+      "fix": "compute capacity from line count or known max; call values.try_reserve(max).map_err(|_| MyError::Allocation)?; replace per-line Vec<String> collect with split_once + &str slicing"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typed_error_domain",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames returns Vec<Record> with no error type; all failure modes (I/O, parse, out-of-range, indexing) are hidden behind panic",
+      "failure_mode": "caller has no way to distinguish or handle specific failure modes; the domain has no error taxonomy",
+      "fix": "define a typed error enum (e.g. enum FrameError { Io(std::io::Error), Invalid, TooMany, Overflow, Allocation }) and change the return type to Result<Vec<Record>, FrameError>"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "value is a raw u16 with no domain constraint enforcement at the type level",
+      "failure_mode": "any code path can construct a Record with an invalid value; the type system cannot enforce domain invariants",
+      "fix": "use a newtype like pub struct RecordValue(u16) with a fallible constructor that validates domain constraints, making illegal states unrepresentable"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this function",
+      "failure_mode": "cannot verify performance claims or allocation behavior; intermediate Vec allocations and string clones may be costly at scale",
+      "fix": "add a micro-benchmark with workload characterization, baseline measurement, and allocation tracking (e.g. criterion or similar)"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_frames allocation or throughput behavior",
+    "no profiler output (flamegraph, perf, or similar) for this function",
+    "no allocation analysis (e.g. allocs-per-call via criterion or similar)",
+    "no command evidence (cargo test, cargo fmt, cargo clippy) was run",
+    "no second-ring review (black-hat or formal) has been completed"
+  ],
+  "residual_risk": "static review only with no commands executed. The crate has 5 BLOCKER-level issues including panics via unwrap, lossy casts, unchecked indexing, missing typed errors, and functional core violations. All failure modes are currently panic-driven with no error taxonomy. Without running cargo test or cargo clippy, and without a black-hat review, residual risk remains high."
+}

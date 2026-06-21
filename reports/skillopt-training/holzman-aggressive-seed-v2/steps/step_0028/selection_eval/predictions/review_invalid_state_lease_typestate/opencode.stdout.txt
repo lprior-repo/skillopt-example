@@ -1,0 +1,13 @@
+Review complete. Written to `review-output.json` with:
+
+- **6 findings** (5 BLOCKER, 1 MAJOR) covering:
+  - Illegal states representable (`String` status + `bool` flags instead of enum typestate)
+  - Primitive obsession (`id: String`, `status: String`)
+  - Violation of functional core (mutation without validation or error path)
+  - Missing typed domain errors
+  - No constructor / all fields public
+  - No boundary validation
+
+- **7 missing evidence** items (benchmarks, profiler, allocation, second-ring review, command evidence, proof artifacts, behavior tests)
+
+- **Residual risk**: High — any consumer can construct arbitrary illegal state combinations with zero enforcement

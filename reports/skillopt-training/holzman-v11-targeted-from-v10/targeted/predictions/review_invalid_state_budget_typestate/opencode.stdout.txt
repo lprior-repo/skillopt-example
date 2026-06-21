@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote valid JSON to `review-output.json`.
+
+**7 findings, all BLOCKER severity:**
+
+| # | Rule | Line | Problem |
+|---|------|------|---------|
+| 1 | status-string-should-be-enum | 3 | `status: String` allows any value; must be enum |
+| 2 | lifecycle-booleans-should-be-typestate | 4 | `is_validated` + `is_sent` booleans create impossible combinations |
+| 3 | Option-invalid-state-combinations | 6 | `sent_at_epoch_ms: Option<u64>` orphaned from lifecycle variant |
+| 4 | raw-primitive-parse-boundary | 2 | `id: String` has no newtype or smart constructor |
+| 5 | mark_sent-no-transition-validation | 9 | `mark_sent` accepts any state, no precondition check |
+| 6 | all-fields-public-no-encapsulation | 1 | All `pub` fields let callers bypass all invariants |
+| 7 | mark_sent-ignores-sent_at_epoch_ms | 9 | Sets sent flags but never populates the timestamp |
+
+**Residual risk:** Illegal states are fully representable at compile time. The type system enforces nothing.

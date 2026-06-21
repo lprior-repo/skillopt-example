@@ -1,0 +1,20 @@
+Issues in `src/lib.rs`:
+1. `.unwrap()` on line 12 — must use proper error handling
+2. No `Empty` check for blank input
+3. No `Invalid` error path for bad parses
+4. No `TooMany` check against `max_items`
+
+Fixing now:
+All 4 tests pass. Running remaining verification gates:
+All verification gates pass. Writing the output:
+Repair complete. Here's the summary:
+
+**Changed file:** `src/lib.rs`
+
+**Bugs fixed:**
+1. **`.unwrap()` on parse** → replaced with `.map_err(|_| ParseError::Invalid)?` — proper error propagation
+2. **Missing `Empty` check** → returns `ParseError::Empty` when input is blank
+3. **Missing `TooMany` check** → returns `ParseError::TooMany` when item count exceeds `max_items`
+4. **Missing allocation awareness** → `try_reserve` with `ParseError::Allocation` mapping
+
+**Gates passed:** `cargo fmt`, `cargo test` (4/4), `cargo clippy` (zero warnings), production code free of forbidden macros.

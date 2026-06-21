@@ -1,0 +1,16 @@
+Repaired `src/lib.rs`. The original `parse_routes` had these Holzman violations:
+
+- `unwrap()` on parse (line 12) — panic surface
+- `split(',').map(...).collect()` into intermediate `Vec` — unbounded allocation, no `try_reserve`
+- No `max_items` enforcement — `TooMany` path impossible
+- No empty-input check — `Empty` path impossible
+
+Changes made:
+1. Empty input rejected first → `ParseError::Empty`
+2. `Vec::new()` + `try_reserve(max_items)` (no `Vec::with_capacity`)
+3. Direct iteration over `input.split(',')` (no intermediate `Vec`)
+4. `values.len() >= max_items` checked before each push → `ParseError::TooMany`
+5. Parse errors via `map_err` → `ParseError::Invalid`
+6. Empty trimmed parts → `ParseError::Invalid`
+
+All 4 behavior tests pass. Zero clippy warnings. Zero formatting drift.

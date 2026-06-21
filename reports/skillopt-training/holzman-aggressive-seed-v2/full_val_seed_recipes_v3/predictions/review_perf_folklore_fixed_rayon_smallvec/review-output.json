@@ -1,0 +1,41 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "performance-discipline-no-cargo-cult",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO declares 'use Rayon and SmallVec because it will be faster' without any workload specification, baseline measurement, or benchmark evidence. This directly violates the Holzman Rust performance discipline: 'Do not cargo-cult Rayon, SmallVec, Cow, zero-copy, manual loops, or iterator chains. Use them because the workload, lifetime, allocation budget, or benchmark supports them.'",
+      "failure_mode": "Introducing Rayon for a 4-element fixed-size input will add thread-pool scheduling overhead, mutex contention, and task creation costs that dwarf any per-element savings, producing measurable slowdown. Adding SmallVec without measured hot-path data is speculative optimization that adds a dependency and compile-time cost with no proven benefit.",
+      "fix": "Remove the TODO. If a performance improvement is needed, first define the workload (input distribution, throughput target, latency SLA), measure the current baseline with a benchmark, use a profiler to identify the actual hot path, and only then justify Rayon/SmallVec with evidence showing the benefit exceeds their overhead."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "smallvec-justification",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns Vec<&'static str> for a fixed 4-byte input. This always allocates on the heap (minimum capacity 1 element, but typically more due to Vec growth strategy), even when all data fits on the stack.",
+      "failure_mode": "Every call to classify_four performs at least one heap allocation (Vec::new + allocator call). For a fixed-size 4-element input, this is unnecessary allocation overhead. If SmallVec were introduced per the TODO, it would need to be justified by measured hot-path distribution showing the small-size case is dominant.",
+      "fix": "Either keep the return type as Vec and accept the allocation (documented trade-off), or if SmallVec is introduced, require a benchmark proving the small-size case dominates and the stack-based path reduces measurable latency. The current function signature and implementation are functionally correct; the question is whether the allocation cost matters for this workload."
+    },
+    {
+      "severity": "INFO",
+      "rule": "no-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler evidence, or allocation analysis exist in this crate. The performance claim in the TODO cannot be evaluated without baseline data.",
+      "failure_mode": "Any performance optimization made without evidence risks regressing latency, increasing allocation count, or adding dependency surface. There is no way to verify that Rayon or SmallVec would improve performance for this function's actual workload.",
+      "fix": "Add a criterion or similar benchmark harness with workloads matching the expected input distribution. Profile with `cargo flamegraph` or `perf` before and after any change. Record allocation counts with `alloc_counter` or similar."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for performance claims",
+    "no profiler evidence for hot-path analysis",
+    "no allocation analysis for Vec vs SmallVec trade-off",
+    "no second-ring evidence for any performance optimization",
+    "no command evidence for cargo fmt, cargo check, or cargo clippy"
+  ],
+  "residual_risk": "Static review only; no commands run. The source code contains no forbidden constructs (no unsafe, unwrap, expect, panic, todo in production logic beyond the TODO comment itself). The function is functionally correct for its domain. The primary risk is that a future developer follows the TODO and introduces Rayon/SmallSpec without measurement, causing regression. No benchmarks, profiler, or allocation evidence exist to validate any optimization."
+}

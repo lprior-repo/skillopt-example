@@ -1,0 +1,31 @@
+Now I have the full picture. The issues in `src/lib.rs`:
+
+1. `summarize_metrics` returns `Result<String, SummaryError>` but tests expect `Result<Summary, SummaryError>`
+2. `.unwrap()` on parse (line 24)
+3. Unchecked indexing `parts[1]` (line 24)
+4. Unchecked `total += value` (line 25) — no overflow detection
+5. Division by zero when count=0 (line 35)
+6. Missing `render_summary` function
+7. Missing empty/invalid input handling
+All 6 tests pass. Let me run the remaining verification gates.
+Clippy caught 4 issues: unchecked `count += 1`, `count as u64` (lossy), `count as u32` (lossy), and division side effects. Let me fix these.
+Right — `From<usize> for u64` isn't implemented. I need `try_from` for both.
+`unwrap` is also banned. The correct approach is a targeted allow on the provably-safe cast.
+Clippy passes. Now run tests.
+All 6 tests pass, clippy clean. Let me verify the final source and write the output.
+Duplicate allow attribute — let me clean that up.
+Repair complete. All 6 tests pass, all strict clippy gates pass.
+
+**Changes made to `src/lib.rs`:**
+
+| Issue | Fix |
+|---|---|
+| `unwrap()` on parse | `map_err(\|_\| SummaryError::Invalid)` |
+| Unchecked `parts[1]` indexing | `split_once(',')` with typed error |
+| `total += value` (overflow) | `checked_add` → `Overflow` error |
+| `count += 1` (overflow) | `checked_add` → `TooMany` error |
+| Missing empty input handling | `count == 0` → `Empty` error |
+| Missing invalid input handling | `split_once`/`parse` → `Invalid` error |
+| Wrong return type (`String`) | Changed to `Summary` struct |
+| Missing `render_summary` | Added pure formatting function |
+| `count as u64`, `count as u32` | `u32::try_from` with error; `u64` cast with targeted allow |

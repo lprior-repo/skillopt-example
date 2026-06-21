@@ -1,0 +1,52 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Use of `unsafe { std::mem::transmute }` to convert `[u8; 4]` to `u32`. The Holzman contract explicitly forbids production `unsafe`. `transmute` also silently encodes host endianness, making this function produce incorrect results on big-endian targets without any warning.",
+      "failure_mode": "On little-endian hosts the function returns a byte-order-swapped value on big-endian targets (or vice versa), corrupting all length interpretation downstream with no error signal. Additionally, any future re-implementation that preserves the `unsafe` block could silently introduce undefined behavior if the type layout changes.",
+      "fix": "Replace with `u32::from_le_bytes([input[0], input[1], input[2], input[3]])` (or `from_be_bytes` if big-endian is intended). This is a safe, explicit, endianness-portable conversion with zero `unsafe`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Direct array indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` without bounds checking. The Holzman contract forbids unchecked indexing. If the input slice has fewer than 4 bytes, this will panic at runtime.",
+      "failure_mode": "A short or empty input slice triggers an out-of-bounds panic, aborting the calling thread. In a server context this can cause denial of service from a single malformed request.",
+      "fix": "Add a length guard before indexing: `if input.len() < 4 { return Err(...); }` or restructure the function to return a `Result<u32, LengthError>` and use `get(0).unwrap()` / `get(1)` etc. within the safe path."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function parses raw bytes into a domain value (`u32` length) but returns a bare primitive instead of a trusted newtype. The Holzman contract says to parse at boundaries into trusted data and replace primitive domain APIs with newtypes when the value has domain rules.",
+      "failure_mode": "Callers cannot distinguish a parsed length from any other `u32`, enabling illegal states where invalid lengths are passed through the core without validation. The domain invariant (\"this value represents a byte length\") is invisible to the type system.",
+      "fix": "Define a newtype `pub struct Len(u32)` with a fallible constructor that checks bounds, and change the function signature to `pub fn read_len(input: &[u8]) -> Result<Len, ParseError>`."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this function. If this is intended as a hot-path length reader, performance claims or allocation-free design cannot be verified.",
+      "failure_mode": "Unmeasured performance assumptions may lead to suboptimal hot-path design. The unsafe transmute pattern may have been chosen for perceived performance without evidence.",
+      "fix": "Add a benchmark in `benches/` or `tests/` comparing the current implementation against `u32::from_le_bytes` with `criterion` or `std::bench`, and document the measured difference."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for this function",
+    "no profiler data to validate allocation or performance claims",
+    "no command evidence for `cargo fmt`, `cargo clippy`, or `cargo test`"
+  ],
+  "residual_risk": "Static review only with no commands run. The `unsafe transmute` with unspecified endianness and unchecked indexing are confirmed BLOCKERs by code inspection. A full review would require running `cargo test` and `cargo clippy` to verify no additional issues exist in the broader crate."
+}

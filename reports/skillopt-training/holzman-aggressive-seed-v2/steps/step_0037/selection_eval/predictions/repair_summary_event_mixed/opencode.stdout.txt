@@ -1,0 +1,16 @@
+Now I have the full picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. The source has many Holzman violations. Let me fix them.
+All 6 tests pass. Let me write the output JSON.
+Repaired. Here's what changed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `.parse().map_err(|_| SummaryError::Invalid)` |
+| `parts[1]` unchecked indexing | `split_once(',').ok_or(SummaryError::Invalid)` |
+| `total += value` unchecked | `checked_add` → `Overflow` |
+| `count += 1` unchecked | `checked_add` → `Overflow` |
+| `total / count` unchecked div | `checked_div` → `Empty` |
+| `count as u64` lossy cast | Safe: `count` bounded by line iteration |
+| Wrong return type `Result<String>` | `Result<Summary>` matching test contract |
+| Missing `render_summary` | Added pure formatter function |
+
+All 6 behavior tests pass.

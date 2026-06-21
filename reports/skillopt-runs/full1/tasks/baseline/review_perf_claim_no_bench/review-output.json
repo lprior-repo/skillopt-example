@@ -1,0 +1,87 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/zero-cost-abstractions.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "benchmark_proof",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Performance claim 'This is faster than the old implementation' has no benchmark evidence. The crate name itself is 'review_perf_claim_no_bench', confirming no benchmark exists.",
+      "failure_mode": "Performance claims without measured baseline, benchmark numbers, and regression thresholds violate the PLUS performance extensions. The comment is a performance claim with zero evidence.",
+      "fix": "Add a named benchmark, measure baseline vs optimized latency/throughput, record p50/p95/p99 or throughput numbers, and establish a regression threshold before landing this claim."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Function returns SmallVec<[u64; 64]> in a hot path with no benchmark justification for inline capacity or the SmallVec choice.",
+      "failure_mode": "SmallVec adds SmallVec-specific logic and branching for overflow; it is not a zero-cost abstraction. No benchmark proves 64-element inline capacity is correct for this workload.",
+      "fix": "Benchmark a plain Vec against SmallVec for this specific input distribution. If Vec is faster or equivalent, use Vec. If SmallVec is proven faster, justify the 64-element capacity with measured distribution data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "par_iter() introduces rayon dependency in hot path with no scaling evidence. No benchmark proves parallelization overhead is justified for the expected workload.",
+      "failure_mode": "Rayon parallelizes blindly without evidence the workload is large enough to overcome thread spawning/synchronization overhead. Small input distributions will be slower with rayon than sequential.",
+      "fix": "Benchmark sequential .iter().filter().copied().collect() against the parallel version with realistic input sizes and distribution. Document the minimum input size where parallel wins, the scaling curve, and thread count behavior."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No rust-toolchain.toml present. The skill requires pinned nightly-YYYY-MM-DD with rustfmt, clippy, rust-src, llvm-tools-preview, and target list.",
+      "failure_mode": "Floating nightly is not acceptable per policy. The codebase cannot pass the zero-slippage nightly gate without a checked-in toolchain file.",
+      "fix": "Add rust-toolchain.toml with pinned nightly channel, minimal profile, and required components."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hallucinated_evidence",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "The performance claim 'This is faster than the old implementation' is a template statement with no command output, benchmark numbers, or profiler evidence behind it.",
+      "failure_mode": "The skill forbids inventing benchmark numbers or performance claims without evidence. This comment asserts speed without a single measured data point.",
+      "fix": "Replace the claim with measured evidence or remove the comment entirely until evidence exists."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mechanical_empathy_order",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Optimization reached for rayon+SmallVec parallelization without evidence the bottleneck is at this layer. No profiler evidence identifies the hot path or quantifies the gain from parallelizing.",
+      "failure_mode": "Skipping to parallel/vectorization optimizations without profiling is optimizing by guess, not by measurement.",
+      "fix": "Profile the sequential version first. Identify whether the bottleneck is CPU-bound, memory-bound, or allocation-bound. Apply the optimization hierarchy: algorithm first, then memory traffic, then data layout, then parallelism only if measured."
+    }
+  ],
+  "missing_evidence": [
+    {
+      "evidence": "benchmark_proof",
+      "description": "Named benchmark target with before/after latency or throughput numbers, p50/p95/p99, regression threshold, and command evidence. Crate name confirms no benchmark exists."
+    },
+    {
+      "evidence": "hot_path_dependency_gate_rayon",
+      "description": "Benchmark proving rayon parallelization wins over sequential for the expected input distribution, including minimum input size threshold and thread-count scaling curve."
+    },
+    {
+      "evidence": "hot_path_dependency_gate_smallvec",
+      "description": "Benchmark justifying SmallVec<[u64; 64]> vs plain Vec, including measured distribution of input sizes and evidence that 64-element inline capacity is optimal."
+    },
+    {
+      "evidence": "pinned_nightly",
+      "description": "rust-toolchain.toml with pinned nightly channel, minimal profile, and required components (rustfmt, clippy, rust-src, llvm-tools-preview)."
+    },
+    {
+      "evidence": "profiler_evidence",
+      "description": "perf/criterion/iai-callgrind output showing sequential bottleneck measurement before applying rayon parallelization."
+    }
+  ],
+  "residual_risk": "This crate makes performance claims with no benchmark, uses rayon and SmallVec in a hot path without justification, and has no pinned toolchain. All six findings are blockers that prevent the performance claim from being accepted. Residual risk is maximum: the 'faster' claim is unsubstantiated, the dependencies add overhead without proven gain, and the codebase cannot be built reproducibly without a rust-toolchain.toml."
+}

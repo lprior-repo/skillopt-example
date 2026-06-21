@@ -1,0 +1,16 @@
+I can see the issues. The `encode_frame` function has:
+1. `payload.len() as u32` — lossy cast (Holzman violation)
+2. No `payload.len() > max_payload` check (test `rejects_limit` fails)
+3. Missing `checked_add` and `try_reserve` (required repair patterns)
+
+Let me fix the source:
+All 2 tests pass. Let me run the full mandatory verification gate:
+All gates pass clean. Let me verify the final source and write the output:
+Repair complete. Changes made to `src/lib.rs`:
+
+1. **Added `PayloadTooLarge` check** — `payload.len() > max_payload` returns `Err(FrameError::PayloadTooLarge)` before any allocation
+2. **Removed lossy cast** — `payload.len() as u32` replaced with `u32::try_from(payload.len()).map_err(...)` 
+3. **Added `checked_add`** — `4usize.checked_add(payload.len())` with `ok_or(FrameError::Overflow)?`
+4. **Added `try_reserve`** — `out.try_reserve(capacity).map_err(...)` replaces unbounded allocation
+
+All Holzman gates pass: `cargo fmt`, `cargo test` (2/2), `cargo check`, strict `cargo clippy` — zero warnings.

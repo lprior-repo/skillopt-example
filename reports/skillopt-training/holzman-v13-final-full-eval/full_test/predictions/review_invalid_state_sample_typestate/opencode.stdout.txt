@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Done. Review output written to `review-output.json`.
+
+**Summary: 8 BLOCKER findings, 6 missing evidence items.**
+
+The task crate `SampleWorkflow` violates Holzman + Functional Rust at the structural level:
+
+| # | Rule | Line | Core issue |
+|---|---|---|---|
+| 1 | `typestate_state_machine` | 1 | No typestate — lifecycle is loose booleans + string |
+| 2 | `status_string` | 3 | `pub status: String` with magic literal `"sent"` |
+| 3 | `bool_lifecycle` | 4 | `pub is_validated: bool` — lifecycle encoded as bool |
+| 4 | `bool_lifecycle_is_sent` | 5 | `pub is_sent: bool` — same class violation |
+| 5 | `option_invalid_state_combinations` | 6 | `sent_at_epoch_ms` orphaned from the sent state |
+| 6 | `newtype_domain_ids` | 2 | `pub id: String` — no newtype, no validation |
+| 7 | `parse_boundary` | 1 | Raw primitives cross parse boundary, no smart constructors |
+| 8 | `functional_core_shell_leakage` | 9 | `mark_sent` accepts any struct, no precondition guards |
+
+All 7 required fields present on every finding. No commands were run (review-only task).

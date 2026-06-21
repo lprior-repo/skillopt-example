@@ -1,0 +1,77 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a bare `String`, allowing any value (e.g. \"deleted\", null, or garbled). The domain invariant that status must be one of a known set (e.g. pending, validated, sent) is not enforced by the type system.",
+      "failure_mode": "Any caller can construct or mutate a LedgerWorkflow with an invalid status string, and downstream code must re-validate at every use site instead of trusting type-level guarantees.",
+      "fix": "Replace `status: String` with a newtype enum `LedgerStatus { Pending, Validated, Sent }` with a fallible `TryFrom<String>` for boundary parsing."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a lifecycle flag. Booleans encode only two states and cannot express the workflow ordering invariant (e.g. must be validated before sent). Combined with `is_sent: bool`, the struct allows 4 combinations but the domain likely only permits a strict progression.",
+      "failure_mode": "A ledger can be constructed with `is_validated=false, is_sent=true`, representing an invalid state where an unvalidated ledger is already sent. The type system cannot prevent this.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typestate enum or a `LedgerStage` enum (e.g. `Pending`, `Validated`, `Sent { sent_at: EpochMs }`) that makes illegal transitions unconstructable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is the second lifecycle flag. Both `is_validated` and `is_sent` should be collapsed into a single ordered typestate.",
+      "failure_mode": "Same as above — independent bools cannot encode the monotonic progression invariant. A caller can set both to true or both to false independently.",
+      "fix": "Merge into `LedgerStage` typestate enum as described in the status fix above."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_side_effects",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the struct in place (takes `mut item` by value and returns it), and sets `status = \"sent\".to_string()` — a side effect that allocates and hardcodes the transition. There is no pre-condition check: any ledger, regardless of current state, can be marked sent.",
+      "failure_mode": "A pending, unvalidated ledger can be marked sent without any domain validation. The function does not enforce the validated-then-sent invariant.",
+      "fix": "Change to a pure function that takes a reference (or typed state) and returns a new `Result<LedgerWorkflow, LedgerError>`. Pre-condition: ledger must be in Validated stage. Use the typed `LedgerStage` enum to encode the transition."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain type. An ID should be a newtype that encodes format rules (length, charset) at the boundary.",
+      "failure_mode": "Downstream code cannot assume valid ID format; any string (empty, whitespace, malicious) is representable.",
+      "fix": "Introduce `pub struct LedgerId(String)` with a `TryFrom<String>` constructor that validates format at the parse boundary, then use `LedgerId` in the core struct."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`\"sent\".to_string()` performs a heap allocation to produce a `String` from a string literal. With the typed `LedgerStatus` enum fix, this allocation disappears entirely.",
+      "failure_mode": "Unnecessary heap allocation on every call to `mark_sent`, degrading performance with no correctness benefit.",
+      "fix": "Replace with enum variant assignment once `status` becomes `LedgerStatus`."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`LedgerWorkflow` has all public fields. This allows external code to mutate any field directly, bypassing all type-level invariants (even if they were typed correctly).",
+      "failure_mode": "External code can do `ledger.status = \"whatever\"` or `ledger.is_sent = true` directly, rendering all type-level discipline useless.",
+      "fix": "Make fields `pub(crate)` or private with public constructors/behaviors that enforce invariants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for allocation patterns",
+    "no allocation audit (no `try_reserve` or capacity analysis)",
+    "no command-line interface or CLI specification evidence",
+    "no second-ring defense (no tests, no fuzz, no property tests)"
+  ],
+  "residual_risk": "The struct represents all 2^3 = 8 combinations of {id, status, is_validated, is_sent, sent_at} with no domain invariants. Two fields (status, is_validated/is_sent) that should form a typed state machine are bare primitives. mark_sent has zero pre-conditions. This is the textbook definition of 'illegal states are representable.' Without the typestate/enum fixes, no amount of testing can prove correctness."
+}

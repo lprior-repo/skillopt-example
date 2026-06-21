@@ -1,0 +1,11 @@
+Now I have full context. Let me run the current tests to see the failure state, then repair.
+Now I'll apply the repair following the frame/packet encoder mandatory pattern from SKILL.md.
+All tests pass. Now writing the required output.
+Repair complete. Changes made to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** (line 9-11) — returns `FrameError::PayloadTooLarge` when payload exceeds limit
+2. **Replaced lossy cast** `payload.len() as u32` → `u32::try_from(payload.len())` with `map_err` (line 15)
+3. **Added checked arithmetic** `4usize.checked_add(payload.len())` for capacity computation (line 12-14)
+4. **Added `try_reserve`** for bounded allocation instead of implicit grow (line 17-18)
+
+All 2 tests pass. `repair-output.json` written.

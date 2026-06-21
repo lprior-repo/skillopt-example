@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses status: String, is_validated: bool, is_sent: bool — invalid state combinations are fully representable (e.g. status=\"sent\" with is_sent=false, status=\"draft\" with is_sent=true, both bools true, validated but not sent, sent but not validated, etc.)",
+      "failure_mode": "Domain invariant 'sent implies validated' cannot be enforced by the type system; runtime bugs where ledger reaches inconsistent states are silent and unpreventable",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single enum typestate (e.g. enum LedgerState { Draft, Validated, Sent { sent_at: u64 } }) that makes every illegal combination unconstructable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a bare string with no domain identity invariant. Any 0-length, whitespace-only, or malformed string is accepted.",
+      "failure_mode": "No domain-level validation of ledger identity; invalid IDs propagate silently into the core",
+      "fix": "Introduce a newtyped LedgerId(String) with a fallible constructor (LedgerId::new) that enforces non-empty, trimmed identity at the boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates in-place (mut item) and returns the struct. No typed error return, no railway programming. The transition from any state to 'sent' is unconditional — no validation gate, no invariant check.",
+      "failure_mode": "Ledger can be marked sent from any prior state (including invalid/unvalidated states), bypassing the validation gate entirely",
+      "fix": "Signature: fn mark_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, LedgerError>. Require the ledger to be in a Validated state before the Sent transition. Return a typed domain error (e.g. LedgerError::NotValidated) if the precondition fails."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent boolean lifecycle flags that can be in inconsistent combinations.",
+      "failure_mode": "Caller can set both to true (double-transition) or set is_sent=true without is_validated=true, violating the domain invariant that sent ledgers must be validated",
+      "fix": "Collapse into a single enum typestate that encodes the valid transition graph. The enum variants carry their own data (e.g. Sent { sent_at_epoch_ms: u64 }) eliminating redundant fields."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_string_status_field",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String stores a free-form string that duplicates information already tracked by is_validated and is_sent. 'sent'.to_string() in mark_sent is redundant with item.is_sent = true.",
+      "failure_mode": "Status string can diverge from the boolean flags at any point, creating inconsistent observations of the ledger state",
+      "fix": "Remove status: String entirely. The enum typestate encodes the lifecycle; no separate string field is needed."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_checked_arithmetic_allocation",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> stores raw u64 epoch without any checked conversion at the parse boundary. If this value originates from external input (Unix timestamp, JSON, network), width casts or parse failures are unhandled.",
+      "failure_mode": "Untrusted epoch values can overflow or come from invalid sources; no boundary validation proven at the type level",
+      "fix": "Parse at boundaries into a typed EpochMs(u64) with checked conversions. Use u64::try_from with explicit error mapping at the shell boundary."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_typed_error_domain",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No typed domain error type exists. mark_sent returns the struct directly with no error path for preconditions (e.g. must be validated before sending).",
+      "failure_mode": "Precondition violations are either silently ignored or would require panic/expect — both forbidden by Holzman Rust",
+      "fix": "Define an enum LedgerError { NotValidated, AlreadySent } and return Result<LedgerWorkflow, LedgerError> from mark_sent"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "pub_fields_expose_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are pub, allowing external code to mutate state directly without domain methods, bypassing any future invariant checks.",
+      "failure_mode": "External code can set fields to invalid values without going through typed constructors or transition methods",
+      "fix": "Make fields private (no pub). Provide constructors and transition methods as the only mutation path."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle transition",
+    "no profiler data for allocation patterns in mark_sent (String::to_string + String allocation on status)",
+    "no allocation audit — mark_sent calls .to_string() on a string literal (redundant allocation) and the struct fields themselves allocate",
+    "no second-ring evidence (no Miri, Kani, or Loom runs to verify state transition invariants)",
+    "no command evidence of cargo fmt, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "Static review only — no commands run. The crate has fundamental typestate violations: illegal ledger states are fully representable via independent bool/string fields. The mark_sent function has no precondition enforcement and no error handling. Without enum typestates and typed domain errors, the core cannot prevent invalid state transitions. The redundant .to_string() on a literal and public fields compound the issues."
+}

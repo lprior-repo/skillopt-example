@@ -1,0 +1,1 @@
+Repair complete: `repair-output.json` written, `cargo test` passed (4/4), `cargo clippy` clean.

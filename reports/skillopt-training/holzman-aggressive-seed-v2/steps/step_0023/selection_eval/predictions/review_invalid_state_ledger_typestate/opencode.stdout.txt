@@ -1,0 +1,11 @@
+Review complete. Written to `review-output.json`.
+
+**5 BLOCKER findings** in `src/lib.rs`:
+
+1. **Line 1** — `status: String` + two boolean flags instead of a typed enum typestate. Illegal states are fully representable (e.g., `status="sent"` with `is_sent=false`).
+2. **Line 2** — `id: String` is a raw primitive with no newtype or domain validation.
+3. **Line 9** — `mark_sent` has zero invariant checks; it can transition any item to sent regardless of validation state.
+4. **Line 4** — `is_validated: bool` and `is_sent: bool` are independent booleans encoding 4 states when the domain has 3 valid ones.
+5. **Line 9** — No `Result` return type; invalid transitions are silently allowed instead of rejected with typed errors.
+
+**5 missing evidence items**: no benchmarks, no profiler data, no allocation analysis, no behavior tests, no command evidence.

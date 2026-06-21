@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a free-form String instead of an enum or typestate. Any string value (e.g. \"invalid\", \"deleted\", \"\") is permitted, including states incompatible with is_sent=true.",
+      "failure_mode": "A caller can set status to any arbitrary string, producing an invalid domain state that the compiler cannot prevent. Downstream logic comparing status to string literals like \"sent\" is fragile and non-exhaustive.",
+      "fix": "Replace `status: String` with an enum `enum BudgetStatus { Draft, Validated, Sent }` and use pattern matching for transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bool, which allows the struct to represent both validated and not-validated states as arbitrary bit patterns. Combined with String status and bool is_sent, the struct has 2^3 * N states, most of which are illegal.",
+      "failure_mode": "The struct can hold is_sent=true with status=\"draft\" and is_validated=false simultaneously — an impossible or contradictory domain state that the type system does not catch.",
+      "fix": "Replace bool lifecycle fields with a single enum or typestate enum that encodes the full workflow state. The compiler enforces exactly one valid state at a time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a bool lifecycle flag, redundant with status String. This creates independent boolean and string axes of state that can drift out of sync.",
+      "failure_mode": "is_sent can be true while status is not \"sent\", or vice versa. No constructor enforces their invariant together, so any field mutation can break consistency.",
+      "fix": "Eliminate is_sent entirely. Encode \"sent\" as a single variant in the status enum. If a sent timestamp is needed, store it only in the sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> as a separate field. Option permits both Some and None independently of sent state, violating the invariant that a sent budget must have a timestamp.",
+      "failure_mode": "The struct can be in a state where is_sent=true but sent_at_epoch_ms=None, or is_sent=false but sent_at_epoch_ms=Some(...). Both are domain violations.",
+      "fix": "Move sent_at_epoch_ms into the enum variant for the sent state, e.g. `Sent { sent_at_epoch_ms: u64 }`. This makes it impossible to have a sent budget without a timestamp."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not validate the current state before transitioning. It blindly sets status=\"sent\", is_sent=true, and leaves sent_at_epoch_ms unchanged (potentially None). It also does not set sent_at_epoch_ms at all.",
+      "failure_mode": "A BudgetWorkflow in Draft status with is_sent=false and sent_at_epoch_ms=None can be passed to mark_sent, producing a struct where is_sent=true but sent_at_epoch_ms=None — a directly contradictory state. The function accepts any input state, with no preconditions.",
+      "fix": "Accept the current status enum as a parameter or use a method on an enum typestate. Transition must be exhaustive: only allow transition from Validated to Sent. Set sent_at_epoch_ms to the current epoch. Reject invalid source states with a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "id is a bare String with no domain constraints. Budget IDs should have structural rules (format, length, uniqueness) enforced at the type level.",
+      "failure_mode": "Empty strings, duplicate IDs, or malformed IDs are indistinguishable from valid IDs at the type level, pushing all validation into runtime checks scattered across the codebase.",
+      "fix": "Replace with a newtype `BudgetId(String)` or `BudgetId([u8; N])` with a fallible constructor that validates format/length. Use the newtype in BudgetWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent sets sent_at_epoch_ms but never reads a clock, timestamp source, or accepts one as a parameter. In a real system the sent timestamp must come from a clock abstraction in the imperative shell. Here it is silently omitted, making the function non-deterministic in practice.",
+      "failure_mode": "The function cannot produce a correct sent_at_epoch_ms value without access to time. If this were wired to a real system, callers would need to pass time through the shell, violating the pure-core principle.",
+      "fix": "If this is a pure core function, remove sent_at_epoch_ms from the transition entirely and let the shell layer inject the timestamp via a separate command. Or accept a `now_ms: u64` parameter for testability."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "type_discipline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is `pub String` — public mutable field of a free-form string. No encapsulation or domain typing.",
+      "failure_mode": "Callers can mutate id to any value, including empty or duplicate, with no type-level guard.",
+      "fix": "Use a private field with a getter, or replace with a typed newtype `BudgetId` that encodes domain rules."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "type_discipline",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BudgetWorkflow are `pub`. There is no constructor, no encapsulation, and no invariant enforcement.",
+      "failure_mode": "Any code in the crate can construct a BudgetWorkflow with arbitrary field combinations, bypassing all domain invariants.",
+      "fix": "Make fields private. Provide a constructor or builder that enforces invariants. Better yet, replace the struct with an enum of typed states."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unnecessary_allocations",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent creates a new String via `.to_string()` for the status literal \"sent\" instead of using a comparison against an enum variant or a &'static str.",
+      "failure_mode": "Heap allocation on every transition call for a constant string value. In a hot path this is wasteful and unmeasured.",
+      "fix": "Replace String status with an enum. No allocation needed for state transitions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any budget workflow operation",
+    "no profiler evidence for allocation patterns in the budget workflow path",
+    "no allocation audit showing try_reserve usage or bounded capacity decisions",
+    "no command evidence (cargo test, cargo fmt, cargo clippy) was executed",
+    "no second-ring evidence (Miri, Kani, or property tests) for state machine invariants"
+  ],
+  "residual_risk": "The struct encodes a state machine as independent scalar fields (String status, bool flags, Option<u64>), making illegal states trivially representable. The mark_sent function performs no state validation and omits the timestamp assignment, producing directly contradictory structs. This is a textbook violation of the power-of-ten Rust principle. A complete redesign using a typed state enum is required before this code is safe for production."
+}

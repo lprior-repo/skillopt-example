@@ -1,0 +1,67 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses raw String for status and bool flags for lifecycle, allowing illegal state combinations (e.g., is_sent=true with status != \"sent\", or is_validated=false after mark_sent). The compiler cannot enforce valid transitions.",
+      "failure_mode": "Any caller can construct or mutate a LedgerWorkflow into an invalid state (e.g., is_sent=true but status=\"pending\"), breaking auditability and ledger integrity.",
+      "fix": "Replace status:String with an enum type LedgerStatus { Pending, Validated, Sent } and replace is_validated/is_sent bools with a single LedgerStatus field. Make mark_sent accept only the pre-transition typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive lifecycle flag. Combined with is_sent: bool and status: String, it creates a 3-field lifecycle that can describe impossible states (e.g., validated but not sent, or sent with status=\"pending\").",
+      "failure_mode": "State machine inconsistencies are only catchable at runtime via manual checks. No compile-time guarantee of valid transitions.",
+      "fix": "Collapse into a single enum: pub enum LedgerStatus { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }. Remove is_validated and is_sent entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive domain identifier with no domain constraints. No validation that the id conforms to ledger ID rules (length, format, uniqueness).",
+      "failure_mode": "Invalid IDs (empty, malformed, duplicated) propagate into the core without rejection at the boundary.",
+      "fix": "Wrap in a newtype: pub struct LedgerId(String). Add a fallible constructor LedgerId::try_from(raw: String) that validates domain rules."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes a fully-constructed LedgerWorkflow and mutates it unconditionally. It does not enforce that the ledger was in a valid pre-sent state (e.g., Validated). Any state can transition to sent.",
+      "failure_mode": "A pending or already-sent ledger can be marked sent without validation, corrupting the audit trail and bypassing required prior steps.",
+      "fix": "Use typestates: pub struct LedgerPending { ... } and pub struct LedgerSent { ... }. mark_sent accepts LedgerValidated and returns Result<LedgerSent, TransitionError>, rejecting invalid transitions at compile time."
+    },
+    {
+      "severity": "HIGH",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a pure function (no I/O), which is good, but it returns the full mutated struct instead of a new typestate. It mutates in-place rather than returning a new immutable value.",
+      "failure_mode": "Callers may hold references to the pre-sent state and observe inconsistent data after mutation.",
+      "fix": "Return a new LedgerSent value constructed from the validated input. Do not mutate the input."
+    },
+    {
+      "severity": "HIGH",
+      "rule": "sent_at_epoch_ms_unenforced",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from is_sent. A ledger can be is_sent=true with sent_at_epoch_ms=None, or is_sent=false with sent_at_epoch_ms=Some(...).",
+      "failure_mode": "Timestamp inconsistency breaks auditability — sent ledgers without timestamps, or timestamps without sent flag.",
+      "fix": "Bake sent_at_epoch_ms into the Sent variant: pub enum LedgerStatus { ..., Sent { sent_at_epoch_ms: u64 } }."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claims",
+    "no profiler/baseline/allocation evidence for this crate",
+    "no second-ring test or integration evidence",
+    "no CLI command or binary evidence for workflow testing"
+  ],
+  "residual_risk": "High — the domain model permits illegal state combinations with no compile-time enforcement. The typestate anti-pattern (bool flags + string status) is the dominant risk. No verification evidence exists."
+}

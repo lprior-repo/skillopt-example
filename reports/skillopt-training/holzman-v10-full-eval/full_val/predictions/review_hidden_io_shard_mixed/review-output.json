@@ -1,0 +1,181 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() on fallible I/O",
+      "failure_mode": "corrupted path, missing file, or permission error panics the entire task instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, LoadError>, use .map_err(|e| LoadError::Io(e)) on read_to_string"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() on fallible parse",
+      "failure_mode": "non-numeric value in field 1 panics the entire task instead of returning a typed parse error",
+      "fix": "Use .map_err(|_| ParseError::Invalid) and return Result<Vec<Record>, LoadError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(parts[1].parse::<u32>().unwrap() as u16) - lossy u32-to-u16 cast",
+      "failure_mode": "values in range 65536-4294967295 silently truncate to u16 range, corrupting data with no error",
+      "fix": "Use u16::try_from(parsed).map_err(|_| ParseError::Overflow) to reject out-of-range values"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] - unchecked indexing into split result",
+      "failure_mode": "empty line or line without comma causes index-out-of-bounds panic",
+      "fix": "Use split_once(',') and pattern-match the Ok( (name, value) ) tuple"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] - unchecked indexing into split result",
+      "failure_mode": "line with only one field or empty line causes index-out-of-bounds panic",
+      "fix": "Use split_once(',') and pattern-match the Ok((name, value)) tuple"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) in data-processing function",
+      "failure_mode": "side-channel log leakage in pure logic path; stdout pollution breaks consumer pipelines and adds unbounded I/O to hot path",
+      "fix": "Remove println entirely. Logging belongs in the shell layer, never in the functional core"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_leakage",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards fuses I/O (fs::read_to_string), logging (println), parsing, and domain construction in a single fn",
+      "failure_mode": "cannot test parsing logic in isolation; I/O side effects contaminate deterministic core; single point of failure across all concerns",
+      "fix": "Split into: (1) boundary fn load_shards that reads file and calls parse_records, (2) pure fn parse_records(lines: &[String]) -> Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_errors",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards returns Vec<Record> with no error type; all failures panic",
+      "failure_mode": "consumer has no way to distinguish IO error from parse error from overflow error; every failure is a task abort",
+      "fix": "Define enum LoadError { Io(std::io::Error), Invalid, Overflow, TooMany, Allocation } and return Result<Vec<Record>, LoadError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No max_items cap, no try_reserve, no iteration limit on lines",
+      "failure_mode": "unbounded file size causes unbounded Vec allocation and OOM; hostile input triggers resource exhaustion",
+      "fix": "Accept max_items: usize parameter; call values.try_reserve(max_items).map_err(|_| LoadError::Allocation) after parsing; enforce count <= max_items before push"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "Record.value is raw u16, not a domain newtype",
+      "failure_mode": "any u16 value is accepted without domain validation; no enforcement of valid range, units, or semantics",
+      "fix": "Define struct RecordValue(u16) with a smart constructor that validates domain invariants, store Record { name: RecordName, value: RecordValue }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is raw String, not a domain newtype",
+      "failure_mode": "empty strings, whitespace-only names, and non-domain strings are accepted without validation",
+      "fix": "Define struct RecordName(String) with smart constructor requiring non-empty, trimmed string"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_raw_split_collect_index",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(…​).collect() into Vec<String> then indexed access",
+      "failure_mode": "allocates intermediate Vec per line; loses information about how many fields existed (trailing commas produce extra empty strings); indexing is unchecked",
+      "fix": "Use line.split_once(',').ok_or(ParseError::Invalid) to get (name, value_str) tuple; parse value_str directly; no intermediate Vec needed"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_checked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>() then cast to u16 - no checked conversion path",
+      "failure_mode": "value 70000 parses successfully as u32 then truncates to 44464 as u16, silently producing wrong data",
+      "fix": "Parse directly as u16 via .parse::<u16>().map_err(...), or use u16::try_from(u32_val).map_err(|_| ParseError::Overflow)"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_performance_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_shards",
+      "failure_mode": "unknown if this is the bottleneck; no baseline to validate any future optimization against",
+      "fix": "Add a criterion or custom benchmark measuring parse throughput on representative shard files"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No [dev-dependencies] for criterion or similar in Cargo.toml; no benches/ directory",
+      "failure_mode": "cannot produce benchmark evidence for any performance claim about load_shards",
+      "fix": "Add criterion as dev-dependency and create benches/ with load_shards benchmark"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No flamegraph, perf, or sampler evidence for the load_shards hot path",
+      "failure_mode": "cannot verify that split/collect/index is actually the bottleneck vs I/O",
+      "fix": "Run cargo flamegraph or perf on load_shards to identify actual hot path"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No allocation profile evidence showing per-line Vec<String> allocation cost",
+      "failure_mode": "unknown if intermediate allocation is significant; could be optimizing the wrong thing",
+      "fix": "Use dlmalloc stats, jemalloc profiler, or `dhat` to measure allocation footprint"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo fmt, clippy, or check evidence reported",
+      "failure_mode": "cannot confirm crate compiles cleanly under strict lint gates",
+      "fix": "Run cargo fmt --check, cargo check --all-targets --all-features, and strict clippy; report results"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_shards throughput or latency",
+    "no profiler/flamegraph evidence for hot-path identification",
+    "no allocation profile evidence for per-line Vec allocation cost",
+    "no command evidence (cargo fmt/check/clippy/test) run or reported",
+    "no second-ring evidence for any performance or zero-cost claim"
+  ],
+  "residual_risk": "Static review identified 14 blockers and 4 major findings. Every absolute law violation (unwrap, unchecked indexing, lossy cast, hidden I/O, shell leakage, no typed errors, unbounded allocation, no newtypes, raw split-collect-index, no checked arithmetic) remains present. The crate will not compile under strict clippy gates due to unwraps and indexing. No commands were run. The code must be fully repaired before any delivery gate."
+}

@@ -1,0 +1,120 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() performs hidden I/O inside a function returning Vec<Record> with no Result type, leaking side effects into what should be a pure computation path",
+      "failure_mode": "caller cannot distinguish file-not-found from empty file; error manifests as a panic instead of a typed error",
+      "fix": "return Result<Vec<Record>, LoadError>; propagate io::Error via map_err to a typed LoadError::Io variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "unwrap() on fs::read_to_string result is a panic surface on untrusted input (missing file, permission denied)",
+      "failure_mode": "process aborts with panic when the file is absent or unreadable instead of returning a recoverable error",
+      "fix": "replace with map_err(|e| LoadError::Io(e)) on a Result-returning signature"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "unwrap() on parts[1].parse::<u32>() is a panic surface on non-numeric field values",
+      "failure_mode": "process panics when a CSV field contains non-numeric data instead of returning a typed parse error",
+      "fix": "replace with map_err(|_| LoadError::InvalidValue(name))? on a Result-returning signature"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy conversion from u32 to u16 that silently truncates values outside 0-65535",
+      "failure_mode": "large u32 values silently wrap to invalid u16 values, corrupting data without any error signal",
+      "fix": "use u16::try_from(parts[1].parse::<u32>()?)? or parse directly as u16 with map_err for typed overflow/underflow reporting"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing on a dynamically-sized Vec with no bounds check",
+      "failure_mode": "process panics via IndexOutOfBoundsException when a CSV line has fewer than 2 fields",
+      "fix": "use parts.get(0).ok_or(LoadError::TooFewFields)? and parts.get(1).ok_or(LoadError::TooFewFields)? for fallible access"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden side effect (stdout I/O) embedded in what should be a pure data-parsing step",
+      "failure_mode": "pure logic produces observable side effects, breaking functional-core purity and making the function unsuitable for testing, benchmarking, or composition without stdout pollution",
+      "fix": "remove println! entirely; if telemetry is needed, return a separate metrics result or use a logging framework in the shell layer"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record exposes raw String and u16 primitives; the parse boundary is absent, so callers can construct invalid domain states directly (e.g., empty name, out-of-range value)",
+      "failure_mode": "illegal states are representable because external primitives cross into the domain without validation via a smart constructor or parse function",
+      "fix": "introduce a private Record { name: Name, value: Value } with a parse fn load_record(line: &str) -> Result<Record, ParseError> that validates constraints and makes invalid states unrepresentable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::collect() without any capacity reservation or domain-size cap allocates unbounded memory on untrusted input",
+      "failure_mode": "a single file with millions of lines triggers unbounded heap growth and potential OOM without any upstream cap",
+      "fix": "pre-count lines or use try_reserve with a domain max cap; replace collect() with a bounded explicit loop that enforces max_items and returns TypedError::TooMany on overflow"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "data_calculations_actions",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions fuses file I/O (Action), stdout logging (Action), CSV parsing (Action), and domain struct construction (Data/Calculation) into a single function",
+      "failure_mode": "no functional-core boundary; pure data transformation cannot be unit-tested in isolation; side effects leak into computation path; violates Data/Calculations/Actions architecture",
+      "fix": "split into: (1) shell fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError> handling I/O, (2) pure fn parse_records(lines: &[str]) -> Result<Vec<Record>, ParseError> handling CSV parsing and domain construction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_returns",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no Result type, discarding all fallible operations (file read, field access, parsing, truncation) by handling them with unwrap",
+      "failure_mode": "every fallible path in the function body is converted to a panic; callers have no mechanism to handle errors gracefully",
+      "fix": "change signature to fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError> and propagate all fallible operations through the Result type with a typed error enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this file I/O and parsing path which allocates per-line Vec<String> and clones",
+      "failure_mode": "performance characteristics are unknown; per-line allocation of Vec<String> + to_string clones on every field is a likely bottleneck with no measurement to guide optimization",
+      "fix": "add a criterion or tinytest benchmark for load_sessions; profile with cargo-flamegraph or similar; if per-line Vec allocation is the bottleneck, consider borrowing from the original line string with split_once"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated file-reading and CSV-parsing workload",
+    "no profiler evidence (flamegraph, perf, or similar) for allocation hotspots in the parse path",
+    "no allocation evidence (allocations per record, total heap growth) for unbounded input",
+    "no second-ring evidence (assembly or MIR) for bounds-check removal or zero-cost claims",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy, and cargo test were not run"
+  ],
+  "residual_risk": "Static review identifies 11 BLOCKER violations across hidden I/O, panic surfaces (unwrap, lossy as), unchecked indexing, missing parse boundary, absent bounded allocation, and no functional-core separation. No commands were executed (no cargo check/clippy/test/fmt evidence). The crate would not pass any Holzman verification gate in its current state. All unwrap, lossy as, println!, and unchecked indexing must be replaced with typed errors and fallible access before any delivery gate."
+}

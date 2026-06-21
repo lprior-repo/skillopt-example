@@ -1,0 +1,18 @@
+Now I have all the information needed. The task crate has one source file (`src/lib.rs`) with numerous Holzman + Functional Rust violations. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**9 BLOCKER findings** across `src/lib.rs`:
+
+| Line | Rule | Issue |
+|------|------|-------|
+| 9 | zero_forbidden_constructs | `unwrap()` on `fs::read_to_string` |
+| 9 | zero_hidden_io | File I/O fused into domain data function |
+| 19 | zero_forbidden_constructs | `parse().unwrap()` panics on bad input |
+| 19 | zero_lossy_conversions | `as u16` silently truncates values >65535 |
+| 16 | zero_unchecked_access | `parts[0]`, `parts[1]` without bounds check |
+| 16 | zero_hidden_io | `println!` in parsing layer |
+| 12 | mandatory_parse_patterns | `split().collect()` into Vec instead of `split_once` |
+| 4 | domain_api_no_raw_primitives | `Record` exposes raw `String`/`u16`, no parse boundary |
+| 8 | checked_returns | Returns `Vec<Record>` instead of `Result`, cannot express failure |
+
+**6 missing evidence** items: no benchmark, profiler, allocation, second-ring, or command evidence for the mandatory verification gate.

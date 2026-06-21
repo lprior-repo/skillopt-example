@@ -1,0 +1,9 @@
+Review complete. Written to `review-output.json`.
+
+**8 findings, 5 BLOCKERs, 3 MAJORs** — key issues:
+
+1. **Buffer overrun** (`src/lib.rs:8`): `_mm_loadu_ps` reads 4 f32s when `i < input.len()` but `i + 4 > input.len()`, reading past the allocation.
+2. **Silently incorrect results**: Tail elements (0-3 remaining) are never processed — `out.iter().sum()` drops them.
+3. **Missing `#[target_feature(enable = "sse")]`**: Illegal instruction risk without the attribute.
+4. **No non-x86_64 fallback**: Function doesn't compile on ARM/RISC-V/etc.
+5. **No benchmark/profiler/command evidence** for the SIMD performance claim.

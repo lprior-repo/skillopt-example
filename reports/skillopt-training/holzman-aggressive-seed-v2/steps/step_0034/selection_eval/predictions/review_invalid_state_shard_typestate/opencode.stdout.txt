@@ -1,0 +1,8 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Wrote `review-output.json` with 6 findings:
+
+- **3 BLOCKERs**: No typestate enum (illegal states representable), bare `String` id (no newtype), no fallible constructor enforcing validated-before-sent precondition
+- **2 MAJORs**: `mark_sent` silently accepts invalid transitions, `Option<u64>` timestamp is structurally inconsistent with sent state
+- **1 MINOR**: Unnecessary heap allocation for `"sent".to_string()`
+
+Core problem: `ShardWorkflow` uses primitive fields (`String`, `bool`, `Option<u64>`) instead of an enum typestate, making every illegal shard state freely constructible with zero validation at the type or runtime level.

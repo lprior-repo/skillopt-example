@@ -1,0 +1,18 @@
+Now I understand the issues. The current `encode_frame` has:
+1. Lossy `as u32` conversion (line 10) — Holzman violation
+2. No payload size check against `max_payload` — fails `rejects_limit` test
+3. Missing `checked_add` and `try_reserve` per mandatory frame encoder pattern
+
+Let me fix it.
+Both tests pass. Let me verify the final source and write the output JSON.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+1. **Payload validation** — Added `if payload.len() > max_payload` check returning `Err(FrameError::PayloadTooLarge)` (was missing, causing `rejects_limit` test failure)
+
+2. **Lossy `as` conversion** — Replaced `payload.len() as u32` with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+
+3. **Checked arithmetic** — Added `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?` for capacity computation
+
+4. **Bounded allocation** — Added `out.try_reserve(capacity).map_err(|_| FrameError::Allocation)?` per mandatory frame encoder pattern
+
+All 2 tests pass, clippy clean, JSON output written.

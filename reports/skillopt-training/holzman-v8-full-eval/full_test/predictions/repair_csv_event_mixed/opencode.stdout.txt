@@ -1,0 +1,17 @@
+Now I have the full picture. The current `parse_events` has multiple violations: uses `unwrap()`, ignores `max_items`, doesn't check empty input, and never returns `ParseError`. Let me read the references and then fix.
+Now I have full context. The fixes needed in `src/lib.rs`:
+
+1. **Remove `unwrap()`** → return `Err(ParseError::Invalid)` on parse failure
+2. **Check empty input** → return `Err(ParseError::Empty)`
+3. **Enforce `max_items`** → return `Err(ParseError::TooMany)` when item count exceeds limit
+4. **No `unwrap`/`panic`/`assert` in production**
+All 4 tests pass. Running the full Holzman verification gate.
+All checks pass. Writing the output file.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+- **Removed `unwrap()`** — replaced with `match` returning `Err(ParseError::Invalid)` on parse failure
+- **Added empty-input check** — returns `Err(ParseError::Empty)` for blank/whitespace-only input
+- **Enforced `max_items` limit** — returns `Err(ParseError::TooMany)` when items exceed the cap
+- **Pre-allocated with `Vec::with_capacity(max_items)`** — bounded allocation
+
+All 4 behavior tests pass. Holzman verification gates pass.

@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/reviews/review-output-contract.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/claim-traceability.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_required",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow has no typestate enum or state machine. Callers can construct any combination of status, is_validated, is_sent, and sent_at_epoch_ms, making illegal states (e.g., is_sent=true with status=\"new\") representable and undetectable.",
+      "failure_mode": "Logic downstream that assumes sent items have status=\"sent\" or validated items have is_validated=true will silently operate on invalid data, producing incorrect metrics without any error signal.",
+      "fix": "Replace fields with a typestate enum: `enum MetricState { New { id: MetricId }, Validated { id: MetricId, validated_at: Instant }, Sent { id: MetricId, sent_at: u64 } }`. Each variant owns only the fields valid for that state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is declared as `pub status: String`. Status strings allow arbitrary values (\"\", \"SENT\", \"sent\", null-like empty) that bypass domain invariants. mark_sent at line 10 sets it via string assignment.",
+      "failure_mode": "A caller can set status to any string at any time, including clearing it after mark_sent, or comparing with `== \"sent\"` which is fragile and typo-prone. No compile-time guarantee that status matches is_sent/is_validated.",
+      "fix": "Replace `status: String` with a domain enum: `enum MetricStatus { New, Validated, Sent }`. Remove mark_sent string mutation; encode transitions as enum variants owned by a typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool at lines 4-5 are independent lifecycle booleans. Two booleans create four states (00, 01, 10, 11) but only some are valid (e.g., validated before sent). No enforcement of ordering or mutual exclusivity.",
+      "failure_mode": "Callers can set is_sent=true and is_validated=true in any order, or set is_sent=true while is_validated=false, representing physically impossible metric lifecycles. Logic branching on these booleans will have unreachable or dangerous paths.",
+      "fix": "Replace both booleans with a single typestate enum that encodes valid transitions: `enum MetricState { New, Validated, Sent { sent_at_epoch_ms: u64 } }`. Transitions become functions returning the next variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> allows None when is_sent=true (missing timestamp) and Some when is_sent=false (premature timestamp). The Option is detached from the is_sent boolean that controls its validity.",
+      "failure_mode": "A sent metric with None timestamp loses temporal evidence. A non-sent metric with Some timestamp implies premature state leakage. Downstream code reading sent_at_epoch_ms cannot trust its correlation with is_sent.",
+      "fix": "Move sent_at_epoch_ms inside the typestate variant that owns it: `MetricState::Sent { sent_at_epoch_ms: u64 }`. None is no longer representable for sent metrics, and Some is impossible for non-sent metrics."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_newtype_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain meaning. Any String is accepted, including empty strings, UUIDs that don't match the expected format, or strings meant for other entity types.",
+      "failure_mode": "Metrics can be created with empty IDs or IDs from another domain, causing collisions, lost metrics, or cross-contamination. String equality for IDs is O(n) and typo-prone compared to typed comparison.",
+      "fix": "Create a `MetricId` newtype: `pub struct MetricId(String);` with a smart constructor `fn new(id: impl Into<String>) -> Result<MetricId, MetricError>` that validates non-empty format at the parse boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow is a plain struct with all pub fields and no smart constructor or parse function. Raw primitives cross the parse boundary without validation, so callers can construct invalid domain states directly via struct literal.",
+      "failure_mode": "Every caller can write `MetricWorkflow { id: \"\".to_string(), status: \"\".to_string(), is_validated: false, is_sent: false, sent_at_epoch_ms: None }` and produce a struct that violates every domain invariant with zero compiler warnings.",
+      "fix": "Make all fields private, add a smart constructor `fn new(id: MetricId) -> MetricWorkflow` that produces the initial New state, and replace mark_sent with a typed transition method `fn into_sent(self, epoch_ms: u64) -> Result<MetricWorkflow, MetricError>` that validates preconditions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_allows_invalid_transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes any MetricWorkflow and mutates status and is_sent unconditionally, allowing transition from any state (including already-sent or invalid states) to sent. No precondition checks.",
+      "failure_mode": "Double-sending is silently accepted. A validated-but-not-sent item can be sent. An already-sent item gets its timestamp not updated (sent_at_epoch_ms stays stale). No ordering invariant is enforced.",
+      "fix": "Replace free function with a method on a typestate-aware struct. Use `match` on the state enum to only allow Validated->Sent transition. Return `Result` to reject invalid transitions."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark module exists. mark_sent allocates (\"sent\".to_string()) on every call. For a metrics workflow that may be called in hot paths, allocation cost is unmeasured.",
+      "failure_mode": "Unmeasured allocation in a hot path can cause GC pressure, latency spikes, or cache misses that degrade throughput. Without a baseline, no one can detect regression.",
+      "fix": "Add a `#[cfg(test)]` benchmark module with Criterion. Benchmark mark_sent with realistic payload sizes. Compare allocation count and bytes via `Bencher::iter`."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation behavior",
+    "no profiler evidence for hot-path cost of String allocation in mark_sent",
+    "no allocation audit for the to_string() call on line 10",
+    "no second-ring evidence for zero-cost claims (none stated but no measurement baseline exists)"
+  ],
+  "residual_risk": "The crate represents every illegal MetricWorkflow state as valid Rust. Without typestate enum, the domain model provides zero compile-time protection. A full repair requires replacing the struct with a typestate enum, removing status String, replacing lifecycle booleans, moving Option fields into variants, creating a MetricId newtype, enforcing parse boundaries, and converting mark_sent to a typed transition method. Until repaired, any code depending on MetricWorkflow invariants is at risk of silent data corruption."
+}

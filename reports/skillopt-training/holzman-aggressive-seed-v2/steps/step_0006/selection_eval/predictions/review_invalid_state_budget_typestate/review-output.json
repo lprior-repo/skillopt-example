@@ -1,0 +1,62 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_flags_for_state",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a primitive boolean flag that can represent invalid state combinations (e.g., `is_validated=false` with `status=\"sent\"`), violating the rule that no Option or bool flags may represent invalid states.",
+      "failure_mode": "The domain invariant that a budget must be validated before being sent cannot be enforced by the compiler; callers can leave is_validated=false while setting status to \"sent\", producing a logically impossible workflow state.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single `status: BudgetStatus` enum that encodes the full lifecycle (e.g., `Pending`, `Validated`, `Sent`) so illegal states are unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_flags_for_state",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is a primitive boolean flag that can be true while status is anything other than \"sent\", creating redundant and contradictory state representation.",
+      "failure_mode": "Callers can set `is_sent=true` without calling `mark_sent`, or set `is_sent=true` while `status` remains \"pending\". Both represent states the domain model must forbid.",
+      "fix": "Remove `is_sent` entirely. Use an enum-based status type so \"sent\" is a single, indivisible state variant rather than a separate flag."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` allows any arbitrary string value (\"foo\", \"deleted\", \"null\"), making the state space unbounded and invalid states constructable by any caller.",
+      "failure_mode": "A caller can assign `status=\"invalid\"` or `status=\"\"` and the type system provides zero protection. The domain has a fixed set of lifecycle states that should be enumerated by the type.",
+      "fix": "Replace `pub status: String` with a domain enum `pub status: BudgetStatus` containing only the valid variants (e.g., `Pending`, `Validated`, `Sent`). Parse at boundaries; keep the core type-safe."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields_without_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `BudgetWorkflow` are `pub`, allowing external code to mutate status, flags, and timestamps arbitrarily without any invariant enforcement.",
+      "failure_mode": "Any module in the crate (or downstream crates) can set `item.is_sent=true; item.status=\"anything\";` producing inconsistent state with zero validation.",
+      "fix": "Make fields private and provide a private constructor or builder that enforces invariants. Expose only domain-safe mutation methods."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_invalid_state_sent_without_timestamp",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` sets `is_sent=true` and `status=\"sent\"` but does not populate `sent_at_epoch_ms`, leaving the budget in a state where it is marked sent but has no send timestamp.",
+      "failure_mode": "Downstream code that reads `sent_at_epoch_ms` will get `None` for a budget that is already \"sent\", causing incorrect audit trails or missing temporal invariants.",
+      "fix": "Either require the epoch as a parameter to `mark_sent`, or use an enum typestate where `Sent { sent_at: u64 }` makes the timestamp mandatory as part of the variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_validated_before_sent_invariant",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` does not check that `is_validated` is true before allowing the transition to sent, allowing an unvalidated budget to be marked sent.",
+      "failure_mode": "A caller can bypass validation entirely: call `mark_sent` on a `BudgetWorkflow` with `is_validated=false`, producing a budget that is sent but never validated — a critical domain invariant violation.",
+      "fix": "Use a typestate pattern: have separate types `ValidatedBudget` and `SentBudget`. The transition function `validate(budget) -> ValidatedBudget` and `send(ValidatedBudget) -> SentBudget` ensures validation is a required prerequisite at compile time."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for any performance claim", "no profiler data for hot paths", "no allocation analysis or try_reserve usage review", "no command evidence (cargo fmt/check/clippy/test not run)", "no second-ring evidence for bounds-check or zero-cost claims"],
+  "residual_risk": "The struct has no enum or typestate for its lifecycle, no validation before state transitions, public mutable fields, and redundant bool+string state representation. Every illegal state is constructible. This is a textbook invalid-state typestate violation — the entire purpose of this eval crate."
+}

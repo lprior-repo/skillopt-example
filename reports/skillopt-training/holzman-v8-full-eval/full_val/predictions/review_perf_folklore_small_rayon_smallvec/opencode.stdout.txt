@@ -1,0 +1,13 @@
+Review complete. Written to `review-output.json` with:
+
+- **6 findings** (3 BLOCKER, 3 ADVISORY)
+- **4 reference files read**: SKILL.md, functional-core-performance.md, hardening-checklist.md, review-output-contract.md
+- **6 missing evidence items**: no benchmark, no profiler, no allocation analysis, no formal verification, no command evidence, no tests
+
+Key findings:
+1. **Performance claim without evidence** - TODO asserts Rayon+SmallVec will be faster with zero measurements
+2. **Rayon on tiny work** - Rayon overhead dwarfs 4-byte iteration cost
+3. **SmallVec without justification** - needs benchmark proof
+4. **Heap Vec for fixed 4 elements** - guarantees per-call heap allocation
+5. **Iterator pipeline overhead** - unrolled loop or SmallVec inline would eliminate intermediates
+6. **Zero test coverage** - no behavioral baseline exists

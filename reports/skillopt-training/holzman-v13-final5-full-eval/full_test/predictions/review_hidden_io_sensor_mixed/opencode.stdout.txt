@@ -1,0 +1,16 @@
+Review complete. Found 8 BLOCKER violations in `src/lib.rs`:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | no_hidden_io_in_data_layer | 9 | `fs::read_to_string` fuses I/O with parsing/domain construction |
+| 2 | no_unwrap_or_panic | 9 | `.unwrap()` on file read panics on any I/O error |
+| 3 | no_hidden_io_in_data_layer | 16 | `println!` leaks console I/O into data layer |
+| 4 | no_unchecked_indexing | 16 | `parts[0]`/`parts[1]` raw indexing without bounds check |
+| 5 | no_lossy_cast | 19 | `as u16` silently truncates values > 65535 |
+| 6 | no_intermediate_allocation | 12 | `Vec<String>` allocation per line via `split().collect()` |
+| 7 | no_typed_error_taxonomy | 1 | No domain error enum for I/O/parse/overflow failures |
+| 8 | no_bounded_allocation | 8 | No `try_reserve`, no max_rows cap, unbounded file parsing |
+
+Missing evidence: no benchmarks, profiler data, command-truth evidence, or second-ring evidence.
+
+Output written to `review-output.json`.

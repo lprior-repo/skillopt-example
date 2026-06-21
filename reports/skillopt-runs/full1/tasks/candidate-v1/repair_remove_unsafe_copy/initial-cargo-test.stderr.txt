@@ -1,0 +1,5 @@
+   Compiling repair_remove_unsafe_copy v0.1.0 (/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/repair_remove_unsafe_copy)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/5782e93438dcb646/debug/deps/repair_remove_unsafe_copy-bcc4c3a00a90852d)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/5782e93438dcb646/debug/deps/behavior-148cc883fe8168e3)
+   Doc-tests repair_remove_unsafe_copy

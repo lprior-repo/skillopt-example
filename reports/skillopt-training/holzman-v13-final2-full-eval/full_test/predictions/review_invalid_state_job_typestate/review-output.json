@@ -1,0 +1,82 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "JobWorkflow has no enum-based state machine; any combination of status, is_validated, is_sent is structurally allowed including invalid ones like status=\"sent\" with is_validated=false",
+      "failure_mode": " callers construct and mutate JobWorkflow fields independently, producing states that should never exist (e.g. an unvalidated job marked sent, or a sent job that is not actually sent according to its boolean flag)",
+      "fix": "Replace the struct fields with a single JobState enum (e.g. Pending, Validated, Sent) that encodes valid transitions. Constructors and transitions return JobState directly; callers cannot assemble illegal combinations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String, allowing arbitrary text values (\"\", \"SENT\", \"pending\", \"\", any runtime string) instead of a closed set of domain states",
+      "failure_mode": " callers pass typos, wrong casing, or non-domain strings; downstream match or comparison logic silently misbehaves or panics; no compile-time enforcement of valid statuses",
+      "fix": "Replace `pub status: String` with `pub status: JobStatus` where JobStatus is an enum with explicit variants (Pending, Validated, Sent). Remove the separate is_sent and is_validated booleans once the enum owns the state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that can contradict each other (e.g. is_validated=false, is_sent=true) and cannot express ordering (validated must precede sent)",
+      "failure_mode": " callers set booleans in any order or skip steps entirely; the struct admits logically impossible states with no compile-time guard; transitions are not enforced",
+      "fix": "Encode lifecycle in a single enum typestate (Pending -> Validated -> Sent) so each variant owns the boolean information it needs and invalid transitions are impossible at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from the lifecycle booleans; a job can have sent_at_epoch_ms=Some(…) with is_sent=false, or is_sent=true with sent_at_epoch_ms=None",
+      "failure_mode": " callers produce inconsistent state where sent-time data exists without the sent flag or vice versa; logic reading sent_at_epoch_ms cannot trust is_sent and vice versa",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typestate enum: `Sent { sent_at_epoch_ms: u64 }`. This makes illegal combinations unrepresentable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive that carries no domain invariants (format, length, uniqueness); any string is accepted including empty, whitespace, or malformed identifiers",
+      "failure_mode": " callers pass empty strings, unbounded input, or malformed IDs; no validation at construction; accidental mixing of ID types across domains",
+      "fix": "Replace with `pub id: JobId` where JobId is a newtype wrapping a validated representation (e.g. `struct JobId(String)` with a smart constructor that returns Result<JobId, ParseError>). Parse hostile input once at the shell boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String, bool, Option<u64>) cross the parse boundary without fallible smart constructors; callers can construct invalid domain states directly from untrusted data",
+      "failure_mode": " external input (JSON deserialization, API payloads, file data) populates JobWorkflow fields with invalid values; there is no single parse point that enforces invariants before core logic sees the data",
+      "fix": "Define JobWorkflow (or a new JobDomain type) with private fields and a single fallible constructor: `fn try_from(id: &str, status: &str, validated: bool) -> Result<Self, JobError>`. The constructor parses and validates once, producing a trusted domain value. The core logic consumes only trusted types."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_no_precondition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any JobWorkflow regardless of its current state and overwrites status to \"sent\" without checking that is_validated=true or any precondition; it also ignores sent_at_epoch_ms",
+        "failure_mode": " callers can mark any job as sent without validation; the function silently accepts invalid preconditions and produces a sent-but-not-validated job",
+        "fix": "Change the function signature to accept a validated-specific state: `fn mark_sent(state: ValidatedState) -> SentState`. Each transition type takes the prior state and returns the next state, encoding preconditions in the type system."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated or implied performance claim",
+    "no profiler evidence for hot-path identification or allocation profiling",
+    "no allocation evidence: mark_sent does `.to_string()` on every call, creating a new heap allocation per transition with no try_reserve or bounded allocation",
+    "no second-ring evidence (no allocation counts, no microbenchmark of string interning or string replacement)",
+    "no command evidence: no cargo fmt/check/clippy/test run records"
+  ],
+  "residual_risk": "Static review only; no commands executed. The code structurally permits all illegal state combinations through independent primitive fields. No typestate enum, no parse boundary, no smart constructors, and no precondition enforcement on transitions. A full repair would require replacing the entire struct with an enum-based typestate machine, newtyped IDs, fallible constructors, and transition functions with typed inputs/outputs."
+}

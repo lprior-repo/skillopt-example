@@ -1,0 +1,12 @@
+Issues identified in `src/lib.rs`:
+1. `max_payload` parameter ignored — `rejects_limit` test will fail
+2. `payload.len() as u32` — lossy `as` conversion
+3. No allocation failure handling
+
+Fix:
+Repair complete. Both tests pass. Changes made to `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — returns `PayloadTooLarge` when `payload.len() > max_payload`
+2. **Replaced lossy `as` conversion** — `payload.len() as u32` → `try_into()` with `Overflow` error
+3. **Added overflow-checked arithmetic** — `checked_add` for total frame size
+4. **Added allocation failure handling** — `try_reserve` for `Allocation` error

@@ -1,0 +1,10 @@
+Now I have the full picture. The current code has multiple Holzman violations: `unwrap()`, no empty check, no `max_items` enforcement, and no invalid-value handling. Let me fix the production source.
+All 4 tests pass. Now writing the required output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Removed `.unwrap()`** — replaced with `map_err(|_| ParseError::Invalid)` for checked parsing
+2. **Added empty input check** — returns `Err(ParseError::Empty)`
+3. **Added `max_items` enforcement** — counts split parts and returns `Err(ParseError::TooMany)` if exceeded
+4. **Used `with_capacity(count)`** — exact capacity from split count, no over-allocation
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

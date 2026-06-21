@@ -1,0 +1,14 @@
+Review complete. Written to `review-output.json`.
+
+**6 findings** (3 BLOCKER, 3 MAJOR):
+
+| Severity | Rule | Issue |
+|---|---|---|
+| BLOCKER | `illegal_state_representable` | String status + bool flags allow inconsistent state combinations |
+| BLOCKER | `no_typestate_enforcement` | `mark_sent` accepts any state, no transition guards |
+| BLOCKER | `primitive_obsession` | `id: String` lacks domain newtype with validation |
+| MAJOR | `functional_core_imperative_shell` | In-place mutation with allocation, not pure |
+| MAJOR | `no_error_taxonomy` | No `Result` return, no typed errors |
+| MAJOR | `public_fields_expose_invariants` | All fields `pub`, bypassable by external code |
+
+**Missing evidence:** benchmarks, profiler data, allocation audit, clippy/fmt/test output, any command evidence.

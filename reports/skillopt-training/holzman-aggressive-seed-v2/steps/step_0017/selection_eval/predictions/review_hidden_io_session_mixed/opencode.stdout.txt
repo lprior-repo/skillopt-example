@@ -1,0 +1,16 @@
+Now I have the full picture. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**7 findings, all BLOCKER severity:**
+
+| Line | Rule | Problem |
+|------|------|---------|
+| 9 | `zero_forbidden_constructs` | `fs::read_to_string(...).unwrap()` panics on I/O errors |
+| 19 | `zero_forbidden_constructs` | `.parse::<u32>().unwrap()` panics on bad input |
+| 19 | `zero_forbidden_constructs` | `as u16` lossy cast silently truncates values > 65535 |
+| 12 | `parsing_access_pattern` | `split(',')+collect()+[0]/[1]` allocates Vec + unchecked indexing |
+| 16 | `functional_core` | `println!` hidden I/O side effect in parsing function |
+| 8 | `typed_errors` | Returns `Vec<Record>` — no `Result`, all failures hidden behind `unwrap` |
+| 8 | `functional_core` | `fs::read_to_string` I/O mixed into parsing — no core/shell split |
+
+**5 missing evidence items:** no benchmarks, no profiler data, no allocation audit, no clippy/check gates, no second-ring evidence.

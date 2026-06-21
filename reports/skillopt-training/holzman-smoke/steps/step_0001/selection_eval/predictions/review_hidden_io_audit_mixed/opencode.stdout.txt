@@ -1,0 +1,16 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Valid JSON written to `/tmp/opencode/holzman-skillopt-train/7a6c177df0067f1a/review_hidden_io_audit_mixed/review-output.json`.
+
+**8 BLOCKER findings** across 6 Holzman Rust rules:
+
+| Rule | Lines | Issue |
+|---|---|---|
+| `zero_forbidden_constructs` | 9, 13 | Two `unwrap()` calls on I/O and parse — both panic on bad input |
+| `zero_forbidden_constructs` | 13 | Lossy `as u16` cast silently truncates values > 65535 |
+| `zero_forbidden_constructs` | 11 | Unchecked `parts[0]`/`parts[1]` indexing — panics on short lines |
+| `functional_core_imperative_shell` | 12 | `println!` side effect inside parsing core |
+| `functional_core_imperative_shell` | 8 | Monolithic I/O+parse function — no pure core isolation |
+| `make_illegal_states_unrepresentable` | 3 | Public `Record` fields allow empty names / truncated values |
+| `no_hidden_side_effects` | 11 | Full `Vec<String>` allocation via `.collect()` instead of `split_once` |
+
+**5 missing evidence items**: no benchmarks, profiler data, allocation tracing, second-ring commands (Miri/Kani), or compile/test evidence.

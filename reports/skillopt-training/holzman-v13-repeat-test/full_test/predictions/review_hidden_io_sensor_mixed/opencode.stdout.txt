@@ -1,0 +1,19 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 BLOCKER findings, 1 WARNING, 6 missing evidence items.**
+
+The single file `src/lib.rs:8` fuses file I/O, parsing, logging, and domain construction into `load_sensors` — a textbook hidden-I/O violation. Key blockers:
+
+| Line | Violation |
+|---|---|
+| 9 | `fs::read_to_string().unwrap()` — panic on I/O error |
+| 16 | `println!` in parsing logic — hidden stdout I/O |
+| 16, 19 | `parts[0]`, `parts[1]` — unchecked indexing panics |
+| 19 | `.parse().unwrap()` — panic on invalid numeric input |
+| 19 | `as u16` — lossy u32-to-u16 cast silently truncates |
+| 12 | `split(',').collect()` — should use `split_once` |
+| 8 | No `try_reserve`, no domain cap, unbounded allocation |
+| 4 | `name: String` — raw primitive, illegal states representable |
+
+Missing: benchmarks, profiler evidence, allocation analysis, tests, error types, CLI command evidence.

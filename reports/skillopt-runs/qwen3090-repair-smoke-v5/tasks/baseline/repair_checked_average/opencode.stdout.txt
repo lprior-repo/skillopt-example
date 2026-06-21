@@ -1,0 +1,8 @@
+Issues in `src/lib.rs`:
+1. No empty-slice check (would divide by zero)
+2. Unchecked `sum += *value` (overflows on `[u32::MAX, 1]`)
+
+Fixing:
+The sum must stay in u32 range. Using u64 hid the overflow. Fixing with `u32::checked_add`:
+All 3 tests pass. Let me verify with clippy:
+repair-output.json written to `/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v5/tasks/baseline/repair_checked_average/repair-output.json` and `cargo test` passed (3/3).

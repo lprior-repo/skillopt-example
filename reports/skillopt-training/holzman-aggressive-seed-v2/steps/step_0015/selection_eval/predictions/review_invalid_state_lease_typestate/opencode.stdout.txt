@@ -1,0 +1,16 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 7 BLOCKER findings, all relating to invalid state representation:**
+
+| # | Rule | Line | Problem |
+|---|------|------|---------|
+| 1 | `make_illegal_states_unrepresentable` | 3 | `status: String` — any arbitrary string is valid |
+| 2 | `make_illegal_states_unrepresentable` | 4 | `is_validated: bool` — independent of status |
+| 3 | `make_illegal_states_unrepresentable` | 5 | `is_sent: bool` — redundant with status, independently mutable |
+| 4 | `make_illegal_states_unrepresentable` | 9 | `mark_sent` has no state-gate — accepts any input |
+| 5 | `functional_core_domain_types` | 6 | `sent_at_epoch_ms: Option<u64>` — raw primitive, no newtype |
+| 6 | `functional_core_domain_types` | 2 | `id: String` — raw primitive, no `LeaseId` newtype |
+| 7 | `no_production_unsafe_or_panics` | 10 | `"sent".to_string()` string-literal state mutation |
+
+**Root cause:** The struct has no typestate — three independent primitive fields (`String` + `bool` + `bool`) encode the same logical state, making contradictory states (e.g., `status: "draft"` with `is_sent: true`) trivially constructible and `mark_sent` has zero transition guards.

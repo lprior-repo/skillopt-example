@@ -1,0 +1,17 @@
+Now I have all the data. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings** (6 BLOCKER, 2 MAJOR):
+
+| # | Rule | File:Line | Summary |
+|---|------|-----------|---------|
+| 1 | `make_illegal_states_unrepresentable` | `src/lib.rs:3` | `status: String` allows arbitrary values, no type enforcement |
+| 2 | `no_bool_lifecycle_flags` | `src/lib.rs:4` | `is_validated: bool` + `is_sent: bool` = 4 combinatorial states, not a linear workflow |
+| 3 | `no_bool_lifecycle_flags` | `src/lib.rs:5` | `mark_sent()` sets `is_sent=true` without clearing `is_validated` — impossible real-world state |
+| 4 | `parse_at_boundaries_not_in_core` | `src/lib.rs:2` | `id: String` raw primitive, no newtype validation |
+| 5 | `functional_core_imperative_shell` | `src/lib.rs:9` | In-place mutation with `.to_string()` on a literal — imperative, not pure |
+| 6 | `pub_struct_fields` | `src/lib.rs:1` | All fields pub — external code bypasses all invariants |
+| 7 | `zero_forbidden_constructs` | `src/lib.rs:10` | Unnecessary heap allocation for `"sent".to_string()` |
+| 8 | `performance_evidence` | `src/lib.rs:1` | No benchmarks, profiler data, or allocation audit |
+
+5 missing evidence items (benchmarks, profiler, allocation audit, validation, command evidence). Residual risk: static review only, fundamental domain model violations present.

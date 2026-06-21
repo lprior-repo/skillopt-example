@@ -1,0 +1,29 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/ed4ac7735f44d13a/repair_summary_event_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/ed4ac7735f44d13a/repair_summary_event_mixed/.skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe, unwrap, expect, panic, todo, unimplemented, unreachable, unchecked indexing, unchecked arithmetic, lossy as, or ignored fallible results",
+    "summarize_metrics returns Result<Summary, SummaryError> — pure core returns domain data, not formatted strings",
+    "render_summary is a separate pure function for formatting — functional core / imperative shell boundary",
+    "split_once used instead of collect + unchecked indexing for two-field line parsing",
+    "checked_add used for total accumulation to detect overflow",
+    "checked_div used for average computation after proving count is nonzero",
+    "u32::try_from used instead of lossy as cast for count conversion",
+    "Empty input rejected early before any iteration",
+    "TooMany error returned when count exceeds max_rows during iteration",
+    "Invalid lines (missing comma or non-numeric value) rejected via split_once + map_err",
+    "Tests are the immutable behavior contract — no test files edited",
+    "Cargo.toml not edited",
+    "All 6 behavior tests pass"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All production unsafe/unwrap/expect/panic/unchecked-indexing/unchecked-arithmetic/lossy-casts eliminated. Function signatures match test contract. Pure core returns Summary struct; rendering isolated to render_summary."
+}

@@ -1,0 +1,17 @@
+Now let me explore the task crate structure and source:
+Now I have all the context needed. Let me write the review:
+Review complete. Written to `review-output.json`.
+
+**7 findings** across the task crate:
+
+| Severity | Rule | File:Line |
+|---|---|---|
+| BLOCKER | tiny-fixed-size-allocation | `src/lib.rs:1` |
+| BLOCKER | rayon-folklore-perf-claim | `src/lib.rs:2` |
+| BLOCKER | smallvec-folklore-perf-claim | `src/lib.rs:2` |
+| BLOCKER | unsupported-performance-claim | `src/lib.rs:2` |
+| WARNING | missing-benchmark-evidence | `src/lib.rs:1` |
+| WARNING | missing-profiler-evidence | `src/lib.rs:1` |
+| WARNING | missing-allocation-evidence | `src/lib.rs:1` |
+
+**Key violation**: The TODO comment at line 2 recommends Rayon + SmallVec for a 4-element fixed-input function. This is a textbook folklore anti-pattern — parallel dispatch overhead for 4 bytes is orders of magnitude worse than sequential iteration, and SmallVec's inline-capacity management is unnecessary when the output is statically `[&'static str; 4]`. The fix is to replace `Vec<&'static str>` with `[&'static str; 4]`, eliminating all heap allocation.

@@ -1,0 +1,74 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/reviews/review-output-contract.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_required",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "QuoteWorkflow uses a flat struct with no typestate enum to enforce valid state transitions. Any caller can set any combination of status, is_validated, is_sent, and sent_at_epoch_ms, making illegal states representable.",
+      "failure_mode": "A caller can construct a QuoteWorkflow with status='sent', is_sent=true, is_validated=false — an invalid lifecycle where a quote is marked sent before it was ever validated. No transition invariants exist.",
+      "fix": "Define a `QuoteStatus` enum with variants for each lifecycle stage (e.g. `Pending`, `Validated`, `Sent { sent_at_epoch_ms: u64 }`). Replace `status: String`, `is_validated: bool`, `is_sent: bool`, `sent_at_epoch_ms: Option<u64>` with a single `status: QuoteStatus` field. Use a method like `fn transition_to_sent(self, epoch_ms: u64) -> Result<QuoteWorkflow, QuoteError>` that enforces the correct pre-condition (must be Validated)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_string_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw `String` field. Any arbitrary string value is accepted — e.g. `\"sent\"`, `\"SENT\"`, `\"sent!\"`, `\"\"`, `\"validated\"` — with no compile-time guarantee that only valid lifecycle labels are used.",
+      "failure_mode": "A caller sets `item.status = \"SENT\"` or `item.status = \"\"`. The string comparison `item.status == \"sent\"` silently fails to match, leading to incorrect workflow behavior with no diagnostic. Invalid strings like `\"pending\"` with `is_sent=true` represent impossible states.",
+      "fix": "Replace `status: String` with a domain enum `QuoteStatus` whose variants encode the lifecycle stages. This eliminates arbitrary string values at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_flaws",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Two independent booleans (`is_validated: bool`, `is_sent: bool`) encode a workflow lifecycle with no enforcement of ordering. Valid states require `is_sent => is_validated`, but the struct allows `is_sent=true` and `is_validated=false`.",
+      "failure_mode": "A caller sets `is_sent=true` without setting `is_validated=true`, representing a quote that was sent before validation — a business-rule violation with no runtime or compile-time guard. The two booleans are also independent of the `status` String, creating three separate sources of truth.",
+      "fix": "Replace both booleans with a single `status: QuoteStatus` enum. Use `QuoteStatus::Validated` for the validated-but-not-sent state and `QuoteStatus::Sent { sent_at_epoch_ms: u64 }` for the sent state. This makes `is_sent => is_validated` a compile-time invariant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is a detached optional field. It can be `Some(0)` when `is_sent=false`, or `None` when `is_sent=true` — both are invalid state combinations that the struct cannot prevent.",
+      "failure_mode": "A quote has `is_sent=true` but `sent_at_epoch_ms=None`, meaning the quote was sent without a recorded timestamp. Conversely, `is_sent=false` with `sent_at_epoch_ms=Some(12345)` implies a timestamp was recorded for a quote that was never sent. The Option is orphaned from the lifecycle booleans.",
+      "fix": "Move `sent_at_epoch_ms` into the typestate enum variant: `QuoteStatus::Sent { sent_at_epoch_ms: u64 }`. This makes the timestamp only present when the quote is actually sent, eliminating orphaned optional data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id_missing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive String used as a domain identifier. Any arbitrary string — empty, null bytes, overly long, or non-unique — is accepted with no validation or domain semantics.",
+      "failure_mode": "A caller creates a QuoteWorkflow with `id: \"\"` or `id: \"\\0\\0\\0\"`. These invalid IDs could collide, break downstream systems, or cause parsing errors. There is no domain-level guarantee that IDs are non-empty, well-formed, or unique.",
+      "fix": "Define a `QuoteId` newtype: `pub struct QuoteId(String)`. Provide a smart constructor `QuoteId::new(s: String) -> Result<QuoteId, QuoteError>` that rejects empty/whitespace-only IDs, then use `id: QuoteId` in the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_absent",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No parse boundary exists. Raw primitives (String for id, String for status, bools for lifecycle) cross the boundary directly into the domain struct. There are no smart constructors, no fallible validation, and no parse-once rule. Callers can construct invalid domain states directly from untrusted input.",
+      "failure_mode": "External input (e.g. HTTP request body, CSV line, DB row) constructs a `QuoteWorkflow` with arbitrary field values — empty id, unknown status string, inconsistent booleans — bypassing all domain invariants. The core logic consumes untrusted, potentially invalid data.",
+      "fix": "Create a shell-level parser that accepts raw DTO/primitives and returns `Result<QuoteWorkflow, ParseError>`. Use fallible smart constructors: `QuoteId::new()`, `QuoteStatus::from_str()`, and a final constructor `QuoteWorkflow::new(id, status)` that validates cross-field invariants (e.g. sent implies validated with timestamp). The core then only accepts the validated domain type."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler evidence for hot-path analysis",
+    "no allocation evidence — `to_string()` on line 10 allocates a new String each call to mark_sent",
+    "no command-truth evidence — no tests, no clippy run, no CI gate",
+    "no second-ring evidence for any correctness or performance claim"
+  ],
+  "residual_risk": "The struct has no typestate enforcement, no parse boundary, no typed error taxonomy, and no allocation bounds. Callers can construct any combination of status string, booleans, and optional timestamp, including business-rule-invalid states. The `mark_sent` function performs no pre-condition check and unconditionally overwrites status and is_sent. Without a typestate enum, smart constructors, and boundary parsing, illegal states are representable at compile time. This is a blocker-level architectural defect."
+}

@@ -1,0 +1,27 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable",
+    "No lossy as conversions - replaced payload.len() as u32 with u32::try_from(payload.len())",
+    "No unchecked indexing - payload bounds checked against max_payload",
+    "No unchecked arithmetic - overflow-checked conversion via try_from",
+    "Smallest source change satisfies all tests",
+    "Tests were not edited",
+    "Cargo.toml was not edited",
+    "Pure logic in encode_frame, no I/O in core"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "Allocation variant on FrameError is defined but not exercised by tests or implementation; Overflow variant is exercised by try_from but only triggers for payloads exceeding u32::MAX which the max_payload check would reject first."
+}

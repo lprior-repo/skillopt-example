@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status field is String instead of a domain enum typestate. Any string value is valid, so illegal states like status='sent' with is_sent=false are representable.",
+      "failure_mode": "A caller can construct a LeaseWorkflow with inconsistent status/sent state; downstream logic must defensively check multiple fields instead of relying on a single enum discriminant.",
+      "fix": "Replace pub status: String with pub status: LeaseStatus where LeaseStatus is an enum { Pending, Sent, ... }. Remove is_sent bool entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bare bool flag. True/false carry no domain semantics and cannot express validation sub-states or reasons for rejection.",
+      "failure_mode": "Code must juggle boolean alongside status and is_sent, creating combinatorial invalid state space. No compiler enforcement of validation ordering.",
+      "fix": "Replace with a LeaseValidation enum or typestate (e.g., NotValidated, Validated, Rejected(String))."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a redundant bool that duplicates status='sent'. The bool and status string can drift out of sync.",
+      "failure_mode": "Caller sets is_sent=true but leaves status=\"pending\", or vice versa. No invariant enforcement at the type level.",
+      "fix": "Remove is_sent entirely. Derive sentness from the LeaseStatus enum discriminant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-typestate",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is Option<u64> with no type-level link to is_sent or status. A lease can be is_sent=true with sent_at_epoch_ms=None, which is logically inconsistent.",
+      "failure_mode": "Sent leases without timestamps pass construction. Downstream code must defensively check for None, and there is no way to make the 'sent-with-timestamp' invariant unrepresentable.",
+      "fix": "Remove sent_at_epoch_ms from the struct. If a sent timestamp is needed, model it via a typestate (e.g., LeaseStatus::Sent { sent_at: u64 }) or a separate validated type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare String with no domain type. Any string, including empty or malformed IDs, is accepted.",
+      "failure_mode": "Empty or non-identifier values can flow through the core. No compile-time guarantee that id follows the domain's ID format.",
+      "fix": "Introduce a LeaseId newtype struct with a fallible constructor that validates the format at the boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-mutation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates in place (mut item, item.status = ...). This is imperative-shell style leaked into what should be a pure calculation. No return type indicating the state transition.",
+      "failure_mode": "Callers cannot reason about pre/post conditions of the transition. The function signature does not encode which states are valid inputs or outputs.",
+      "fix": "Replace with fn try_advance_to_sent(item: LeaseWorkflow) -> Result<LeaseWorkflow, LeaseTransitionError> that validates the pre-state and returns the post-state or an error. Or use a typestate API: item.mark_sent() -> LeaseWorkflowSent."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional-core-string-concat",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a new String on every call. With proper enum typestate, no allocation is needed for status setting.",
+      "failure_mode": "Unnecessary heap allocation on every state transition. If status is an enum, transition is zero-cost.",
+      "fix": "Replace String status with enum LeaseStatus; mark_sent becomes a zero-allocation enum assignment."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-behavior-test",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test files exist in the crate. Without behavior tests, there is no evidence that the (flawed) API works as intended, and no regression guard for any repair.",
+      "failure_mode": "Any future change can silently break behavior. No baseline to verify typestate corrections preserve the intended workflow.",
+      "fix": "Add tests/behavior.rs (or equivalent) exercising: valid transitions, rejected transitions, and invariant enforcement."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim (mark_sent allocation pattern)",
+    "no profiler evidence for the string-allocation path in mark_sent",
+    "no allocation audit - the .to_string() call allocates on every transition but there is no documented allocation budget",
+    "no second-ring evidence (no Miri, Kani, or property-based tests for state-space coverage)",
+    "no command evidence (no cargo fmt / cargo test / cargo clippy output present)"
+  ],
+  "residual_risk": "The entire LeaseWorkflow model violates the Holzman requirement to make illegal states unrepresentable. The struct admits inconsistent status/is_sent/sent_at_epoch_ms combinations with zero compiler enforcement. The mark_sent function performs in-place mutation rather than a pure, verifiable state transition. Without enum typestates, newtyped domain primitives, and behavior tests, the crate has no defense-in-depth against invalid state construction or regression. Static review only; no commands were run."
+}

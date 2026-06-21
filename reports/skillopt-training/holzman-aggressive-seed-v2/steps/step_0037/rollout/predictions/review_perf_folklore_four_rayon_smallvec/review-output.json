@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-cargo-cult-rayon",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO explicitly mandates Rayon for a fixed [u8; 4] input. Rayon thread-pool and work-stealing overhead vastly exceeds any benefit for four elements. Holzman Rust requires using Rayon only with measured scaling evidence, not cargo-cult assertions.",
+      "failure_mode": "Adding Rayon will increase latency per call (thread pool dispatch + join overhead) for a 4-byte input, making the function slower, not faster. Under high call rate this also wastes OS threads.",
+      "fix": "Remove the Rayon TODO. If parallelism is ever warranted, benchmark with real workloads first and document threshold (e.g., N >= 10000) where speedup materializes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-cargo-cult-smallvec",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO explicitly mandates SmallVec without any measured small-size distribution. Functional Core Performance defaults require SmallVec only when small-size distribution is known and measured.",
+      "failure_mode": "SmallVec<[&str; 4]> has zero advantage here: the stack capacity exactly equals the max size (4 bytes classify to 4 results), so it degrades to a single heap allocation identical to Vec, plus SmallVec's inline capacity metadata overhead.",
+      "fix": "Remove the SmallVec TODO. If the output cardinality is always 4, return a `[&'static str; 4]` array instead of any Vec type, eliminating all allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Performance claim ('because it will be faster') has zero supporting evidence. No benches/ directory, no criterion or divan benchmark files, no baseline command or numbers.",
+      "failure_mode": "Optimization decisions without evidence invite regression. The stated optimization (Rayon + SmallVec) is highly likely to be slower for this workload, but without a baseline there is no way to verify.",
+      "fix": "Write a criterion/divan benchmark comparing the current Vec implementation against any proposed alternative. Run on target hardware. Report baseline, threshold, and variance before applying the optimization."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No flamegraph, perf, or instrumented profiling evidence for the hot path. Without profiling, the hotspot claim is unverified.",
+      "failure_mode": "Optimizing code that is not a hotspot wastes engineering time and may introduce complexity or regressions.",
+      "fix": "Run `cargo flamegraph` or `perf record` on realistic call patterns to confirm this function is a hotspot before investing in optimization."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation profiling evidence. The function returns a heap-allocated Vec for exactly 4 elements. No allocator tracking or `mimalloc`/`jemalloc` stats exist.",
+      "failure_mode": "Unnecessary heap allocation per call can cause allocator contention and cache pressure at high call rates, degrading throughput.",
+      "fix": "Add allocation profiling (e.g., `dhat` or `jemalloc` stats) to measure allocation rate and size. Prefer stack-backed return types when cardinality is bounded."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests exist for this crate. No tests/ directory, no `#[cfg(test)]` module, no unit or behavior tests.",
+      "failure_mode": "Any future modification (including the TODO's proposed Rayon/SmallVec changes) has no regression guard. Incorrect behavior changes will go undetected.",
+      "fix": "Add at least one test covering the four possible byte-classification outcomes: all even, all odd, mixed, and boundary values (0, 1, 127, 255)."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim (Rayon + SmallVec faster)",
+    "no profiler evidence for hot-path identification",
+    "no allocation evidence for Vec return type on 4-element output",
+    "no command evidence (no benchmarks run, no clippy/fmt/check executed)"
+  ],
+  "residual_risk": "Static review only. No commands were run. The TODO on line 2 is a clear cargo-cult violation: Rayon and SmallVec are explicitly mandated for a 4-byte input with zero evidence. The most likely outcome of implementing that TODO is a measurable performance regression. The function should return `[&'static str; 4]` to eliminate all allocation for a fixed-size input, or retain the current Vec if API compatibility requires it. No tests exist to guard against regression."
+}

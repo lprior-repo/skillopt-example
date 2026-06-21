@@ -1,0 +1,1 @@
+Repaired `src/lib.rs` (added `max_payload` bounds check and checked `u32` conversion) and wrote `repair-output.json` — `cargo test` passed (2/2).

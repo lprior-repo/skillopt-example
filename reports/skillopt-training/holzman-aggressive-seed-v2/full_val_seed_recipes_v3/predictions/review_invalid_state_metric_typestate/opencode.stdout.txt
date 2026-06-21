@@ -1,0 +1,8 @@
+Review complete. Wrote `review-output.json` with 4 BLOCKER findings:
+
+1. **Line 1** — `status: String` + `is_validated: bool` + `is_sent: bool` allows illegal state combinations at compile time; needs enum/typestate state machine (SKILL.md:35)
+2. **Line 2** — `id: String` is primitive obsession; needs `MetricId` newtype with validated constructor
+3. **Line 9** — `mark_sent` mutates fields directly instead of enforcing pre-state via typed state transitions
+4. **Line 10** — `.to_string()` allocation on every state mutation with no typed error path
+
+6 missing evidence items flagged (no benchmarks, profiler, allocation audit, second-ring verification, command evidence, or error taxonomy).

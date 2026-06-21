@@ -1,0 +1,112 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() on external file I/O",
+      "failure_mode": "Missing file, permission denied, or unreadable path aborts the entire process instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, IoError> (or a domain Io error type) and propagate with ? at the caller boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() on untrusted CSV field",
+      "failure_mode": "Malformed number field panics the caller; a single bad row crashes the entire frame load",
+      "fix": "Use checked parse via .map_err() to a typed Parse error, and return Result<Vec<Record>, ParseError> so each row failure is handled gracefully"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 cast from u32 parse result is lossy; values >65535 silently truncate",
+      "failure_mode": "A valid u32 in range 65536..=4294967295 truncates to a wrong u16 instead of producing an overflow error, corrupting the data silently",
+      "fix": "Use u16::try_from(parts[1_parsed]) with map_err to a TypedError::ValueOverflow, or parse directly as u16 via parts[1].parse::<u16>()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accessed without bounds check on split result",
+      "failure_mode": "Empty line or line with no comma yields empty parts Vec; index out of bounds panic",
+      "fix": "Use split_once(',') and handle None (missing comma) gracefully, or use .get(0) with ok_or/unwrap_or_else returning a typed Parse error for malformed rows"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accessed without bounds check",
+      "failure_mode": "Line with only one comma-separated field (e.g. \"name,\") yields parts[1] as empty string or panics if fewer than 2 fields exist",
+      "fix": "Use split_once(',') and .get(1) or pattern-match on the two-field result, returning a typed Parse error for missing fields"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames mixes I/O (fs::read_to_string) with parsing logic in a single function that also contains println! (side effect at line 16)",
+      "failure_mode": "Cannot unit-test the parsing logic in isolation; logging is coupled to data transformation, violating pure-core principle and making behavior non-deterministic across environments",
+      "fix": "Extract pure parsing into a separate fn parse_record(&str) -> Result<Record, ParseError> with no I/O or logging. Shell layer calls fs::read_to_string, feeds lines to the pure parser, and handles side effects (logging) separately"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_hidden_side_effects_in_core",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() side effect inside data-processing function",
+      "failure_mode": "Non-deterministic output; side effects leak into pure calculation path, making tests environment-dependent and breaking functional-core purity",
+      "fix": "Remove println! from the parser. If logging is needed, push it to the shell layer outside the pure transformation, or accept a callback/logger parameter explicitly"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_try_reserve",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec<String> allocation for split parts without try_reserve or known capacity",
+      "failure_mode": "Unbounded allocation on untrusted input; malformed lines with many commas can trigger excessive heap growth with no graceful allocation-failure handling",
+      "fix": "For a known two-field grammar, use split_once(',') instead of collecting all parts. If collecting is needed, use try_reserve with checked capacity and map allocation failure to a typed error"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses raw String and u16 instead of domain newtypes with invariants",
+      "failure_mode": "No compile-time guarantee that name is non-empty or value is in valid domain range; any code can construct an invalid Record",
+      "fix": "Introduce newtype wrappers (e.g. RecordName(String) with non-empty invariant, RecordValue(u16)) and a fallible constructor fn Record::try_new(name: &str, value: u16) -> Result<Self, InvalidRecord>"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for the frame-loading path",
+      "failure_mode": "Cannot verify performance claims or allocation behavior; hidden allocations from String::to_string() on every split field are unmeasured",
+      "fix": "Add a benchmark (e.g. criterion) measuring parse throughput, allocation count, and memory for representative input sizes"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo test, cargo fmt, or cargo clippy evidence present in crate",
+      "failure_mode": "Compilation correctness, formatting compliance, and lint hygiene are unverified",
+      "fix": "Run cargo fmt && cargo test && cargo clippy -- -D warnings and record command outcomes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the frame-loading path",
+    "no profiler data for allocation hotspots",
+    "no behavior test for parse_record edge cases (empty lines, missing fields, overflow values)",
+    "no cargo fmt / cargo test / cargo clippy evidence"
+  ],
+  "residual_risk": "Static review only; no commands run. Six BLOCKER violations (unwrap, lossy cast, unchecked indexing, functional-core breach) require immediate fix. Without behavior tests, the fix quality cannot be verified automatically. The crate as written will panic on any malformed input or missing file."
+}

@@ -1,0 +1,13 @@
+Now let me explore the task crate to find the source files.
+Now I have all the information I need. Let me analyze the single source file for Holzman Rust violations.
+
+The crate has one function `parse_scores` that uses `.parse::<u32>().unwrap()` which violates multiple Holzman rules:
+
+1. **`unwrap()` on line 4** - panics on invalid input (e.g., "abc", empty lines, out-of-range numbers)
+2. **No typed error handling** - ignores fallible `parse()` result
+3. **No bounds on loop** - input lines could be huge
+4. **No rust-toolchain.toml** - violates pinned nightly policy
+5. **No benchmarks** - no performance evidence exists
+
+Let me write the review output:
+Review output written to `/tmp/opencode/holzman-skillopt/smoke3/tasks/candidate-v1/review_unbounded_parser/review-output.json` with 7 findings including 2 BLOCKERs (unwrap panic path), 2 MAJORs (unchecked results, unbounded loop), and 3 ERRORs (allocation, toolchain, missing evidence).

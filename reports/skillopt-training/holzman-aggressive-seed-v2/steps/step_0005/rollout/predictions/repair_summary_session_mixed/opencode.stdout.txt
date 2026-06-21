@@ -1,0 +1,12 @@
+Now I have the full picture. The tests import `render_summary` and `Summary`, and expect `summarize_metrics` to return `Result<Summary, SummaryError>`. The production code has `unwrap()`, no overflow detection, no empty/invalid handling, and wrong return types. Let me fix all of this.
+All 6 tests pass. Let me clean up the unused variable warning:
+Clean build, all 6 tests pass, zero warnings. Now writing the repair output:
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+1. **`summarize_metrics` return type**: Changed from `Result<String, SummaryError>` to `Result<Summary, SummaryError>` to match test contract
+2. **`unwrap()` removed** (`line 24`): `parse::<u64>().unwrap()` replaced with `.map_err(|_| SummaryError::Invalid)?`
+3. **Unchecked indexing removed** (`line 24`): `parts[1]` replaced with `parts.len() < 2` bounds check + `parts[1]`
+4. **Unchecked addition removed** (`line 25`): `total += value` replaced with `total.checked_add(value).ok_or(SummaryError::Overflow)?`
+5. **Unchecked division removed** (`line 35`): `total / count as u64` replaced with `total.checked_div(count as u64)` + zero-guard
+6. **Empty input detection**: Added early return `Err(SummaryError::Empty)` when `count == 0`
+7. **`render_summary` function**: Extracted formatting logic as a pure shell function matching test contract

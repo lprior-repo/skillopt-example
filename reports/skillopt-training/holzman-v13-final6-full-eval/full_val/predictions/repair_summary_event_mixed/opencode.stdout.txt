@@ -1,0 +1,25 @@
+Now I have full understanding. The tests expect:
+- `summarize_metrics` returns `Result<Summary, SummaryError>` (not `String`)
+- A `render_summary(Summary) -> String` function
+- Empty input → `Err(Empty)`, invalid lines → `Err(Invalid)`, overflow → `Err(Overflow)`
+
+Current source has: `split().collect()`, `unwrap()`, `+=`, `as` casts, missing `render_summary`, wrong return type.
+All 6 tests pass. Running strict clippy as required by the verification gate.
+All gates pass. Writing the required JSON output.
+Repair complete. All gates passed:
+
+- **6/6 tests pass** (summarizes, renders, rejects_empty, rejects_invalid, rejects_too_many, detects_overflow)
+- **Clippy**: zero warnings with strict Holzman lint configuration
+- **cargo fmt**: clean, no drift
+
+**Changes made to `src/lib.rs`:**
+
+1. `summarize_metrics` return type: `Result<String>` → `Result<Summary>` (matches test contract)
+2. Added `render_summary(Summary) -> String` (extracts formatting to shell layer)
+3. `line.split(',').map().collect()` → `line.split_once(',')` (no intermediate Vec, no indexing)
+4. `unwrap()` on parse → `map_err(|_| SummaryError::Invalid)` (typed error)
+5. `total += value` → `total.checked_add(value).ok_or(Overflow)` (checked arithmetic)
+6. `count += 1` → `count.checked_add(1).ok_or(Overflow)` (checked arithmetic)
+7. `count as u32` and `total / count as u64` → `u64::try_from(count)` / `u32::try_from(count)` / `checked_div` (no lossy casts)
+8. Empty input rejection added
+9. Invalid line detection (missing comma) added

@@ -1,0 +1,63 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Production unsafe block containing raw SIMD intrinsics without any safety invariant, bounds verification, or scalar fallback. Holzman core contract explicitly forbids production unsafe.",
+      "failure_mode": "Unsafe SIMD path can read out-of-bounds memory when input.len() is not a multiple of 4, and has no verified path for non-x86_64 targets (compiles to nothing, returning sum of empty).",
+      "fix": "Replace the entire unsafe SIMD block with a safe scalar implementation (e.g. input.iter().sum()). If SIMD is required, gate it behind a verified safe wrapper with bounds-checked chunking, a tail-handling scalar pass, and a cfg-gated fallback on non-x86_64."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_no_scalar_fallback",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "SIMD unaligned load (_mm_loadu_ps) reads 16 bytes (4 f32s) per iteration. When input.len() is not a multiple of 4, the final load reads past valid slice bounds into uninitialized/adjacent memory.",
+      "failure_mode": "Out-of-bounds memory read on non-aligned lengths causes undefined behavior: data corruption, information leak, or crash. No tail handling exists.",
+      "fix": "Process input in chunks of 4 using split_at_checked or a bounded loop with input.len() & !3 for the SIMD portion, then handle the tail with a separate scalar pass over input[(i & !3)..]."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_no_target_fallback",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The entire function is gated by #[cfg(target_arch = \"x86_64\")] with no alternative path for other architectures. On non-x86_64 this fn does not exist as a pub symbol — callers get a compile error, or if the unsafe block is the only body, the function is unreachable.",
+      "failure_mode": "Compilation failure on aarch64/riscv64 or silent no-op behavior if the function body is otherwise unreachable, breaking cross-platform correctness.",
+      "fix": "Provide a #[cfg(not(target_arch = \"x86_64\"))] fallback that delegates to a safe scalar sum, or restructure so the public API always compiles and delegates to a safe internal core regardless of target architecture."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "SIMD implementation carries an implicit performance claim (faster than scalar) but no benchmark, profiler, or allocation evidence exists in this crate. Holzman performance discipline requires measured evidence before using SIMD.",
+      "failure_mode": "Unverified performance optimization may be slower than a simple .iter().sum() for small inputs due to SIMD overhead, violating the principle of not cargo-culting optimization.",
+      "fix": "Add a criterion or custom benchmark comparing SIMD vs scalar across input sizes (16, 64, 256, 1024, 4096 elements) with variance measurements. Only ship SIMD when measured faster than scalar."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_behavior_tests",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No tests exist in the crate for a function that performs numerical computation with SIMD. Holzman requires behavior tests for domain calculations.",
+      "failure_mode": "Correctness of the SIMD summation vs scalar summation cannot be verified. Edge cases (empty slice, single element, non-multiple-of-4 length) are untested.",
+      "fix": "Add behavior tests: empty slice returns 0.0, single element returns that element, length=5 returns correct sum matching .iter().sum(), and compare SIMD output against scalar gold for multiple random inputs."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied SIMD performance claim",
+    "no profiler evidence (perf, flamegraph, etc.) comparing SIMD vs scalar paths",
+    "no allocation evidence (no allocation tracking, but SIMD path uses zero heap allocations — this is acceptable)",
+    "no second-ring verification (no Kani harness, no Miri run, no property tests for numerical equivalence)",
+    "no command evidence of any verification step"
+  ],
+  "residual_risk": "High. The function uses production unsafe SIMD with no bounds-checked tail handling, no scalar fallback, and no tests. On non-multiple-of-4 inputs it reads out-of-bounds memory. On non-x86_64 it does not compile or is unreachable. Safe scalar replacement eliminates all risk with no measurable performance penalty for typical input sizes."
+}

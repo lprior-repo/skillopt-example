@@ -1,0 +1,14 @@
+Now I have a clear picture. The current code has multiple Holzman violations and doesn't match the test signatures. Let me fix it.
+All 6 tests pass. Let me verify formatting and write the output.
+Repair complete. All 6 tests pass. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `parts[1].parse().unwrap()` — unchecked indexing + panic | `split_once(',')` with `ok_or(SummaryError::Invalid)` |
+| `total += value` — unchecked arithmetic | `total.checked_add(value).ok_or(Overflow)` |
+| `count += 1` — unchecked arithmetic | `count.checked_add(1).ok_or(Overflow)` |
+| `total / count as u64` — lossy `as` cast + unchecked division | `total.checked_div(u64::from(count)).ok_or(Invalid)` |
+| No empty-input check | Early `input.is_empty()` guard returning `Empty` |
+| `split(',').map(...).collect()` — allocation waste | `split_once(',')` direct destructuring |
+| Missing `render_summary` function | Added `pub fn render_summary(Summary) -> String` |
+| Wrong return type | Changed `Result<String, ...>` → `Result<Summary, ...>` |

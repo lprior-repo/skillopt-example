@@ -1,0 +1,18 @@
+Review complete. Written to `review-output.json`.
+
+**8 findings across the task crate** (`src/lib.rs`):
+
+| Severity | Rule | Line | Issue |
+|---|---|---|---|
+| BLOCKER | make_illegal_states_unrepresentable | 1 | `status: String` + `is_validated: bool` + `is_sent: bool` allow every illegal combination |
+| BLOCKER | no_primitive_observations | 2 | `id: String` — no `PacketId` newtype |
+| BLOCKER | no_primitive_observations | 6 | `sent_at_epoch_ms: Option<u64>` — no `SentAt` newtype |
+| BLOCKER | functional_core_imperative_shell | 9 | `mark_sent` mutates in-place, allocates unconditionally, accepts any state transition |
+| BLOCKER | parse_at_boundaries | 9 | Hard-coded `"sent".to_string()` string literal instead of enum variant |
+| MAJOR | no_public_mutable_fields | 1 | All fields `pub` — external code can break invariants |
+| MAJOR | no_default_constructors | 1 | No constructor — empty/invalid structs are constructible |
+| MAJOR | missing_benchmark_evidence | 9 | No benchmark for `mark_sent` allocation pattern |
+
+**5 missing evidence items**: benchmarks, profiler data, allocation analysis, second-ring tests, command evidence.
+
+**Residual risk**: High — the compiler provides zero protection against invalid `PacketWorkflow` instances.

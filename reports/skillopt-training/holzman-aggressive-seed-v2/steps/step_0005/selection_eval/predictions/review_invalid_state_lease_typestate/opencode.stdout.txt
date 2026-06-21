@@ -1,0 +1,15 @@
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+- **6 BLOCKER** violations across `src/lib.rs`:
+  1. **Illegal states representable** (line 1) — `String` status + `bool` flags allow any combination including invalid ones
+  2. **Bool lifecycle flags** (line 4) — `is_validated: bool` encodes no transition rules
+  3. **String status** (line 3) — arbitrary text, no exhaustive matching, no enforced valid set
+  4. **No core/shell separation** (line 9) — `mark_sent` mutates domain data silently with no typed error
+  5. **Unbounded allocation** (line 10) — `"sent".to_string()` with no memory-pressure handling
+  6. **All fields pub** (line 2) — external code bypasses all encapsulation and transition logic
+
+- **3 MAJOR** findings: `id` not newtyped, all fields public, raw `Option<u64>` timestamp without clock abstraction
+
+- **6 missing evidence items**: no benchmarks, profiler data, allocation audit, CI commands, CLI evidence, or formal typestate spec

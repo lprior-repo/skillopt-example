@@ -1,0 +1,8 @@
+Review complete. Written to `review-output.json` with **9 findings** (8 BLOCKER, 1 WARNING) and **5 missing evidence items**. Key violations:
+
+- 4x `unwrap()` on fallible operations (I/O, parse, indexing)
+- 1x lossy `as u16` cast from `u32`
+- `split(',') + collect` instead of `split_once`
+- `println!` side effect inside pure transformation pipeline
+- No domain `Result` error type on the public API
+- No `try_reserve` for bounded allocation

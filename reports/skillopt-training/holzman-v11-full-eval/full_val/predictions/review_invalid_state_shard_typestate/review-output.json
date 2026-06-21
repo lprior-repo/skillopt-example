@@ -1,0 +1,91 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "hardening-status-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a bare String instead of an enum; allows illegal shard statuses like 'sent', 'pending', 'unknown', or any arbitrary value.",
+      "failure_mode": "Invalid status strings silently accepted, breaking downstream status-based dispatch or audit; no compile-time guarantee that status is a known state.",
+      "fix": "Replace `pub status: String` with a `ShardStatus` enum (`Pending`, `Validated`, `Sent`) with Display/FromStr for boundaries."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hardening-lifecycle-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Lifecycle booleans `is_validated: bool` and `is_sent: bool` instead of typestate; allows illegal combinations like (is_validated=false, is_sent=true) or (is_sent=true, is_validated=false).",
+      "failure_mode": "Shard can be sent without validation, violating the core workflow invariant that only validated shards are sent.",
+      "fix": "Model the lifecycle as a typestate enum (`ShardWorkflow<TState>`) or separate types: `PendingShard`, `ValidatedShard`, `SentShard`. Each type only exposes the operations valid for that lifecycle phase."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hardening-encapsulation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are `pub`, allowing external code to construct `ShardWorkflow` with any combination of values, bypassing all invariants.",
+      "failure_mode": "Any caller can create a ShardWorkflow with status='sent', is_sent=true, is_validated=false, and sent_at_epoch_ms=None — an irrecoverably invalid state.",
+      "fix": "Make all fields `pub(crate)` or private; provide constructor methods (`ShardWorkflow::new_pending()`, `ShardWorkflow::mark_sent()`) that enforce invariants at construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the struct in place via `mut item` parameter and returns it, instead of a pure functional transformation from one domain value to another.",
+      "failure_mode": "Caller may lose the original state; no guard prevents calling mark_sent on an unvalidated shard; the function silently accepts any ShardWorkflow regardless of lifecycle phase.",
+      "fix": "Signature: `fn mark_sent(validated: ValidatedShard) -> SentShard`. Accept only the validated lifecycle type; return the sent lifecycle type. No mutable parameters."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hardening-no-ignored-must-use",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` lacks `#[must_use]`; the functional-core pattern requires that transition functions produce new values that cannot be silently ignored.",
+      "failure_mode": "A caller can invoke `mark_sent(shard)` and discard the result, leaving the shard in an un-sent state while believing it was sent.",
+      "fix": "Add `#[must_use = \"call must consume the returned SentShard\"]` to `mark_sent`."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "hardening-bounded-strings",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is an unbounded `String`; no cap on shard ID length, no newtype to carry the ID domain rules.",
+      "failure_mode": "Unbounded allocation from external input; potential DoS via extremely long IDs; no compile-time guarantee that id follows the expected format.",
+      "fix": "Use a newtype `ShardId(String)` with a constructor that validates length and format, returning a typed error on invalid input."
+    },
+    {
+      "severity": "INFO",
+      "rule": "functional-core-performance",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`mark_sent` allocates a new String via `\"sent\".to_string()` every call instead of using an enum variant or interned/static reference.",
+      "failure_mode": "Unnecessary heap allocation on the hot path; performance degradation under high throughput if this is called frequently.",
+      "fix": "Replace the String status field with an enum; the enum variant carry no allocation. If a display string is needed, use `Display` impl."
+    },
+    {
+      "severity": "INFO",
+      "rule": "hardening-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark exists for `mark_sent` or the ShardWorkflow transition path; no workload description, hot-path target, or baseline measurement.",
+      "failure_mode": "Performance regressions in shard processing cannot be detected; no evidence that the transition path meets throughput targets.",
+      "fix": "Add a `benches/` crate with a benchmark for `mark_sent` under realistic shard volume, measuring allocation count and latency."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or ShardWorkflow transition path",
+    "no profiler evidence for hot-path allocation behavior",
+    "no allocation audit (e.g., valgrind/dhat) for mark_sent per-call allocations",
+    "no second-ring evidence (assembly/SBOM) for zero-cost claims",
+    "no command evidence: cargo fmt/check/clippy/test not run"
+  ],
+  "residual_risk": "The struct admits every illegal state combination (validated/sent ordering, arbitrary status strings, unvalidated sent shards). Without typestates or enum-based status, the API has zero compile-time guarantees. Static review only; no commands run."
+}

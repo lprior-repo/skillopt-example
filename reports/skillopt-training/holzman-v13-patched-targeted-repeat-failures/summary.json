@@ -1,0 +1,9 @@
+{
+  "candidate": "holzman-rust-candidate-v13-patched",
+  "skill_sha256": "4e2224b09b1b93bbc30f719e86902051705cdfa9055455d81eca39ebe723894e",
+  "n": 2,
+  "hard": 1.0,
+  "soft": 1.0,
+  "passed": 2,
+  "failed": []
+}

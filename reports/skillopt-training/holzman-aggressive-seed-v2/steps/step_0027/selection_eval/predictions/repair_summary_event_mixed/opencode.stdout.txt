@@ -1,0 +1,11 @@
+Now I see the issues. The tests expect `Result<Summary, SummaryError>` and a `render_summary` function, but the code returns `Result<String, ...>` and has multiple Holzman violations. Let me fix it.
+All 6 tests pass. Let me write the output.
+Repair complete. All 6 tests pass. Key changes made to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, ...>` (matching test contract)
+- **Added `render_summary`**: Separates rendering from computation (Functional Core/Imperative Shell)
+- **`split_once`**: Replaced `split(',') + collect + parts[1]` with `line.split_once(',')` (no unchecked indexing)
+- **`checked_add`**: Replaced `total += value` with overflow-safe accumulation
+- **`checked_div`**: Replaced `total / count as u64` with `checked_div` using `try_from` casts
+- **Error handling**: `.unwrap()` replaced with `.map_err()`, empty/invalid/overflow/TooMany all properly returned
+- **No `Vec` allocation**: Removed unnecessary `Vec<String>` collection in hot loop

@@ -1,0 +1,16 @@
+Review complete. Wrote valid JSON to `/tmp/opencode/holzman-skillopt-train/a89d0ef35806f420/review_invalid_state_event_typestate/review-output.json`.
+
+**6 BLOCKER findings** across the crate:
+
+| Rule | File:Line | Issue |
+|---|---|---|
+| `make_illegal_states_unrepresentable` | `src/lib.rs:3` | `status: String` allows arbitrary invalid values |
+| `no_bool_lifecycle_flags` | `src/lib.rs:4` | `is_validated: bool` — inconsistent with other fields |
+| `no_bool_lifecycle_flags` | `src/lib.rs:5` | `is_sent: bool` — redundant, unsynchronized with status |
+| `functional_core_no_side_effects_in_core` | `src/lib.rs:9` | `mark_sent` has no precondition checks, accepts any state |
+| `no_primitive_obsession` | `src/lib.rs:2` | `id: String` — no validation, allows empty/malformed |
+| `no_primitive_obsession` | `src/lib.rs:6` | `sent_at_epoch_ms: Option<u64>` desyncs from `is_sent` |
+
+**Missing evidence**: No benchmarks, profiler/allocation data, integration tests, or command evidence (cargo fmt/test/clippy).
+
+**Residual risk**: The entire domain model is representable in illegal states. Booleans and strings carry the lifecycle — structural type fixes are required before any runtime testing can be meaningful.

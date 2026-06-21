@@ -1,0 +1,389 @@
+[
+  {
+    "id": "repair_csv_token_mixed",
+    "hard": 0,
+    "soft": 0.9800000000000002,
+    "task_type": "repair",
+    "task_description": "Repair repair_csv_token while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "try_reserve",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_csv_token_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_csv_token_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_csv_token_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_csv_token_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo fmt\",\"status\":\"passed\"},{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\n    \"No unwrap in production code - parse errors return ParseError::Invalid\",\n    \"No unchecked indexing - uses iterator over split\",\n    \"Empty input returns ParseError::Empty\",\n    \"max_items enforced with ParseError::TooMany\",\n    \"Invalid tokens return ParseError::Invalid instead of panic\",\n    \"Pure core: parse_tokens is deterministic with no I/O\",\n    \"No unsafe, panic, todo, unimplemented, unreachable, assert macros\",\n    \"No lossy as conversions\",\n    \"Functional core / imperative shell boundary preserved\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"none - all 4 behavior tests pass, no forbidden constructs remain in production source\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/repair_csv_token_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_csv_token_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.9800000000000002,
+      "failures": [
+        [
+          "try_reserve"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": true,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 4,
+      "total_groups": 5,
+      "missing_groups": [
+        [
+          "try_reserve"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "repair_frame_audit_mixed",
+    "hard": 0,
+    "soft": 0.9500000000000002,
+    "task_type": "repair",
+    "task_description": "Repair repair_frame_audit while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "try_reserve; checked_add",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_frame_audit_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_frame_audit_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_frame_audit_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_frame_audit_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \".skill/holzman-rust/SKILL.md\",\n    \".skill/holzman-rust/references/functional-core-performance.md\",\n    \".skill/holzman-rust/references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [\n    {\"command\": \"cargo fmt\", \"status\": \"passed\"},\n    {\"command\": \"cargo test\", \"status\": \"passed\"}\n  ],\n  \"rules_satisfied\": [\n    \"zero_forbidden_constructs - removed lossy as cast\",\n    \"checked_conversions - u32::try_from(payload.len()) instead of as u32\",\n    \"max_payload_enforced - payload.len() > max_payload returns PayloadTooLarge\",\n    \"overflow_path - u32::try_from(payload.len()) maps overflow to FrameError::Overflow\",\n    \"no_unsafe_no_unwrap_no_expect_no_panic\",\n    \"functional_core - pure deterministic encode_frame with no I/O\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"None - all forbidden constructs removed, all tests pass, checked conversions in place\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/repair_frame_audit_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_frame_audit_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.9500000000000002,
+      "failures": [
+        [
+          "try_reserve"
+        ],
+        [
+          "checked_add"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": true,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 2,
+      "total_groups": 4,
+      "missing_groups": [
+        [
+          "try_reserve"
+        ],
+        [
+          "checked_add"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "repair_summary_event_mixed",
+    "hard": 0,
+    "soft": 0.7777777777777779,
+    "task_type": "repair",
+    "task_description": "Repair repair_summary_event while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "checked_div; u32::try_from/try_from",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_event_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_event_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_event_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_event_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \".skill/holzman-rust/SKILL.md\",\n    \".skill/holzman-rust/references/functional-core-performance.md\",\n    \".skill/holzman-rust/references/review-output-contract.md\",\n    \"Cargo.toml\",\n    \"src/lib.rs\",\n    \"tests/behavior.rs\"\n  ],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [\n    {\"command\": \"cargo fmt\", \"status\": \"passed\"},\n    {\"command\": \"cargo test\", \"status\": \"passed\"}\n  ],\n  \"rules_satisfied\": [\n    \"No production unwrap/expect/panic/panic macros\",\n    \"No unchecked indexing \u2014 using split_once instead of split+collect+indexing\",\n    \"No unchecked arithmetic \u2014 using checked_add for total accumulator\",\n    \"No division by zero risk \u2014 early Empty check on is_empty input\",\n    \"No split+collect+indexing \u2014 using split_once for first-delimiter extraction\",\n    \"Parsing returns typed domain errors (Invalid) instead of panicking\",\n    \"Overflow detected via checked_add returning Overflow error\",\n    \"summarize_metrics returns Result<Summary, SummaryError> matching test contract\",\n    \"render_summary function added matching test contract\",\n    \"Smallest production change \u2014 only src/lib.rs modified\",\n    \"Cargo.toml untouched\",\n    \"Test files untouched\",\n    \"Functional core: pure parsing/computation separated from I/O formatting\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"none \u2014 all 6 behavior tests pass; all forbidden constructs removed; split_once used per Holzman parsing rule; checked arithmetic for accumulator\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/repair_summary_event_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_event_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.7777777777777779,
+      "failures": [
+        [
+          "checked_div"
+        ],
+        [
+          "u32::try_from",
+          "try_from"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": false,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 7,
+      "total_groups": 9,
+      "missing_groups": [
+        [
+          "checked_div"
+        ],
+        [
+          "u32::try_from",
+          "try_from"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "repair_summary_ledger_mixed",
+    "hard": 0,
+    "soft": 0.7888888888888891,
+    "task_type": "repair",
+    "task_description": "Repair repair_summary_ledger while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "u32::try_from/try_from",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_ledger_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_ledger_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_ledger_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_ledger_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \"SKILL.md\",\n    \"references/functional-core-performance.md\",\n    \"references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\n    \"src/lib.rs\"\n  ],\n  \"commands\": [\n    {\n      \"command\": \"cargo fmt\",\n      \"status\": \"passed\"\n    },\n    {\n      \"command\": \"cargo test\",\n      \"status\": \"passed\"\n    }\n  ],\n  \"rules_satisfied\": [\n    \"No production unsafe\",\n    \"No unwrap/expect/panic in production code\",\n    \"No unchecked indexing - uses split_once for delimiter extraction\",\n    \"No unchecked arithmetic - uses checked_add/checked_div\",\n    \"No lossy as casts - uses type inference and checked_div\",\n    \"No ignored fallible results\",\n    \"Functional core: Summary is pure data, summarize_metrics is pure calculation, render_summary is pure formatting\",\n    \"Smallest source change: only edited src/lib.rs, tests unchanged\",\n    \"Cargo.toml unchanged - no dependency changes needed\",\n    \"All 6 behavior tests pass\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"None - all forbidden constructs removed, all tests pass, pure core with no side effects\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/repair_summary_ledger_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/repair_summary_ledger_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.7888888888888891,
+      "failures": [
+        [
+          "u32::try_from",
+          "try_from"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": false,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 8,
+      "total_groups": 9,
+      "missing_groups": [
+        [
+          "u32::try_from",
+          "try_from"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "review_hidden_io_session_mixed",
+    "hard": 1,
+    "soft": 1.0,
+    "task_type": "review",
+    "task_description": "Review review_hidden_io_session for Holzman + functional-core Rust violations.",
+    "fail_reason": "",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_hidden_io_session_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_hidden_io_session_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_hidden_io_session_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_hidden_io_session_mixed/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"fs::read_to_string(path).unwrap() panics on I/O failure (missing file, permission denied, etc.)\",\n      \"failure_mode\": \"untrusted or missing file path crashes the entire program instead of returning a typed I/O error\",\n      \"fix\": \"return Result<Vec<Record>, std::io::Error> and propagate with ? or map_err\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \"parts[1].parse::<u32>().unwrap() panics on non-numeric input\",\n      \"failure_mode\": \"malformed CSV line crashes the program instead of returning a typed parse error\",\n      \"fix\": \"return Result and use ? on parse, or map_err to a domain ParseError\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"zero_forbidden_constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 19,\n      \"problem\": \"Lossy as cast from u32 to u16 (parse::<u32>().unwrap() as u16) silently truncates values > 65535\",\n      \"failure_mode\": \"values in range 65536..=u32::MAX silently wrap to 0..65535, corrupting data without any error\",\n      \"fix\": \"use u16::try_from(parts[1].parse::<u32>().unwrap_or_else(...)) or parse directly into u16 via a checked approach, returning an error on out-of-range\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": \"12-15\",\n      \"problem\": \"Uses split(',').map().collect() to build a full Vec<String> when only two fields are needed; should use split_once\",\n      \"failure_mode\": \"unnecessary heap allocation per line, and the Vec is later accessed with unchecked indexing\",\n      \"fix\": \"use line.split_once(',') to get (name, value_str) directly, then trim and parse each\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"parsing_and_access\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 16,\n      \"problem\": \"parts[0] \u2014 unchecked indexing into Vec<String> with no bounds check\",\n      \"failure_mode\": \"empty lines or lines with fewer than 2 comma-separated fields cause a panic\",\n      \"fix\": \"use split_once(',') and match the Option<(&&str, &str)> result; return error on None\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 16,\n      \"problem\": \"println!(\\\"loaded {}\\\", parts[0]) is I/O (logging) inside the data-parsing core pipeline\",\n      \"failure_mode\": \"side-effectful code is mixed into the pure calculation layer, breaking functional core / imperative shell separation and making the core untestable in isolation\",\n      \"fix\": \"move println! to the imperative shell; the core parsing function should return pure data with no I/O\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 8,\n      \"problem\": \"load_sessions combines I/O (fs::read_to_string) with pure parsing in a single public function\",\n      \"failure_mode\": \"the functional core cannot be tested without the imperative shell; no separation of concerns\",\n      \"fix\": \"split into: (1) a pure fn parse_sessions(lines: &[String]) -> Result<Vec<Record>, ParseError> for the core, and (2) a shell fn load_sessions(path: &str) -> Result<Vec<Record>, SessionError> that reads the file and delegates to the pure core\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make_illegal_states_unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": \"4-5\",\n      \"problem\": \"Record has no type-level invariants; name is a plain String (no uniqueness/non-empty check), value is u16 (allows 0 and any value with no domain constraint)\",\n      \"failure_mode\": \"invalid Record instances (empty name, out-of-range value) can be constructed directly\",\n      \"fix\": \"use a newtype with a fallible constructor that validates invariants, e.g. pub struct Record { name: NonEmptyString, value: ValidatedValue }\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for load_sessions throughput or allocation behavior\",\n    \"no profiler data for hot path (split, collect, parse) per-line cost\",\n    \"no allocation analysis \u2014 Vec<String> collect per line is unbounded\",\n    \"no second-ring test for malformed CSV inputs (missing fields, non-numeric value, empty lines, lines with extra commas)\",\n    \"no command evidence for cargo fmt, cargo clippy, or cargo test\"\n  ],\n  \"residual_risk\": \"static review only; no commands run. The crate has 8 BLOCKER-class violations spanning forbidden constructs (unwrap, as cast), unchecked indexing, mixed I/O in the pure core, and missing domain invariants. All must be fixed before delivery.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/review_hidden_io_session_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_hidden_io_session_mixed",
+    "grade": {
+      "hard": 1.0,
+      "soft": 1.0,
+      "failures": [],
+      "json_valid": true,
+      "matched_groups": 8,
+      "total_groups": 8,
+      "missing_groups": [],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  },
+  {
+    "id": "review_invalid_state_budget_typestate",
+    "hard": 1,
+    "soft": 1.0,
+    "task_type": "review",
+    "task_description": "Review review_invalid_state_budget for Holzman + functional-core Rust violations.",
+    "fail_reason": "",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_budget_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_budget_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_budget_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_budget_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"illegal_states_representable_status\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 3,\n      \"problem\": \"status is pub String \u2014 any arbitrary string value is valid, including \\\"draft\\\", \\\"deleted\\\", \\\"sent\\\", or \\\"\\\". Domain lifecycle states should be an enum so illegal states are unrepresentable at compile time.\",\n      \"failure_mode\": \"Callers can assign invalid lifecycle strings (e.g., status = \\\"deleted\\\") bypassing domain invariants. No constructor or validator enforces allowed values.\",\n      \"fix\": \"Replace `pub status: String` with `pub status: BudgetStatus` where `BudgetStatus` is a non-exhaustive enum with variants like Draft, Validated, Sent. Remove public setter access.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"illegal_states_representable_bools\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 4,\n      \"problem\": \"is_validated: bool and is_sent: bool are independent flags. This allows logically inconsistent states such as is_validated=false with is_sent=true, or both true simultaneously. Boolean lifecycle flags should be replaced with enums or typestates.\",\n      \"failure_mode\": \"The struct can represent impossible state combinations (e.g., sent without validated). Callers can set is_sent=true without ever setting is_validated=true, violating domain invariants.\",\n      \"fix\": \"Replace `is_validated: bool` and `is_sent: bool` with a single `state: BudgetState` enum or use a typestate pattern where the type itself encodes the lifecycle stage (e.g., `BudgetDraft`, `BudgetValidated`, `BudgetSent`).\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"all_fields_public\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"All fields of BudgetWorkflow are pub, allowing external code to construct the struct with arbitrary values and set any field directly. This completely bypasses invariants.\",\n      \"failure_mode\": \"Any caller can create `BudgetWorkflow { id: \\\"\\\".into(), status: \\\"whatever\\\".into(), is_validated: false, is_sent: false, sent_at_epoch_ms: None }` or mutate fields to enter invalid states without going through any domain method.\",\n      \"fix\": \"Make all fields `pub(crate)` or private. Provide a fallible constructor (e.g., `BudgetWorkflow::new(id) -> Result<Self, Error>`) that sets valid initial state. Expose only domain methods like `mark_sent`.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"missing_typestate_lifecycle\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"BudgetWorkflow is a single struct with no typestate discrimination. The type does not encode which lifecycle stage the budget is in. This is a fundamental domain model violation.\",\n      \"failure_mode\": \"The Rust compiler cannot prevent invalid transitions (e.g., marking a non-validated budget as sent). All state-machine logic is runtime-only with no compile-time guarantees.\",\n      \"fix\": \"Use a typestate pattern with separate structs or an enum: `enum BudgetPhase { Draft(BudgetDraft), Validated(BudgetValidated), Sent(BudgetSent) }` where each variant carries only the fields needed for that phase.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"io_in_calculation\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"mark_sent uses `\\\"sent\\\".to_string()` \u2014 this is a heap allocation inside what should be a pure calculation function. The functional core should not perform allocations.\",\n      \"failure_mode\": \"Allocation in the pure core path increases GC pressure and prevents the function from being used in no-alloc contexts. Also ties the core to a specific string representation.\",\n      \"fix\": \"Use an enum variant for the status (e.g., `BudgetStatus::Sent`) which is zero-copy. Remove `to_string()` entirely. If the status must be a string for serialization, handle it at the imperative shell boundary, not in the core.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"no_fallible_constructor\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No constructor exists to validate or initialize BudgetWorkflow. The struct can be instantiated via struct literal with any combination of values.\",\n      \"failure_mode\": \"Without a constructor, there is no enforcement point for domain invariants. Invalid BudgetWorkflow instances can be created at any call site.\",\n      \"fix\": \"Add `impl BudgetWorkflow { fn new(id: String) -> Result<Self, BudgetError> { ... } }` that initializes all fields to valid defaults and performs any needed validation.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"sent_at_epoch_ms_no_validation\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 6,\n      \"problem\": \"sent_at_epoch_ms is an Option<u64> that can hold any u64 value including 0 (Unix epoch) or future timestamps. There is no validation that it is only set when is_sent=true, and no validation of the value itself.\",\n      \"failure_mode\": \"sent_at_epoch_ms can be set to an arbitrary u64 independently of is_sent flag, allowing inconsistent state (sent_at_epoch_ms=Some(0) with is_sent=false). Zero could be mistaken for Unix epoch.\",\n      \"fix\": \"Tie sent_at_epoch_ms to the typestate \u2014 only Sent phase carries the timestamp. Use `Option<NonZeroU64>` or a dedicated `EpochMs` newtype to prevent zero-value confusion.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_benchmark_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmarks exist for any performance claims about BudgetWorkflow allocation patterns or throughput.\",\n      \"failure_mode\": \"Without benchmarks, allocation behavior (e.g., .to_string() in mark_sent) cannot be validated as acceptable. Performance regressions go undetected.\",\n      \"fix\": \"Add a criterion or simple bench for mark_sent to measure allocation count and time. Even a basic `criterion` benchmark showing zero or one allocation per call provides evidence.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_profiler_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No profiler evidence (flamegraph, perf, or similar) exists to validate the performance characteristics of the core calculation path.\",\n      \"failure_mode\": \"Cannot verify that the functional core remains fast or that allocations are bounded under real workload.\",\n      \"fix\": \"Run `cargo flamegraph` or `cargo prof` to produce profiling evidence for the mark_sent call path.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_allocation_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"No allocation tracking evidence exists. The use of `to_string()` in mark_sent allocates a heap String on every call.\",\n      \"failure_mode\": \"Repeated calls to mark_sent cause unbounded heap allocations that may not be acceptable in latency-sensitive paths.\",\n      \"fix\": \"Replace `to_string()` with an enum variant to eliminate allocation. Add `#[global_allocator]` tests or `tracemalloc`-style tracking to prove zero-allocation behavior.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_command_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No CI commands, test evidence, or formal verification artifacts exist for this crate.\",\n      \"failure_mode\": \"No automated gate prevents regressions to the domain invariants or introduces new violations.\",\n      \"fix\": \"Add a CI gate with `cargo test` and `cargo clippy` runs. For high-assurance, add property tests (proptest) that verify BudgetWorkflow invariants.\"\n    }\n  ],\n  \"missing_evidence\": [\"no benchmark exists for mark_sent allocation profile\", \"no profiler data for core calculation path\", \"no allocation tracking evidence for BudgetWorkflow lifecycle\", \"no CI command evidence (cargo test/clippy)\", \"no formal verification or property-test evidence for domain invariants\"],\n  \"residual_risk\": \"High. The BudgetWorkflow struct is a plain data bag with public fields, no typestate, no enum types, and no constructor. Any caller can create and mutate it into illegal states with zero compiler enforcement. The mark_sent function performs a heap allocation in the pure core. Without type-level domain invariants, all correctness is runtime-only. This violates the core Holzman principles: illegal states are fully representable, the functional core performs I/O-side allocations, and there is no evidence chain.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/review_invalid_state_budget_typestate",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_budget_typestate",
+    "grade": {
+      "hard": 1.0,
+      "soft": 1.0,
+      "failures": [],
+      "json_valid": true,
+      "matched_groups": 6,
+      "total_groups": 6,
+      "missing_groups": [],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  },
+  {
+    "id": "review_invalid_state_lease_typestate",
+    "hard": 0,
+    "soft": 0.0,
+    "task_type": "review",
+    "task_description": "Review review_invalid_state_lease for Holzman + functional-core Rust violations.",
+    "fail_reason": "enum/typestate/state machine; status/String; bool/lifecycle; Option/invalid state; newtype/domain; parse/boundary; missing_json",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_lease_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_lease_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_lease_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_lease_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/review_invalid_state_lease_typestate",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_lease_typestate",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.0,
+      "failures": [
+        [
+          "enum",
+          "typestate",
+          "state machine"
+        ],
+        [
+          "status",
+          "String"
+        ],
+        [
+          "bool",
+          "lifecycle"
+        ],
+        [
+          "Option",
+          "invalid state"
+        ],
+        [
+          "newtype",
+          "domain"
+        ],
+        [
+          "parse",
+          "boundary"
+        ],
+        [
+          "missing_json"
+        ]
+      ],
+      "json_valid": false,
+      "matched_groups": 0,
+      "total_groups": 6,
+      "missing_groups": [
+        [
+          "enum",
+          "typestate",
+          "state machine"
+        ],
+        [
+          "status",
+          "String"
+        ],
+        [
+          "bool",
+          "lifecycle"
+        ],
+        [
+          "Option",
+          "invalid state"
+        ],
+        [
+          "newtype",
+          "domain"
+        ],
+        [
+          "parse",
+          "boundary"
+        ]
+      ],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  },
+  {
+    "id": "review_invalid_state_ledger_typestate",
+    "hard": 1,
+    "soft": 1.0,
+    "task_type": "review",
+    "task_description": "Review review_invalid_state_ledger for Holzman + functional-core Rust violations.",
+    "fail_reason": "",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_ledger_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_ledger_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_ledger_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_ledger_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\n    \"SKILL.md\",\n    \"references/functional-core-performance.md\",\n    \"references/review-output-contract.md\"\n  ],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make_illegal_states_unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"LedgerWorkflow uses status: String + is_validated: bool + is_sent: bool instead of enums/typestates. These primitives can represent contradictory states such as status=\\\"sent\\\" with is_sent=false, or is_validated=true with status=\\\"draft\\\". No constructor enforces invariants.\",\n      \"failure_mode\": \"Any code reading LedgerWorkflow must defensively check for contradictory field combinations. Business invariants (e.g. sent implies validated) are not enforced at compile time.\",\n      \"fix\": \"Replace status with a sealed enum (e.g. enum LedgerStatus { Draft, Validated, Sent }) and is_validated/is_sent with a typestate or derive them from status. Remove redundant bools.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"mark_sent mutates LedgerWorkflow in-place (mut item) and returns the mutated struct. This is imperative-style state mutation disguised as a function. The function has no input validation and directly writes a magic string literal \\\"sent\\\".\",\n      \"failure_mode\": \"The caller can hold a reference to the original struct and observe inconsistent intermediate state. String literal \\\"sent\\\" bypasses the type system \u2014 any string can be assigned anywhere.\",\n      \"fix\": \"Use a pure transition: fn mark_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, TransitionError>. Validate preconditions (e.g. must be validated before sent), return a new struct, and use enum-typed status instead of string mutation.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_primitive_obsession\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"id: String is a raw primitive with no domain rules encoded. sent_at_epoch_ms: Option<u6> is raw without a time type.\",\n      \"failure_mode\": \"Any code can construct a LedgerWorkflow with an empty id, invalid epoch, or malformed id string. Domain invariants (id format, non-zero timestamps) are unchecked.\",\n      \"fix\": \"Use newtypes: struct LedgerId(String) with a fallible constructor, and struct TimestampMs(u64) with non-zero validation at the boundary.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"allocation_handling\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"mark_sent uses \\\"sent\\\".to_string() which heap-allocates every call. The struct already owns a String for id, so every field is heap-allocated. No try_reserve or capacity awareness anywhere.\",\n      \"failure_mode\": \"Allocation failure (Err(Allocation)) is unhandled. In high-throughput or memory-constrained contexts, to_string() can fail silently or cause OOM.\",\n      \"fix\": \"Use enum-based status to eliminate string storage entirely. If strings are needed, use try_reserve at collection boundaries and handle Allocation errors.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_benchmark_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmarks exist for any performance claim. The crate has no benches/ directory, no criterion or built-in benchmark code, and no profiler or allocation tracking evidence.\",\n      \"failure_mode\": \"Without benchmarks, performance characteristics (especially around the to_string() allocation in mark_sent) are unverified and cannot be defended.\",\n      \"fix\": \"Add a criterion benchmark measuring mark_sent throughput and allocation count under realistic input sizes.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_profiler_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No flamegraph, perf, or sampler evidence exists. Hot paths are unidentified.\",\n      \"failure_mode\": \"Cannot confirm whether mark_sent is hot or cold. Optimization decisions are cargo-culted.\",\n      \"fix\": \"Run cargo flamegraph or perf on realistic workloads to identify hot paths.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_second_ring_command_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No clippy, Miri, Kani, or other second-ring command evidence exists.\",\n      \"failure_mode\": \"Undefined behavior, data races, and proof gaps are unverified.\",\n      \"fix\": \"Run cargo clippy -- -D warnings and cargo miri test on any unsafe or concurrent code.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for mark_sent throughput or allocation cost\",\n    \"no profiler/flamegraph evidence for hot-path identification\",\n    \"no allocation tracking (try_reserve, allocation error handling)\",\n    \"no second-ring command evidence (clippy, Miri, Kani, cargo test)\"\n  ],\n  \"residual_risk\": \"High. The domain model is fundamentally broken: illegal states are fully representable via String status + bool flags, business invariants are unenforceable, and mark_sent performs imperative mutation with magic string literals instead of typed typestate transitions. Without enum-based status and typestate enforcement, no amount of downstream checking can guarantee correctness. Static review only; no commands run.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/review_invalid_state_ledger_typestate",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_ledger_typestate",
+    "grade": {
+      "hard": 1.0,
+      "soft": 1.0,
+      "failures": [],
+      "json_valid": true,
+      "matched_groups": 6,
+      "total_groups": 6,
+      "missing_groups": [],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  },
+  {
+    "id": "review_invalid_state_packet_typestate",
+    "hard": 0,
+    "soft": 0.6666666666666666,
+    "task_type": "review",
+    "task_description": "Review review_invalid_state_packet for Holzman + functional-core Rust violations.",
+    "fail_reason": "Option/invalid state; parse/boundary",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_packet_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_packet_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_packet_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_packet_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make_illegal_states_unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"PacketWorkflow uses primitive String for status and separate bool flags (is_validated, is_sent) instead of enums/typestates. Any combination of these fields is constructible, including inconsistent states like is_sent=true with status=\\\"pending\\\".\",\n      \"failure_mode\": \"Programmer can create packets in logically impossible states. The bool flags and status string are redundant and can diverge, making runtime checks unreliable and allowing illegal state transitions.\",\n      \"fix\": \"Replace `status: String` with a sealed `PacketStatus` enum. Replace `is_validated: bool` and `is_sent: bool` with a `PacketState` typestate enum. Remove redundant fields entirely.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_imperative_shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"PacketWorkflow exposes all fields as `pub` mutable struct fields. The struct is a mutable bag-of-fields with no invariants enforced by the type system.\",\n      \"failure_mode\": \"Any code can mutate any field directly, bypassing the domain lifecycle. No constructor enforces invariants. The struct is a data blob, not a domain type.\",\n      \"fix\": \"Make fields `pub(crate)` or private with a fallible constructor. Enforce lifecycle via typestate enum so the compiler rejects illegal transitions.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"domain_types_not_newtyped\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"`id: String` is a bare primitive with no domain meaning. Any string can be used as a packet ID.\",\n      \"failure_mode\": \"No validation that IDs follow domain rules (format, length, uniqueness). Empty strings, duplicates, or malformed IDs are accepted silently.\",\n      \"fix\": \"Introduce `struct PacketId(String)` with a constructor that validates format and rejects invalid values.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"primitive_obsession_string_status\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 3,\n      \"problem\": \"`status: String` stores human-readable status text instead of a typed enum. Status comparison requires string equality checks.\",\n      \"failure_mode\": \"Typos in status strings (e.g., \\\"Sent\\\" vs \\\"sent\\\") cause silent logic errors. String comparison is slower than enum matching. New statuses require scattered string updates.\",\n      \"fix\": \"Replace with `enum PacketStatus { Pending, Validated, Sent }` or similar domain enum. Pattern-match instead of string-compare.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"boolean_blindness\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 4,\n      \"problem\": \"`is_validated: bool` and `is_sent: bool` are separate boolean flags that encode a state machine but lack ordering constraints. Both can be true simultaneously or both false indefinitely.\",\n      \"failure_mode\": \"A packet can be marked sent without being validated (is_sent=true, is_validated=false). There is no enforced transition order. The two bools encode a 4-state machine but allow only 2 of 4 states to be meaningful.\",\n      \"fix\": \"Replace both booleans with a single `PacketState` enum: `enum PacketState { Pending, Validated, Sent }`. The enum enforces exactly one state at a time and the valid transitions.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"mark_sent_logic_unenforced\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"`mark_sent` sets status=\\\"sent\\\" and is_sent=true but does not check is_validated. It also allocates a new String for status via `.to_string()`.\",\n      \"failure_mode\": \"Packets can transition directly to sent without validation. The redundant string allocation is wasteful. No timestamp is set on sent_at_epoch_ms despite having the field.\",\n      \"fix\": \"Replace `mark_sent` with a method on the typestate-aware type. The typestate enum variant `Sent` should carry the timestamp. Validation must be a prerequisite for the sent transition, enforced by the type system.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"allocation_without_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"`mark_sent` calls `.to_string()` on a string literal, allocating a heap String every time. The status field is also a String in the struct itself.\",\n      \"failure_mode\": \"Every call to `mark_sent` allocates a new heap String. In hot paths this causes unnecessary GC pressure. The status field cannot benefit from SmallVec or stack allocation.\",\n      \"fix\": \"Use an enum for status (zero-cost) or use `&'static str` if status values are finite and known at compile time. Avoid heap allocation for domain state markers.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_benchmark_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmark exists for `mark_sent` or `PacketWorkflow` lifecycle operations. Performance claims cannot be verified.\",\n      \"failure_mode\": \"Allocation patterns, enum vs string performance, and typestate overhead cannot be measured. Regressions go undetected.\",\n      \"fix\": \"Add a criterion benchmark for the PacketWorkflow lifecycle: creation, validation, and marking sent. Measure allocation counts and throughput.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_profiler_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No profiler data (flamegraph, callgrind, perf) exists for the PacketWorkflow code path.\",\n      \"failure_mode\": \"Hot spots, allocation sites, and cache behavior are unknown. Optimization decisions are guesses.\",\n      \"fix\": \"Run `cargo flamegraph` or `perf record` on a benchmark harness to identify actual hot paths before optimizing.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_allocation_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No allocation tracking (e.g., `tracing` allocation span, dhat-rs, jemalloc profiling) exists to verify the allocation footprint of PacketWorkflow.\",\n      \"failure_mode\": \"Hidden allocations (e.g., `.to_string()` in mark_sent) cannot be quantified or eliminated.\",\n      \"fix\": \"Run with `dhat-rs` or jemalloc profiling on the benchmark to measure allocations per lifecycle step.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing_command_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No CLI command evidence (no test binary, no benchmark runner, no clippy run) exists to validate the crate compiles or passes checks.\",\n      \"failure_mode\": \"The crate may have subtle issues undetected by static review alone.\",\n      \"fix\": \"Run `cargo check`, `cargo clippy`, and `cargo test` when feasible. Document command outcomes in review evidence.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for mark_sent or PacketWorkflow lifecycle\",\n    \"no profiler data (flamegraph/perf) for the code path\",\n    \"no allocation tracking (dhat-rs/jemalloc) to quantify heap usage\",\n    \"no command evidence (cargo check/clippy/test) to verify compilation and lint status\",\n    \"no second-ring analysis (Miri/Loom/fuzz) for concurrency or UB in packet handling\",\n    \"no formal contract for PacketWorkflow state transitions\"\n  ],\n  \"residual_risk\": \"Static review only; no commands run. The crate has fundamental architectural violations: primitive obsession, missing typestates, boolean blindness, and redundant state fields make illegal states representable. Even if it compiles, the domain model cannot enforce packet lifecycle invariants at compile time. The typestate + enum refactor is required before performance optimization or formal verification is meaningful.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/review_invalid_state_packet_typestate",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_packet_typestate",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.6666666666666666,
+      "failures": [
+        [
+          "Option",
+          "invalid state"
+        ],
+        [
+          "parse",
+          "boundary"
+        ]
+      ],
+      "json_valid": true,
+      "matched_groups": 4,
+      "total_groups": 6,
+      "missing_groups": [
+        [
+          "Option",
+          "invalid state"
+        ],
+        [
+          "parse",
+          "boundary"
+        ]
+      ],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  },
+  {
+    "id": "review_invalid_state_shard_typestate",
+    "hard": 1,
+    "soft": 1.0,
+    "task_type": "review",
+    "task_description": "Review review_invalid_state_shard for Holzman + functional-core Rust violations.",
+    "fail_reason": "",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_shard_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_shard_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_shard_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_shard_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make-illegal-states-unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"ShardWorkflow uses two boolean flags (is_validated, is_sent) plus a status String to model lifecycle. These are redundant, partially overlapping, and allow illegal combinations such as is_validated=false with is_sent=true, or status=\\\"sent\\\" with is_sent=false, or both flags false with no status value.\",\n      \"failure_mode\": \"Any code path reading these fields must manually reconcile inconsistent state. A caller may assume the shard is validated because is_validated=true while it was never actually validated (the flags are independently mutable public fields).\",\n      \"fix\": \"Replace status: String, is_validated: bool, is_sent: bool with a single enum typestate (e.g., enum ShardStage { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }). Make the struct fields private and construct only valid states via a fallible constructor.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"type-discipline-status-string\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 3,\n      \"problem\": \"status is a free-form String. functional-core-performance.md mandates replacing status strings with typed enums. No domain invariant is enforced at the type level.\",\n      \"failure_mode\": \"Any arbitrary string (including empty, garbage, or inconsistent values) can be assigned. String comparison throughout the codebase replaces compile-time guarantees.\",\n      \"fix\": \"Replace pub status: String with pub status: ShardStage (an enum). Remove is_validated and is_sent flags entirely.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"type-discipline-bool-lifecycle\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 4,\n      \"problem\": \"is_validated: bool is a primitive boolean lifecycle flag. functional-core-performance.md: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.'\",\n      \"failure_mode\": \"Boolean lifecycle flags are inherently two-state and composable in ways the domain disallows. They cannot express ordering (must be validated before sent) or capture transition data (sent_at_epoch_ms).\",\n      \"fix\": \"Fold the boolean into a typed enum so validated state is a compile-time guarantee, not a runtime boolean.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"type-discipline-bool-lifecycle\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 5,\n      \"problem\": \"is_sent: bool is a primitive boolean lifecycle flag. Same issue as is_validated.\",\n      \"failure_mode\": \"The sent flag can be true independently of any timestamp or status string, and can be flipped without any transition invariant being checked.\",\n      \"fix\": \"Fold the sent flag into the same typed enum as status and is_validated, carrying sent_at_epoch_ms as data on the Sent variant.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional-core-imperative-shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"mark_sent is a pure function that mutates public fields directly with no error return. Transitioning a shard to 'sent' is inherently fallible (may require validation check, timestamp capture, etc.) but has no Result type.\",\n      \"failure_mode\": \"Callers cannot handle failure. If validation is a prerequisite for sending, there is no way to reject the operation \u2014 the function silently sends an invalid shard.\",\n      \"fix\": \"Return Result<ShardWorkflow, ShardError> from mark_sent. Check domain invariants (e.g., the shard must be in a validated stage) before transitioning. Use the typed enum typestate to make invalid transitions a compile error.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional-core-imperative-shell\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"mark_sent uses .to_string() allocation to set status. Per functional-core-performance.md: 'Avoid intermediate String allocations in pure pipelines.' The function takes ownership and returns the entire struct, yet still allocates a new String for a literal.\",\n      \"failure_mode\": \"Unnecessary heap allocation on every call. If mark_sent is called in a hot path, this allocates per invocation without benefit.\",\n      \"fix\": \"With a typed enum typestate, the Sent variant carries the timestamp directly \u2014 no String allocation needed. Use enum variants, not string literals, for state transitions.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"type-discipline-id-newtype\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"id: String is a primitive String for a shard identifier. Per functional-core-performance.md: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.' The same principle applies to domain identifiers \u2014 a String ID has no domain-level constraints.\",\n      \"failure_mode\": \"Empty strings, duplicated IDs, or non-IDs cannot be distinguished at the type level. The compiler provides no guarantee that a valid shard ID was supplied.\",\n      \"fix\": \"Introduce a newtype: pub struct ShardId(String). Add a fallible constructor (e.g., ShardId::from_str) that validates the ID format at the boundary.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"make-illegal-states-unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 6,\n      \"problem\": \"sent_at_epoch_ms: Option<u64> is an Option lifecycle field with no typestate tying it to the is_sent flag. The timestamp can be None while is_sent=true, or Some while is_sent=false.\",\n      \"failure_mode\": \"The epoch timestamp may be missing for a shard that is marked as sent, or may exist for a shard not yet sent. Both are domain violations that the compiler cannot detect.\",\n      \"fix\": \"Move sent_at_epoch_ms into the Sent variant of the typed enum: Sent { sent_at_epoch_ms: u64 }. The timestamp is then guaranteed to exist whenever the shard is sent.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"zero-forbidden-constructs\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"All struct fields are pub. Public fields allow external code to set any combination of fields, making illegal states trivially representable.\",\n      \"failure_mode\": \"External code can construct a ShardWorkflow with is_sent=true, status=\\\"sent\\\", is_validated=false, and sent_at_epoch_ms=None \u2014 a state the domain should never permit.\",\n      \"fix\": \"Make all fields private. Provide a private constructor or a builder that only allows valid state combinations.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"missing-benchmark-evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmarks exist for mark_sent or ShardWorkflow. Holzman Rust requires measured evidence before claiming any performance characteristic. The struct contains two owned String fields that allocate on every copy.\",\n      \"failure_mode\": \"Without benchmarks, there is no evidence that the allocation cost is acceptable. If mark_sent is called in a hot path, the String allocations and cloning could be a bottleneck.\",\n      \"fix\": \"Add a benchmark comparing the current approach against a typestate-enum approach with no allocations. Report results before merging.\"\n    },\n    {\n      \"severity\": \"INFO\",\n      \"rule\": \"missing-profiler-allocation-evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No allocation profiling or second-ring command evidence exists. Holzman Rust requires profiler evidence to justify the performance discipline.\",\n      \"failure_mode\": \"Without allocation profiling, the actual heap pressure of the owned String fields is unknown.\",\n      \"fix\": \"Run allocational profiling (e.g., heaptrack, dhat) on realistic workloads to establish the allocation baseline.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for mark_sent or ShardWorkflow lifecycle operations\",\n    \"no profiler or allocation evidence for the owned String fields\",\n    \"no second-ring command evidence (no clippy, no Miri, no test output)\"\n  ],\n  \"residual_risk\": \"Static review only; no commands run. The code permits arbitrarily illegal state combinations through independent mutable public booleans and a free-form status string. No benchmarks or profiler evidence exist to justify the allocation cost of owned String fields in the struct and mark_sent function. The fundamental fix is replacing the three primitive lifecycle fields with a single typed enum typestate.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0018/selection_eval/predictions/review_invalid_state_shard_typestate",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/2c3c374b9bcd1a1c/review_invalid_state_shard_typestate",
+    "grade": {
+      "hard": 1.0,
+      "soft": 1.0,
+      "failures": [],
+      "json_valid": true,
+      "matched_groups": 6,
+      "total_groups": 6,
+      "missing_groups": [],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  }
+]

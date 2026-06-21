@@ -1,0 +1,70 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses String status plus independent bool flags (is_validated, is_sent) instead of an enum typestate. Any combination of these fields is constructible, making illegal states representable.",
+      "failure_mode": "A LeaseWorkflow can have status=\"sent\" with is_sent=false, or status=\"draft\" with is_validated=true. Downstream logic relying on these flags will observe inconsistent state, causing silent data corruption or incorrect routing.",
+      "fix": "Replace String status and bool flags with a typed LeaseStatus enum and a typestate struct that encodes workflow transitions. Remove is_validated and is_sent; derive sent state from the typestate enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain constraints. status is a raw String instead of a domain enum.",
+      "failure_mode": "Empty strings, null-like values, or arbitrary text can flow into the core. status can hold any string (e.g., \"foo\"), making pattern matching on known states impossible and enabling incorrect branch execution.",
+      "fix": "Newtype id into LeaseId with a fallible constructor that rejects empty/invalid strings. Replace status String with a LeaseStatus enum (e.g., Draft, Validated, Sent, Failed) covering all valid domain states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes and returns a mutable LeaseWorkflow directly with no error path, no validation, and no pure-core boundary. It is a shell-level mutation disguised as a core function.",
+      "failure_mode": "Calling mark_sent on a non-validated or invalid lease silently transitions it to sent. There is no typed error to propagate rejection. The function has no pre-condition checks and mutates through the entire struct.",
+      "fix": "Make mark_sent a pure function that takes a LeaseWorkflow in a pre-sent state and returns Result<LeaseWorkflow, LeaseError>. Use the typestate enum to enforce that only valid transitions are allowed. Move I/O side effects (e.g., actually sending the lease) to a separate shell action."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns LeaseWorkflow directly instead of Result<T, LeaseError>. There is no error taxonomy for transition failures.",
+      "failure_mode": "Callers cannot distinguish between a successful transition and a rejected one. Invalid transitions become silent no-ops or incorrect state mutations rather than returning typed, actionable errors.",
+      "fix": "Return Result<LeaseWorkflow, LeaseError> where LeaseError is a domain enum (e.g., InvalidTransition, NotValidated, AlreadySent). This enables railway-oriented error handling at the shell boundary."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow has no constructor. Consumers can create instances with any field values directly via struct literal syntax since all fields are pub.",
+      "failure_mode": "External code can construct a LeaseWorkflow with status=\"sent\", is_sent=false, and is_validated=false simultaneously, bypassing all workflow invariants. There is no trusted construction point.",
+      "fix": "Make all fields private. Provide a single fallible constructor `LeaseWorkflow::new(id, initial_status)` that validates invariants at construction time. Use a builder or explicit factory for multi-step workflows."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_public_mutable_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LeaseWorkflow are pub, allowing arbitrary external mutation of domain state.",
+      "failure_mode": "Any caller can set item.status = \"foo\", item.is_sent = !item.is_sent, or item.is_validated = false from outside the module, completely breaking invariants without any workflow logic.",
+      "fix": "Make all fields private. Expose behavior through methods on the type (e.g., .mark_sent()) that enforce state transitions. The type itself should be the sole authority on valid state changes."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for hot path identification",
+    "no allocation analysis (no try_reserve or allocation budget tracking)",
+    "no second-ring review artifact (black-hat or proof-plan-review)",
+    "no command execution evidence (no cargo fmt/test/clippy output)",
+    "no Verus/Kani/Flux/proptest proof plan or artifacts",
+    "no behavior tests for transition invariants"
+  ],
+  "residual_risk": "The crate represents an invalid-state-prone domain model with zero type discipline. Any consumer can construct arbitrary illegal state combinations. The mark_sent function has no validation, no error handling, and no typestate enforcement. Without the typestate enum, newtypes, typed errors, and private fields, this code cannot guarantee workflow correctness. Static review only; no commands were run."
+}

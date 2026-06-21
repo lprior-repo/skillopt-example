@@ -1,0 +1,32 @@
+{
+  "reasoning": "The agent failed on 'try_reserve' and 'checked_add' in the latest trajectory, and previous trajectories show persistent failures on checked arithmetic, try_reserve, and try_from. The latest failure also included a syntax error with try_from. The edits will reinforce the mandatory use of checked arithmetic, try_reserve, and correct try_from usage across the skill.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Arithmetic:** Use `checked_add`/`checked_mul` for accumulators, `checked_div` for division (with non-zero check), and `try_from` for casts. Never use `as` for width changes or unchecked `+`/`/` for totals.",
+      "content": "- **Arithmetic:** ALL integer arithmetic involving totals, counts, or capacity MUST use `checked_add`, `checked_mul`, `checked_div`, or `try_from`. Never use `+`, `-`, `*`, `/`, or `as` for these operations. Division MUST use `checked_div` with error propagation. Use `TryFrom::try_from(value)` (associated function syntax) for conversions, never `value.try_from()`.",
+      "source_type": "failure",
+      "support_count": 1
+    },
+    {
+      "op": "replace",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Never use `Vec::with_capacity` in production code.",
+      "source_type": "failure",
+      "support_count": 1
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` or `Vec::new` without `try_reserve` when capacity is bounded, unchecked `+`/`-`/`*` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Ensure all integer casts use `TryFrom::try_from(value)` and all division uses `checked_div`.",
+      "source_type": "failure",
+      "support_count": 1
+    },
+    {
+      "op": "append",
+      "content": "## Common Syntax Pitfalls\n- `try_from` is an associated function: use `T::try_from(value)` or `u32::try_from(value)`, NOT `value.try_from()`.\n- `checked_add`/`checked_mul`/`checked_div` return `Option<T>`: always handle the `None` case with `?` or `unwrap_or_else`/`map_err`.",
+      "source_type": "failure",
+      "support_count": 1
+    }
+  ]
+}

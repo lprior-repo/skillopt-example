@@ -1,0 +1,11 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 findings, 0 passed**
+
+| Severity | Count | Key Issues |
+|----------|-------|-------------|
+| BLOCKER | 5 | Boolean lifecycle flags, string magic values, no typestate, mutable struct, raw primitives |
+| MAJOR | 3 | Exposed mutability, no constructor invariants |
+
+The core violation is that `BudgetWorkflow` uses `String` for status and `bool` flags (`is_validated`, `is_sent`) instead of a typestate enum — making every illegal state constructible at compile time. This is a foundational DDD design flaw, not an implementation detail.

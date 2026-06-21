@@ -1,0 +1,9 @@
+Now I understand the task. The frame encoder needs: payload limit check, checked arithmetic, `try_reserve`, and `checked_add`. Let me apply the minimal fix.
+Repair complete. Changes to `src/lib.rs`:
+
+1. **Added payload limit check** — `payload.len() > max_payload` returns `PayloadTooLarge`
+2. **Replaced lossy cast** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)`
+3. **Added checked arithmetic** — `4usize.checked_add(payload.len())` with `Overflow` error
+4. **Added bounded allocation** — `Vec::new()` + `try_reserve(capacity)` with `Allocation` error
+
+All 2 tests pass, clippy clean, no production `unsafe`/`unwrap`/`as` casts remain.

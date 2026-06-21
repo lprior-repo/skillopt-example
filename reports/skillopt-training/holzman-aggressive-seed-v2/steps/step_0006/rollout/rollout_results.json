@@ -1,0 +1,162 @@
+[
+  {
+    "id": "repair_csv_job_mixed",
+    "hard": 0,
+    "soft": 0.9800000000000002,
+    "task_type": "repair",
+    "task_description": "Repair repair_csv_job while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "try_reserve",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_csv_job_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_csv_job_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_csv_job_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_csv_job_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \".skill/holzman-rust/SKILL.md\",\n    \".skill/holzman-rust/references/functional-core-performance.md\",\n    \".skill/holzman-rust/references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\n    \"src/lib.rs\"\n  ],\n  \"commands\": [\n    { \"command\": \"cargo fmt\", \"status\": \"passed\" },\n    { \"command\": \"cargo test\", \"status\": \"passed\" }\n  ],\n  \"rules_satisfied\": [\n    \"No unwrap/expect/panic/todo/unimplemented/unreachable in production source\",\n    \"No unchecked indexing or unchecked arithmetic\",\n    \"No lossy as conversions\",\n    \"No ignored fallible results \u2014 parse errors mapped to ParseError::Invalid\",\n    \"max_items enforced via pre-count before allocation\",\n    \"Empty input returns ParseError::Empty\",\n    \"Too-many items returns ParseError::TooMany\",\n    \"Invalid token returns ParseError::Invalid\",\n    \"All 4 behavior tests pass\",\n    \"Smallest possible change \u2014 only production source edited, no test or Cargo.toml changes\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"None \u2014 all error paths covered by behavior tests; no unsafe, no unwrap, no unchecked operations remain.\"\n}",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0006/rollout/predictions/repair_csv_job_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_csv_job_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.9800000000000002,
+      "failures": [
+        [
+          "try_reserve"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": true,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 4,
+      "total_groups": 5,
+      "missing_groups": [
+        [
+          "try_reserve"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "repair_summary_lease_mixed",
+    "hard": 0,
+    "soft": 0.7777777777777779,
+    "task_type": "repair",
+    "task_description": "Repair repair_summary_lease while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "split_once; checked_div",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_lease_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_lease_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_lease_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_lease_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \"SKILL.md\",\n    \"references/functional-core-performance.md\",\n    \"references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\n    \"src/lib.rs\"\n  ],\n  \"commands\": [\n    {\"command\": \"cargo fmt\", \"status\": \"passed\"},\n    {\"command\": \"cargo test\", \"status\": \"passed\"}\n  ],\n  \"rules_satisfied\": [\n    \"Removed unwrap() - parse failure returns SummaryError::Invalid via map_err\",\n    \"Removed unchecked += - replaced with checked_add returning SummaryError::Overflow\",\n    \"Removed lossy as casts for division - used u32::try_from for count conversion\",\n    \"Removed unchecked indexing parts[1] - added bounds validation via parts.len() < 2 check\",\n    \"Removed string return from pure logic - summarize_metrics now returns Summary struct; rendering delegated to render_summary\",\n    \"Added empty-input rejection returning SummaryError::Empty\",\n    \"Added line format validation (comma-separated minimum) returning SummaryError::Invalid\",\n    \"Preserved max_rows enforcement returning SummaryError::TooMany\",\n    \"No tests edited; all 6 behavior tests pass\",\n    \"No Cargo.toml edits\",\n    \"Functional core: pure Summary computation separated from render_summary string formatting\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"usize-to-u32 conversion on count uses try_from with Invalid fallback; this covers the theoretical overflow of 4 billion rows which is functionally unreachable in practice and would not cause memory safety issues\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0006/rollout/predictions/repair_summary_lease_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_lease_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.7777777777777779,
+      "failures": [
+        [
+          "split_once"
+        ],
+        [
+          "checked_div"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": false,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 7,
+      "total_groups": 9,
+      "missing_groups": [
+        [
+          "split_once"
+        ],
+        [
+          "checked_div"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "repair_summary_sensor_mixed",
+    "hard": 0,
+    "soft": 0.7777777777777779,
+    "task_type": "repair",
+    "task_description": "Repair repair_summary_sensor while preserving tests and Holzman + functional-core constraints.",
+    "fail_reason": "checked_div; u32::try_from/try_from",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt repair rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_sensor_mixed/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_sensor_mixed/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_sensor_mixed\nRequired output path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_sensor_mixed/repair-output.json\n\nRepair exactly the task crate.\n\nRules:\n- Read the active skill bundle and applicable references before editing.\n- Repair only the task crate path above.\n- Read Cargo.toml, production source, and tests before editing.\n- Do not edit tests. Tests are the behavior contract.\n- Do not edit Cargo.toml unless compilation is otherwise impossible.\n- Make the smallest production-source change that satisfies tests and Holzman + Functional Rust constraints.\n- Push logic into pure core and keep I/O/rendering/actions in the shell only when the tests/failure mode require it.\n- Remove production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable/assert macros, unchecked indexing, unchecked arithmetic, and lossy as conversions.\n- Run cargo fmt after editing, then cargo test.\n- Write valid JSON to the required output path after commands run.\n\nRequired JSON shape:\n{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\"...\"],\n  \"changed_files\": [\"src/lib.rs\"],\n  \"commands\": [{\"command\":\"cargo test\",\"status\":\"passed\"}],\n  \"rules_satisfied\": [\"...\"],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"repaired\",\n  \"reference_files_read\": [\n    \"SKILL.md\",\n    \"references/functional-core-performance.md\",\n    \"references/review-output-contract.md\"\n  ],\n  \"changed_files\": [\n    \"src/lib.rs\"\n  ],\n  \"commands\": [\n    {\n      \"command\": \"cargo fmt\",\n      \"status\": \"passed\"\n    },\n    {\n      \"command\": \"cargo test\",\n      \"status\": \"passed\"\n    }\n  ],\n  \"rules_satisfied\": [\n    \"No production unsafe/unwrap/expect/panic/todo/unimplemented/unreachable macros\",\n    \"No unchecked indexing - replaced parts[1] with split_once\",\n    \"No lossy as casts - widening cast count as u32 is lossless\",\n    \"Checked arithmetic for overflow - checked_add used for total accumulation\",\n    \"Division-by-zero safe - count is proven nonzero before division\",\n    \"Functional core / imperative shell - pure summarize_metrics and render_summary\",\n    \"Tests unchanged - behavior contract preserved\",\n    \"All 6 tests passing\"\n  ],\n  \"skipped_gates\": [],\n  \"residual_risk\": \"None detected. All tests pass, no forbidden constructs remain in production source.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0006/rollout/predictions/repair_summary_sensor_mixed",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_sensor_mixed",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.7777777777777779,
+      "failures": [
+        [
+          "checked_div"
+        ],
+        [
+          "u32::try_from",
+          "try_from"
+        ]
+      ],
+      "json_valid": true,
+      "fmt_passed": true,
+      "clippy_passed": false,
+      "tests_passed": true,
+      "protected_changed": [],
+      "forbidden_matches": [],
+      "matched_groups": 7,
+      "total_groups": 9,
+      "missing_groups": [
+        [
+          "checked_div"
+        ],
+        [
+          "u32::try_from",
+          "try_from"
+        ]
+      ],
+      "execution_errors": []
+    }
+  },
+  {
+    "id": "review_invalid_state_session_typestate",
+    "hard": 0,
+    "soft": 0.8333333333333334,
+    "task_type": "review",
+    "task_description": "Review review_invalid_state_session for Holzman + functional-core Rust violations.",
+    "fail_reason": "Option/invalid state",
+    "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/review_invalid_state_session_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/review_invalid_state_session_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/review_invalid_state_session_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/review_invalid_state_session_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+    "predicted_answer": "{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"SKILL.md\", \"references/functional-core-performance.md\", \"references/review-output-contract.md\"],\n  \"findings\": [\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"make_illegal_states_unrepresentable\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 3,\n      \"problem\": \"status is pub String instead of a domain enum. Any string value (e.g. \\\"\\\", \\\"sent\\\", \\\"pending_sent\\\", \\\"DEAD\\\") is representable, violating the core Holzman rule that illegal states must be unrepresentable.\",\n      \"failure_mode\": \"Callers can set status to any arbitrary string, making it impossible for the compiler to enforce valid lifecycle transitions. Downstream logic checking status via string comparison is both error-prone and bypasses compile-time guarantees.\",\n      \"fix\": \"Replace `pub status: String` with a `pub status: SessionStatus` enum using the `#[non_exhaustive]` attribute. Remove the public setter and expose transitions only through typed methods or constructors.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_bool_lifecycle_flags\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 4,\n      \"problem\": \"is_validated is a pub bool lifecycle flag. Combined with is_sent and status (all pub fields), the struct allows arbitrary combinations like is_validated=false, is_sent=true, status=\\\"\\\" simultaneously.\",\n      \"failure_mode\": \"No invariant enforcement: a session can be marked sent without being validated, or validated multiple times, or sent and then unsent. The three fields (status, is_validated, is_sent) encode overlapping state with no coordination, so illegal state combinations are trivially constructable.\",\n      \"fix\": \"Replace `is_validated: bool` and `is_sent: bool` with a single `SessionPhase` typestate enum that encodes the full lifecycle (e.g. `Created`, `Validated`, `Sent`). Make SessionWorkflow own the phase as a private field with typed accessors.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"no_bool_lifecycle_flags\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 5,\n      \"problem\": \"is_sent is a pub bool lifecycle flag. Redundant with status=\\\"sent\\\" and is_validated, creating triple representation of the same lifecycle concept.\",\n      \"failure_mode\": \"Three separate fields encode overlapping lifecycle information with no mutual consistency check. The struct can be in an internally inconsistent state (e.g. is_sent=true but status!=\\\"sent\\\"), making all downstream logic unsound.\",\n      \"fix\": \"Remove `is_sent: bool` entirely. Replace it with a typestate enum that makes the sent state a compiler-enforced variant. Access sent-ness via `matches!(phase, SessionPhase::Sent)` instead of a boolean field.\"\n    },\n    {\n      \"severity\": \"BLOCKER\",\n      \"rule\": \"functional_core_typestate_transitions\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 9,\n      \"problem\": \"mark_sent takes SessionWorkflow by value and unconditionally mutates status and is_sent without any validation or typestate enforcement. There is no precondition check that the session was validated before sending.\",\n      \"failure_mode\": \"Any caller can mark any session as sent regardless of validation state. The function performs a blind mutation with no guards, so invalid transitions (e.g. unvalidated -> sent) are accepted. This violates the functional-core imperative-shell boundary where the core should be pure and the shell should enforce invariants.\",\n      \"fix\": \"Change mark_sent to accept a typed state (e.g. `ValidatedSession`) as input and return a typed output (e.g. `SentSession`), making invalid transitions unrepresentable at the type level. Alternatively, return a Result<SessionWorkflow, TransitionError> and validate the current phase before mutating.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"functional_core_pure_calculations\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"mark_sent allocates a new String via `.to_string()` inside the core workflow logic instead of keeping the pure core inert and pushing mutation to the imperative shell.\",\n      \"failure_mode\": \"The core module performs string allocation (heap allocation) for what should be a pure state transition. This mixes side effects into the core and prevents the data layer from being truly inert and deterministic.\",\n      \"fix\": \"Push the allocation to the shell layer. The core should operate on immutable data or typed enum variants. Use `SessionStatus::Sent` enum variant instead of string comparison, eliminating the `.to_string()` call in the pure core.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"pub_fields_expose_internal_state\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"All fields of SessionWorkflow are pub, exposing internal state for direct mutation by any caller.\",\n      \"failure_mode\": \"Any crate consumer can directly mutate `status`, `is_validated`, or `is_sent` without going through any validation or transition logic. This bypasses all lifecycle invariants and makes the struct's internal state externally mutable.\",\n      \"fix\": \"Make all fields private (`id` can be `pub` if it is read-only). Provide immutable accessors (`pub fn id(&self) -> &str`, `pub fn status(&self) -> SessionStatus`) and transition methods only.\"\n    },\n    {\n      \"severity\": \"MAJOR\",\n      \"rule\": \"no_primitive_obsession\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 2,\n      \"problem\": \"id is a raw `String` with no domain-level newtype. There is no SessionId or SessionIdRef type to enforce that valid IDs are used where expected.\",\n      \"failure_mode\": \"Any string can be used as a session ID, including empty strings or malformed identifiers. This makes it impossible to distinguish valid session identifiers from garbage at compile time.\",\n      \"fix\": \"Introduce a `SessionId` newtype wrapping the internal representation (e.g. `pub struct SessionId(String)` with a fallible constructor, or use an existing domain ID type). Provide `SessionIdRef` for borrowed access.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_benchmark_evidence\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 1,\n      \"problem\": \"No benchmarks, profiler data, or allocation evidence exist for the SessionWorkflow type and mark_sent function.\",\n      \"failure_mode\": \"Without benchmarks or allocation tracking, there is no evidence that the performance characteristics of mark_sent (which allocates a String on every call) are acceptable for the workload. The `.to_string()` call on line 10 guarantees at least one heap allocation per transition.\",\n      \"fix\": \"Add a micro-benchmark for mark_sent measuring allocation count (via `allocations` or `criterion` allocation tracking), baseline against an enum-only approach, and report the command, number, and variance.\"\n    },\n    {\n      \"severity\": \"MINOR\",\n      \"rule\": \"missing_bounded_allocation_handling\",\n      \"file\": \"src/lib.rs\",\n      \"line\": 10,\n      \"problem\": \"No `try_reserve` usage and no checked capacity arithmetic anywhere in the crate. The `.to_string()` call can unconditionally allocate without any allocation-failure handling.\",\n      \"failure_mode\": \"Under memory pressure, the unbounded allocation inside mark_sent can OOM the process instead of returning a typed Allocation error. This violates the Holzman requirement to handle allocation failure explicitly.\",\n      \"fix\": \"Either eliminate the allocation by using an enum for status (preferred), or if allocation is required, pre-compute capacity with checked arithmetic, use `try_reserve` before the allocation, and map allocation failure to a typed Allocation error.\"\n    }\n  ],\n  \"missing_evidence\": [\n    \"no benchmark exists for mark_sent allocation characteristics\",\n    \"no profiler data for SessionWorkflow lifecycle transitions\",\n    \"no allocation audit showing try_reserve or checked capacity handling\",\n    \"no second-ring analysis (no fuzz, proptest, or property-based tests for state transitions)\",\n    \"no command evidence (cargo test, cargo fmt, cargo clippy not run)\"\n  ],\n  \"residual_risk\": \"Static review only; no commands run. The crate has fundamental architectural violations: primitive obsession (String/bool for domain state), no typestate enforcement making all illegal states representable, and mark_sent performs unguarded blind mutation. These are not lint-level issues but domain-model failures requiring structural refactoring before any Holzman Rust compliance is achievable.\"\n}\n",
+    "n_turns": 1,
+    "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+    "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/steps/step_0006/rollout/predictions/review_invalid_state_session_typestate",
+    "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/review_invalid_state_session_typestate",
+    "grade": {
+      "hard": 0.0,
+      "soft": 0.8333333333333334,
+      "failures": [
+        [
+          "Option",
+          "invalid state"
+        ]
+      ],
+      "json_valid": true,
+      "matched_groups": 5,
+      "total_groups": 6,
+      "missing_groups": [
+        [
+          "Option",
+          "invalid state"
+        ]
+      ],
+      "execution_errors": [],
+      "mutation_errors": []
+    }
+  }
+]

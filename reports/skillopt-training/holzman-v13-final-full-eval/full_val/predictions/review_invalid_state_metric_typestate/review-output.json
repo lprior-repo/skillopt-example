@@ -1,0 +1,93 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow has no typestate enum; status and boolean flags allow illegal state combinations like status='new' with is_validated=true and is_sent=true simultaneously, and mark_sent bypasses validation entirely.",
+      "failure_mode": "Any caller can construct MetricWorkflow with contradictory fields or advance directly to 'sent' without validation, violating the domain lifecycle invariant that sent requires validated.",
+      "fix": "Replace status, is_validated, and is_sent with a single typestate enum like enum WorkflowState { Pending, Validated, Sent { sent_at_epoch_ms: u64 } } with a single field; make all constructors fallible and enforce transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String instead of an enum. Any arbitrary string value (\"sent\", \"DELETED\", \"\", null-bytes) is valid, and mark_sent writes a magic string literal.",
+      "failure_mode": "Callers can set status to any string, including values the domain does not recognize; string comparison is fragile and the lifecycle state is not enforced by the type system.",
+      "fix": "Replace with a non-exhaustive enum: enum Status { Pending, Validated, Sent }. Remove is_sent and is_validated booleans entirely—they are subsumed by the enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool encode lifecycle state as independent booleans. There are 4 boolean combinations but only 2-3 valid lifecycle states (pending, validated, sent). The boolean encoding makes invalid states representable.",
+      "failure_mode": "(valid=false, sent=false), (valid=true, sent=false), (valid=true, sent=true), and (valid=false, sent=true) are all representable; the last is logically impossible, and the first two cannot distinguish 'never validated' from 'not yet sent'.",
+      "fix": "Replace both booleans with a single typestate enum that encodes the lifecycle as mutually exclusive variants, e.g. enum State { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate field from is_sent: bool. The Option allows sent_at_epoch_ms=Some(t) while is_sent=false, or sent_at_epoch_ms=None while is_sent=true—both are invalid state combinations.",
+      "failure_mode": "The Option field can drift out of sync with the is_sent boolean, producing unreachable states that violate the invariant that sent_at_epoch_ms is present if and only if the workflow is sent.",
+      "fix": "Tuck sent_at_epoch_ms inside the typestate enum variant that owns it: State::Sent { sent_at_epoch_ms: u64 }. This makes the presence of the timestamp part of the type, eliminating the Option entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is pub String with no validation, no newtype wrapper, and no domain semantics. Any empty string, null bytes, or arbitrary-length string is accepted as a valid metric ID.",
+      "failure_mode": "Callers can construct MetricWorkflow with id=\"\", id=\"  \", or an unbounded-length string that may exceed storage or indexing limits downstream. No domain invariant on id format or length is enforced at the type level.",
+      "fix": "Introduce a newtype: pub struct MetricId(String) or better pub struct MetricId(NonZeroU64) if IDs are numeric. Provide a fallible smart constructor that validates format/length and returns a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow is constructed directly with raw primitives (String, String, bool, bool, Option<u64>). There is no parse boundary—no smart constructor, no fallible factory, no validation at the module boundary—so callers can construct any invalid domain state directly.",
+      "failure_mode": "The type exposes its internal representation as a public struct with public fields; callers bypass any lifecycle invariants, status constraints, and timestamp consistency rules by writing struct literals with arbitrary values.",
+      "fix": "Make all fields private (or remove the struct entirely in favor of an enum). Provide a single fallible constructor like fn try_new(id: impl Into<String>) -> Result<MetricWorkflow, NewError> that returns a valid-by-construction type. The type should be represented as an enum typestate, not a struct of primitives."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "public_fields_expose_impl",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of MetricWorkflow are pub, exposing the internal representation. This breaks encapsulation and allows callers to mutate status, booleans, and Option independently of any domain logic.",
+      "failure_mode": "External code can do item.status = \"\"; item.is_validated = false; item.is_sent = false; item.sent_at_epoch_ms = Some(0); without any domain logic or invariant enforcement, producing a struct that violates every domain rule.",
+      "fix": "Make all fields private or replace the struct with an enum typestate. Provide domain methods (e.g. validate(), mark_sent()) that enforce invariants at call sites."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_no_invariant_check",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent unconditionally sets status and is_sent without checking is_validated or any precondition. The lifecycle transition from validated to sent is not enforced.",
+      "failure_mode": "A MetricWorkflow in any state—including one with is_validated=false—can be marked as sent, violating the domain invariant that only validated metrics may be sent.",
+      "fix": "Replace mark_sent with a method on the typestate enum that is only callable from the Validated variant: fn mark_sent(self) -> MetricWorkflow. The type system enforces the precondition."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or MetricWorkflow construction",
+    "no profiler data for the hot path containing MetricWorkflow operations",
+    "no allocation analysis for String::to_string() and Vec allocations in mark_sent",
+    "no second-ring evidence (CI, sanitizer, or fuzz) for the typestate invariants",
+    "no command evidence that cargo fmt/check/clippy/test pass on this crate"
+  ],
+  "residual_risk": "Struct is entirely built on raw primitives with public fields, no typestate enum, no parse boundary, and a state-agnostic mutation function. Every Holzman law around make-illegal-states-unrepresentable, status-as-enum, bool-as-typestate, and parse-boundary is violated. Static review only; no commands executed. The crate must be redesigned with an enum typestate before any delivery."
+}

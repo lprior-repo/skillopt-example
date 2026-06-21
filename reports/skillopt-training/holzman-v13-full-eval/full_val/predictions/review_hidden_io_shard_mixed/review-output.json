@@ -1,0 +1,110 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on file-not-found or I/O error",
+      "failure_mode": "entire program aborts when the shard file is missing or unreadable instead of returning a typed error the caller can handle",
+      "fix": "return Result<Vec<Record>, LoadError> and use map_err to convert io::Error into a typed error variant"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value or missing field",
+      "failure_mode": "corrupt shard data causes a panic rather than returning a typed ParseError the caller can recover from",
+      "fix": "return Result<Vec<Record>, LoadError>, use map_err on parse, and return a typed ParseError::InvalidValue for bad numeric data"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy as cast: u32 value cast to u16 via as u16, silently truncating values above 65535",
+      "failure_mode": "a valid u32 like 70000 becomes 4464 with no error, silently corrupting data",
+      "fix": "use u16::try_from(value).map_err(|_| LoadError::Overflow) instead of as u16"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are unchecked array index accesses",
+      "failure_mode": "a line with fewer than 2 comma-separated fields panics with index-out-of-bounds instead of returning a typed ParseError::Invalid",
+      "fix": "use parts.get(0) and parts.get(1) returning None on missing fields, then map_err into a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is hidden I/O inside what should be pure data-parsing logic",
+      "failure_mode": "parsing function leaks logging side effect into the core, making it impossible to use without console output and breaking pure-data/Actions architecture",
+      "fix": "remove println! entirely; logging belongs in the shell layer, not in data loading"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_shards fuses file I/O, parsing, logging, and domain construction in a single infallible function returning Vec<Record>",
+      "failure_mode": "no error taxonomy exists; callers cannot distinguish file-not-found from parse errors from allocation failures; shell and calculation boundaries are violated",
+      "fix": "declare a typed enum LoadError { Io(io::Error), Parse(ParseError), Allocation }, return Result<Vec<Record>, LoadError>, and isolate fs::read_to_string in the shell"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mandatory_patterns",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Uses line.split(',').map().collect() into Vec<String> instead of the mandatory split_once pattern",
+      "failure_mode": "allocates a Vec of all parts unnecessarily; split_once is required for one-separator grammars per the hardening checklist",
+      "fix": "use let (_name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)?; and parse value_str.trim()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power_of_ten_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No bounded allocation: no try_reserve, no domain cap on max_items, no checked capacity arithmetic on the output Vec",
+      "failure_mode": "a very large shard file can exhaust memory without a graceful allocation error; Vec grows unchecked",
+      "fix": "add a max_items parameter, call values.try_reserve(max_items).map_err(|_| LoadError::Allocation)? after validation, and enforce the cap before pushing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses status as raw String (pub name: String) instead of a newtype or domain value object",
+      "failure_mode": "any caller can construct Record with arbitrary strings bypassing domain validation; illegal states are representable",
+      "fix": "wrap name in a named newtype like RecordName(String) with a smart constructor that validates the domain rules"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power_of_ten_verification",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Missing benchmark, profiler, allocation, and command-truth evidence",
+      "failure_mode": "no performance baseline, no allocation audit, no benchmark commands to validate correctness or speed claims",
+      "fix": "add a benchmark with workload description, baseline command, and measured numbers; add allocation audit with profiler evidence"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for hot-path analysis",
+    "no allocation audit showing try_reserve or bounded allocation usage",
+    "no command-truth evidence for cargo fmt, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "Review is static analysis only; no commands were run. The source contains 10 BLOCKER violations including panic surfaces (unwrap), unchecked indexing, lossy casts, hidden I/O, fused shell/calculation, missing error taxonomy, mandatory pattern violations, unbounded allocation, raw-primitive domain state, and missing evidence. All must be repaired before delivery."
+}

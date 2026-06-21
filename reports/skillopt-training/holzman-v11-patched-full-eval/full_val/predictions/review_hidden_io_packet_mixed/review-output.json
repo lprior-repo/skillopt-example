@@ -1,0 +1,144 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_panic_surfaces",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure",
+      "failure_mode": "missing file or permission error causes process abort instead of returning a typed error",
+      "fix": "Return a typed LoadError (Io variant), use map_err on fs::read_to_string, propagate Result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! inside parsing logic leaks I/O into what should be pure data transformation",
+      "failure_mode": "side effects prevent deterministic testing, make output ordering dependent, and violate Functional Core / Imperative Shell",
+      "fix": "Remove println! from the parser; return log data if logging is needed; shell layer emits logs"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] unchecked indexing into split result without bounds check",
+      "failure_mode": "malformed line with no commas causes panic at runtime",
+      "fix": "Use split_once(',') to destructurally get two fields with .ok_or(ParseError::Invalid) fallback"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] unchecked indexing into split result without bounds check",
+      "failure_mode": "line with only one comma-separated field panics at runtime",
+      "fix": "Use split_once(',') for two-field destructuring instead of split/collect/get indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_conversions",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 performs lossy cast from u32 to u16",
+      "failure_mode": "values in range 65536-4294967295 silently truncate to u16 range, producing incorrect domain values without any validation",
+      "fix": "Parse directly as u16 with parse::<u16>().map_err(ParseError::InvalidValue), or use u32::try_from(parsed_u32).map_err(ParseError::Overflow)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets fuses file I/O, logging, parsing, and collection in one function with no error type",
+      "failure_mode": "no separation of pure parsing from I/O shell; caller cannot handle specific error modes; function is not testable with synthetic input without filesystem access",
+      "fix": "Split into (1) parse_record(line: &str) -> Result<Record, ParseError> (pure core) and (2) load_packets(path: &str) -> Result<Vec<Record>, LoadError> (shell that does I/O)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no error type; all failures silently panic",
+      "failure_mode": "IO errors, parse errors, out-of-range values, and malformed lines are indistinguishable and all manifest as panics",
+      "fix": "Define enum LoadError { Io(io::Error), InvalidRecord { line: usize, reason: ParseError } } and parse::ParseError { Empty, Invalid, Overflow, Allocation }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No capacity cap or try_reserve on the output Vec; unbounded file input can allocate unbounded memory",
+      "failure_mode": "large or adversarial input files cause unbounded heap allocation and potential OOM",
+      "fix": "Add max_records: usize parameter; call out.try_reserve(max_records).map_err(|_| LoadError::Allocation)? before the loop"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_for_two_field",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map().collect() allocates a Vec for every line when only two fields are needed",
+      "failure_mode": "unnecessary per-line allocation; extra fields beyond two silently ignored; no structural guarantee of exactly-two fields",
+      "fix": "Use let (name, value_str) = line.split_once(',').ok_or(ParseError::Invalid)?; then parse value_str directly"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses pub name: String and pub value: u16 with no validation invariants",
+      "failure_mode": "any caller can construct Record with empty name string or any u16 value, including domain-invalid states",
+      "fix": "Use newtype name: NonEmptyString, hide struct fields, and provide Record::new(name: &str, value: u16) -> Result<Record, ParseError> smart constructor"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_perf_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this code path",
+      "failure_mode": "cannot verify whether Vec allocation per line, split+collect pattern, or any other aspect is the bottleneck",
+      "fix": "Add Criterion or similar benchmark comparing current implementation against split_once+try_reserve variant; measure allocation count via alloc_zeroed or similar"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_perf_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence exists to validate hot-path identification or allocation profile",
+      "failure_mode": "optimization decisions are guesswork without flamegraph or allocation-granularity data",
+      "fix": "Run perf or flamegraph on representative input; document allocation hotspots before optimizing"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_perf_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No command evidence for allocation analysis (e.g., cargo-flamegraph, valgrind --tool=massif, or jemalloc profiling)",
+      "failure_mode": "cannot prove whether the per-line Vec<String> allocation from split/collect is a meaningful cost",
+      "fix": "Add allocation profiling commands to CI and document baseline numbers with hardware target"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_perf_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring evidence (assembly, allocation count, or benchmark) for any performance claim",
+      "failure_mode": "claims about the performance of this packet-loading path are unverified",
+      "fix": "Add bench/ directory with Criterion benchmarks comparing current and refactored implementations; verify with assembly output if applicable"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the load_packets code path",
+    "no profiler evidence (perf/flamegraph/massif) for allocation hotspots",
+    "no allocation analysis (cargo-flamegraph, heaptrack, or similar)",
+    "no command evidence for any performance claim"
+  ],
+  "residual_risk": "Static review only; no commands run. All absolute law violations (unwrap, hidden I/O, unchecked indexing, lossy cast, no error types, no bounded allocation, Functional Core violation) remain in source. 12 findings require repair before this code is acceptable. The crate has no tests, benches, or CI gate to prevent regression."
+}

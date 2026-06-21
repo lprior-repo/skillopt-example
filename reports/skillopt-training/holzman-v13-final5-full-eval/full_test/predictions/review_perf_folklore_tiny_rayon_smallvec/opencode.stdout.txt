@@ -1,0 +1,12 @@
+Now I have the full picture. The task crate is tiny — a single function with folklore performance claims. Let me write the review output.
+Review complete. Written 6 findings to `/tmp/opencode/holzman-skillopt-train/f9c39e52d777a23b/review_perf_folklore_tiny_rayon_smallvec/review-output.json`.
+
+Key findings:
+- **BLOCKER**: Folklore TODO claiming Rayon + SmallVec "will be faster" with zero evidence
+- **BLOCKER**: Returns `Vec<&'static str>` for fixed `[u8; 4]` — heap allocates for trivially small output; should return `[&'static str; 4]`
+- **BLOCKER**: SmallVec is pointless for known-size 4 elements
+- **BLOCKER**: Rayon on 4 elements is guaranteed slower due to parallel overhead
+- **MAJOR**: No benchmark baseline or profiler evidence
+- **MAJOR**: No cargo check/clippy/test compilation evidence
+
+5 missing evidence items flagged (benchmark, profiler, allocation tracing, assembly/cycle data, baseline).

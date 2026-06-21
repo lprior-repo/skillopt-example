@@ -1,0 +1,26 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap/panic/expect",
+    "Empty input rejected with ParseError::Empty",
+    "Invalid parse rejected with ParseError::Invalid",
+    "Max items enforced with ParseError::TooMany",
+    "Smallest source change to satisfy tests",
+    "Tests not modified",
+    "Cargo.toml not modified"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "No residual risk; all 4 behavior tests pass, forbidden constructs removed, typed error taxonomy fully exercised"
+}

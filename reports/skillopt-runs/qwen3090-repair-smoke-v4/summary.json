@@ -1,0 +1,181 @@
+{
+  "run_id": "qwen3090-repair-smoke-v4",
+  "run_root": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4",
+  "sandbox_run_root": "/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4",
+  "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "candidate_name": "candidate-v4",
+  "candidate_overlay_dir": "candidates/holzman-rust-candidate-v4",
+  "resume": false,
+  "tasks": [
+    "repair_csv_u16",
+    "repair_checked_average"
+  ],
+  "aggregates": [
+    {
+      "bundle": "baseline",
+      "task_count": 2,
+      "hard": 0.0,
+      "soft": 0.8833333333333335,
+      "mixed": 0.44166666666666676,
+      "passed_tasks": 0
+    },
+    {
+      "bundle": "candidate-v4",
+      "task_count": 2,
+      "hard": 0.0,
+      "soft": 0.8916666666666668,
+      "mixed": 0.4458333333333334,
+      "passed_tasks": 0
+    }
+  ],
+  "gate": {
+    "action": "accept_new_best",
+    "current_score": 0.4458333333333334,
+    "best_score": 0.4458333333333334,
+    "best_step": 1
+  },
+  "results": [
+    {
+      "task_id": "repair_csv_u16",
+      "kind": "repair",
+      "bundle": "baseline",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/baseline/repair_csv_u16",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4/tasks/baseline/repair_csv_u16",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+      "task_digest": "9d58636a934294c84622dc0e68f2378381dabed50ae5fc324ed979fa8a73da97",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.9833333333333335,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 0,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": true,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 2,
+        "total_groups": 3,
+        "missing_groups": [
+          [
+            "try_reserve",
+            "reserve"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "repair_checked_average",
+      "kind": "repair",
+      "bundle": "baseline",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/baseline/repair_checked_average",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4/tasks/baseline/repair_checked_average",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+      "task_digest": "d2b3a05d47c9ab4db5e0910b27e4271101226a42825be0a593d0483155155fd8",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.7833333333333334,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 101,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": false,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 2,
+        "total_groups": 3,
+        "missing_groups": [
+          [
+            "try_from"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "repair_csv_u16",
+      "kind": "repair",
+      "bundle": "candidate-v4",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/candidate-v4/repair_csv_u16",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4/tasks/candidate-v4/repair_csv_u16",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "6485b68474bc81625c61d06859db2d3eca1374b1802566bfd19bd9db37c2aaad",
+      "task_digest": "9d58636a934294c84622dc0e68f2378381dabed50ae5fc324ed979fa8a73da97",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.9833333333333335,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 0,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": true,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 2,
+        "total_groups": 3,
+        "missing_groups": [
+          [
+            "try_reserve",
+            "reserve"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "repair_checked_average",
+      "kind": "repair",
+      "bundle": "candidate-v4",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-repair-smoke-v4/tasks/candidate-v4/repair_checked_average",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-repair-smoke-v4/tasks/candidate-v4/repair_checked_average",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "6485b68474bc81625c61d06859db2d3eca1374b1802566bfd19bd9db37c2aaad",
+      "task_digest": "d2b3a05d47c9ab4db5e0910b27e4271101226a42825be0a593d0483155155fd8",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.8000000000000002,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 101,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": false,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 3,
+        "total_groups": 3,
+        "missing_groups": []
+      }
+    }
+  ]
+}

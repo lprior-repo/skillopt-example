@@ -1,0 +1,18 @@
+Now I have the full picture. Let me analyze the issues and fix them:
+
+1. Return type mismatch: tests expect `Result<Summary, SummaryError>`, code returns `Result<String, _>`
+2. Missing `render_summary` function
+3. Unchecked indexing `parts[1]` and `unwrap()` on parse
+4. No empty check, no invalid format check
+5. Unchecked `+=` (overflow) and division by zero
+All 6 tests pass. Now writing the repair output.
+Repaired. Changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, _>` (matches test contract)
+- **Added `render_summary`**: Formats a `Summary` struct into the display string
+- **Removed `unwrap()`**: Parse failures return `SummaryError::Invalid` via `map_err`
+- **Removed unchecked indexing**: Replaced `parts[1]` with `split_once(',')`
+- **Removed unchecked `+=`**: Uses `checked_add()` — returns `Overflow` on wrap
+- **Added empty/invalid guards**: Returns `Empty` for empty input or all-whitespace lines; returns `Invalid` for malformed lines lacking a comma
+- **Added checked division**: `checked_div` replaces bare `/` (avoids div-by-zero)
+- **No forbidden constructs remain**: no `unsafe`, `unwrap`, `expect`, `panic`, `todo`, `unimplemented`, `unreachable`, or unchecked operations

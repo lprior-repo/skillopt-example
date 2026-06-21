@@ -1,0 +1,7 @@
+Two violations to fix: (1) missing `max_payload` check for `PayloadTooLarge`, (2) lossy `as u32` cast.
+**Repaired.** Two violations fixed in `src/lib.rs`:
+
+1. **Missing `PayloadTooLarge` guard** — added `payload.len() > max_payload` check returning `Err(FrameError::PayloadTooLarge)` before encoding.
+2. **Lossy `as u32` cast** — replaced `payload.len() as u32` with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`.
+
+Also added `try_reserve` + `checked_add` per the frame/packet encoder pattern in the skill. Both tests pass, no forbidden constructs remain.

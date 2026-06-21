@@ -1,0 +1,9 @@
+Now I understand the task. The current `parse_samples` has multiple Holzman violations: `.unwrap()`, no `max_items` enforcement, no `try_reserve`, collects into Vec directly. Tests require proper error handling for empty, invalid, and too-many cases.
+
+Let me apply the mandatory CSV/parser repair pattern:
+All 4 tests pass. Let me verify no forbidden patterns remain and run clippy:
+Repair complete. Changes to `src/lib.rs`:
+
+- **Removed**: `.unwrap()` on parse, unbounded `collect()` into Vec, ignored `max_items` parameter
+- **Added**: Empty-input rejection first, `Vec::new` + `try_reserve` allocation pattern, per-item `max_items` enforcement returning `TooMany`, `map_err` on parse returning `Typed Invalid`, `Allocation` error on reserve failure
+- **All 4 tests pass**, clippy clean, JSON output written

@@ -1,0 +1,21 @@
+Now I understand the issues. Let me read the references directory too.
+Now I have full picture. The current `src/lib.rs` has these Holzman violations and test mismatches:
+
+1. Returns `Result<String, SummaryError>` but tests expect `Result<Summary, SummaryError>`
+2. Missing `render_summary` function
+3. `unwrap()` on parse
+4. Unchecked `+=` on total (overflow)
+5. Lossy `count as u64` cast and division-by-zero risk
+6. Unchecked indexing `parts[1]`
+7. No empty-input rejection
+All 6 tests pass. Writing the repair output.
+Repair complete. All 6 tests pass. Changes made to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- **Added `render_summary`**: Pure function that formats `Summary` into display string
+- **Removed `unwrap()`**: Parse errors mapped to `SummaryError::Invalid`
+- **Removed unchecked indexing**: `parts[1]` replaced with `parts.get(1).ok_or(...)`
+- **Removed unchecked arithmetic**: `total += value` replaced with `checked_add` (returns `Overflow` on overflow)
+- **Removed lossy cast**: `count as u64` replaced with native `u64` counter
+- **Division safety**: Uses `checked_div` instead of raw `/`
+- **Empty input**: Returns `SummaryError::Empty` for empty input

@@ -1,0 +1,13 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/d6228225424a3486/review_hidden_io_session_mixed/review-output.json`.
+
+**Summary: 12 findings (all BLOCKER or CRITICAL), 5 missing evidence items.**
+
+Key violations in `src/lib.rs`:
+- **3x `unwrap()`** — lines 9, 19: panics on I/O error and parse failure
+- **3x unchecked indexing** — lines 16, 18, 19: `parts[0]`, `parts[0]`, `parts[1]` with no bounds checks
+- **1x lossy cast** — line 19: `as u16` silently truncates u32 values outside 0–65535
+- **1x split+collect anti-pattern** — line 12: collects all CSV parts into Vec instead of `split_once`
+- **2x functional core I/O breaches** — lines 9, 16: `fs::read_to_string` and `println!` in a data-loading function
+- **1x missing try_reserve** — line 8: unbounded Vec growth via collect
+- **1x std::fs in core** — line 1: module imports filesystem I/O

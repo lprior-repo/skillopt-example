@@ -1,0 +1,150 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure",
+      "failure_mode": "untrusted file path can abort the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, IoError> and use ? on fs::read_to_string"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on invalid numeric input",
+      "failure_mode": "malformed invoice line can abort the program instead of returning a typed parse error",
+      "fix": "use .parse::<u32>().map_err(ParseError) with ? or map_err to return a typed domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy as cast: parse::<u32>().unwrap() as u16 silently truncates values >65535",
+      "failure_mode": "invoice values outside u16 range wrap silently, producing incorrect records without any error signal",
+      "fix": "use u16::try_from(parsed) and return a typed conversion error for values outside range"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Unchecked indexing parts[0] and parts[1] without bounds checks",
+      "failure_mode": "invoice lines with fewer than 2 comma-separated fields panic at runtime",
+      "fix": "use line.split_once(',') for first-delimiter extraction, then .1.split_once(',') or .split(',') with get(1), and handle None with typed errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',') + collect() into Vec<String> when split_once suffices for two-field extraction",
+      "failure_mode": "allocates intermediate Vec<String> for every line, including trimmed copies of all fields, wasting memory and allocations",
+      "fix": "use split_once(',') to get name and value_str, then parse value_str directly without collecting all parts into Vec<String>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side effect inside the data-loading pipeline",
+      "failure_mode": "hidden I/O side effect in a function that should be a deterministic data transformer; breaks purity and makes behavior environment-dependent",
+      "fix": "remove println!; logging belongs exclusively in the imperative shell layer, not in the core data pipeline"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_invoices returns Vec<Record> with no error type; all failures silently abort via panic",
+      "failure_mode": "no failure mode is exposed to the caller; every I/O, parse, index, or cast error causes an unconditional panic instead of a typed domain error",
+      "fix": "signature should be fn load_invoices(path: &str) -> Result<Vec<Record>, InvoiceError> with a typed error enum covering IoError, ParseError, FormatError"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No try_reserve before Vec::collect() growth; allocation failure is unhandled",
+      "failure_mode": "if the invoice file is large, Vec reallocation can fail with OOM and panic via collect() propagate",
+      "fix": "estimate line count or use try_reserve on an initially empty Vec, handling AllocationError via map_err"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record has pub fields with String type instead of domain newtype",
+      "failure_mode": "name field accepts any string including empty/whitespace; no domain invariant enforces valid invoice names",
+      "fix": "use a Name newtype with a fallible constructor that validates non-empty and well-formed, making illegal names unrepresentable"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Function mixes I/O (fs::read_to_string) with data transformation (map/collect) in one function",
+      "failure_mode": "cannot test the parsing logic in isolation; purity is broken; the core calculation is not separated from the imperative shell",
+      "fix": "split into fn read_invoices(path: &str) -> Result<String, IoError> (shell) and fn parse_invoices(text: &str) -> Result<Vec<Record>, ParseError> (pure core)"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 14,
+      "problem": ".map(|part| part.trim().to_string()) allocates String for every field unnecessarily",
+      "failure_mode": "intermediate String allocations for each trimmed field before cloning into Record; wasteful for a two-field record",
+      "fix": "keep parts as &str slices via split_once, trim in-place or use trim() directly on &str without to_string(), only allocate final Record strings"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No benchmark targets defined; no allocation profiler evidence exists",
+      "failure_mode": "cannot verify that the allocation-heavy pattern (Vec<String> per line + to_string per field) meets any performance budget",
+      "fix": "add a [[bench]] section with criterion or similar; measure allocations per invoice line"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No #[test] functions or behavior tests exist for load_invoices",
+      "failure_mode": "no evidence that the function handles valid input, malformed lines, empty files, or boundary values correctly",
+      "fix": "add behavior tests for: valid invoice lines, lines with missing fields, lines with non-numeric values, lines with values exceeding u16::MAX, empty file"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No second-ring evidence (Miri, Kani, proptest) for error paths",
+      "failure_mode": "unchecked indexing and unwrap chains have no bounded-model-checking or property-based testing coverage",
+      "fix": "add proptest-based property tests for parse behavior; run cargo miri on error paths once corrected to return Results"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No evidence of cargo fmt, cargo clippy, or cargo test execution",
+      "failure_mode": "code quality, lint, and correctness gates are unverified",
+      "fix": "run cargo fmt, cargo clippy -- -D warnings, and cargo test; report outcomes"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for allocation or throughput claims",
+    "no profiler data (flamegraph, perf, or similar) for the hot path",
+    "no allocation tracking (e.g., criterion allocator hooks or alloc_counter) for Vec<String> per-line pattern",
+    "no second-ring evidence: Miri, Kani, proptest, or Loom runs",
+    "no behavior tests for valid input, malformed input, empty file, and boundary values",
+    "no command evidence: cargo fmt, cargo clippy, cargo test not run"
+  ],
+  "residual_risk": "Multiple BLOCKERs remain: unwrap on I/O and parse, lossy as cast, unchecked indexing, hidden println! side effect, no error type, no try_reserve, and mixed I/O with pure transformation. The function will panic on any malformed input, large files, or out-of-range values. Static review only; no commands executed."
+}

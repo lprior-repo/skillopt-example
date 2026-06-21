@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production `unsafe` with `std::mem::transmute` used to convert a byte array to `u32`. Holzman Rust forbids all production `unsafe`.",
+      "failure_mode": "transmute bypasses Rust's type and alignment guarantees; any future caller passing misaligned or non-[u8;4] data through a wrapper would invoke undefined behavior with no soundness proof.",
+      "fix": "Remove `unsafe` entirely. Use `u32::from_le_bytes`, `u32::from_be_bytes`, or `u32::from_ne_bytes` (document the chosen endianness) which are safe, explicit, and require `[u8; 4]` at the type level."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Unchecked array indexing `input[0]`, `input[1]`, `input[2]`, `input[3]` on a `&[u8]` with no bounds check before access.",
+      "failure_mode": "If `input.len() < 4` the function panics at runtime, crashing the caller instead of returning a typed domain error.",
+      "fix": "Accept `[u8; 4]` by value at the function boundary instead of `&[u8]`, or add `input.get(0..4).ok_or(Error::ShortInput)` before indexing. Using `[u8; 4]` as the parameter type makes illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_transmute",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`std::mem::transmute::<[u8; 4], u32>` is used for a byte-to-int conversion. Transmute is the wrong tool for endian-aware serialization.",
+      "failure_mode": "`transmute` preserves the bit pattern but silently binds the API to the host byte order. On big-endian platforms the value is byte-swapped relative to little-endian consumers, producing silently incorrect numeric results without any compiler warning.",
+      "fix": "Replace with `u32::from_le_bytes(...)` (or `from_be_bytes`/`from_ne_bytes` with an explicit doc comment declaring the wire format). This is safe, explicit about endianness, and prevents silent cross-platform data corruption."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_or_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The function signature `read_len(input: &[u8]) -> u32` signals a pure read but has two hidden failure modes (panic on short input, undefined behavior via transmute) not reflected in the return type.",
+      "failure_mode": "Callers cannot handle failure via the type system. The fallibility is invisible, violating the functional-core principle that data is valid by construction and errors are typed.",
+      "fix": "Change the signature to return a typed error: `fn read_len(input: &[u8]) -> Result<u32, ReadLenError>` or accept `[u8; 4]` and return `Result<u32, ReadLenError>` where the error type covers short-input and any future validation failures."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for this hot-path function that reads a length field from bytes.",
+      "failure_mode": "Without benchmarks the performance claim (or lack thereof) is unverified; a replacement using `from_le_bytes` or bounds-checked paths must be measured to confirm no regression.",
+      "fix": "Add a `criterion` or `divan` benchmark comparing the current transmute path against `from_le_bytes` and a bounds-checked variant."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (perf, flamegraph, or sampler) for this function.",
+      "failure_mode": "Without profiling the hotness of `read_len` is unknown; unsafe shortcuts are unjustified if the function is not on a critical path.",
+      "fix": "Profile the call site to determine if this is a hot path before deciding on any low-level optimization."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation analysis showing whether the temporary `[u8; 4]` array or any intermediate allocations occur.",
+      "failure_mode": "The `[input[0], input[1], input[2], input[3]]` expression constructs a stack-temporary array; allocation behavior should be confirmed via compiler output or profiler.",
+      "fix": "Inspect MIR/assembly or use `no_alloc` testing to confirm zero heap allocation for the replacement."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for `read_len`", "no profiler evidence for hot-path classification", "no allocation analysis for the byte-array construction"],
+  "residual_risk": "static review only; no commands run. The crate contains `unsafe` code and unchecked indexing that are BLOCKERs. A safe replacement using `u32::from_le_bytes` with `[u8; 4]` input and `Result` return type would eliminate all BLOCKERs. Performance and allocation claims are unsubstantiated."
+}

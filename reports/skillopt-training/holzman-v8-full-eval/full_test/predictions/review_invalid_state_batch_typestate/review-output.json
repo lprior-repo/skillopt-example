@@ -1,0 +1,109 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "holzman-rust/SKILL.md",
+    "holzman-rust/references/functional-core-performance.md",
+    "holzman-rust/references/hardening-checklist.md",
+    "holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow represents invalid state combinations: status is an unchecked String (any value allowed), is_validated and is_sent are independent booleans that can contradict each other (e.g., is_sent=true with status=\"draft\"), and sent_at_epoch_ms can be Some while is_sent=false.",
+      "failure_mode": "Callers can construct or mutate BatchWorkflow into logically impossible states. A batch could appear sent (is_sent=true) with no timestamp, or validated but never sent, or with an arbitrary status string that breaks downstream match logic.",
+      "fix": "Replace status String with a Status enum (Draft, Validated, Sent). Replace is_validated/is_sent booleans with a single typestate enum (Unvalidated, Validated, Sent). Move sent_at_epoch_ms inside the Sent variant so the timestamp only exists when the batch is actually sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_enums_not_strings",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String field, allowing any arbitrary string value. This breaks pattern-matching reliability and forces callers to string-compare rather than exhaustively match states.",
+      "failure_mode": "Downstream code that matches on status strings is fragile: typos produce silent bugs, new states require every comparison site to be updated, and there is no compiler-enforced exhaustiveness.",
+      "fix": "Replace `pub status: String` with `pub status: Status` where Status is a sealed enum with explicit variants. Derive PartialEq, Clone, Debug."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle_booleans_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated (bool) and is_sent (bool) are independent lifecycle flags. They can be set in any combination (both true, both false, only one true), which does not model a proper lifecycle progression.",
+      "failure_mode": "A batch can be both validated and not sent, or sent without validation. The boolean pair permits 4 states but the domain likely requires only 3 ordered transitions (unvalidated -> validated -> sent). This redundancy enables invalid transitions and makes the state machine impossible to reason about.",
+      "fix": "Replace both booleans with a single BatchState enum (Unvalidated, Validated, Sent) that enforces ordered transitions via the type system. The mark_sent function should only accept a Validated state and return Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional_lifecycle_data_variant_owned",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a global Option<u64> on the struct, independent of the sent flag. It can be Some while the batch is not sent, or None while the batch is sent.",
+      "failure_mode": "Readers cannot trust that a Some timestamp means the batch was actually sent. Writers can forget to set is_sent when they set the timestamp, leaving an inconsistent record.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typestate enum: `Sent { sent_at_epoch_ms: u64 }`. This makes the timestamp only present when the batch is sent, by construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smart_constructors_validation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has all pub fields with no smart constructor or validation. Any code can create an instance with invalid combinations by directly assigning fields.",
+      "failure_mode": "No enforcement at construction time. Callers can bypass any intended lifecycle by direct field mutation, making the struct a bag of primitives rather than a domain type.",
+      "fix": "Make all fields private. Provide a private constructor and public factory functions that return Result<BatchWorkflow, BatchError>. Or better, make the enum variants themselves the only construction paths."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes and returns BatchWorkflow by value, mutating the struct in place. It is a procedural state mutation, not a pure domain function that returns a new valid state.",
+      "failure_mode": "The function does not prevent invalid transitions (it does not check current state before setting sent). It has no typed error for \"cannot send a batch that is not validated\".",
+      "fix": "Change mark_sent to accept a BatchState::Validated (or a validated wrapper type) and return BatchState::Sent with the timestamp. The pure core function should be: `fn transition_to_sent(validated: ValidatedBatch, now_ms: u64) -> SentBatch`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_id_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a pub String with no domain meaning. No BatchId newtype exists to prevent mixing batch IDs with other string fields.",
+      "failure_mode": "A batch ID can be confused with a status string, a user ID, or any other String field. No compile-time distinction between domain IDs and arbitrary text.",
+      "fix": "Introduce `pub struct BatchId(String)` or a tuple-newtype with smart constructor, and use it for the id field."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark harness exists for mark_sent or any performance-sensitive path. No allocation measurement, no profiler evidence.",
+      "failure_mode": "Cannot verify whether the String allocations in mark_sent (to_string on status) or the by-value struct copies are cost-effective for the expected throughput.",
+      "fix": "Add a criterion or custom benchmark measuring mark_sent with realistic batch sizes and state transitions. Measure allocations via alloc_counter or similar."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_test_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module exists. No behavior tests validate the domain invariants, state transitions, or error cases.",
+      "failure_mode": "No proof that the current (flawed) behavior works as intended, and no regression guard for future fixes.",
+      "fix": "Add tests for: valid state transitions (validated->sent), rejected invalid transitions (draft->sent should fail), and round-trip construction/destruction."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "allocations_in_hot_path",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent calls `.to_string()` on the literal \"sent\", creating a heap allocation for a known compile-time string. The entire BatchWorkflow struct is copied by value including the id String.",
+      "failure_mode": "Unnecessary heap allocation on every send operation. If mark_sent is called in a hot path, this adds allocator pressure that a benchmark would surface.",
+      "fix": "After typestate refactoring, the Sent variant holds the timestamp by value (no String allocation needed). The struct can be passed by reference if mutation is not required by the shell layer."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any performance-sensitive path",
+    "no profiler evidence (flamegraph, perf) for allocation hotspots",
+    "no allocation measurement (alloc_counter, jemalloc profiling)",
+    "no behavior tests for state transitions",
+    "no second-ring evidence (property tests, proptest, fuzz) for lifecycle invariants"
+  ],
+  "residual_risk": "The crate has fundamental domain modeling violations: illegal states are fully representable via independent bool/String/Option fields. The typestate pattern is completely absent. mark_sent performs in-place mutation with no transition guards. All risks are architectural — no unsafe code or FFI, so no memory-unsafe failures. The primary failure mode is logical inconsistency that propagates silently through downstream code. Fixing requires a full domain model rewrite (Status enum + typestate enum + variant-owned timestamp), not incremental patches."
+}

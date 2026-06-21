@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_required",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow has no typestate enum. Status, validated flag, and sent flag are independent fields that can form any combination (e.g. status='pending', is_sent=true, is_validated=false). No invariant enforcement exists.",
+      "failure_mode": "Any caller can place a LedgerWorkflow in a logically impossible state such as 'sent but not validated' or 'validated but not sent' with no type-level guarantee of legal transitions.",
+      "fix": "Define a `LedgerState` enum with variants for each lifecycle phase (Pending, Validated, Sent). Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single `state: LedgerState` field where the variant carries the associated data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is `String`, allowing arbitrary values (e.g. \"foo\", \"SENT\", \"sent\", \"delivered\"). Status strings collapse a typed state machine into unvalidated text.",
+      "failure_mode": "Callers can set status to any string, including values that violate business invariants. String comparison is error-prone and invisible to the type checker.",
+      "fix": "Replace `status: String` with an enum variant on the LedgerState typestate. If the enum is Pending/Validated/Sent, the state value itself encodes the status with zero invalid possibilities."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_bools",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated (bool) and is_sent (bool) are independent lifecycle booleans. Two booleans create 4 combinations (TT, TF, FT, FF) but a ledger lifecycle has a linear order. Independent bools allow invalid states like validated=false, sent=true.",
+      "failure_mode": "Runtime checks become necessary everywhere a ledger is used, because the type cannot distinguish (validated=true, sent=false) from (validated=false, sent=true) or the impossible (both true with status='pending').",
+      "fix": "Replace both booleans with a single typestate enum. Put the validated data inside the Validated variant and the sent data inside the Sent variant, so invalid combinations are unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_invalid_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is `Option<u64>` independent from is_sent. A caller can set is_sent=true while sent_at_epoch_ms=None, or is_sent=false while sent_at_epoch_ms=Some(...). The Option does not track lifecycle consistency.",
+      "failure_mode": "Downstream code checking is_sent may assume sent_at_epoch_ms is Some, causing Option-unwrap or misinterpretation. The type system cannot enforce that sent_at_epoch_ms is Some exactly when in the sent state.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the typestate enum as `Some<u64>`, so the timestamp exists only in the sent state and None is impossible outside it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_raw_primitive_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is `String` with no domain constraints. Any string (empty, whitespace, malformed UUID) is accepted. No newtype wraps the id to prevent mixing with other string fields.",
+      "failure_mode": "A caller can pass an empty string or non-UUID string as a ledger id. The compiler cannot distinguish LedgerId from other String fields, enabling swap bugs at call sites.",
+      "fix": "Define `pub struct LedgerId(String)` with a smart constructor that validates format (e.g. `fn new(s: String) -> Result<LedgerId, ParseError>`) and use it in the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_violation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "raw primitives cross the parse boundary without fallible smart constructors. LedgerWorkflow accepts String id, String status, bool flags, and Option<u64> directly with no validation. The type itself is a DTO, not a domain type.",
+      "failure_mode": "Invalid domain states are constructible at any call site with zero validation. There is no parse boundary — hostile or malformed input reaches the struct without smart constructor checks.",
+      "fix": "Define a shell-level DTO (e.g. `LedgerWorkflowDto`) that accepts raw primitives, then provide a fallible `LedgerWorkflow::try_from(dto)` smart constructor that validates id format, status enum membership, and enforces lifecycle invariants before producing a trusted domain value."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "shell_leakage_mark_sent",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates the struct in-place: sets status via `.to_string()` (allocation), flips is_sent bool, and returns the full struct. This is imperative mutation leaking into what should be a pure domain transition. The `.to_string()` on line 10 is an allocation in the transition path.",
+      "failure_mode": "Every call to mark_sent allocates a new String for status, even though the state transition could be a simple enum variant assignment. The mutation pattern prevents reasoning about which fields changed and allows callers to further mutate the returned struct.",
+      "fix": "Replace mark_sent with a pure transition: `fn transition_to_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, TransitionError>` that validates preconditions (e.g. must be Validated first) and returns a new struct with the Sent variant. No .to_string() needed — enum variants are zero-allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mut_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LedgerWorkflow are `pub`, allowing external mutation of every field at any time. This defeats encapsulation and makes invariants impossible to enforce.",
+      "failure_mode": "Any crate that imports LedgerWorkflow can write `item.status = \"anything\"` or `item.is_sent = false` after mark_sent(), undoing transitions with zero validation.",
+      "fix": "Make fields `pub(crate)` or private, provide only domain-safe accessors, and use a typestate enum so that the only way to change state is through the enum transition API."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No evidence that the crate compiles, passes clippy strict gates, or runs tests. No cargo check, clippy, or test output present.",
+      "failure_mode": "Without compilation and test evidence, there is no proof that the code is syntactically valid, type-correct, or that tests match the stated behavior. The review cannot verify behavior or rule compliance.",
+      "fix": "Run `cargo check --workspace --all-targets --all-features`, `cargo clippy` with strict deny flags, and `cargo test`. Report pass/fail with exact command output."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_benchmark_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No benchmark, profiler, or allocation evidence exists. The `.to_string()` allocation on line 10 is unmeasured. No allocation budget or try_reserve pattern is present. No performance baseline or claim.",
+      "failure_mode": "Unmeasured allocation in a hot path could cause latency spikes or memory pressure. Without allocation evidence, it is impossible to confirm the code meets Holzman bounded-resource requirements.",
+      "fix": "Add a benchmark crate measuring transition_to_sent latency with and without allocation. Replace `.to_string()` with enum variant assignment (zero allocation). Document allocation budget and evidence."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark evidence for mark_sent or any transition function",
+    "no profiler evidence for allocation hot paths",
+    "no allocation evidence — .to_string() on line 10 is unmeasured",
+    "no command evidence — cargo check, clippy strict, and tests not run",
+    "no second-ring evidence for any performance or correctness claims"
+  ],
+  "residual_risk": "Review is static only. No commands were executed. The struct has no typestate, uses raw primitive fields (String status, bool lifecycle flags, Option timestamp), has all public fields, and mark_sent performs imperative mutation with .to_string() allocation. These violations are fundamental to the Holzman doctrine and must be repaired before delivery. The code is deliverable only after typestate enum, smart constructor parse boundary, private fields, and benchmark evidence are in place."
+}

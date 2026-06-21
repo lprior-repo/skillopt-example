@@ -1,0 +1,15 @@
+Now I have all context. Writing the review output.
+Review complete. Written 8 BLOCKER findings to `review-output.json`:
+
+| # | Rule | File:Line | Issue |
+|---|------|-----------|-------|
+| 1 | enum_typestate_state_machine | src/lib.rs:1 | No typestate enum for lifecycle |
+| 2 | no_status_string | src/lib.rs:3 | `status: String` allows arbitrary values |
+| 3 | no_bool_lifecycle | src/lib.rs:4 | Independent bools contradict each other |
+| 4 | no_option_invalid_state_combinations | src/lib.rs:6 | `Option<u64>` detached from lifecycle |
+| 5 | no_raw_primitive_domain_id | src/lib.rs:2 | `id: String` is unvalidated raw primitive |
+| 6 | parse_boundary_no_smart_constructor | src/lib.rs:1 | No constructor; invalid states creatable directly |
+| 7 | mark_sent_no_state_machine_validation | src/lib.rs:9 | Unconditional mutation, no precondition checks |
+| 8 | pub_fields_no_encapsulation | src/lib.rs:2 | All fields public — zero invariant enforcement |
+
+All findings include required fields (severity, rule, file, line, problem, failure_mode, fix). 6 typestate findings plus parse_boundary per SKILL.md §Review Mode. All 8 are BLOCKER.

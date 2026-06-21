@@ -1,0 +1,12 @@
+Review complete. Written `review-output.json` with:
+
+- **6 findings**, all BLOCKER severity:
+  1. `make_illegal_states_unrepresentable` — struct uses `String` + two `bool` flags instead of a typestate enum
+  2. `type_discipline_bool_lifecycle` — `is_validated: bool` should be a typestate
+  3. `type_discipline_bool_lifecycle` — `is_sent: bool` dual-represents sent-state alongside `status: String`
+  4. `domain_newtypes` — `id: String` lacks domain constraints
+  5. `functional_core_state_transitions` — `mark_sent` mutates fields directly with string assignment, no pre-condition validation
+  6. `functional_core_pure_calculation` — no functional core / imperative shell separation
+
+- **6 missing evidence**: no benchmark, profiler, allocation analysis, second-ring analysis, command evidence, or tests
+- **Residual risk**: static review only, packet lifecycle fully unenforced at compile time

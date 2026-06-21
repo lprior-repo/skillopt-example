@@ -1,0 +1,14 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**5 findings across the crate:**
+
+| # | Severity | Rule | Lines |
+|---|----------|------|-------|
+| 1 | BLOCKER | `make_illegal_states_unrepresentable` | 1 | `is_validated: bool` + `is_sent: bool` allow inconsistent states (sent without validated) |
+| 2 | BLOCKER | `no_primitive_obsession` | 2 | `id: String` and `status: String` are raw primitives with no domain constraints |
+| 3 | BLOCKER | `no_option_for_lifecycle` | 6 | `sent_at_epoch_ms: Option<u64>` is redundant with `is_sent: bool` and can diverge |
+| 4 | BLOCKER | `functional_core_no_mutating_shell` | 9 | `mark_sent` mutates in place, doesn't validate preconditions, doesn't set timestamp, no error return |
+| 5 | MINOR | `performance_no_benchmark_evidence` | 1 | No benchmarks, profiler, or allocation evidence |
+
+**Core issue:** The struct makes illegal states representable. All four state-encoding fields (`status`, `is_validated`, `is_sent`, `sent_at_epoch_ms`) should be collapsed into a single `MetricState` enum with typed payloads enforcing transitions.

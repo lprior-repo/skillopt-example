@@ -1,0 +1,18 @@
+Now I understand the issues. The source has:
+1. `.unwrap()` - forbidden
+2. No empty input check
+3. No `max_items` enforcement
+4. No `try_reserve` for allocation discipline
+
+Let me fix the source:
+All 4 tests pass. Now let me write the required output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| ParseError::Invalid)?` |
+| No empty input check | Early return `Err(ParseError::Empty)` |
+| No `max_items` enforcement | Guard before push → `Err(ParseError::TooMany)` |
+| `Vec::with_capacity` / unbounded alloc | `Vec::new` + `try_reserve` → `Err(ParseError::Allocation)` |
+
+All 4 behavior tests pass. JSON output written to `repair-output.json`.

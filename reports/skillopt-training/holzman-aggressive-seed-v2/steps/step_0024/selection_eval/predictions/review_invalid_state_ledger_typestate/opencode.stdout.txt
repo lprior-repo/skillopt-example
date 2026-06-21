@@ -1,0 +1,14 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with 7 findings and 4 missing evidence items.
+
+**Summary of violations found in `src/lib.rs`:**
+
+| # | Severity | Rule | Line |
+|---|----------|------|------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | 1 | `String` status + `bool` flags allow arbitrary invalid state combinations |
+| 2 | BLOCKER | no_primitive_obsession | 3 | `status: String` has no domain semantics — any arbitrary string accepted |
+| 3 | BLOCKER | bool_lifecycle_flags | 4 | `is_validated: bool` + `is_sent: bool` create 4-state combinatorial space with unenforced invariants |
+| 4 | MAJOR | functional_core_purity | 9 | `mark_sent` mutates struct in-place instead of returning a new typed state |
+| 5 | MAJOR | allocation_without_try_reserve | 10 | `"sent".to_string()` allocates on every call; enum would eliminate this |
+| 6 | MINOR | public_fields_no_encapsulation | 2 | All fields `pub` — callers bypass domain constructors entirely |
+| 7 | MINOR | sent_at_epoch_ms_should_be_newtype | 6 | Raw `u64` for domain timestamp lacks type-level time-unit semantics |

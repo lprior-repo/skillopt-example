@@ -1,0 +1,22 @@
+Now I understand the issues. The test expects `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function to exist. The current implementation has multiple Holzman violations: `unwrap()`, no empty check, no overflow detection, no invalid line handling, and returns `String` instead of `Summary`.
+Now I'll apply the repair following the Holzman recipes exactly.
+Wait, I need to simplify the `_name` handling to match the recipe pattern properly.
+All 6 tests pass. Now run the remaining verification gates.
+No assertion/unreachable macros in production code. Now writing the required output.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+**Violations removed:**
+- `unwrap()` on parse → `map_err(|_| SummaryError::Invalid)`
+- Unchecked indexing `parts[1]` → `split_once(',')`
+- Unchecked `+` on total → `checked_add`
+- Unchecked `+` on count → `checked_add`
+- Lossy `count as u32` → `u32::try_from(count)`
+- Unchecked division `total / count` → `checked_div`
+
+**Contract changes to match tests:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- Added `render_summary(Summary) -> String` for formatting
+- Empty input returns `Err(SummaryError::Empty)`
+- Invalid lines (missing comma, bad parse) return `Err(SummaryError::Invalid)`
+
+**All 6 behavior tests pass, `cargo fmt --check` clean, no assertions/unreachable in production code.**

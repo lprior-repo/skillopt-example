@@ -1,0 +1,19 @@
+Now I have the full picture. The crate is `review_invalid_state_sample_typestate` with a single `src/lib.rs`. This is a typestate violation sample. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**8 findings across `src/lib.rs`** — this is a textbook invalid-state typestate sample:
+
+| Severity | Rule | Line | Issue |
+|----------|------|------|-------|
+| BLOCKER | `typestate_enum_machine` | 1 | Flat struct instead of state machine enum |
+| BLOCKER | `status_string` | 3 | `status: String` allows arbitrary invalid values |
+| BLOCKER | `bool_lifecycle` | 4 | Independent booleans encode contradictory lifecycles |
+| BLOCKER | `option_invalid_state_combinations` | 6 | `Option<u64>` decoupled from `is_sent` flag |
+| MAJOR | `newtype_domain_ids` | 2 | `id: String` lacks domain newtype wrapping |
+| MAJOR | `parse_boundary` | 1 | No smart constructor; raw primitives cross boundary |
+| MAJOR | `unbounded_state_transition` | 9 | `mark_sent` ignores current state entirely |
+| MAJOR | `pub_fields_no_encapsulation` | 2 | All fields pub, enabling arbitrary mutation |
+
+**5 missing evidence items**: no benchmarks, profiler data, allocation audit, second-ring evidence, or command execution.
+
+**Residual risk**: All illegal state combinations are representable and mutable. No type-level enforcement of the Pending -> Validated -> Sent lifecycle.

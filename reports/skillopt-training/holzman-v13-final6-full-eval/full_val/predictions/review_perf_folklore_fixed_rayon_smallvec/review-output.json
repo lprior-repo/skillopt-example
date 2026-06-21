@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-input-rayon-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO suggests using Rayon and SmallVec for a [u8; 4] input based on folklore, not measurement. Rayon parallel overhead dwarfs any benefit for 4 elements. SmallVec is unnecessary when the collection size is statically known to be 4.",
+      "failure_mode": "Adding Rayon creates thread-pool task dispatch overhead that makes the function slower by orders of magnitude for 4-element inputs. SmallVec's inline capacity of 4 would not meaningfully reduce allocations over Vec for a known-4-size result and adds type complexity with no measured benefit.",
+      "fix": "Remove the Rayon/SmallVec TODO. For a fixed 4-element input, return [\"&'static str; 4] directly so the caller owns a stack-allocated array with zero heap allocation, or use a caller-provided mutable output buffer. Only consider SmallVec if profiling proves Vec is a bottleneck on a hot path with variable-length inputs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation-discipline-tiny-fixed",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Returns Vec<&'static str> for a fixed 4-element input, forcing a heap allocation on every call. The size is statically known; collecting into Vec is unnecessary memory traffic.",
+      "failure_mode": "Every call to classify_four allocates a new Vec on the heap, triggering allocator work, cache pollution, and potential allocation failure. In a hot path called millions of times per second, this allocation churn becomes a measurable bottleneck.",
+      "fix": "Return [&'static str; 4] instead of Vec<&'static str>. Replace the iterator chain with a fixed array assignment: let mut out = [\"even\"; 4]; for i in 0..4 { out[i] = if bytes[i] & 1 == 0 { \"even\" } else { \"odd\" }; }; out"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "performance-claim-traceability",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No benchmark, baseline, target hardware, workload, input distribution, or threshold exists for the performance claim implied by the TODO. The claim that Rayon/SmallVec will be faster is unmeasured folklore.",
+      "failure_mode": "Optimizing without measurement leads to worse performance. Rayon scheduling overhead for 4 elements is guaranteed to be slower than serial iteration. SmallVec adds indirection for a fixed 4-element case without measured benefit. Changes made on folklore produce regressions.",
+      "fix": "Delete the TODO entirely. If a performance concern is real, add a benchmark in benches/ with workload definition, baseline measurement, target hardware, and regression threshold. Only then consider alternatives, and only if measurement proves them faster."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark suite exists in the crate. The function classify_four is a candidate for performance work but has no benches/ directory, no benchmark targets, and no baseline numbers.",
+      "failure_mode": "Without benchmark evidence, any change to this function's implementation is blind. There is no way to verify correctness of performance claims, detect regressions, or establish acceptable variance thresholds.",
+      "fix": "Create benches/classify_four.rs with criterion or similar benchmark harness. Measure baseline with the current Vec implementation on representative inputs, then re-measure after any optimization. Report p50/p95/p99 latency or operations/sec with workload and hardware documentation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "todo-must-not-suggest-unmeasured-change",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment prescribes a specific optimization (Rayon + SmallVec) that violates the absolute law: no unmeasured performance changes. TODOs should describe what to fix, not prescribe how, especially when the prescription is folklore-based.",
+      "failure_mode": "A future implementer follows the TODO literally, adding rayon and smallvec dependencies and introducing parallel overhead for a 4-element workload, degrading performance while adding dependency surface.",
+      "fix": "Replace the TODO with a measurement-driven observation: 'TODO: benchmark classify_four hot path to determine if stack-allocated [&str; 4] output is warranted, or if Vec is acceptable for the expected call frequency and payload size.'"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "index-check-iter-over-array",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Uses .iter().map() on a [u8; 4] which creates an iterator with no static bounds guarantee visible to the reader. While the array size is known at compile time, the iterator chain obscures the fixed-size nature.",
+      "failure_mode": "The iterator abstraction hides the fact that exactly 4 items will be produced. This makes the code harder to reason about for bounded-control-flow analysis and prevents the compiler from unrolling the loop as effectively as a for loop or array destructuring.",
+      "fix": "Use a bounded explicit for loop over indices 0..4, or array destructuring, to make the fixed iteration count explicit in the source. This aids static analysis and enables better unrolling."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo check, clippy, or test evidence exists for the crate. The source has a TODO but no tests, examples, or CI configuration to validate behavior or prevent regressions.",
+      "failure_mode": "Changes to classify_four could silently break behavior. Without tests or compilation gates, there is no automated safety net for correctness or style violations.",
+      "fix": "Add at least one test: #[cfg(test)] mod tests { #[test] fn classify_four_evens() { assert_eq!(classify_four(&[0u8; 4]), vec![\"even\", \"even\", \"even\", \"even\"]); } }"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four performance claims",
+    "no profiler evidence identifying classify_four as a bottleneck",
+    "no allocation tracing (e.g., afl fuzz + jemalloc profiling) to quantify per-call heap cost",
+    "no second-ring assembly evidence to verify bounds-check removal or vectorization",
+    "no baseline command output or regression threshold documented",
+    "no workload definition specifying expected call frequency and input distribution",
+    "no tests exist for classify_four to prevent behavioral regression"
+  ],
+  "residual_risk": "Static review only. No commands were run (cargo check/clippy/test/benchmark). The core finding is that the TODO comment prescribes unmeasured optimizations (Rayon, SmallVec) for a 4-element fixed input, which is guaranteed folklore-based degradation. The recommended fix (return [&'static str; 4]) eliminates heap allocation entirely and removes the folklore trap. Risk is mitigated by the simplicity of the code and the clarity of the fix, but unconfirmed without running cargo fmt --check, cargo check, cargo clippy, and cargo test."
+}

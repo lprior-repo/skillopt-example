@@ -1,0 +1,118 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any file error (not found, permissions, I/O).",
+      "failure_mode": "untrusted file path aborts the entire process instead of returning a typed error the caller can handle.",
+      "fix": "return Result<Vec<Record>, LoadError> and use .map_err(|e| LoadError::Io(e)) to surface I/O failures."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value in the second CSV field.",
+      "failure_mode": "malformed CSV line with non-numeric value in column 2 aborts the entire batch instead of returning a typed parse error.",
+      "fix": "use .parse::<u32>().map_err(|_| LoadError::Invalid(line_num)) and return Result<Vec<Record>, LoadError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 conversion after parse silently truncates values > 65535.",
+      "failure_mode": "a valid u32 like 70000 parses successfully then truncates to 4448, producing silently corrupt domain data.",
+      "fix": "use u16::try_from(parsed_u32).map_err(|_| LoadError::Overflow(line_num)) to reject out-of-range values."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing into a split result collected into Vec.",
+      "failure_mode": "a CSV line with fewer than 2 fields (empty line, trailing newline, malformed row) panics via index-out-of-bounds.",
+      "fix": "use split_once(',') and match on Some((name, value_str)) with .ok_or(LoadError::Invalid(line_num))."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_separation",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds side-effecting I/O inside the parsing/mapping closure.",
+      "failure_mode": "pure data-loading function leaks console I/O into the functional core, making the function non-deterministic, untestable in isolation, and impossible to use in contexts where stdout capture or silence is required.",
+      "fix": "remove println entirely from the pure path. If logging is needed, return a separate log/warning type or push it into the shell layer after load_sessions returns."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions fuses file I/O (fs::read_to_string), parsing (split/collect), domain construction (Record), and side-effecting I/O (println) into a single function.",
+      "failure_mode": "no separation of concerns prevents testing pure parsing independently of filesystem state; callers cannot substitute in-memory data, mock files, or reuse the parsing logic without triggering disk access.",
+      "fix": "split into (1) fn parse_record(line: &str) -> Result<Record, ParseError> for pure logic and (2) fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError> for shell work that reads the file and calls parse_record."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_try_reserve",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::with_capacity is absent; split+collect creates intermediate Vec with unbounded allocation from untrusted file content.",
+      "failure_mode": "a file with millions of lines or extremely long lines allocates unbounded heap memory, enabling OOM DoS from hostile input.",
+      "fix": "validate line count against a trusted cap before allocation; use iter().map(...).try_reserve(cap).map_err(...); then collect into Vec, or use a streaming approach."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "split_once_mandatory",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() allocates a Vec for all CSV fields and trims every one, when only two fields are needed.",
+      "failure_mode": "unnecessary heap allocation per line plus allocation of trimmed copies for every field, even unused ones; also splits on ALL commas so a name containing commas corrupts the record.",
+      "fix": "use let (name, value_str) = line.split_once(',').ok_or(ParseError::Invalid) then parse only value_str."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no error type; all failures are panics (unwrap, indexing, cast).",
+      "failure_mode": "callers cannot distinguish file-not-found from malformed data from numeric overflow, preventing targeted recovery or reporting.",
+      "fix": "define enum LoadError { Io(std::io::Error), Invalid(usize), Overflow(usize) } and return Result<Vec<Record>, LoadError>."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "raw_primitive_domain_state",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record::name is a raw String with no invariants enforced by the type system.",
+      "failure_mode": "any code can create Record with empty, whitespace-only, or otherwise invalid names, making illegal domain states representable.",
+      "fix": "use a Name newtype with a smart constructor: struct Name(String); impl Name { fn new(s: &str) -> Result<Self, ParseError>; }"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmarks, baseline measurements, or profiler evidence exist for load_sessions performance characteristics.",
+      "failure_mode": "performance claims about this function are unsubstantiated; unbounded allocation on hostile input is unquantified.",
+      "fix": "add criterion or similar benchmarks measuring I/O latency, per-line parsing throughput, and allocation profiles across small/large/hostile inputs."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or allocation",
+    "no baseline measurement for file size vs allocation profile",
+    "no profiler data (flamegraph, heaptrack, or similar) on current implementation",
+    "no second-ring evidence: no Miri, Kani, or loom runs for UB/concurrency concerns in file I/O paths",
+    "no command evidence: cargo fmt --check, cargo clippy, cargo check, cargo test were not run (review-only mode, no edit permission)"
+  ],
+  "residual_risk": "Static review only. Every function in this crate violates absolute laws (unwrap, unchecked indexing, lossy cast, hidden I/O, fused shell/core). No commands were run. A full Holzman-compliant rewrite would need: typed errors, split_once parsing, remove all unwrap/panic, remove println from pure path, introduce newtypes, bounded allocation with try_reserve, and separate pure parser from I/O shell. Without running cargo check/clippy/test, no guarantee of compile-correctness or test coverage."
+}

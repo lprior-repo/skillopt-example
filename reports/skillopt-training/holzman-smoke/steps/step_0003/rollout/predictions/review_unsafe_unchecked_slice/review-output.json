@@ -1,0 +1,49 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Production `unsafe` block using `get_unchecked` for slice bounds",
+      "failure_mode": "Caller-supplied `start` and `len` are never validated; if `start + len > input.len()` the function returns a dangling or out-of-bounds slice, causing UB on any subsequent read. If `start + len` overflows, the range wraps to a small valid range, silently returning wrong data instead of an error.",
+      "fix": "Remove `unsafe`. Use `input.get(start..start + len).ok_or(Error::OutOfBounds) {..}` or a fallible constructor that returns a typed error, and use `start.checked_add(len).ok_or(Error::Overflow) {..}` before the bounds check."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Unchecked `usize` addition `start + len` can silently overflow",
+      "failure_mode": "When `start + len` exceeds `usize::MAX`, it wraps to a small value, producing a valid-but-wrong slice range. No panic, no error — just silently incorrect memory access.",
+      "fix": "Replace `start + len` with `start.checked_add(len).ok_or(Error::ArithmeticOverflow)?` before computing the range."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional-core-performance",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No `try_reserve`, no error handling for any caller-side allocation path; raw `usize` params with no domain newtypes",
+      "failure_mode": "The `field` function is a raw utility with no invariants encoded in types. Callers can pass any `(usize, usize)` pair; the function silently trusts them and propagates UB. No domain newtypes for offset or length means no compile-time guarantee that these values represent valid slice coordinates.",
+      "fix": "Introduce `newtype` wrappers for `Offset` and `Length` with validated constructors. Return `Result<&[u8], FieldError>` instead of a bare `&[u8]`. Replace the entire body with safe `get` + `checked_add` + error conversion."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this crate",
+      "failure_mode": "Any performance claim (or decision to use `unsafe` for speed) is unsubstantiated. The safe equivalent may already be fast enough on modern CPUs, or the unsafe path may not matter at the actual workload.",
+      "fix": "Add a `criterion` benchmark comparing the unsafe `get_unchecked` path against the safe `checked_add + get + ok_or` path across representative input sizes."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to justify or measure the unsafe `get_unchecked` path",
+    "no profiler data showing this function is a hot path",
+    "no allocation analysis — no `try_reserve` or allocation budget evidence",
+    "no second-ring review or black-hat review artifact exists"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate contains an `unsafe` function that bypasses all bounds and arithmetic checks. Any use of `field()` in production code will cause UB on out-of-bounds or overflow inputs. The function must be replaced with a fallible safe alternative before any integration."
+}

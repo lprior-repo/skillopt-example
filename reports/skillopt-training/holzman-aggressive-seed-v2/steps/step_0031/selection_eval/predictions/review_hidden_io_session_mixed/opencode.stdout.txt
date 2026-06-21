@@ -1,0 +1,12 @@
+Review complete. Wrote `review-output.json` with **9 BLOCKER findings** and **6 missing evidence items**.
+
+Key violations found in `src/lib.rs`:
+- **Line 9**: `unwrap()` on I/O — panics instead of returning typed error
+- **Line 12-15**: `split(',') + collect()` + indexing — anti-pattern, unnecessary heap alloc
+- **Line 16**: `println!` hidden side effect in library code
+- **Line 16**: `parts[0]` unchecked indexing
+- **Line 19**: `parts[1]` unchecked indexing
+- **Line 19**: `.parse().unwrap()` panics on non-numeric input
+- **Line 19**: `as u16` lossy width-reducing cast instead of `try_from`
+- **Line 8**: I/O mixed with parsing — no functional core / imperative shell split
+- **Line 8**: `Vec<Record>` return type with no error propagation

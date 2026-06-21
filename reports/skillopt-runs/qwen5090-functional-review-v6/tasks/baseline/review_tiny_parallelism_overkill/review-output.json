@@ -1,0 +1,80 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/runtime-performance-architecture.md",
+    "references/zero-cost-abstractions.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "concurrency_budget / holzman-rust: no_rayon_without_scaling_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment states 'Future speedup: replace this with Rayon and SmallVec.' Rayon scheduling overhead for 4 elements will be orders of magnitude slower than the sequential path. This comment actively misleads future developers toward a performance regression, violating the concurrency budget rule that parallelism must have scaling evidence and that Rayon is rejected without measured proof.",
+      "failure_mode": "Performance regression: task creation, work-stealing scheduler overhead, and thread synchronization for 4 items will dominate execution time by 100x-1000x over sequential iteration. The code path is hot-path-critical (input size fixed at 4), and the comment guarantees wrong optimization decisions.",
+      "fix": "Remove the Rayon suggestion entirely. For this workload, parallelism is an anti-pattern. The comment should be deleted or rewritten to note that sequential iteration is already optimal for this input size."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "allocation_budget / zero-cost-abstractions: no_unjustified_alloc",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function signature returns `Vec<&'static str>` for a fixed 4-element input, guaranteeing a heap allocation on every call. The comment also proposes SmallVec but pairs it with Rayon, conflating two orthogonal issues. For known-size-small outputs, `ArrayVec<[&'static str; 4]>` or `SmallVec<[&'static str; 4]>` provides zero-heap-allocation without any parallelism.",
+      "failure_mode": "Per-call heap allocation and deallocation. Allocator contention, pointer chasing for the Vec buffer, and cache pollution from heap churn. For a function called with fixed 4-element input, this is a guaranteed hot-path allocation with zero justification.",
+      "fix": "Change return type to `ArrayVec<[&'static str; 4]>` (from `arrayvec` crate) or `SmallVec<[&'static str; 4]>` to eliminate all heap allocations for this fixed-size output. Inline capacity is exactly 4, matching the input size."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "storage_placement / latency-throughput-playbook: measured_choice",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Return type uses heap allocation (`Vec`) without any measured evidence or budget statement. The storage placement decision (heap Vec for 4 items) is not justified and is demonstrably suboptimal compared to stack-backed alternatives for this input/output shape.",
+      "failure_mode": "Unnecessary heap allocation per call, increased GC pressure for the allocator, cache line pollution from heap buffer management, and degraded p99 latency from allocator lock contention in multi-threaded contexts.",
+      "fix": "Use `ArrayVec<[&'static str; 4]>` or `SmallVec<[&'static str; 4]>` as the return type. This is a measured-choice decision: stack-backed inline storage for known-small output with zero heap pressure."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "benchmark_proof / holzman-rust: no_performance_claim_without_benchmark",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The crate has a comment claiming a 'speedup' via Rayon, which is a performance claim direction. No benchmark target, no baseline numbers, no profiler evidence, and no acceptance threshold exist in this crate. The Cargo.toml has no dev-dependencies including no criterion, no iai-callgrind, and no benchmark target.",
+      "failure_mode": "Optimization decisions made without evidence. Future developers following the comment will introduce a Rayon dependency and measurable slowdown with no benchmark to detect or prevent the regression.",
+      "fix": "Add a criterion benchmark targeting `classify_four` with representative inputs. Establish baseline before any optimization. Remove the misleading comment immediately."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "pinned_nightly_required / holzman-rust: rust_toolchain_missing",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `rust-toolchain.toml` exists in the crate. The Holzman Rust skill requires a checked-in pinned nightly toolchain for any Rust work. Without it, compiler versions, lint behavior, and feature availability are floating and unbounded.",
+      "failure_mode": "Build reproducibility risk: clippy warnings, fmt formatting, and lint severity can change between Rust releases. Performance-relevant codegen optimizations vary by compiler version.",
+      "fix": "Add a `rust-toolchain.toml` with a pinned dated nightly channel, minimal profile, and the required components (rustfmt, clippy, rust-src, llvm-tools-preview)."
+    },
+    {
+      "severity": "ERROR",
+      "rule": "power10_short_functions / holzman-rust: function_size",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "While the function is short (6 lines), the comment on line 2 represents a design decision embedded in production source code that should not be in a hot path. The comment is not documentation of invariants or behavior; it is an optimization roadmap that pollutes the source and will mislead.",
+      "failure_mode": "Source code noise that encodes incorrect optimization advice. Future code reviewers and automated tools may misinterpret the comment as an intentional design direction.",
+      "fix": "Remove the comment entirely. If optimization roadmap is needed, place it in task tracking or design docs, not in production source code."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmark target exists (no [bench] section in Cargo.toml, no criterion or iai-callgrind dependency, no benches/ directory)",
+    "No profiler evidence (no flamegraph, perf stat, samply, or DHAT data for the function)",
+    "No workload definition (no stated input distribution, hot path frequency, latency target, or throughput target)",
+    "No `rust-toolchain.toml` file (pinned nightly not present)",
+    "No `rust-toolchain.toml` with allowlisted features for portable_simd or try_blocks",
+    "No `cargo fmt --check` evidence",
+    "No `cargo clippy` evidence",
+    "No `cargo test` evidence",
+    "No assembly or LLVM IR evidence for the hot path function",
+    "No allocation count or allocation budget for the function"
+  ],
+  "residual_risk": "The crate compiles cleanly in its current form but contains a misleading comment that actively promotes a performance regression (Rayon for 4 elements). The absence of benchmarks, profiler evidence, workload definitions, and a pinned toolchain means no performance or safety claims can be verified. The primary risk is that future developers will follow the comment and introduce Rayon, causing severe performance degradation on a function that should return `ArrayVec` or `SmallVec` for zero-allocation behavior. All Holzman Rust gates (zero-slippage nightly, correctness, performance) are unexecutable without benchmarks and toolchain pinning."
+}

@@ -1,0 +1,107 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [".skill/holzman-rust/SKILL.md", ".skill/holzman-rust/references/functional-core-performance.md", ".skill/holzman-rust/references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (file not found, permission denied, etc.)",
+      "failure_mode": "Untrusted or missing file path causes a panic instead of returning a typed error, violating the no-unwrap rule and crashing the entire program",
+      "fix": "Use fs::read_to_string(path).map_err(|e| IOError(e))? or return a typed IOError variant from a custom Result type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) performs I/O (stdout) inside what should be a parsing/data-loading function; also uses unchecked indexing parts[0]",
+      "failure_mode": "Hidden side effect violates functional-core/imperative-shell separation. If a line has no comma, parts[0] is fine but this pattern encourages unchecked indexing; more critically, println! breaks purity and makes the function non-deterministic and non-testable",
+      "fix": "Remove println! entirely from the core path. If logging is needed, return the parsed data and let the shell layer handle logging. Use split_once(',') for the first delimiter extraction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on parse result panics on invalid numeric input",
+      "failure_mode": "Malformed CSV data (non-numeric second field) causes a panic instead of a typed parse error, violating the no-unwrap rule",
+      "fix": "Use parts.get(1).ok_or(ParseError(MissingField))? then .parse::<u32>().map_err(ParseError::InvalidNumber)? with a typed error type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 — lossy widening/narrowing cast from u32 to u16 silently truncates values outside u16 range",
+      "failure_mode": "Any parse result > 65535 silently wraps, corrupting data. This is an unchecked lossy conversion, directly forbidden by Holzman Rust rules",
+      "fix": "Use u16::try_from(parsed_u32).map_err(|_| Error::ValueOutOfBounds) to reject out-of-range values with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexing into Vec<String> produced by split/collect",
+      "failure_mode": "If the line is empty, parts[0] panics with index out of bounds",
+      "fix": "Use split_once(',') and handle the None case, or use parts.first().ok_or(ParseError(MissingField))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing into Vec<String> produced by split/collect",
+      "failure_mode": "If the line has fewer than 2 comma-separated fields, parts[1] panics with index out of bounds",
+      "fix": "Use split_once(',') to extract exactly two fields, returning a typed error when the second field is missing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions mixes I/O (fs::read_to_string), logging (println!), and data parsing in a single function that returns Vec<Record>",
+      "failure_mode": "Violates functional-core/imperative-shell: the function cannot be tested deterministically, cannot separate error handling, and couples parsing logic to filesystem and stdout I/O",
+      "fix": "Extract a pure parse_record(line: &str) -> Result<Record, ParseError> function. Have load_sessions call parse_record in a loop, handling I/O errors at the boundary with a typed Result return"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "parsing_pattern",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Uses line.split(',').map(...).collect() to produce a Vec<String>, then indexes into it, instead of using split_once for the known two-field structure",
+      "failure_mode": "Allocates intermediate Vec and String copies unnecessarily. split + collect + indexing is the anti-pattern the Holzman skill explicitly forbids when split_once suffices",
+      "fix": "Use line.split_once(',').ok_or(ParseError(MissingDelimiter)) to extract name and value_str, then parse value_str directly"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "error_type_absence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No custom error type exists; function returns Vec<Record> with no Result wrapper",
+      "failure_mode": "All errors must panic (unwrap). The function cannot propagate typed errors for I/O failures, parse failures, or out-of-range values",
+      "fix": "Define a RecordError enum (IOError, ParseError, ValueOutOfBounds, MissingField) and change the return type to Result<Vec<Record>, RecordError>"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmarks exist for load_sessions or any performance claim",
+      "failure_mode": "No measurable baseline or throughput claim can be validated; performance regression risk is unmeasured",
+      "fix": "Add a criterion or similar benchmark comparing this implementation against a split_once-based, checked-arithmetic version"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_test_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module, no tests directory, no behavior tests exist",
+      "failure_mode": "No test coverage at all — any change can silently break parsing, error handling, or type invariants without detection",
+      "fix": "Add tests for: valid CSV lines, missing delimiter, non-numeric value, out-of-range value (>65535), empty file, and missing file"
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for load_sessions or any stated performance claim", "no profiler evidence for allocation hot paths", "no allocation analysis (no valgrind/alloc-trace/criterion allocation data)", "no second-ring evidence (no assembly output, no SBOM, no release-provenance data)", "no command-line interface entry point or binary target defined"],
+  "residual_risk": "High — the entire crate panics on any malformed input, missing file, or out-of-range value due to repeated unwrap() usage. Lossy as u16 silently truncates data. No error types, no tests, no benchmarks exist. The function violates functional-core/imperative-shell by embedding I/O (fs, println) and parsing in one monolithic function. All 6 core Holzman violations (unwrap, lossy cast, unchecked indexing, hidden I/O, no typed errors, anti-pattern parsing) are present and unmitigated."
+}

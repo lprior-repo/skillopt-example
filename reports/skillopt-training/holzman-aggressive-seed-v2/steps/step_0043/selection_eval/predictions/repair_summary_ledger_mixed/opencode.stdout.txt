@@ -1,0 +1,12 @@
+Now I have the full picture. The code has multiple Holzman violations: unchecked indexing, `unwrap`, unchecked arithmetic, missing `render_summary`, and wrong return type. Let me fix it.
+All 6 tests pass, zero forbidden constructs remain. Writing output.
+Repair complete. All 6 tests pass. Changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- **Added `render_summary`**: formats `Summary` into the expected string
+- **`split_once`**: replaced `split(',')+collect()+parts[1]` (unchecked indexing) with `line.split_once(',')`
+- **Checked arithmetic**: `checked_add` for total/count, `checked_div` for average
+- **Checked conversion**: `u32::try_from(count)` instead of `count as u32`
+- **Error propagation**: `.map_err(|_| SummaryError::Invalid)` replaces `.unwrap()`
+- **Empty check**: early return on empty input
+- **Overflow detection**: `checked_div` handles the max-u64 + 1 overflow case

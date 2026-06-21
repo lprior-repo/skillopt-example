@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a freeform String instead of an enum typestate. Any string value (\"\", \"deleted\", \"corrupted\", or any future value) is structurally valid, so the compiler cannot enforce the domain lifecycle.",
+      "failure_mode": "Downstream code may branch on unexpected status strings, silently mishandle shards, or produce corrupted lineage. Invalid state transitions are silently accepted at compile time.",
+      "fix": "Replace `pub status: String` with `pub status: ShardStatus` where `ShardStatus` is an enum with exactly the permitted lifecycle variants (e.g. `Pending`, `Validated`, `Sent`). Remove `is_sent` entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Two independent bool flags `is_validated` and `is_sent` represent a 4-state Boolean cartesian product, but the domain only allows a subset (e.g. sent without validated is illegal). No invariant enforcement at the type level.",
+      "failure_mode": "The state {is_validated: false, is_sent: true} is constructable and represents an illegal lifecycle transition (shard sent before validation). No compile-time or runtime gate catches this.",
+      "fix": "Collapse `is_validated: bool` and `is_sent: bool` into a single `status: ShardStatus` enum typestate that encodes the legal transitions and makes illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`id` is a raw `String` with no domain constraints. Shard identifiers may have format, length, or uniqueness invariants that are entirely unenforced.",
+      "failure_mode": "Empty, malformed, or duplicate shard IDs are silently accepted. No type-level guarantee that ids are non-empty, properly formatted, or unique within a scope.",
+      "fix": "Introduce `pub id: ShardId` as a newtype struct wrapping `String` with a fallible constructor that validates format and non-emptiness, returning a domain error on invalid input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_model",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` is a free function that mutates a struct by reassigning `status` to the literal string \"sent\" and setting `is_sent = true` separately. This dual-update is error-prone and the string literal \"sent\" is not connected to any type.",
+      "failure_mode": "If the string literal changes, or if a future developer adds another lifecycle stage, the dual-update pattern will drift. The function can be called on a shard that was never validated because the type offers no guard.",
+      "fix": "Replace with a method or constructor on the typed state machine: `ShardStatus::Sent::from_validated(validated_shard)` or similar, so the transition is only available from the correct preceding state."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "type_discipline_parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "No validation constructor on `ShardWorkflow`. The struct exposes all fields as `pub`, allowing callers to construct any invalid combination without a factory gate.",
+      "failure_mode": "Callers can `ShardWorkflow { id: \"\".into(), status: \"\".into(), is_validated: false, is_sent: true, sent_at_epoch_ms: None }` and the compiler will not complain.",
+      "fix": "Make all fields `pub(crate)` or private, and provide a single fallible constructor `ShardWorkflow::new(...)` that validates invariants and returns a typed domain error."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`mark_sent` creates a new String via `.to_string()` for the \"sent\" literal on every call, even though the value is a known constant.",
+      "failure_mode": "Unnecessary heap allocation on every invocation. For a hot path this adds measurable latency and allocation pressure.",
+      "fix": "Use a `ShardStatus` enum (which is zero-cost, stack-only) instead of `String`. If a String must remain, use `&'static str` for constant status labels."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` performs a state mutation (`item.status = \"sent\".to_string()`) that mixes domain transition logic with imperative field assignment rather than expressing the transition as a pure function from one valid typestate to another.",
+      "failure_mode": "The mutation pattern makes it harder to reason about invariants and harder to test the pure transition logic independently of the struct layout.",
+      "fix": "Define `mark_sent` as a pure function that takes a validated `ShardWorkflow` and returns a new `ShardWorkflow` with the typed `ShardStatus::Sent`, or better yet, make it a method on the validated typestate variant."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for `mark_sent` or any lifecycle transition",
+    "no profiler data for allocation hot spots in the shard workflow pipeline",
+    "no allocation audit (no `try_reserve`, no allocation budget analysis)",
+    "no second-ring evidence (no fuzzing, property tests, or Kani proofs of state machine invariants)",
+    "no command-level evidence (no cargo test, cargo clippy, or cargo bench runs documented)"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate compiles but has fundamental type-level violations that make illegal shard states constructable at compile time. The dual bool flags and raw String status create a state space that exceeds the domain's legal transitions. Without enum typestates and a factory constructor, no amount of runtime testing can guarantee the invariant that sent shards were always validated. The missing evidence gates (benchmarks, allocation analysis, formal/state-machine proofs) leave performance and correctness claims unsubstantiated."
+}

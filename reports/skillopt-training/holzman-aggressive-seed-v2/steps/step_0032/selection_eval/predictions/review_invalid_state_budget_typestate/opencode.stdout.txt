@@ -1,0 +1,16 @@
+Now I have all the source. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (7 total):**
+
+| # | Severity | Rule | Key Issue |
+|---|----------|------|-----------|
+| 1 | BLOCKER | `make_illegal_states_unrepresentable` | Primitive `String` status + `bool` flags allow illegal states |
+| 2 | BLOCKER | `typestate_enforcement` | Lifecycle (Draft→Validated→Sent) not enforced by types |
+| 3 | BLOCKER | `consistent_state_update` | `mark_sent` doesn't set `sent_at_epoch_ms` — inconsistent state |
+| 4 | BLOCKER | `no_public_mutable_fields` | All fields public, invariants bypassable externally |
+| 5 | BLOCKER | `primitive_obsession` | `id: String` missing `BudgetId` newtype |
+| 6 | WARNING | `functional_core_purity` | Unnecessary `.to_string()` allocation per call |
+| 7 | INFO | `missing_benchmark` / `missing_command_evidence` | No benchmarks, tests, or CI evidence |
+
+**Residual risk:** Illegal states are fully constructible and undetectable. No enum-based typestates, no validated constructor, no behavioral tests. The `mark_sent` function produces internally inconsistent state.

@@ -1,0 +1,137 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unwrap-io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permissions, disk full).",
+      "failure_mode": "untrusted file path aborts the entire process instead of returning a typed error the caller can handle or retry.",
+      "fix": "Return Result<Vec<Record>, PacketError::Io> and use fs::read_to_string(path).map_err(|e| PacketError::Io(e))?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-hidden-io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds console I/O inside a data-parsing function that should be pure.",
+      "failure_mode": "Side-effecting shell logic fused into the functional core makes the parsing non-deterministic, non-reproducible, and impossible to test without capturing stdout. Violates Functional Core / Imperative Shell.",
+      "fix": "Remove println! entirely. Move all I/O (file reads, logging) to the imperative shell layer. Core parsing must be a pure function."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unchecked-indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] indexes into a Vec created from split without bounds checking.",
+      "failure_mode": "Empty line or malformed line causes IndexOutOfBoundsException (panic), crashing the process on hostile input.",
+      "fix": "Use parts.get(0).ok_or(PacketError::Invalid(\"missing name\"))?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unchecked-indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] indexes into split output without bounds checking.",
+      "failure_mode": "Single-field line (no comma) causes index-out-of-bounds panic on hostile input.",
+      "fix": "Use parts.get(1).ok_or(PacketError::Invalid(\"missing value\"))?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unwrap-parse",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on any non-numeric string (e.g. \"abc\", \"\", overflow).",
+      "failure_mode": "Malformed CSV data crashes the process instead of returning a typed parse error the caller can reject gracefully.",
+      "fix": "Use parts[1].trim().parse::<u32>().map_err(|_| PacketError::Invalid(\"non-numeric value\"))?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-lossy-cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "(...parse::<u32>().unwrap()) as u16 performs a lossy narrowing conversion without bounds check.",
+      "failure_mode": "Values in [65536, 4294967295] silently truncate to u16 range, corrupting data without error. Illegal values become representable.",
+      "fix": "Use u16::try_from(parsed_u32).map_err(|_| PacketError::Overflow(\"value exceeds u16 max\"))?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-typed-error-taxonony",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no Result wrapper — every internal error is a panic.",
+      "failure_mode": "Caller cannot distinguish between IO failure, parse error, overflow, or allocation failure. All manifest as panics.",
+      "fix": "Declare pub fn load_packets(path: &str) -> Result<Vec<Record>, PacketError> with an enum covering Io, Invalid, Overflow, and Allocation variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-raw-primitive-domain-state",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record.name is a raw String — no domain invariants, no newtype, no smart constructor.",
+      "failure_mode": "Empty, whitespace-only, or otherwise invalid names are silently accepted. The domain has no protection against illegal name values.",
+      "fix": "Use a Name newtype struct with a smart constructor that validates non-empty/trimmed input, or use NonEmptyString from a crate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unbounded-allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates an unbounded Vec<String> with no max_items cap and no try_reserve.",
+      "failure_mode": "A single enormous line (or many lines) can allocate arbitrary heap memory, enabling OOM attacks on untrusted input.",
+      "fix": "Accept a max_items parameter, validate each line count against it, call values.try_reserve(max_items).map_err(|_| PacketError::Allocation)? before the loop, and enforce the cap before pushing."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split-once-for-one-separator",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "line.split(',').map(|part| part.trim().to_string()).collect() splits and allocates all fields when only two are needed.",
+      "failure_mode": "Creates intermediate Vec<String> for every line (unnecessary allocation), and any extra commas create extra unused entries rather than a clean two-field parse.",
+      "fix": "Use let (name, value) = line.split_once(',').ok_or(PacketError::Invalid(\"missing comma\"))?; then parse name.trim() and value.trim()."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-shell-separation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "File I/O (fs::read_to_string), console I/O (println!), parsing, and domain construction are all fused in one function.",
+      "failure_mode": "Violates Functional Core / Imperative Shell. The pure parsing logic cannot be unit-tested in isolation. Side effects make the function non-deterministic and untestable.",
+      "fix": "Split into: (1) shell fn load_packets(path) -> Result<Vec<Record>, PacketError> handling I/O, (2) pure fn parse_records(lines: &[str]) -> Result<Vec<Record>, PacketError> with no I/O."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this crate.",
+      "failure_mode": "Cannot verify performance claims or allocation behavior. Unbounded Vec allocation per line may be acceptable but unmeasured.",
+      "fix": "Add a criterion or custom benchmark measuring throughput and peak heap allocation for realistic input sizes."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No fmt, check, clippy, or test evidence exists for this crate.",
+      "failure_mode": "Cannot confirm the crate compiles cleanly under strict lint gates required by the Holzman Rust verification gate.",
+      "fix": "Run cargo fmt --check, cargo clippy with strict gates, and cargo test to produce command evidence."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_packets throughput or allocation",
+    "no profiler data to identify the actual bottleneck",
+    "no allocation measurement (no heaptrack/tickrs/bencher output)",
+    "no second-ring evidence (no Kani proof, no property tests, no Miri UB scan)",
+    "no clippy/cargo-check evidence under strict lint gates",
+    "no test suite evidence — no test files exist in the crate"
+  ],
+  "residual_risk": "Static review only with zero commands run. The crate contains 11 blockers including unwrap panics, unchecked indexing, lossy casts, hidden I/O, unbounded allocation, and no typed error taxonomy. This crate must be fully rewritten before any delivery gate can pass."
+}

@@ -1,0 +1,18 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 6 findings:
+
+**4 BLOCKERs:**
+1. **Illegal states representable** (`src/lib.rs:1`) — independent booleans + String allow any invalid combination
+2. **Primitive String status** (`src/lib.rs:3`) — no closed set of domain states
+3. **Core allocation** (`src/lib.rs:10`) — `"sent".to_string()` allocates in the pure core
+4. **Bool lifecycle** (`src/lib.rs:4`) — two independent flags, no workflow ordering
+
+**1 additional BLOCKER:**
+5. **sent_at_epoch_ms orphan** (`src/lib.rs:6`) — Option<u64> independent of is_sent
+
+**1 MAJOR:**
+6. **No state gating** (`src/lib.rs:9`) — mark_sent transitions from any state, no validation
+
+**Missing evidence:** no benchmark, profiler, allocation analysis, or second-ring/command evidence.
+
+Residual risk: all violations are structural, requiring a full refactor (enum typestates, pure return patterns, tied timestamp construction).

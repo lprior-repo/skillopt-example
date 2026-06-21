@@ -1,0 +1,72 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses pub status: String, pub is_validated: bool, pub is_sent: bool — any combination is constructible, including invalid ones like status='sent' with is_sent=false, or status='deleted' with is_sent=true. There is no enforced invariant between status and the boolean flags.",
+      "failure_mode": "Downstream code cannot assume status/flag consistency; bugs silently produce inconsistent ledger records that may pass through without detection, violating DDD invariants and making the state machine unrecoverable.",
+      "fix": "Replace status: String with an enum (e.g., enum LedgerStatus { New, Validated, Sent, Failed }) and remove is_sent/is_validated bools. Encode transitions as methods on the enum or a typestate struct that makes illegal states unconstructible."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_option_lifecycle_fields",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive boolean lifecycle flag. This is explicitly forbidden by the pre-commit safety audit — bool fields that encode state must be replaced with enums or typestates.",
+      "failure_mode": "Boolean flags can be set independently of other fields, creating inconsistent states. A ledger can appear both validated and unvalidated depending on which field is queried, leading to incorrect processing decisions.",
+      "fix": "Replace is_validated: bool and is_sent: bool with a single status enum that encodes the full lifecycle. The status enum itself is the single source of truth."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_string_lifecycle_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary string values ('sent', 'SENT', 'pending', 'foobar', '') that have no domain meaning. This is a primitive obsession — a string should not represent a typed domain concept.",
+      "failure_mode": "Typo in status comparison ('Sent' vs 'sent'), case-sensitivity bugs, and arbitrary invalid values all cause silent misrouting. String comparison is error-prone and unenforceable at compile time.",
+      "fix": "Replace with a sealed enum: enum LedgerStatus { New, Validated, Sent, Failed }. Use match/arm-based dispatch instead of string comparison."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_mark_sent_without_precondition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent blindly sets status='sent' and is_sent=true regardless of the current state. There is no precondition check — a ledger in any state (including 'deleted' or 'failed') can be marked sent. This violates state-machine invariants.",
+      "failure_mode": "Invalid state transitions (e.g., deleted → sent, failed → sent) produce incorrect ledger records. In an audit system, this breaks the immutability and traceability guarantees of the ledger.",
+      "fix": "Replace with a fallible method on a typed state machine: fn mark_sent(self) -> Result<LedgerStatusSent, TransitionError> that only accepts transitions from Validated → Sent. Use the typestate pattern to enforce legal transitions at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow is a mutable data bag with pub fields and no encapsulation. mark_sent mutates the struct in place. The domain logic (what states are valid, how transitions work) is encoded as free functions rather than being embedded in the type.",
+      "failure_mode": "No compile-time guarantee that transitions are legal. Any caller can construct LedgerWorkflow with arbitrary field combinations. The core is not a pure domain model — it is a mutable record with no invariants.",
+      "fix": "Make fields private, provide a fallible constructor that establishes invariants, and encode transitions as methods on a typestate or enum that guarantees legal state machines."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_error_type",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns LedgerWorkflow directly with no error type. Invalid transitions are silently accepted rather than reported as typed domain errors.",
+      "failure_mode": "Callers have no way to distinguish a successful transition from a no-op or invalid one. Error handling is impossible without inspecting internal fields, breaking the railway-oriented error model.",
+      "fix": "Return Result<LedgerWorkflow, TransitionError> where TransitionError is a typed enum (e.g., enum TransitionError { InvalidState, AlreadySent }). Parse at boundaries into trusted types; reject invalid transitions explicitly."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists — the crate has no benchmarks for transition throughput or state-machine performance",
+    "no profiler data — no allocation profiles or hot-path analysis for mark_sent or any lifecycle method",
+    "no allocation evidence — no measured budget for Vec/String allocations in the workflow pipeline",
+    "no second-ring evidence — no integration or end-to-end tests exercising the full state machine",
+    "no command evidence — no cargo test / cargo clippy output confirming compilation or correctness"
+  ],
+  "residual_risk": "The LedgerWorkflow struct is a primitive-dbag anti-pattern with no type discipline, no state machine invariants, and no error handling. All 6 Holzman rules are violated. The code as written represents an invalid-state-permitting data structure with no functional core — it must be refactored with enums/typestates before any delivery."
+}

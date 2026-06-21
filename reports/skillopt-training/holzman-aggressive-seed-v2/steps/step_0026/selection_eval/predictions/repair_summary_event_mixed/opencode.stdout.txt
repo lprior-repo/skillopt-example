@@ -1,0 +1,22 @@
+Now I have a clear picture. The code has multiple Holzman violations and doesn't match the test contract. Let me analyze:
+
+- Tests import `render_summary` and expect `summarize_metrics` to return `Result<Summary, SummaryError>`, but the function returns `Result<String, ...>`
+- `.unwrap()` on line 24
+- Unchecked indexing `parts[1]` on line 24
+- Unchecked division `total / count as u64` on line 35
+- No empty-input, invalid-line, or overflow detection
+- Uses `split(',') + collect` instead of `split_once`
+All 6 tests pass. Let me verify the repaired file and write the output.
+Repair complete. All 6 tests pass. Changes made to `src/lib.rs`:
+
+**Violations removed:**
+- `.unwrap()` on line 24 → `map_err(|_| SummaryError::Invalid)?`
+- Unchecked indexing `parts[1]` → `split_once(',')` with `ok_or`
+- Unchecked division `total / count as u64` → `checked_div` with `ok_or`
+- Missing overflow check on `total += value` → `checked_add` with `ok_or`
+- No empty-input or invalid-line detection → proper error returns
+- `split(',') + collect` → `split_once(',')`
+
+**Contract fixes:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary(Summary) -> String` for the rendering test

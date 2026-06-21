@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permissions, etc.)",
+      "failure_mode": "untrusted or absent filesystem input causes thread panic instead of returning a typed parse/I/O error",
+      "fix": "Return Result<Vec<Record>, IOError> and propagate with ? or match; never unwrap fs I/O"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input (overflow, bad digits, empty string)",
+      "failure_mode": "malformed CSV data aborts the entire session load instead of yielding a per-record parse error",
+      "fix": "Use parse::<u32>().map_err(|e| ParseError::BadValue { ... }) and propagate; return Result<Vec<Record>, RecordError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 lossy cast truncates u32 values > 65535 silently",
+      "failure_mode": "values in 65536..u32::MAX are silently truncated to u16 range, producing incorrect records with no error signal",
+      "fix": "Use u16::try_from(val).map_err(...) to produce a typed overflow error, or parse directly as u16"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_access_pattern",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() then parts[0]/parts[1] indexing allocates a Vec and uses unchecked indexing",
+      "failure_mode": "allocates a Vec<String> per line unnecessarily; parts[0] and parts[1] may panic with IndexOutOfBounds if the line has fewer than 2 comma-separated fields",
+      "fix": "Use line.split_once(',').map_err(...) for first-delimiter extraction; handle missing second field with a typed error; avoid collect()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is hidden I/O side effect inside a parsing function",
+      "failure_mode": "breaks purity of the parsing logic, makes the function untestable in isolation, and produces stdout noise in benchmarks and tests",
+      "fix": "Remove println!; if logging is needed, push it to the imperative shell layer (caller) or use a logger abstraction injected as a parameter"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_errors",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no Result type; all fallible operations (I/O, parse, cast) are hidden behind unwrap",
+      "failure_mode": "caller has no way to distinguish missing file, malformed line, or overflow; error context is lost at panic",
+      "fix": "Signature should be fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError> with a domain-typed error enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions performs fs::read_to_string directly — I/O mixed into what should be a parse-only concern",
+      "failure_mode": "cannot unit-test parsing logic without filesystem setup; violates functional core / imperative shell split",
+      "fix": "Split into shell fn load_sessions(path: &str) -> Result<Vec<Record>, LoadError> that reads the file, and pure fn parse_records(text: &str) -> Result<Vec<Record>, ParseError> that handles all parsing"
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for load_sessions throughput or latency", "no profiler evidence for allocation profile of CSV parsing", "no allocation audit: per-line Vec<String> allocation via collect() is unbounded", "no command evidence: cargo fmt --check, cargo check, cargo clippy gates not run", "no second-ring evidence (assembly, SBOM) for any performance claim"],
+  "residual_risk": "static review only; no commands run. The crate contains 6 distinct BLOCKER violations (unwrap on I/O, unwrap on parse, lossy as cast, unchecked indexing, hidden I/O, no typed errors) that must be repaired and verified before any delivery gate."
+}

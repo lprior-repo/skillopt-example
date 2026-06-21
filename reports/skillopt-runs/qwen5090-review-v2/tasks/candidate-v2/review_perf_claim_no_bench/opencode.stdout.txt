@@ -1,0 +1,2 @@
+Now I have the full picture. Let me write the review output.
+The review is complete. Output written to `/tmp/opencode/holzman-skillopt/qwen5090-review-v2/tasks/candidate-v2/review_perf_claim_no_bench/review-output.json`.

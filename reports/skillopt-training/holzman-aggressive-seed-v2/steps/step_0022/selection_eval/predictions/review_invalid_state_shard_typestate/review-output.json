@@ -1,0 +1,96 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses separate `status: String`, `is_validated: bool`, and `is_sent: bool` fields, allowing illegal state combinations (e.g., status=\"pending\" with is_sent=true, or is_validated=false with is_sent=true). No invariant enforcement.",
+      "failure_mode": "Any combination of status, is_validated, and is_sent is constructible. A shard can be marked sent without being validated, or have status contradict its sent flag, leading to silent data corruption or incorrect downstream behavior.",
+      "fix": "Replace `status: String`, `is_validated: bool`, `is_sent: bool` with a single `ShardStatus` enum type (e.g., `enum ShardStatus { Pending, Validated, Sent { at_epoch_ms: u64 } }`). Use a typestate pattern or sealed enum so only valid transitions exist. Make all fields private with a fallible constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain constraints. No newtype wrapper enforces format, uniqueness, or lifecycle rules.",
+      "failure_mode": "Invalid, empty, duplicate, or malformed IDs are accepted by construction. Domain invariants around ID format cannot be enforced at the type level.",
+      "fix": "Introduce a `ShardId` newtype: `pub struct ShardId(String);` with a fallible `ShardId::new(input: &str) -> Result<Self, InvalidShardId>` constructor. Use `ShardId` in `ShardWorkflow`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` is a free-form primitive, not an enum. Any arbitrary string value is valid, including contradictory values relative to `is_sent`/`is_validated`.",
+      "failure_mode": "Status strings like \"sent\", \"SENT\", \"Sent\", \"\", or \"deleted\" are all accepted. No exhaustiveness check at compile time. Pattern matching on status is lossy and error-prone.",
+      "fix": "Replace with `status: ShardStatus` enum. Define variants for each valid state. This makes illegal status values unrepresentable and enables exhaustive match."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a primitive lifecycle flag. Combined with `is_sent: bool`, this creates a 2^4 = 16-state product space where most states are illegal.",
+      "failure_mode": "The boolean flags can be independently set to contradictory values (validated=true, is_sent=false; validated=false, is_sent=true; etc.) with no compiler-level protection.",
+      "fix": "Eliminate `is_validated` and `is_sent` entirely. Encode both pieces of information into a single `ShardStatus` enum with variants that embed necessary data (e.g., `Sent { sent_at_epoch_ms: u64 }`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_contracts",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the struct in place without any precondition checks. It does not verify that the shard is in a valid state before marking as sent (e.g., it does not check is_validated).",
+      "failure_mode": "A shard can be marked sent without ever being validated. The function has no guard against invalid state transitions, violating the domain contract that sent shards should be validated.",
+      "fix": "Replace `mark_sent` with a pure function `fn try_mark_sent(current: &ShardWorkflow) -> Result<ShardWorkflow, TransitionError>` that checks the current state (e.g., status must be Validated) and returns an error for invalid transitions. Or use an enum-based typestate where the type encodes the allowed transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "public_fields_domain_structs",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `ShardWorkflow` are `pub`, allowing external code to set any field to any value, bypassing all invariants.",
+      "failure_mode": "Callers can directly assign `workflow.is_sent = true;` without going through `mark_sent`, or set `workflow.status = \"bogus\";`, creating illegal states from any crate that imports this one.",
+      "fix": "Make all fields `pub(crate)` or private. Provide public constructors and transition methods that enforce invariants."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for the domain logic. No profiler data or allocation analysis for `mark_sent` (which does `.to_string()` allocations).",
+      "failure_mode": "Unknown performance characteristics of the transition path. String allocations on hot paths could cause unexpected memory pressure.",
+      "fix": "Add a criterion benchmark for `mark_sent` measuring allocation count and latency. Consider using `Cow<'static, str>` or enum-based status to avoid allocations on the hot path."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests, no benchmarks, no profiler data, no allocation analysis, no command evidence for any claim.",
+      "failure_mode": "No behavioral contract is verified. No proof that `mark_sent` preserves invariants or that the API works correctly.",
+      "fix": "Add at least behavior tests covering: valid transition to sent, rejection of invalid transition (not validated), and identity preservation for non-transition inputs. Add benchmarks for throughput."
+    },
+    {
+      "severity": "INFO",
+      "rule": "sent_at_epoch_ms_redundant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is redundant with `is_sent: bool`. When `is_sent` is true, `sent_at_epoch_ms` should always be `Some`, and vice versa. This dual representation can diverge.",
+      "failure_mode": "A shard can have `is_sent=true` with `sent_at_epoch_ms=None`, or `is_sent=false` with `sent_at_epoch_ms=Some(...)`, creating inconsistent state.",
+      "fix": "Embed `sent_at_epoch_ms` directly into the `ShardStatus::Sent` variant so it only exists when the shard is sent. Eliminates the Option and the redundancy."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any domain function",
+    "no profiler data for allocation profiles",
+    "no allocation analysis for String/Vec usage in transition paths",
+    "no behavior tests for valid/invalid state transitions",
+    "no command evidence (cargo test, cargo bench, cargo clippy not run)",
+    "no second-ring review or formal verification artifacts"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental architectural violations: primitive obsession (String for id/status), boolean lifecycle flags instead of typestates, no invariant enforcement, public fields bypassing constructors, and a transition function that skips precondition checks. These are structural issues requiring a type-level rewrite, not a surface fix. Without benchmarks or tests, no performance or behavioral claims can be verified."
+}

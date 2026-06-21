@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses disjoint booleans (is_validated, is_sent) and an Option for lifecycle data instead of a proper typestate enum. This allows impossible states such as validated-but-not-sent AND sent-but-not-validated, or both false (never started) vs never created at all.",
+      "failure_mode": "Logic branches on individual booleans cannot enforce ordering invariants (validate before send, send exactly once). Callers can construct or transition to logically impossible states, corrupting ledger semantics.",
+      "fix": "Replace `is_validated: bool`, `is_sent: bool`, and `sent_at_epoch_ms: Option<u64>` with a single `LedgerState` enum: `enum LedgerState { New { validated: bool }, Sent { sent_at: u64 } }` with smart constructors enforcing transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` is a raw string field used for lifecycle tracking. Any arbitrary string value (empty, \"foo\", \"sent\", \"pending\", \"SENT\") is permitted, including values that have no meaning in the domain.",
+      "failure_mode": "Pattern matches or string comparisons on `status` cannot be exhaustive. Typos like \"sent \" vs \"sent\" silently produce incorrect behavior. Illegal string states bypass all domain invariants.",
+      "fix": "Replace `status: String` with a domain enum: `enum LedgerStatus { New, Validated, Sent }`. Remove the string entirely; status is derivable from the typestate enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a lifecycle boolean that cannot express the full state machine. Combined with `is_sent: bool` on line 5, the Cartesian product yields 4 states but only 2-3 are valid (new, validated, sent). The bool pair also cannot carry the `sent_at` timestamp.",
+      "failure_mode": "Boolean combinations like (true, true) and (false, false) are ambiguous or invalid. No way to represent 'sent with timestamp' vs 'validated but not sent' unambiguously. Transitions cannot be type-checked.",
+      "fix": "Eliminate both `is_validated` and `is_sent` bools. Fold them into a single `LedgerState` enum with variants carrying their associated data (e.g., `Validated` variant carries nothing extra; `Sent` variant carries `sent_at: u64`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is an optional lifecycle field detached from the boolean lifecycle flags. It is valid to have `is_sent: false` with `Some(timestamp)`, or `is_sent: true` with `None`, both of which are logically inconsistent.",
+      "failure_mode": "Optional lifecycle data that is not owned by the variant that needs it creates dangling or contradictory state. Consumers must defensively check both the bool and the Option, and still cannot be certain of consistency.",
+      "fix": "Move the timestamp into the typestate enum variant: `LedgerState::Sent { sent_at: u64 }`. The Option disappears entirely; `Sent` always has a timestamp, `New` never does."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw `String` used as a domain identifier. A raw string provides zero compile-time guarantees that the ID follows domain rules (format, uniqueness, non-empty). All string fields on public structs are raw primitive domain state.",
+      "failure_mode": "Callers can create `LedgerWorkflow` with empty, whitespace-only, or malformed IDs. Equality comparison on IDs is lexicographic string comparison, not domain-identity comparison. IDs cannot be used in sets/maps with domain semantics without extra validation.",
+      "fix": "Introduce a newtype: `pub struct LedgerId(String)` with a private constructor, or better a smart constructor `LedgerId::from(s: &str) -> Result<LedgerId, ParseIdError>`. Make the field private on `LedgerWorkflow`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "There is no constructor, smart constructor, or parse function for `LedgerWorkflow`. Raw primitives (String, bool, Option<u64>) cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly by populating public fields.",
+      "failure_mode": "Every caller can bypass all invariants by directly assigning to public fields. There is no gate between external input and the domain model. The struct is representable with every illegal combination of fields.",
+      "fix": "Make all fields `pub(crate)` or private. Provide a `LedgerWorkflow::new(id: LedgerId) -> Self` constructor that initializes to the `New` state. Add `LedgerWorkflow::validate(&mut self)` and `LedgerWorkflow::mark_sent(&mut self) -> Result<(), TransitionError>` with proper state checks."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_no_transition_enforcement",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` unconditionally sets `status = \"sent\"` and `is_sent = true` without checking current state. It does not verify `is_validated` is true, does not prevent double-sending, and does not set `sent_at_epoch_ms`.",
+      "failure_mode": "Items can be marked sent without validation (violating business rules), marked sent multiple times (double-send), and sent without a timestamp (losing audit data). The function silently overwrites any prior status.",
+      "fix": "Replace with state-machine transition: `fn mark_sent(&mut self) -> Result<(), LedgerError>` that checks current state is validated, transitions to `Sent { sent_at: now_ms() }`, and returns an error if already sent or not validated."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, allocation budget, or performance evidence exists. The `mark_sent` function allocates via `\"sent\".to_string()` on every call, which is an allocation in a lifecycle transition that may be on a hot path.",
+      "failure_mode": "Without allocation budgets and benchmark evidence, repeated calls to `mark_sent` produce unbounded heap allocations. No baseline exists to compare against if this were refactored.",
+      "fix": "Eliminate the `status: String` entirely (replace with enum) to remove the allocation. Add a benchmark measuring `mark_sent` throughput and allocation count, or remove the function from hot paths with measured justification."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark for mark_sent throughput or allocation count",
+    "no profiler evidence for hot-path identification",
+    "no allocation budget for lifecycle transition functions",
+    "no second-ring evidence for any performance or correctness claims",
+    "no command evidence that cargo fmt/check/clippy/test were executed on this crate"
+  ],
+  "residual_risk": "The struct can represent every illegal state combination (validated/sent ordering violations, orphaned timestamps, arbitrary status strings, unbounded raw IDs). `mark_sent` is a no-op guard that enforces zero invariants and allocates on every call. Until the typestate enum, smart constructors, and transition guards are implemented, any consumer of `LedgerWorkflow` must independently validate all field combinations at runtime, which is infeasible at scale."
+}

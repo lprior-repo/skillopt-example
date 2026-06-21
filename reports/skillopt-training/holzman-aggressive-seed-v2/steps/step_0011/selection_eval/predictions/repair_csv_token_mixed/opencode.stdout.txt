@@ -1,0 +1,10 @@
+Now I have the full picture. The current code has multiple Holzman violations: `unwrap()` on parse, ignores `max_items`, no empty check, no allocation safety. Let me fix it.
+All 4 tests pass. Now I'll write the output file.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+1. **`unwrap()` removed** — `.parse::<u16>().unwrap()` replaced with `.map_err(|_| ParseError::Invalid)?`
+2. **`max_items` now enforced** — returns `Err(ParseError::TooMany)` when parsed count exceeds the limit
+3. **Empty input handled** — returns `Err(ParseError::Empty)` when input string is empty
+4. **No unsafe/unwrap/expect/panic** — all Holzman safety violations eliminated
+
+All 4 behavior tests pass: `parses_values`, `rejects_empty`, `rejects_invalid`, `rejects_too_many`. Output written to `repair-output.json`.

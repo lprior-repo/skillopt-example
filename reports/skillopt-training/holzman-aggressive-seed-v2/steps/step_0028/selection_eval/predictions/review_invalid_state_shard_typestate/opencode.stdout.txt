@@ -1,0 +1,12 @@
+Now I have all source and references. Writing the review output.
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/13b0e54de29d6b23/review_invalid_state_shard_typestate/review-output.json`.
+
+**Summary of 8 findings:**
+
+| Severity | Count | Key Issue |
+|----------|-------|-----------|
+| BLOCKER | 4 | Invalid states representable by construction — `status` (String) and `is_sent`/`is_validated` (bool) are independent fields that can contradict each other |
+| MAJOR | 3 | `mark_sent` doesn't set `sent_at_epoch_ms`; no domain types (enums/typestates); unnecessary heap allocation via `.to_string()` |
+| MINOR | 1 | Allocation inefficiency on state transition |
+
+The fundamental architectural failure: `ShardWorkflow` uses primitive fields (`String`, `bool`, `Option<u64>`) that allow any combination of values, making illegal states like `status="pending"` + `is_sent=true` + `sent_at_epoch_ms=None` fully constructible. The fix is a single `ShardStatus` enum with variants encoding the full lifecycle, eliminating all boolean flags and decoupled fields.

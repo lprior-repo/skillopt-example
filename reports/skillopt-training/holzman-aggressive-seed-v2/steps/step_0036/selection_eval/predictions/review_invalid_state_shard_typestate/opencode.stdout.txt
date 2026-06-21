@@ -1,0 +1,8 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/0dcfa53ea1311bd3/review-invalid_state_shard_typestate/review-output.json`.
+
+**Summary of findings:**
+
+- **4 BLOCKERs**: parallel bool flags (`is_validated`, `is_sent`) allow illegal states with no typestate enforcement; `String` ID lacks domain newtype; `mark_sent` has no preconditions; no boundary parsing into trusted types
+- **3 MAJORs**: heap allocation for `"sent".to_string()` in core; `sent_at_epoch_ms` field never populated; unnecessary full ownership transfer on pure transition
+- **Missing evidence**: no tests, no benchmarks, no allocation profiling, no lint gate evidence

@@ -1,0 +1,17 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Written `review-output.json` with 12 findings (10 blockers, 2 major):
+
+| # | Severity | Rule | Line | Core Issue |
+|---|----------|------|------|------------|
+| 1 | BLOCKER | no_unwrap | 9 | `fs::read_to_string().unwrap()` panics on I/O |
+| 2 | BLOCKER | no_unwrap | 19 | `.parse().unwrap()` panics on bad input |
+| 3 | BLOCKER | no_lossy_casts | 19 | `as u16` silently truncates values > 65535 |
+| 4 | BLOCKER | no_unchecked_indexing | 16 | `parts[0]`/`parts[1]` panic on short lines |
+| 5 | BLOCKER | split_once_mandatory | 12 | `split('').collect()` instead of `split_once` |
+| 6 | BLOCKER | hidden_io | 16 | `println!` inside data-parsing function |
+| 7 | BLOCKER | data_actions | 8 | I/O + parsing + domain fused in one function |
+| 8 | BLOCKER | no_typed_errors | 8 | Returns `Vec<Record>` — no error taxonomy |
+| 9 | BLOCKER | parse_boundary | 4 | Raw `String`/u16, no smart constructors |
+| 10 | BLOCKER | bounded_allocation | 12 | No `try_reserve`, no domain cap |
+| 11 | MAJOR | benchmark | 8 | No performance evidence |
+| 12 | MAJOR | command_evidence | 1 | No fmt/clippy/test evidence |

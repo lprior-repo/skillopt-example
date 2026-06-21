@@ -1,0 +1,96 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has no typestate enum; status is a free-form String and is_sent/is_validated are independent booleans, so illegal state combinations like status='sent' with is_sent=false or status='new' with is_sent=true are representable",
+      "failure_mode": "Any consumer cannot rely on the struct to enforce valid lifecycle transitions; downstream logic may branch on strings/booleans that never synchronize with actual workflow state",
+      "fix": "Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single BatchStatus enum whose variants carry owned lifecycle data (e.g., Variant::Sent { sent_at_epoch_ms: u64 }), making every legal state a variant and every illegal state unrepresentable"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String field; any caller can set status to any string value including typos, empty strings, or values outside the domain vocabulary",
+      "failure_mode": "Typos or invalid strings silently bypass transition logic; pattern matches on status elsewhere must use string equality rather than exhaustive enum matching, enabling unhandled cases",
+      "fix": "Replace pub status: String with a private BatchStatus enum field; remove pub access to status entirely; expose state only through enum variants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that cannot encode a proper state machine; both can be true simultaneously or contradict the status string",
+      "failure_mode": "Boolean fields create a 4x state space (validated×sent) that is incomprehensible at the call site and cannot prevent contradictions like validated=true, sent=true, status='draft'",
+      "fix": "Remove both booleans and encode the full lifecycle as a single enum typestate with explicit transitions (e.g., New -> Validated -> Sent)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is optional lifecycle data stored outside the variant that owns it; it can be None when is_sent=true or Some(...) when status is not sent",
+      "failure_mode": "A batch marked as sent can have sent_at_epoch_ms=None, and a non-sent batch can carry a stale epoch value, breaking any timestamp-dependent downstream logic",
+      "fix": "Move sent_at_epoch_ms into the BatchStatus::Sent variant as u64 (not Option), so sent batches always have a timestamp and non-sent batches never carry one"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a pub String; any caller can construct a BatchWorkflow with an empty string, non-UUID text, or any value that violates domain invariants on batch identifiers",
+      "failure_mode": "No validation is enforced at construction; invalid or collision-prone IDs silently enter the domain, and callers cannot distinguish validated identifiers from raw strings",
+      "fix": "Introduce a BatchId newtype with a fallible smart constructor (e.g., BatchId::try_from(s: &str) -> Result<BatchId, ParseError>) and store it as a private field"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "raw primitives String and bool cross the parse boundary without fallible smart constructors; callers can construct BatchWorkflow directly with any invalid combination of id, status, and booleans",
+      "failure_mode": "The domain core accepts hostile or inconsistent state from the shell because there is no single constructor that validates all invariants at parse time, so every caller must repeat validation logic",
+      "fix": "Provide a single BatchWorkflow::try_new(id: &str, initial: BatchStatus) -> Result<Self, ParseError> that validates the id and initializes all lifecycle state from the trusted enum; make all fields private"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates status and is_sent as string/boolean side effects instead of producing a pure domain transition; it returns the mutated struct rather than a Result or a new state value",
+      "failure_mode": "The command is an imperative shell mutation disguised as a domain function; it can be called on any struct value regardless of current state (no transition guard) and silently overwrites status to 'sent'",
+      "fix": "Define mark_sent as fn mark_sent(current: &BatchWorkflow) -> Result<BatchWorkflow, TransitionError> that matches on the current BatchStatus variant and returns an error for invalid transitions, or better yet, replace it with a state machine transition method on BatchStatus"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation_discipline",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent calls .to_string() on the literal 'sent', allocating a new String every call instead of using a static or enum variant",
+      "failure_mode": "Every state transition allocates a new heap String even though the status set is finite and known; this violates allocation discipline and adds unmeasured overhead to hot paths",
+      "fix": "Replace with a static &str comparison or, better, use a BatchStatus enum variant that carries no String allocation"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any hot-path function in this crate",
+    "no profiler data to identify or validate the actual bottleneck",
+    "no allocation evidence (no alloc counters, no alloc-tracing runs)",
+    "no second-ring evidence tied to actual symbols or artifacts",
+    "no command-truth evidence: no cargo fmt/check/clippy/test commands documented as run",
+    "no workload specification, target hardware description, input distribution, or regression threshold for any performance claim"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate is fundamentally unreviewable at the Holzman level because all domain state is raw primitives with no type-level invariants, no parse boundary, no typed error taxonomy, and no state machine. A complete restructure to enum-based typestate with a single fallible constructor is required before any deeper verification work is meaningful."
+}

@@ -1,0 +1,11 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Wrote `review-output.json` to the required path.
+
+**Summary of findings (10 total):**
+
+| Severity | Count | Key Issues |
+|----------|-------|------------|
+| BLOCKER | 6 | `status: String` (illegal states representable), `is_validated: bool` (boolean lifecycle flag), `is_sent: bool` (contradictory flags), `id: String` (no newtype), `mark_sent` (no precondition enforcement), data bag struct (no type-level invariants) |
+| MAJOR | 4 | Missing benchmark/profiler/allocation/command evidence, unnecessary `.to_string()` allocation |
+
+**Root cause:** `LedgerWorkflow` is a primitive data bag — all fields are `pub` strings/bools with no domain semantics, no typestate, and `mark_sent` performs unconditional mutation with zero validation.

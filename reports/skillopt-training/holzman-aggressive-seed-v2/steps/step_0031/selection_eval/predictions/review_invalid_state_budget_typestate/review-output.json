@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses `status: String` and two separate `bool` flags (`is_validated`, `is_sent`) instead of an enum typestate. Any combination of these fields is representable — e.g., `is_sent=true, is_validated=false, status=\"sent\"` or `is_sent=true, is_validated=false, status=\"draft\"` — making illegal states constructible.",
+      "failure_mode": "Business invariants (must be validated before sent, sent is terminal) are not enforced by the type system. Callers can construct or mutate budgets into logically impossible states, leading to silent data corruption or incorrect downstream processing.",
+      "fix": "Replace `status: String` with an enum `BudgetStatus { Draft, Validated, Sent }`. Replace `is_validated: bool` and `is_sent: bool` with an enum typestate `BudgetLifecycle { Draft, Validated, Sent }`. Remove redundant boolean fields. Use `new()` fallible constructor or builder to guarantee valid construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain constraints. No newtype wrapper enforces id format rules (e.g., non-empty, max length, character set).",
+      "failure_mode": "Empty strings, oversized strings, or malformed ids can be assigned to any BudgetWorkflow instance, violating domain invariants at runtime.",
+      "fix": "Introduce `pub struct BudgetId(String)` with a `new()` constructor that validates non-empty and length constraints, returning a typed error on failure. Use `BudgetId` in `BudgetWorkflow`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` is a raw primitive. Status values are free-form strings instead of a closed enum set.",
+      "failure_mode": "Callers can set status to any string (e.g., \"cancelled\", \"deleted\", \"sent_again\"), breaking the expected state machine and making pattern-matching on states impossible.",
+      "fix": "Replace with `status: BudgetStatus` where `BudgetStatus` is an enum with exactly the valid domain states (e.g., `Draft`, `Validated`, `Sent`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_enforces_invariants",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` does not check `is_validated` before transitioning to sent state. It also does not check if the budget is already sent (idempotency guard). It mutates in-place and does not use a fallible constructor.",
+      "failure_mode": "An unvalidated budget can be marked as sent, bypassing the validation gate. A budget already sent can be sent again, causing duplicate processing or incorrect audit trails.",
+      "fix": "Change `mark_sent` to `pub fn mark_sent(item: BudgetWorkflow) -> Result<BudgetWorkflow, BudgetError>` that first asserts `item.is_validated == true` (or checks enum typestate == Validated), then returns an error if already sent. On success, produce a new instance with lifecycle=Sent and status=Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`mark_sent` calls `.to_string()` which performs heap allocation inside what should be a pure calculation. It takes ownership and mutates fields directly rather than returning a new typed value.",
+      "failure_mode": "Unnecessary heap allocation in the core, and the function signature `mark_sent(item: BudgetWorkflow) -> BudgetWorkflow` hides that it always allocates a new String for status. In a hot path, this causes unmeasured, unbounded allocation.",
+      "fix": "Accept and return typed enums (BudgetStatus/BudgetLifecycle). No `.to_string()` needed — enum variants are zero-cost. Signature should be `fn mark_sent(BudgetWorkflow) -> Result<BudgetWorkflow, BudgetError>` returning a new instance with the correct enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_fallible_constructor",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No `new()` or fallible constructor exists for `BudgetWorkflow`. All fields are `pub`, allowing arbitrary construction of invalid states from any call site.",
+      "failure_mode": "Any caller can instantiate `BudgetWorkflow { id: \"\".into(), status: \"\".into(), is_validated: false, is_sent: false, sent_at_epoch_ms: None }` — a completely invalid budget with no validation.",
+      "fix": "Make all fields `pub(crate)` or private. Add `pub fn new(id: BudgetId) -> Self` (or fallible `-> Result<Self, BudgetError>`) that initializes fields to valid defaults. Use private or `pub(crate)` for internal fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_try_reserve",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "No bounded-allocation handling. The `mark_sent` function allocates unconditionally via `.to_string()`. While this particular crate has no `Vec`, the pattern of unchecked allocation in the core violates the bounded-allocation rule.",
+      "failure_mode": "In larger codebases that extend this pattern, unbounded allocation can cause OOM under load when the allocation budget is untracked.",
+      "fix": "For this crate: replace `.to_string()` with enum variants (zero allocation). For any future Vec/string building in the core, use `try_reserve` with checked capacity arithmetic and handle `Allocation` errors."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_checked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` stores epoch milliseconds but has no bounds checking. No `checked_*` usage for any arithmetic on this value. No conversion guard (`try_from`) if this value is used as an offset or index elsewhere.",
+      "failure_mode": "If `sent_at_epoch_ms` is used in arithmetic (e.g., converting to seconds, adding durations), overflow would cause panics or silent wraparound.",
+      "fix": "Use `checked_add`, `checked_mul`, `checked_div` for any arithmetic on `sent_at_epoch_ms`. Use `u32::try_from` or `usize::try_from` for width-reducing conversions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_domain_error_types",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` returns `BudgetWorkflow` directly instead of a `Result<BudgetWorkflow, BudgetError>`. No typed domain error taxonomy exists. Error cases (not validated, already sent) would have to be indicated via `Option` or panics.",
+      "failure_mode": "Callers must guess failure modes or the function must panic/return Option, both of which break the railway-oriented error handling pattern.",
+      "fix": "Define `pub enum BudgetError { AlreadySent, NotValidated }`. Change return type to `Result<BudgetWorkflow, BudgetError>`."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data exists for allocation hotspots",
+    "no allocation budget analysis exists",
+    "no second-ring integration test evidence exists",
+    "no command-line evidence (cargo fmt/clippy/test) was produced"
+  ],
+  "residual_risk": "The crate has fundamental type-safety violations: illegal states are fully representable via raw String/bool fields, mark_sent enforces no invariants, and no domain error types exist. Static review only — no commands run. The code compiles but is architecturally non-compliant with Holzman Rust doctrine."
+}

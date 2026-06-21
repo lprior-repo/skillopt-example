@@ -1,0 +1,11 @@
+Now I have full context. The source has multiple Holzman violations: `unwrap()`, no empty check, no max_items enforcement, no `try_reserve`. Let me fix it.
+All 4 tests pass. Now writing the repair output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Removed `unwrap()`** → replaced with `map_err(|_| ParseError::Invalid)` for parse failures
+2. **Added empty input check** → returns `Err(ParseError::Empty)` before any processing
+3. **Added `max_items` enforcement** → returns `Err(ParseError::TooMany)` when items exceed limit
+4. **Added `try_reserve`** → bounded allocation with `ParseError::Allocation` fallback
+5. **Empty token handling** → skipped (not treated as invalid)
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

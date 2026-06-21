@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings across the task crate:**
+
+| # | Severity | Rule | Location |
+|---|----------|------|----------|
+| 1 | BLOCKER | no_forbidden_constructs | `src/lib.rs:9` — `.unwrap()` on `fs::read_to_string` |
+| 2 | BLOCKER | no_forbidden_constructs | `src/lib.rs:19` — `.unwrap()` on parse + unchecked `parts[1]` |
+| 3 | BLOCKER | no_forbidden_constructs | `src/lib.rs:16` — unchecked `parts[0]` indexing |
+| 4 | BLOCKER | no_lossy_casts | `src/lib.rs:19` — `as u16` silently truncates values > 65535 |
+| 5 | BLOCKER | functional_core_imperative_shell | `src/lib.rs:16` — `println!` hidden in iterator chain |
+| 6 | BLOCKER | functional_core_imperative_shell | `src/lib.rs:8` — I/O + parsing + logging fused, no typed error surface |
+| 7 | BLOCKER | no_typed_errors | `src/lib.rs:8` — `Vec<Record>` return with no error enum |
+| 8 | MINOR | bounded_allocation | `src/lib.rs:12` — no `try_reserve`, per-line `collect::<Vec>` overhead |
+
+**4 missing evidence items:** no benchmark, no profiler, no allocation analysis, no CI benchmark infrastructure.

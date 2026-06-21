@@ -1,0 +1,10 @@
+Repaired. Summary of changes to `src/lib.rs`:
+
+| Issue | Fix |
+|---|---|
+| `unwrap()` on parse → panic on bad input | `.map_err(|_| ParseError::Invalid)?` |
+| Empty input not handled | Early return `Err(ParseError::Empty)` |
+| `max_items` ignored | Count split parts, return `Err(ParseError::TooMany)` if exceeded |
+| `Vec::with_capacity` (no OOM handling) | `Vec::new()` + `try_reserve` + `Err(ParseError::Allocation)` |
+
+All 4 behavior tests pass. Output written to `repair-output.json`.

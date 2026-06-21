@@ -1,0 +1,14 @@
+Now I understand the task. The current `encode_frame` has multiple violations: lossy `as u32` cast, no payload size check, and missing `checked_add`/`try_reserve`. Let me apply the mandatory frame encoder repair pattern.
+Repair complete. Here's the summary:
+
+**Violations fixed in `src/lib.rs`:**
+1. **Lossy `as` conversion** (`payload.len() as u32`) → `u32::try_from(payload.len()).map_err(...)` 
+2. **Missing payload limit check** → `if payload.len() > max_payload { return Err(FrameError::PayloadTooLarge) }`
+3. **Unchecked capacity arithmetic** → `4usize.checked_add(payload.len())`
+4. **Unbounded allocation** → `Vec::new()` + `out.try_reserve(capacity)`
+
+**Mandatory repair pattern satisfied:** All four frame encoder steps applied (limit check, checked_add, try_from length, try_reserve allocation).
+
+**Commands:** `cargo fmt` ✓, `cargo fmt --check` ✓, `cargo test` (2/2 passed) ✓
+
+**Output:** `repair-output.json` written and validated.

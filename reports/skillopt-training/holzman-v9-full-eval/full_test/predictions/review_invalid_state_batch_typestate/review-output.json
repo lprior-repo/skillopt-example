@@ -1,0 +1,119 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-must-be-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "pub status: String",
+      "problem": "Batch lifecycle state modeled as free-form String, making every string value including \"sent\", \"\", \"foobar\" a valid state. Illegal states are representable.",
+      "failure_mode": "Any caller can assign arbitrary strings to status (e.g., item.status = \"deleted\"), bypassing the intended workflow. No compile-time guarantee that status transitions follow the domain lifecycle.",
+      "fix": "Replace with a sealed enum `BatchStatus { Pending, Validated, Sent }` with private constructor and explicit transition methods."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-must-be-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub is_validated: bool",
+      "problem": "Lifecycle boolean decoupled from status string. No invariant enforcement between status and is_validated — they can diverge (e.g., status=\"sent\" but is_validated=false).",
+      "failure_mode": "Invalid state combinations: status can be \"sent\" with is_validated=false, or status=\"pending\" with is_validated=true. The two fields carry redundant information with no coordination.",
+      "fix": "Fold validated state into the enum as a variant-level property, e.g., `BatchStatus::Validated { validated_at: Option<u64> }`, eliminating the standalone boolean."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-must-be-typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "construct": "pub is_sent: bool",
+      "problem": "Lifecycle boolean duplicates information already in status. No ordering guarantee — is_sent could be true before is_validated.",
+      "failure_mode": "Caller can set is_sent=true with status not equal to \"sent\", creating inconsistent state. Sent-before-validated ordering is not enforced.",
+      "fix": "Fold sent state into the enum variant, e.g., `BatchStatus::Sent { sent_at_epoch_ms: u64 }`, and remove both is_validated and is_sent fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional-lifecycle-data-in-variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "pub sent_at_epoch_ms: Option<u64>",
+      "problem": "Optional lifecycle data stored as a standalone field rather than owned by the variant that needs it. Can be None while status is \"sent\", or Some while status is not \"sent\".",
+      "failure_mode": "sent_at_epoch_ms can be Some(0) with status=\"pending\", or None with status=\"sent\". The timestamp is only meaningful when the batch is in the sent state.",
+      "fix": "Tuck sent_at_epoch_ms into the enum variant: `BatchStatus::Sent { sent_at_epoch_ms: u64 }` (non-Option, since sent implies a timestamp). Remove standalone field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-for-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub id: String",
+      "problem": "Batch ID is a raw String primitive with no domain meaning, validation, or protection from empty/invalid values.",
+      "failure_mode": "Empty string, whitespace-only strings, or malformed IDs are accepted silently. String methods on id enable accidental concatenation or mutation instead of comparison/equality.",
+      "fix": "Introduce `struct BatchId(String)` or `struct BatchId(u64)` with a smart constructor that validates non-empty and returns a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub struct BatchWorkflow { ... }",
+      "problem": "All fields are pub, giving any caller full ability to construct and mutate the struct into any state combination. No smart constructor, no encapsulation.",
+      "failure_mode": "Callers can construct BatchWorkflow with status=\"sent\", is_validated=false, is_sent=false, sent_at_epoch_ms=None — an impossible/inconsistent state that the type system should prevent.",
+      "fix": "Make all fields private. Provide a smart constructor `BatchWorkflow::new(id: BatchId) -> Result<Self, Error>` and transition methods on a typestate enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smart-constructor-for-transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: BatchWorkflow) -> BatchWorkflow",
+      "problem": "Transition function takes owned struct and mutates it without preconditions. Does not check that the batch was validated before sending. Mutates status string directly rather than transitioning a typestate enum.",
+      "failure_mode": "Can mark any batch as sent regardless of validation state. Status is set to a raw string literal instead of transitioning through an enum, bypassing type-level workflow guarantees.",
+      "fix": "Accept a typestate-bound value or enum, enforce preconditions (must be validated before sent), and return a new state variant. E.g., `fn mark_sent(state: BatchStateValidated, now_ms: u64) -> Result<BatchStateSent, Error>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-hidden-io-in-pure-domain",
+      "file": "src/lib.rs",
+      "line": 10,
+      "construct": "item.status = \"sent\".to_string()",
+      "problem": "Transition function uses `.to_string()` allocation to set a literal string. This is wasteful and signals the domain model is using heap-allocated strings for state where an enum would be stack-allocated.",
+      "failure_mode": "Unnecessary heap allocation on every transition. The String type means every state value is heap-allocated even though the state space is finite and known.",
+      "fix": "Replace String status with an enum. Enum variants are zero-cost stack data with no heap allocation for state representation."
+    },
+    {
+      "severity": "WARN",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "No [bench] section in Cargo.toml",
+      "problem": "No benchmark harness exists for any performance claim or baseline measurement.",
+      "failure_mode": "No measurable performance baseline. Any future optimization decisions would be based on guesses rather than measurement.",
+      "fix": "Add a [dev-dependencies] criterion entry and a benches/ directory with at least a baseline serialization/bench for BatchWorkflow if performance matters."
+    },
+    {
+      "severity": "WARN",
+      "rule": "missing-miri-proptest-kani-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "No tests, proptest, or Kani harnesses",
+      "problem": "No test targets at all. No property-based tests, no bounded verification, no undefined-behavior detection.",
+      "failure_mode": "State machine invariants, boundary conditions, and transition correctness are untested. Any repair introducing new transitions would have no automated safety net.",
+      "fix": "Add proptest properties for typestate transitions (e.g., cannot send without validating), Miri for UB, and at minimum unit tests for each transition path."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no proptest or property-based tests for typestate invariants",
+    "no Miri run for undefined-behavior detection",
+    "no Kani harness for state-transition verification",
+    "no profiler data for allocation hot paths"
+  ],
+  "residual_risk": "The crate represents the classic anti-pattern: status strings, lifecycle booleans, and public fields that make every illegal state reachable. This is the exact scenario the task name 'review_invalid_state_batch_typestate' targets. The domain model should be refactored to a typestate enum with smart constructors, variant-own lifecycle data, newtyped IDs, and private fields. Without these changes, the type system provides zero workflow guarantees."
+}

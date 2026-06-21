@@ -1,0 +1,12 @@
+Review complete. Written to `review-output.json`.
+
+**Key findings across the crate:**
+
+| Severity | Rule | File:Line |
+|---|---|---|
+| BLOCKER | make_illegal_states_unrepresentable | `src/lib.rs:1` — `status: String`, `is_validated: bool`, `is_sent: bool` allow all invalid combinations (sent without validated, both true, etc.) |
+| BLOCKER | primitive_obsession_newtypes | `src/lib.rs:2` — `id: String` has no domain identity invariant |
+| BLOCKER | functional_core_imperative_shell | `src/lib.rs:9` — `mark_sent` mutates in-place, no precondition check, no error return |
+| BLOCKER | no_bool_lifecycle_flags | `src/lib.rs:4` — Independent bools are incoherent by design |
+| MAJOR | missing_typed_error_domain | `src/lib.rs:9` — No `LedgerError` type, no error path |
+| MISSING | benchmark/profiler/allocation/command | No evidence of any performance, allocation, or verification runs |

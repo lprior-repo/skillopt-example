@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 7 findings:
+
+**BLOCKERs (5):**
+1. `status: String` instead of a sealed enum (line 3)
+2. `is_validated: bool` as bare lifecycle flag instead of typestate (line 4)
+3. `sent_at_epoch_ms: Option<u64>` orphaned from the variant that owns it (line 6)
+4. `id: String` missing domain newtype (line 2)
+5. `mark_sent` mutates raw fields instead of performing a typestate transition (line 9)
+
+**MINOR (1):** Imperative mutation pattern leaking into functional core (line 9)
+
+**INFO (1):** No benchmark evidence (line 1)
+
+All findings cite the typestate/lifecycle/ID violations from the SKILL.md review mode section at lines 46-48. The core issue: every illegal state combination is representable by the compiler.

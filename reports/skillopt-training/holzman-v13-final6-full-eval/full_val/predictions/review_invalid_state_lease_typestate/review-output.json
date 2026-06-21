@@ -1,0 +1,78 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow has no typestate enum; lifecycle is a bare String plus two booleans with no enforced transitions, so callers can construct arbitrary invalid state combinations (e.g., status='pending' with is_sent=true).",
+      "failure_mode": "Invalid domain states are representable and reachable; no transition logic prevents illegal state jumps, violating the 'make illegal states unrepresentable' absolute law.",
+      "fix": "Define a LeaseState enum (e.g., Created, Validated, Sent, Failed) and replace status/is_validated/is_sent with a single state field. mark_sent should accept the previous state variant and return the next, enforcing one legal transition."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub status: String, a raw string that accepts any value ('pending', 'foo', '', null-as-empty). The mark_sent function blindly sets it to \"sent\" without validating the source state or returning a typed error for illegal transitions.",
+      "failure_mode": "Any string is a valid status; callers bypass the intended state machine entirely. Marking sent from a non-eligible state silently succeeds with no audit trail.",
+      "fix": "Replace with LeaseStatus enum. Change mark_sent to accept the current state and return Result<LeaseWorkflow, TransitionError> or use pattern matching to enforce the exact allowed transition."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are separate lifecycle booleans. is_validated=true could coexist with status='pending', and is_sent=true could coexist with status='sent' or status='failed'. These orthogonal booleans create a 2^3=8 combinatorial state space when only a linear workflow exists.",
+      "failure_mode": "Combinatorial explosion of invalid state combinations; callers can set is_sent=true without setting status, or set both booleans to true independently, creating states with no business meaning.",
+      "fix": "Fold lifecycle data into the typestate enum variants. For example, LeaseState::Sent { sent_at: u64 } carries the sent timestamp in the variant that owns it. is_validated becomes a transition guard, not a separate field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from is_sent: bool and status: String. is_sent=true with sent_at_epoch_ms=None is a valid Rust value but an invalid lease state (sent but no timestamp). is_validated=true with sent_at_epoch_ms=Some is also nonsensical.",
+      "failure_mode": "The Option field allows the 'sent but no timestamp' state, which breaks any downstream logic that assumes sent items always have a timestamp. Validation timestamp leaking into non-validated states is also possible.",
+      "fix": "Move sent_at_epoch_ms into the LeaseState::Sent variant as a bare u64 (not Option). Move validated_at into LeaseState::Validated variant. Each lifecycle data field lives only in the variant that owns it."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive. Any string (empty, whitespace, non-UUID format) is a valid ID. There is no LeaseId newtype enforcing format rules, no smart constructor, and no parse boundary.",
+      "failure_mode": "Invalid IDs (empty string, malformed UUID, duplicate IDs) can enter the workflow. The domain cannot enforce uniqueness or format invariants because id is opaque to the type system.",
+      "fix": "Define pub struct LeaseId(String) or pub struct LeaseId(Uuid) with a smart constructor fn LeaseId::parse(s: &str) -> Result<LeaseId, ParseError>. Replace id: String with id: LeaseId."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow fields are all pub raw primitives (String, bool, Option<u64>). There is no fallible smart constructor, no parse boundary, and no validation at the system edge. Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": "The entire struct is instantiable via field-by-field initialization with zero validation. External input (DTOs, JSON, commands) can produce invalid states without ever being parsed into trusted domain values.",
+      "fix": "Add fn LeaseWorkflow::new(id: LeaseId, initial_state: LeaseState) -> Result<LeaseWorkflow, ValidationErr>. Remove all pub fields; make them private and accessible only through methods. Construct instances only through the smart constructor."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent hot-path performance claim",
+    "no profiler evidence for allocation patterns in LeaseWorkflow lifecycle",
+    "no allocation/budget analysis for String allocations in status field",
+    "no command evidence: cargo fmt --check not run",
+    "no command evidence: cargo clippy not run",
+    "no command evidence: cargo check not run"
+  ],
+  "residual_risk": "Static review only; no commands run. The struct at src/lib.rs:1-7 represents invalid states by construction (String status, bool lifecycle flags, decoupled Option timestamp). No typestate enum, no smart constructor, no parse boundary, and no domain newtypes exist. The mark_sent function at src/lib.rs:9-12 silently accepts any LeaseWorkflow and overwrites state without transition validation. All six Holzman violations are present. Delivery must repair the domain model before any further work."
+}

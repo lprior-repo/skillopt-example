@@ -1,0 +1,5 @@
+   Compiling repair_byte_at v0.1.0 (/tmp/opencode/holzman-skillopt/smoke4/tasks/baseline/repair_byte_at)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/bacee263c82c6054/debug/deps/repair_byte_at-717e4f92370e882e)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/bacee263c82c6054/debug/deps/behavior-85f7c2754d9ff3bb)
+error: test failed, to rerun pass `--test behavior`

@@ -1,0 +1,10 @@
+Clear picture. The function has `unwrap()`, ignores `max_items`, and lacks empty/error handling. Fixing now.
+All 4 tests pass. Writing the required output.
+Repair complete. Changes made to `src/lib.rs`:
+
+- Removed `unwrap()` - replaced with `map_err(|_| ParseError::Invalid)` on parse
+- Added empty input check returning `ParseError::Empty`
+- Added `try_reserve(max_items)` with `ParseError::Allocation` fallback
+- Added `max_items` enforcement returning `ParseError::TooMany`
+- Added empty-trim detection as `ParseError::Invalid`
+- All 4 behavior tests pass, no tests or Cargo.toml modified

@@ -1,0 +1,80 @@
+{
+  "id": "review_invalid_state_job_typestate",
+  "hard": 0,
+  "soft": 0.0,
+  "task_type": "review",
+  "task_description": "Review review_invalid_state_job for Holzman + functional-core Rust violations.",
+  "fail_reason": "enum/typestate/state machine; status/String; bool/lifecycle; Option/invalid state; newtype/domain; parse/boundary; missing_json",
+  "target_user_prompt": "You are running a Holzman Rust SkillOpt rollout. Do not use global skills or memory.\n\nActive skill bundle:\n- SKILL.md: /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/review_invalid_state_job_typestate/.skill/holzman-rust/SKILL.md\n- references: /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/review_invalid_state_job_typestate/.skill/holzman-rust/references\n\nTask crate path: /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/review_invalid_state_job_typestate\nRequired output path: /tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/review_invalid_state_job_typestate/review-output.json\n\nReview exactly the task crate for Holzman + Functional Rust violations.\n\nRules:\n- Read the active skill bundle and applicable references before reviewing.\n- Review only the task crate path above.\n- Do not inspect parent directories, sibling tasks, eval manifests, candidates, or reports.\n- Do not edit Cargo.toml, source, tests, or production files.\n- Do not run cargo commands for review tasks.\n- You may write only the required output path.\n- Findings must include severity, rule, file, line, problem, failure_mode, and fix.\n- Include missing benchmark/profiler/allocation/second-ring/command evidence as findings when relevant.\n\nWrite valid JSON to the required output path:\n{\n  \"status\": \"reviewed\",\n  \"reference_files_read\": [\"...\"],\n  \"findings\": [{\"severity\":\"BLOCKER\",\"rule\":\"...\",\"file\":\"src/lib.rs\",\"line\":1,\"problem\":\"...\",\"failure_mode\":\"...\",\"fix\":\"...\"}],\n  \"missing_evidence\": [],\n  \"residual_risk\": \"...\"\n}",
+  "predicted_answer": "",
+  "n_turns": 1,
+  "model": "qwen36-5090/Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/full_test_seed/predictions/review_invalid_state_job_typestate",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt-train/db94be5bd4fb5955/review_invalid_state_job_typestate",
+  "grade": {
+    "hard": 0.0,
+    "soft": 0.0,
+    "failures": [
+      [
+        "enum",
+        "typestate",
+        "state machine"
+      ],
+      [
+        "status",
+        "String"
+      ],
+      [
+        "bool",
+        "lifecycle"
+      ],
+      [
+        "Option",
+        "invalid state"
+      ],
+      [
+        "newtype",
+        "domain"
+      ],
+      [
+        "parse",
+        "boundary"
+      ],
+      [
+        "missing_json"
+      ]
+    ],
+    "json_valid": false,
+    "matched_groups": 0,
+    "total_groups": 6,
+    "missing_groups": [
+      [
+        "enum",
+        "typestate",
+        "state machine"
+      ],
+      [
+        "status",
+        "String"
+      ],
+      [
+        "bool",
+        "lifecycle"
+      ],
+      [
+        "Option",
+        "invalid state"
+      ],
+      [
+        "newtype",
+        "domain"
+      ],
+      [
+        "parse",
+        "boundary"
+      ]
+    ],
+    "execution_errors": [],
+    "mutation_errors": []
+  }
+}

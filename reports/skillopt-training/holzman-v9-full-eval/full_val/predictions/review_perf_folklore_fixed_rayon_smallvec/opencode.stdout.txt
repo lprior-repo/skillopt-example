@@ -1,0 +1,10 @@
+Review complete. Written `review-output.json` with 5 findings and 6 missing evidence items.
+
+Key findings:
+- **BLOCKER**: Folklore performance claim ("use Rayon and SmallVec because it will be faster") with zero measurement
+- **BLOCKER**: Rayon on 4 elements is fundamentally counter-productive — dispatch overhead dwarfs 2-cycle work items
+- **MAJOR**: Unnecessary heap allocation (`Vec`) for statically known 4-element output — `[&'static str; 4]` eliminates allocation entirely
+- **MAJOR**: No benchmark module exists for the stated performance claim
+- **MINOR**: TODO marker signals unexecuted intent without command evidence
+
+The code is safe (no `unsafe`/`panic`/`unwrap`) and functionally correct, but the folklore optimization TODO carries high risk of embedding the wrong anti-pattern.

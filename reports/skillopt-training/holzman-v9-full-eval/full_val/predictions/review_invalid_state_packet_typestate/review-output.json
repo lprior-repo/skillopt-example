@@ -1,0 +1,122 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/hardening-checklist.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-status-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "PacketWorkflow.status is a raw String instead of a domain enum, allowing illegal packet states (e.g. 'deleted' after 'sent', empty string, any arbitrary text).",
+      "failure_mode": "Invalid state strings propagate through the system; callers cannot exhaustively match states; the domain invariant is invisible to the compiler.",
+      "fix": "Define a `PacketStatus` enum with exactly the legal states (e.g. `Pending`, `Validated`, `Sent`, `Failed`) and replace `pub status: String` with `pub status: PacketStatus`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Lifecycle booleans `is_validated: bool` and `is_sent: bool` encode a state machine that the compiler cannot enforce. Any combination (validated+not-sent, not-validated+sent, both true, both false) is representable.",
+      "failure_mode": "A packet can be marked sent without being validated, or validated and sent simultaneously—violating the workflow invariant that validation precedes sending.",
+      "fix": "Replace booleans with a typestate enum or parametric typestate (e.g. `PacketWorkflow<S: PacketStage>` with `Unvalidated`, `Validated`, `Sent` stages) so each stage carries exactly the fields it needs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-optional-in-variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is a top-level optional field that can be `None` even when the packet is sent, or `Some` when the packet is not yet sent. Optional lifecycle data belongs inside the variant that owns it.",
+      "failure_mode": "Inconsistent state: a `Sent` packet may have no timestamp; a `Pending` packet may have a stale timestamp. The invariant that sent-time exists iff status is sent is unenforceable.",
+      "fix": "Tuck `sent_at_epoch_ms` inside the `Sent` variant of the typestate/enum so it exists only when the packet is in the sent stage."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-newtype-id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw string used as a packet identifier. Any string is accepted with no domain semantics or validation.",
+      "failure_mode": "Empty IDs, IDs with whitespace, or collision-prone strings are silently accepted; the ID cannot be distinguished from other string fields at the type level.",
+      "fix": "Define `newtype PacketId(String)` (or `NonEmptyString`) with a smart constructor that validates non-empty and trims, returning a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-newtype-timestamp",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` uses a raw `u64` for a timestamp without a domain newtype, carrying no meaning or bounds.",
+      "failure_mode": "Future timestamps (year 2100+), zero timestamps, and arbitrary values are accepted; the value cannot be distinguished from a count, length, or ID at the type level.",
+      "fix": "Define `newtype EpochMs(u64)` with a smart constructor that rejects zero/future/unreasonable values, and use `Option<EpochMs>` in the sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smart-constructor-absent",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No smart constructor or `TryFrom` implementation exists to validate and construct `PacketWorkflow`. All fields are `pub` and accept raw primitives directly.",
+      "failure_mode": "Callers can construct packets with any combination of invalid field values at any point, bypassing domain invariants entirely.",
+      "fix": "Make fields private, add `PacketWorkflow::try_new(...)` or `TryFrom<RawPacket>` with validated smart constructor returning a typed error (e.g. `PacketError::InvalidId`, `PacketError::InvalidStatus`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-no-mutation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes ownership of `PacketWorkflow` and mutates fields in place (`item.status = ...; item.is_sent = true;`) instead of returning a new value or using a proper typestate transition.",
+      "failure_mode": "The function does not validate preconditions (e.g. packet must be validated before sent); it blindly overwrites status and sets a flag, allowing any packet to become 'sent'.",
+      "fix": "Design `mark_sent` as a method on a typestate-aware type (e.g. `impl PacketWorkflow<Validated> { fn mark_sent(self) -> PacketWorkflow<Sent> }`) that enforces the transition invariant at compile time."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "evidence-missing-benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark suite exists for any performance claim or behavior guarantee about packet workflow operations.",
+      "failure_mode": "No evidence that `mark_sent` or construction paths meet latency/throughput requirements; performance regressions are undetectable.",
+      "fix": "Add a `benches/` directory with criterion or similar benchmarks for `mark_sent` and construction paths, reporting workload, baseline, and regression threshold."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "evidence-missing-profiler",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (e.g. `cargo flamegraph`, `perf`, `cargo +nightly bench --bench ...`) exists to identify or validate the performance bottleneck.",
+      "failure_mode": "Optimization decisions are based on guesswork rather than measurement; resource-wasting changes may be applied to non-bottleneck code.",
+      "fix": "Add profiler evidence with `cargo +nightly flamegraph` or equivalent, identifying the actual bottleneck before any optimization claim."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "evidence-missing-allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`item.status = \"sent\".to_string()` performs an unbounded heap allocation each time `mark_sent` is called, and there is no allocation evidence or bounded-allocation analysis.",
+      "failure_mode": "Repeated calls allocate new strings every time; if `status` becomes an enum, this allocation disappears, but currently there is no evidence that this allocation pattern is acceptable or measured.",
+      "fix": "Replace `String` status with an enum (eliminating the allocation), and if heap allocation is ever needed, use `try_reserve` with a domain cap and report allocation evidence."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "evidence-missing-command",
+      "file": ".",
+      "line": 0,
+      "problem": "No command evidence exists: no `cargo check`, `cargo clippy`, `cargo test`, or `cargo fmt --check` output is present or claimed. The crate has no `[dev-dependencies]` for tests.",
+      "failure_mode": "There is no verification that the code compiles, passes lints, or passes tests. The crate may be fundamentally broken.",
+      "fix": "Run and report canonical gates: `cargo fmt --check`, `cargo check --all-targets`, `cargo clippy --lib --bins -- -D warnings`, `cargo test`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "law-pub-fields-no-encapsulation",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of `PacketWorkflow` are `pub`, allowing external code to mutate any field directly, bypassing any domain invariants or smart constructors.",
+      "failure_mode": "External code can set `status` to any string, flip `is_sent` without going through `mark_sent`, and leave the struct in an inconsistent state at any time.",
+      "fix": "Make all fields `pub(crate)` or private, expose only domain-safe accessors/mutators, and require construction through a validated smart constructor."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for packet workflow operations (mark_sent, construction)",
+    "no profiler evidence (flamegraph, perf) to identify bottlenecks",
+    "no allocation analysis or try_reserve evidence for hostile-input paths",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy, cargo test not reported",
+    "no second-ring evidence: no proptest, fuzzing, Kani, Miri, or Loom analysis for state-machine invariants"
+  ],
+  "residual_risk": "The crate has a fundamentally broken domain model: raw String status, unenforceable lifecycle booleans, and missing typestate/enum representation. All state invariants are invisible to the compiler. Without fixing the type system to make illegal states unrepresentable, no amount of testing or formal verification can guarantee correctness. The absence of any command evidence (cargo check/clippy/test) means the crate may not even compile as-is. This is not safe for deployment in any form."
+}

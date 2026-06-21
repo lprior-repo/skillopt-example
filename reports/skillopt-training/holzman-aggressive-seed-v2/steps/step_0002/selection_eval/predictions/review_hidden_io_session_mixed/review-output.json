@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — production unwrap on fallible I/O",
+      "failure_mode": "Any disk error (missing file, permission denied, ENOENT) panics the caller instead of returning a typed Parse/I/O error",
+      "fix": "Return Result<Vec<Record>, io::Error> (or a custom IoError enum) and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": ".parse::<u32>().unwrap() — production unwrap on fallible primitive parse",
+      "failure_mode": "Non-numeric value in parts[1] (malformed input, overflow, empty string) panics instead of yielding a typed ParseError",
+      "fix": "Use .map_err(|e| ParseError::Value(..)) or return a Result and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy `as u16` cast from u32 — truncates values above 65535 silently",
+      "failure_mode": "A valid u32 value >65535 wraps to an incorrect u16, corrupting domain data with no error or warning",
+      "fix": "Use u16::try_from(parsed_u32)? or .try_into().map_err(|_| ParseError::Overflow(..))"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Unchecked indexing parts[0] and parts[1] — panics if line has fewer than 2 comma-separated fields",
+      "failure_mode": "Malformed input (empty line, single-field line) causes index-out-of-bounds panic in the caller",
+      "fix": "Use split_once(',') to get exactly two parts, or .get(0) and .get(1) with map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!() inside a data-parsing function — hidden I/O side effect in core-appearing logic",
+      "failure_mode": "The function mixes I/O with parsing, making it impossible to test the pure parsing path in isolation and coupling the core to console output",
+      "fix": "Remove println! from the parser; return parsed records and let the shell layer handle logging/metrics"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sessions returns Vec<Record> with no Result — all fallible operations silently hidden behind unwrap",
+      "failure_mode": "Callers have no way to handle errors; the entire API contract promises success but can panic on any I/O, parse, index, or cast failure",
+      "fix": "Change signature to pub fn load_sessions(path: &str) -> Result<Vec<Record>, SessionError>"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_unnecessary_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collecting all split parts into Vec<String> before using only parts[0] and parts[1] — unnecessary heap allocation and iteration",
+      "failure_mode": "Wastes memory on a full Vec<String> allocation for every line; for long lines this is avoidable heap pressure",
+      "fix": "Use line.split_once(',') to get exactly two &str parts, trim them, and parse directly"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typed error enum defined — uses raw unwrap and String-based path parameter with no validation",
+      "failure_mode": "Error surfaces as a panic with no domain semantics; callers cannot distinguish I/O, parse, or overflow failures",
+      "fix": "Define an enum SessionError { Io(io::Error), Parse(ParseError), Overflow } and return Result<Vec<Record>, SessionError>"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists — no performance baseline or hot-path measurement",
+    "no profiler evidence — no flamegraph, perf, or sample-profile data",
+    "no allocation evidence — no allocs or heap-use measurement for the parser path",
+    "no second-ring evidence — no assembly output, SBOM, or release-provenance data",
+    "no command evidence — cargo fmt, cargo check, cargo clippy, and cargo test were not run as part of this review"
+  ],
+  "residual_risk": "All I/O paths in load_sessions are unguarded by Result propagation or error handling. Every fallible operation (I/O, parse, indexing, cast) can panic. No typed domain errors exist. No benchmarks, profiler, or allocation evidence is present to validate any performance or safety claims. This crate must be repaired to return Result types with typed errors, remove unwrap/panic/println from the parser, replace unchecked indexing with split_once/get, and replace the lossy as cast with try_from before it can be considered Holzman-compliant."
+}

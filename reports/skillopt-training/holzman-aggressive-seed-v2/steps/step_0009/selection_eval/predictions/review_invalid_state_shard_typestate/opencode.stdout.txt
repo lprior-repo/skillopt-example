@@ -1,0 +1,7 @@
+Review complete. Wrote `review-output.json` with 6 findings:
+
+- **3 BLOCKERs** on `ShardWorkflow` (lines 1, 4, 6) — `status: String`, `is_validated: bool`, and `is_sent: bool` make illegal states trivially representable (e.g. `is_sent=true` with `status="draft"`, `sent_at_epoch_ms=None` with `is_sent=true`). All three should collapse into a single enum/typestate.
+- **1 BLOCKER** on `mark_sent` (line 9) — no workflow invariant enforcement; mutating a struct with no constructor validation means transitions are unguarded.
+- **2 WARNINGs** — string-literal status assignment (line 10) is fragile and allocative; no functional core / imperative shell split.
+
+Missing evidence: no benchmarks, profiler data, allocation analysis, behavior tests, or command evidence.

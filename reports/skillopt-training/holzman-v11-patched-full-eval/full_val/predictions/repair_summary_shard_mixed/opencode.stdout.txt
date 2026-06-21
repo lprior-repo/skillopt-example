@@ -1,0 +1,22 @@
+Now I have the full picture. Let me also read the skill references before editing.
+Now I have full understanding of the issues. Let me fix `src/lib.rs`:
+
+1. `summarize_metrics` returns `String` but tests expect `Summary`
+2. `render_summary` function is missing
+3. `.unwrap()` on line 24 — must use checked parsing
+4. Division by zero when count is 0
+5. No overflow check on `total += value`
+6. Lossy `as` casts on count
+All 6 tests pass. Running remaining verification gates.
+All verification gates pass. Now writing the required output.
+Repair complete. All 6 tests pass, all strict lint gates pass.
+
+**Changes made to `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- Added `render_summary` function (expected by tests)
+- Replaced `.unwrap()` with `.map_err(|_| SummaryError::Invalid)` for parse failures
+- Added `checked_add` for sum and count to detect overflow
+- Added `checked_div` for average calculation
+- Used `split_once(',')` per mandate (replaced `split(',').collect()` + indexing)
+- Replaced lossy `as` casts with `try_from` + `map_err`
+- Early empty-input check prevents division-by-zero

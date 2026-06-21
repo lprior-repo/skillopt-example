@@ -1,0 +1,47 @@
+{
+  "step": 5,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 3,
+  "failure_patterns": [
+    {
+      "pattern": "missing_checked_arithmetic: Agents failed to use checked_add/checked_mul for capacity and accumulator calculations.",
+      "count": 2,
+      "task_ids": [
+        "repair_frame_sample_mixed",
+        "repair_frame_session_mixed"
+      ]
+    },
+    {
+      "pattern": "missing_split_once: Agents used manual indexing or split/collect instead of split_once for first-delimiter parsing.",
+      "count": 1,
+      "task_ids": [
+        "repair_summary_session_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.7,
+  "score_after": 0.4,
+  "rejected_edits": [
+    {
+      "op": "replace",
+      "content": "- For `Vec`-producing parsers/encoders with a known maximum, compute capacity with `checked_add`/`checked_mul` (never unchecked `+`/`*`), call `try_reserve` (not `Vec::with_capacity`) before pushing/extending, and map allocation failure to a typed error such as `Allocation` when available.",
+      "target": "- For `Vec`-producing parsers/encoders with a known maximum, compute capacity with checked arithmetic, call `try_reserve` (not `Vec::with_capacity`) before pushing/extending, and map allocation failure to a typed error such as `Allocation` when available."
+    },
+    {
+      "op": "replace",
+      "content": "- For frame encoders, summaries, and counters: use `checked_add`/`checked_mul` for sizes/totals/accumulators, use `checked_div` after proving the divisor is nonzero, and use `u32::try_from`/`usize::try_from` instead of lossy width casts.",
+      "target": "- For frame encoders, summaries, and counters: use `checked_add` for sizes/totals, use `checked_div` after proving the divisor is nonzero, and use `u32::try_from`/`usize::try_from` instead of lossy width casts."
+    },
+    {
+      "op": "insert_after",
+      "content": "- **Parsing:** Use `split_once` for first-delimiter extraction. Use `get` for indexed access. Never use `split` + `collect` + indexing when `split_once` suffices. Never use unchecked indexing like `parts[1]` without bounds checks.",
+      "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the failure mode requires them."
+    },
+    {
+      "op": "replace",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+`/`*` in capacity/length/summary math (use `checked_add`/`checked_mul`), integer `/` where `checked_div` is required, `as` width casts instead of `try_from`, unchecked indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+    }
+  ]
+}

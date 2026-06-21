@@ -1,0 +1,99 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O error (missing file, permissions, etc.)",
+      "failure_mode": "Untrusted or missing file input aborts the entire process instead of returning a typed error",
+      "fix": "Return Result<Vec<Record>, IoError>. Use fs::read_to_string(path).map_err(...) and propagate with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on both missing field and invalid integer string",
+      "failure_mode": "A malformed CSV line (missing second field or non-numeric value) panics instead of yielding a typed parse/missing-field error",
+      "fix": "Use split_once(',') to extract fields, check .is_some() for the second field, use .parse::<u16>().map_err(...) for the numeric conversion, and return a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy as cast: u32 -> u16 via .parse::<u32>().unwrap() as u16",
+      "failure_mode": "A valid u32 value greater than u16::MAX silently truncates, producing incorrect domain data",
+      "fix": "Parse directly as u16 via .parse::<u16>() or use u16::try_from(value).map_err(...) to reject out-of-range values with a typed error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Uses line.split(',').map(...).collect() then accesses parts[0] and parts[1] by unchecked index",
+      "failure_mode": "split + collect allocates a full Vec for every line, then parts[0] and parts[1] are unchecked indexing — either index may panic on short lines",
+      "fix": "Replace with split_once(',') to extract the first delimiter-only pair, then .map(|(name, val)| ...) without collect or indexing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_core",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — side-effecting I/O inside what should be the pure parsing layer",
+      "failure_mode": "Logging inside the data-loading core couples it to std::io, making it untestable in isolation and producing unwanted stdout in consumer processes",
+      "fix": "Remove println! from the pure core. If logging is needed, let the imperative shell (caller) log after the function returns, or accept a callback/handler abstraction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "The function mixes I/O (fs::read_to_string, println!) with data parsing in a single monolithic function",
+      "failure_mode": "Cannot unit-test the parsing logic in isolation; every test requires filesystem access and handles I/O errors that are not part of the domain contract",
+      "fix": "Split into two functions: (1) parse_records(line: &str) -> Result<Record, ParseError> — pure and testable, (2) load_jobs(path: &str) -> Result<Vec<Record>, JobError> — shell that handles I/O and delegates to (1)"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation_discipline",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Allocates Vec<String> per line for split parts when only two fields are needed",
+      "failure_mode": "Unnecessary heap allocation per line degrades throughput; split_once + &str avoids all per-field allocations",
+      "fix": "Use split_once(',') and work with &str slices throughout the parsing pipeline; only allocate String in the final Record if the API requires owned data"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for this I/O-bound function",
+      "failure_mode": "Cannot verify whether this implementation meets throughput/latency requirements; no baseline for regression testing",
+      "fix": "Add a criterion or similar benchmark measuring parse-throughput on representative input, and an allocation audit (e.g., dhat, or manual tracking) for the hot path"
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [dev-dependencies], [[bench]], or [profile] sections — no bench.toml/criterion section, no overflow-check or panic-strategy configuration",
+      "failure_mode": "No instrumentation hooks (overflow checks, debug assertions, allocation tracking) can be enabled via Cargo.toml",
+      "fix": "Add criterion or similar bench dependency, overflow-checks = true in profile.release, and any needed dev-dependencies"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for stated or implied performance claims",
+    "no profiler evidence (flamegraph, perf, dhat) for allocation patterns",
+    "no allocation audit for the per-line Vec<String> allocation in the hot path",
+    "no second-ring evidence (assembly, SBOM, or release binary analysis) for zero-cost or bounds-check removal claims",
+    "no command evidence (cargo fmt, cargo clippy, cargo test) was run — static review only"
+  ],
+  "residual_risk": "Static review identified 7 blockers and 3 warnings across Holzman Rust constraints: forbidden constructs (unwrap, as cast, unchecked indexing), functional core violations (hidden I/O, mixed concerns), and allocation anti-patterns. No commands were executed and no tests exist in the crate. Full repair requires implementing typed error returns, split_once-based parsing, direct u16 parsing, removing println! from the core, splitting into pure/impure layers, and adding a test suite with behavior tests."
+}

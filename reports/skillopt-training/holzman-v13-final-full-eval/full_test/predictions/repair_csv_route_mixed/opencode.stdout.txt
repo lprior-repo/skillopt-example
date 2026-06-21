@@ -1,0 +1,18 @@
+Now let me read the referenced skill docs and run the initial build to see what fails.
+Now I understand the issues. The source uses `.unwrap()`, ignores `max_items`, and uses the forbidden `split.collect()` pattern. Let me apply the minimal repair.
+All 4 tests pass. Now run the full Holzman verification gate.
+All gates pass. Now write the required output file.
+Repair complete. All gates passed.
+
+**Changes made to `src/lib.rs`:**
+
+| Issue | Fix |
+|---|---|
+| `.unwrap()` on parse → panic surface | `.map_err(\|_\| ParseError::Invalid)` typed error |
+| Ignored `max_items` parameter | Enforced before each push, returns `TooMany` |
+| `.split(',').map().collect()` forbidden pattern | Per-element `for` loop with `Vec::new` + push |
+| No empty input check | `input.is_empty()` → `Err(ParseError::Empty)` |
+| No bounded allocation | `try_reserve(max_items)` → `Err(ParseError::Allocation)` |
+| Empty token after trim | Returns `Err(ParseError::Invalid)` |
+
+**Gates:** `cargo fmt`, `cargo test` (4/4), `cargo check`, `cargo clippy` (strict) — all clean.

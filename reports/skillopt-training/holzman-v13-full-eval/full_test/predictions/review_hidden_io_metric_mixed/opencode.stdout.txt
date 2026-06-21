@@ -1,0 +1,8 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**10 findings identified:**
+- **7 BLOCKER**: `unwrap()` on file I/O (line 9), `unwrap()` on parse (line 19), lossy `as u16` cast (line 19), two unchecked indexing sites (lines 16, 19), hidden `println!` I/O (line 16), raw `String` name field violating parse boundary (line 4)
+- **3 MAJOR**: shell leakage — I/O/parsing/domain fused in one function (line 8), no typed error taxonomy (line 8), no bounded allocation/capacity (line 12)
+- **1 MINOR**: unnecessary `Vec<String>` intermediate materialization (line 12)
+- **1 MISSING**: no benchmark/profiler/allocation evidence for `load_metrics`

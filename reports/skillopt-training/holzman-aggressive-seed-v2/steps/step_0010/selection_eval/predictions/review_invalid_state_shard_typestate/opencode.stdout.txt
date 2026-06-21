@@ -1,0 +1,9 @@
+Review complete. Valid JSON written to `review-output.json` with 7 findings (6 BLOCKER, 1 MAJOR) covering:
+
+- **Illegal states representable** — `status: String` allows arbitrary values; `is_validated: bool` and `is_sent: bool` are boolean-blind
+- **Duplicate state tracking** — `is_sent` overlaps with `status`, creating inconsistency risk
+- **No type-level invariants** — Public fields allow any caller to construct invalid shard states
+- **No transition enforcement** — `mark_sent` has no precondition checks
+- **Raw `String` for id** — No `ShardId` newtype
+- **Allocation in hot path** — `.to_string()` on every transition
+- **Missing evidence** — No benchmarks, profiler data, tests, or CI command evidence

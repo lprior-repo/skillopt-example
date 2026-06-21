@@ -1,0 +1,8 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**12 findings** across the crate:
+
+- **8 BLOCKERs**: `unwrap()` on I/O (line 9) and parse (line 19), lossy `as u16` cast (line 19), unchecked indexing `parts[0]`/`parts[1]` (lines 16, 19), hidden `println!` I/O side effect (line 16), no typed domain errors, mixed I/O+parse in single function, no `try_reserve` for allocation (line 12), unnecessary `.clone()` (line 18).
+- **3 INFO**: Missing benchmark, profiler, and allocation evidence.
+- **Residual risk**: Static review only — no build/test commands were executed.

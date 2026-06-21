@@ -1,0 +1,9 @@
+Now I have full context. The current code has violations: `.unwrap()` on parse, no empty check, no `max_items` enforcement, no invalid handling. Let me fix it.
+All 4 tests pass. Now I'll write the required output file.
+Repaired. Changes to `src/lib.rs`:
+
+- **Removed `.unwrap()`** — parse failures now return `ParseError::Invalid` via `map_err`
+- **Added empty-input check** — returns `ParseError::Empty` when input is blank
+- **Added `max_items` enforcement** — returns `ParseError::TooMany` when items exceed the limit
+- **Added empty-part rejection** — consecutive commas produce `ParseError::Invalid`
+- All 4 behavior tests pass. Valid JSON written to `repair-output.json`.

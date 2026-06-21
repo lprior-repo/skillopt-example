@@ -1,0 +1,41 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "performance_no_cargo_cult",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment declares 'use Rayon and SmallVec because it will be faster' — a performance claim made without any benchmark, profiler, or allocation evidence. Rayon parallelism overhead on a 4-byte input is orders of magnitude larger than the work done. SmallVec provides no benefit for a fixed-size 4-element input since the heap vs stack tradeoff is irrelevant.",
+      "failure_mode": "Adding Rayon on 4 elements will cause a thread-pool dispatch, task creation, and synchronization overhead that dwarfs the 4 map iterations, making the code measurably slower. SmallVec adds type complexity with zero allocation savings.",
+      "fix": "Remove the TODO. Do not introduce Rayon or SmallVec for a fixed 4-element slice. If a performance change is needed, first write a benchmark on realistic input distributions, then measure with a profiler and allocation tracing before changing any code."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "allocation_try_reserve",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "The `collect()` call into `Vec<&'static str>` does not use `try_reserve` to pre-allocate. While the capacity is known (4 elements), the code relies on `collect`'s default growth strategy which may do multiple reallocations.",
+      "failure_mode": "Extra allocation and copying overhead. On a 4-element input, default growth may allocate 0, 1, 2, 4 times — causing up to 3 unnecessary reallocations.",
+      "fix": "Collect into a `[&'static str; 4]` array instead of `Vec`, or use `try_reserve` with checked arithmetic before collecting if a Vec is required by the API."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "functional_core_return_type",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Returning `Vec<&'static str>` for a fixed-size domain (4 bytes) leaks an implementation detail (heap allocation) into the public API. The caller cannot know the size without inspecting the return type or runtime length.",
+      "failure_mode": "Callers may allocate additional storage by collecting into Vec again, or may write code that assumes variable length when the domain is fixed at 4.",
+      "fix": "Return `[&'static str; 4]` to make the size part of the type, enforcing compile-time knowledge of the output cardinality."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists to support the stated Rayon + SmallVec performance claim",
+    "no profiler data exists showing current performance characteristics of classify_four",
+    "no allocation tracing (e.g., alloc-trim, valgrind) to measure current heap pressure",
+    "no second-ring benchmark comparing array vs Vec return for this workload",
+    "no command evidence that any performance measurement has been run"
+  ],
+  "residual_risk": "Static review only; no commands run. The code compiles but makes an unverified performance claim about adding Rayon/SmallVec on a 4-byte input, which is almost certainly counterproductive. The main blocker is the cargo-culted performance comment that invites incorrect optimization."
+}

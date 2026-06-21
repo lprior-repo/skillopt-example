@@ -1,0 +1,9 @@
+Now I see the issues. The production code ignores `max_payload`, uses lossy `as` cast, and has no allocation error handling. Let me fix it.
+Both tests pass. Let me write the output.
+Repaired. Three issues fixed in `src/lib.rs:8-24`:
+
+1. **Missing `max_payload` check** — added bounds check returning `PayloadTooLarge`
+2. **Lossy `as` cast** (`payload.len() as u32`) — replaced with `u32::try_from` + `Overflow` error
+3. **Unchecked allocation** — replaced bare `Vec::new()` + `extend` with `try_reserve` + `checked_add` + `Allocation`/`Overflow` errors
+
+Both tests pass, all Holzman forbidden constructs removed.

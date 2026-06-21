@@ -1,0 +1,10 @@
+Now I have all the context. Let me write the review output.
+Done. Review output written to `review-output.json` with 5 findings:
+
+1. **BLOCKER — tiny-fixed-overhead**: `[u8; 4]` input returns `Vec<&'static str>` — heap allocates per call instead of returning `['static str; 4]`
+2. **BLOCKER — rayon-folklore**: TODO prescribes Rayon for 4 elements — parallel dispatch overhead dwarfs the work
+3. **BLOCKER — missing-performance-evidence**: Performance claim with zero benchmark/profiler data
+4. **BLOCKER — allocation-discipline**: `Vec` allocation on every 4-element call with no budget or evidence
+5. **WARNING — speculative-todo-comments**: TODO encodes architectural changes without evidence, risking accidental implementation of folklore-based decisions
+
+Missing evidence: no benchmarks, profiler data, allocation tracking, second-ring evidence, or command evidence.

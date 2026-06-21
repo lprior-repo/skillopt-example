@@ -1,0 +1,18 @@
+Now I have all context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 7 findings (3 BLOCKER, 2 MAJOR, 2 MINOR)**
+
+| Severity | Rule | File:Line |
+|----------|------|-----------|
+| BLOCKER | typestate_invalid_state_representable | src/lib.rs:1 |
+| BLOCKER | mark_sent_no_preconditions | src/lib.rs:9 |
+| BLOCKER | missing_checked_id_conversion | src/lib.rs:6 |
+| MAJOR | primitive_obsession_status_string | src/lib.rs:3 |
+| MAJOR | boolean_blindness_lifecycle | src/lib.rs:4 |
+| MINOR | exposed_mutable_fields | src/lib.rs:1 |
+| MINOR | functional_core_imperative_shell_mixing | src/lib.rs:9 |
+
+**Core issue:** `ShardWorkflow` makes illegal states representable — `status: String` + `is_validated: bool` + `is_sent: bool` permit impossible combinations (e.g., sent but never validated). `mark_sent` has no precondition checks. All fields are `pub`.
+
+**Missing evidence:** no benchmarks, profiler data, allocation audit, or command-run evidence.

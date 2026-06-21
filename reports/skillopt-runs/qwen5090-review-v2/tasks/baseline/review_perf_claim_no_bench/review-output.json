@@ -1,0 +1,134 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/runtime-performance-architecture.md",
+    "references/zero-cost-abstractions.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "benchmark_proof",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Claim 'This is faster than the old implementation.' has zero benchmark, baseline, or profiler evidence. The skill requires every performance claim to have measured evidence with commands and numbers. No benchmark target exists in the crate.",
+      "failure_mode": "Unmeasured optimization hides regressions. Parallel iteration over small inputs can be slower than serial due to thread-scheduling overhead, making the claim false for typical workloads.",
+      "fix": "Add a named benchmark target (e.g. benches/collect_even.rs) with criterion or similar, establish baseline numbers, and tie the performance claim to actual before/after measurements on the target workload."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hallucinated_evidence",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "The comment asserts a performance improvement ('faster') without any verifiable evidence. This is an unsubstantiated performance claim that cannot be validated.",
+      "failure_mode": "Code ships with performance claims that are unprovable, making code review of the claim impossible and creating false confidence in the optimization.",
+      "fix": "Remove the assertion until benchmark evidence exists, or replace with a placeholder that references a benchmark that must be added before merge."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "rayon is used as the primary iteration mechanism in the only public function. rayon introduces threading overhead, thread-pool allocation, and potential unbounded spawn behavior. No benchmark justification or threat-model proof is provided for why parallel iteration over a slice is faster than serial iteration.",
+      "failure_mode": "For small or medium inputs, rayon's thread scheduling overhead dominates, making this slower than a serial filter. The thread pool also carries a hidden allocation cost and potential resource exhaustion under high concurrency.",
+      "fix": "Add a benchmark comparing rayon::par_iter() against values.iter().filter() across a range of input sizes (e.g. 16, 256, 4096, 65536 items). Only use rayon if the benchmark proves it wins at the target workload. Justify with measured scaling evidence."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "smallvec is used as the return type. SmallVec introduces an overflow-to-heap allocation path when the output exceeds inline capacity (64 items). No benchmark justification or allocation budget is provided for SmallVec over Vec or a caller-owned output buffer.",
+      "failure_mode": "SmallVec can silently allocate on the heap when output exceeds the inline capacity, violating the no-post-init-allocation rule for critical paths. The overflow behavior is invisible to callers without type documentation.",
+      "fix": "Document SmallVec overflow behavior, add an allocation budget, or replace with a caller-owned output buffer pattern (e.g. fn collect_even_into(values: &[u64], out: &mut SmallVec<[u64; 64]>) -> Result<(), Error>) to make allocation explicit and controllable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "rayon's par_iter().filter().collect() has no explicit iteration bound visible at the call site. While rayon internally bounds its work, the calling code does not declare or cap the number of items being processed, making it impossible for static analysis to verify bounded behavior.",
+      "failure_mode": "Unbounded input can cause unbounded memory allocation (into SmallVec) and unbounded CPU time. No static bound or input-size limit is visible, violating the Power of Ten fixed-loop-bounds requirement.",
+      "fix": "Add an input-size parameter with a maximum bound, or validate that input.len() <= MAX_INPUT before processing. Document the bounded nature of the operation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "The function signature returns SmallVec<[u64; 64]> without any Result type. SmallVec's push operations can fail when allocation fails, but this is not expressed in the type system. Additionally, there is no input validation for the slice length.",
+      "failure_mode": "Allocation failure during SmallVec growth will panic (via smallvec::SmallVec::push which calls OOM on push), which is an untyped, unexpected failure in production-reachable code.",
+      "fix": "Change the return type to Result<SmallVec<[u64; 64]>, AllocationError> or use SmallVec::try_push in a loop with fallible propagation. Add input bounds checking."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_short_functions",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "The function is 2 logical lines but performs parallel iteration, filtering, and collection without any documentation of bounds, workload assumptions, or invariants. For a safety-critical or mission-critical path, the absence of documentation about the bounded behavior of the parallel operation is a violation.",
+      "failure_mode": "Future maintainers cannot verify the bounded nature of the parallel operation or understand the allocation assumptions.",
+      "fix": "Add a doc comment stating the bounded iteration guarantee, the allocation behavior (SmallVec inline capacity and overflow), and any preconditions on the input slice."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "latency_budget",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No latency target, p50/p95/p99 measurement, or tail-stability analysis is provided. Parallel iteration has non-deterministic timing due to thread scheduling, making latency guarantees impossible without measurement.",
+      "failure_mode": "Tail latency (p99) can be dominated by thread scheduling jitter, cache cold-starts in worker threads, and SmallVec allocation spikes, making this unsuitable for latency-sensitive workloads.",
+      "fix": "Define a latency target and measure p50/p95/p99 under the target workload. Document whether this function is latency-sensitive or throughput-oriented."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_by_default",
+      "file": "Cargo.toml",
+      "line": 7,
+      "problem": "rayon v1.x pulls in unsafe code internally (thread safety, raw pointers for channel communication). This unsafe code is not reviewed or waived. The skill requires explicit user waiver for unsafe dependencies in production code.",
+      "failure_mode": "Unsafe code in rayon could contain UB that is not caught by standard testing, and the dependency's unsafe surface area is not audited.",
+      "fix": "Run cargo geiger to assess the unsafe surface of rayon. If rayon's unsafe usage is acceptable, document the waiver. Otherwise, replace with a safe serial implementation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pinned_nightly_required",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No rust-toolchain.toml file exists in the crate. The skill requires pinned nightly with specific components for any Rust performance work.",
+      "failure_mode": "Floating toolchain causes non-reproducible builds, missing lint coverage, and unpredictable compiler behavior across environments.",
+      "fix": "Add rust-toolchain.toml with a pinned nightly date and required components (rustfmt, clippy, rust-src, llvm-tools-preview)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "scope_aware_blocking",
+      "file": "Cargo.toml",
+      "line": 7,
+      "problem": "rayon is a non-trivial dependency introducing threading, shared state, and unsafe code. No dependency audit (cargo audit, cargo deny, cargo vet, cargo machete, cargo geiger) has been performed or evidenced.",
+      "failure_mode": "Vulnerable, unmaintained, or policy-violating dependencies can ship into production without detection.",
+      "fix": "Run and evidence cargo audit, cargo deny check, cargo vet (if applicable), cargo machete, and cargo geiger. Document dependency posture."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "placeholder_commands_forbidden",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "The performance claim is made without any command evidence. The skill explicitly forbids reporting performance without actual measured evidence. Template commands were not run and none exist.",
+      "failure_mode": "Review cannot verify the claim; any downstream decisions based on the 'faster' assertion are made on unverified information.",
+      "fix": "Run an actual benchmark command (e.g. cargo bench with a named bench target) and include the output in the review. Until then, the claim is unverified and must be treated as a blocker."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmark target exists in the crate (no benches/ directory, no criterion or similar dependency in Cargo.toml)",
+    "No profiler evidence (no flamegraph, perf stat, cachegrind, or samply output)",
+    "No baseline measurement for the claimed 'faster' statement",
+    "No rust-toolchain.toml with pinned nightly toolchain",
+    "No assembly/IR evidence for the hot path (no cargo asm or cargo llvm-ir output)",
+    "No dependency audit evidence (no cargo audit, cargo deny, cargo vet, cargo machete, or cargo geiger output)",
+    "No allocation budget or profiling data for SmallVec growth behavior",
+    "No latency budget (p50/p95/p99) or throughput target defined",
+    "No workload definition (input distribution, target hardware, acceptance threshold)",
+    "No second-ring evidence (no assembly inspection, no API compatibility check, no release-provenance artifacts)"
+  ],
+  "residual_risk": "This review is a static analysis only. No commands were executed because the task is static review. The crate makes an unsubstantiated performance claim ('faster than the old implementation') with no benchmark, baseline, profiler evidence, or toolchain pinning. rayon is a significant unsafe dependency introduced without audit or justification. SmallVec's heap-overflow path is invisible to callers and unbounded. All blocking findings must be resolved before this code can be accepted under Holzman Rust policy. The absence of any benchmark target means the performance claim cannot be verified, and the rayon parallelization cannot be validated as actually faster than serial iteration for the target workload."
+}

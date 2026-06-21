@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-rules",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub String — any arbitrary string value (e.g. \"banana\", \"\") is a valid state. Status must be an enum with explicit variants.",
+      "failure_mode": "Invalid states are representable. Callers can set status to any string, violating the workflow invariant that status follows a defined lifecycle.",
+      "fix": "Replace `pub status: String` with `pub status: PacketStatus` where `PacketStatus` is an enum with exactly the valid lifecycle variants (e.g., `Pending`, `Validated`, `Sent`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are separate booleans. This permits invalid combinations: is_validated=false + is_sent=true, or is_validated=false + is_sent=false + status=\"sent\".",
+      "failure_mode": "The struct represents logically impossible states (e.g., a packet marked sent without being validated). These states cannot be rejected at compile time.",
+      "fix": "Replace both booleans with a single typestate enum: `pub state: PacketState` with variants that encode the lifecycle (e.g., `Pending { id, validated_data: Option<...> }`, `Validated { id }`, `Sent { id, sent_at } }`)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-rules",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a global Option<u64> on the struct. Optional lifecycle data must live inside the variant that owns it, not as a top-level Option that permits invalid combinations.",
+      "failure_mode": "A packet can have is_sent=true and sent_at_epoch_ms=None (sent without a timestamp), or is_sent=false and sent_at_epoch_ms=Some(…). Both are invalid but representable.",
+      "fix": "Move the timestamp into the typestate variant that represents the sent state. In the enum model, the `Sent` variant carries `sent_at: u64` directly (not Option)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-rules",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is pub String. IDs carry domain rules and should use a newtype to prevent accidental misuse and to enforce format/length constraints at construction.",
+      "failure_mode": "Empty strings, malformed IDs, or ID confusion across packet types are all possible. No smart constructor validates the id.",
+      "fix": "Replace with `pub id: PacketId` where `PacketId` is a newtype with a smart constructor that returns a typed error on invalid input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-modeling-rules",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent does not enforce any state transition invariant. It blindly overwrites status to \"sent\" and sets is_sent=true without checking that is_validated is true, without setting sent_at_epoch_ms, and without preventing re-sends.",
+      "failure_mode": "A packet can be marked sent without ever being validated. sent_at_epoch_ms is never set by this function, leaving it None even though is_sent=true. Repeated calls silently overwrite status.",
+      "fix": "Replace the function with a method on the typestate enum that only exists on the `Validated` variant, sets sent_at_epoch_ms, and transitions to the `Sent` variant. Example: `impl PacketState { fn mark_sent(self) -> PacketState { ... } }` on the validated variant only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are pub. There is no encapsulation. No smart constructor, no invariant enforcement, and no way to prevent construction of invalid states.",
+      "failure_mode": "Any caller can construct a PacketWorkflow with any combination of fields, including impossible states. The struct has no constructor, no builder, and no private fields.",
+      "fix": "Make all fields private. Provide a smart constructor `PacketWorkflow::new(id: PacketId) -> Result<PacketWorkflow, NewError>` that initializes the struct to the first lifecycle state with all invariants satisfied. Use a typestate enum for the lifecycle."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-performance",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `\"sent\".to_string()` — allocates a new String on every call for a value that should be a static enum variant, not a heap-allocated string.",
+      "failure_mode": "Unnecessary heap allocation in a state transition function. Combined with the String-based status, this means every transition allocates.",
+      "fix": "Replace with an enum variant. No allocation needed for a state tag."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hardening-checklist",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, no profiler, no allocation evidence exists. The struct and function are hot-path candidates but have zero measurement.",
+      "failure_mode": "Performance claims (or lack thereof) are unmeasured. Adding typestate/enum refactoring should be benchmarked to confirm no regression.",
+      "fix": "Add a micro-benchmark for the current and refactored implementation. Compare allocation counts and latency."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for state transition performance",
+    "no profiler evidence for allocation patterns in mark_sent",
+    "no allocation analysis (e.g., cargo-flamegraph or alloc counters) for the current PacketWorkflow struct",
+    "no command evidence: cargo fmt --check, cargo check, cargo clippy not run (static review only)"
+  ],
+  "residual_risk": "This is a static review only. The entire struct represents invalid states — the status String, two independent lifecycle booleans, and a top-level Option for lifecycle data are all fundamental violations of the Holzman domain modeling rules. The mark_sent function is incomplete (does not set sent_at_epoch_ms) and enforces no transition invariants. Full repair requires a complete typestate refactor: replace all primitive fields with an enum-driven typestate, add a smart constructor, and move mark_sent into a variant method that owns the transition. No commands were run; clippy, fmt, and test gates are unverified."
+}

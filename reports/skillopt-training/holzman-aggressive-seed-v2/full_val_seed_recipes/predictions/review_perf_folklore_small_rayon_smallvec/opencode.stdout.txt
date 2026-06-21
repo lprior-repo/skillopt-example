@@ -1,0 +1,16 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**5 findings across the crate:**
+
+| Severity | Rule | Line | Summary |
+|----------|------|------|---------|
+| **BLOCKER** | no-cargo-cult-rayon | 2 | TODO declares Rayon for 4-byte array — thread dispatch overhead will be slower than sequential |
+| WARNING | smallvec-justification-required | 2 | SmallVec intent without measured distribution evidence |
+| WARNING | no-benchmark-evidence | 2 | Performance claim ("it will be faster") has no measured baseline |
+| INFO | functional-core-purity | 1 | Pure function (good) but no shell/core separation yet |
+| INFO | no-error-taxonomy | 1 | Current signature is infallible but fragile to future changes |
+
+**5 missing evidence items** — no benchmark, profiler, allocation, second-ring assembly, or command evidence exists.
+
+**Primary risk:** The explicit intent to add Rayon to a fixed 4-element workload will be a net regression. SmallVec is plausible but unproven. The pure function itself is correct and safe.

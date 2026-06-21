@@ -1,0 +1,10 @@
+Now I have full picture. The production code has multiple Holzman law violations: `unwrap()`, no empty check, no max_items enforcement, no fallible parsing, no allocation discipline. Tests define the exact behavior contract.
+All 4 tests pass. Let me verify final source is clean, then write the output.
+Source is clean. No forbidden constructs. Writing JSON output.
+Repaired. Summary of changes to `src/lib.rs`:
+
+- **Removed** `.unwrap()` -- replaced with `map_err(|_| ParseError::Invalid)` on `parse()`
+- **Added** empty input check returning `ParseError::Empty`
+- **Added** `max_items` enforcement returning `ParseError::TooMany`
+- **Added** `try_reserve` with fallible `ParseError::Allocation` for bounded allocation
+- **All 4 tests pass**, zero forbidden constructs remaining

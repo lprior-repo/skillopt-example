@@ -1,0 +1,10 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written `review-output.json` with 6 findings:
+
+- **2 BLOCKERs**: Rayon folklore for 4-element input, SmallVec unnecessary for fixed-size output
+- **2 Major**: Heap allocation via `.collect()` on 4 items, no benchmark evidence for performance claim, no tests
+- **1 Minor**: Vec return leaks allocation detail into domain API
+
+Missing evidence: no benchmarks, profiler data, call-site context, or command evidence (review-only mode).
+
+The core issue: the TODO suggests Rayon+SmallVec for a 4-byte input, which is the textbook performance folklore anti-pattern — parallel overhead dwarfs nanosecond workloads.

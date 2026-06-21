@@ -1,0 +1,85 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [".skill/holzman-rust/SKILL.md", ".skill/holzman-rust/references/functional-core-performance.md", ".skill/holzman-rust/references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O errors (missing file, permission denied, truncated input)",
+      "failure_mode": "untrusted file paths can abort the entire process instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> (or a typed domain error) and propagate with ? instead of unwrap()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on parse failure or missing field",
+      "failure_mode": "malformed CSV rows or out-of-range numeric values abort the process; also parts[1] is unchecked indexing which panics if the line has fewer than two commas",
+      "fix": "use get(1) with checked indexing, parse with map_err to a typed error, return Result<Vec<Record>, E>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] is unchecked indexing into a Vec<String> produced by split",
+      "failure_mode": "an empty or whitespace-only line produces parts[0] as an empty string; if a line has no content the Vec could be empty causing a panic",
+      "fix": "use split_once(',') and handle the None case, or guard with parts.first().map_or(...) instead of parts[0]"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 is a lossy cast from u32 — values > 65535 silently truncate without error",
+      "failure_mode": "a parsed u32 value in range 65536..=u32::MAX wraps to an incorrect u16 instead of being rejected",
+      "fix": "use u16::try_from(parsed) and map_err to a typed RangeOverflow or similar error; or parse directly as u16 with parts[1].trim().parse::<u16>().map_err(...)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden I/O side effect inside the iterator chain",
+      "failure_mode": "pure-looking pipeline code performs logging I/O, making the function non-deterministic, untestable, and violating the functional core / imperative shell split; logging should be explicit in the shell layer",
+      "fix": "remove println! from the iterator; return records from a pure parse function; log at the call site in the imperative shell after loading completes"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_core",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_events mixes I/O (fs::read_to_string), parsing, and logging into one function with no typed error surface",
+      "failure_mode": "no way for callers to distinguish I/O errors from parse errors from domain errors; function cannot be unit-tested in isolation",
+      "fix": "split into: (1) a pure fn parse_records(lines: impl IntoIterator<Item=&str>) -> Result<Vec<Record>, ParseError> and (2) a shell fn load_events(path: &str) -> Result<Vec<Record>, AppError> that reads, maps I/O errors, calls parse_records, and logs at the boundary"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_errors",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No typed error type exists; return type is Vec<Record> with panics as the only error signaling",
+      "failure_mode": "consumers have no programmatic way to handle any failure; the error taxonomy (I/O, Parse, RangeOverflow) is completely absent",
+      "fix": "define a sealed error enum: pub enum LoadError { Io(io::Error), Parse { line: usize, field: &'static str, source: ... }, RangeOverflow { field: &'static str, value: u32 } } and return Result<Vec<Record>, LoadError>"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "parts Vec is allocated per-line with no capacity hint; the outer Vec has no try_reserve",
+      "failure_mode": "for large files with many lines, repeated small Vec allocations in the inner loop increase allocation overhead; the outer Vec grows without try_reserve",
+      "fix": "estimate line count if available and use result.try_reserve(estimated_count)?; use split_once(',') instead of collect<Vec<String>> per line to avoid per-line Vec allocation"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated or implied throughput of load_events",
+    "no profiler evidence for the hot path of the iterator chain in load_events",
+    "no allocation analysis (e.g., alloc or perf record) for per-line Vec allocations in the parser",
+    "no command-level evidence (no benchmarks, no benchmarks/ directory, no #[bench] or criterion dependency in Cargo.toml)"
+  ],
+  "residual_risk": "Static review identified 7 blockers and 1 minor finding. All error paths rely on panic rather than typed errors. No benchmarks, profiler, or allocation evidence exist. The function must be refactored to split functional core from imperative shell, replace all unwrap() with typed error propagation, remove the lossy as cast, eliminate hidden I/O (println!), and use checked indexing or split_once. Until these are repaired, the crate cannot pass Holzman delivery gates."
+}

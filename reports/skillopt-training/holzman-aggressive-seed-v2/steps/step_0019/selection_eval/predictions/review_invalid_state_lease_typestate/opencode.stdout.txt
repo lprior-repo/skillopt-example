@@ -1,0 +1,7 @@
+Review complete. Found 9 findings (6 BLOCKER, 3 MAJOR) written to `review-output.json`. Key issues:
+
+- **Illegal states representable**: `LeaseWorkflow` uses `String` for status and `bool` flags instead of domain enums/typestates
+- **No validation in `mark_sent`**: Transitions happen unconditionally with no pre-condition checks
+- **Primitive obsession**: `id` is a raw `String` with no newtype guard
+- **Functional core violated**: String allocation and mutation in core instead of pure validation
+- **Missing evidence**: No benchmarks, profiler, allocation audit, clippy/miri results, or behavior tests

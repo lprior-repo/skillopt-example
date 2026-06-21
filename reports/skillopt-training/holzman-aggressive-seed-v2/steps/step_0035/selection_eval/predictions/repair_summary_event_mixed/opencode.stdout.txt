@@ -1,0 +1,15 @@
+Now I have the full picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function — neither matches the current production code. I also see multiple Holzman violations: `unwrap()`, unchecked indexing, unchecked arithmetic, unchecked division, `as` casts, and `split`+`collect`+indexing instead of `split_once`.
+Two type errors. Let me fix them:
+All 6 tests pass. Now I'll write the repair output.
+I spot a Holzman violation: `max_rows as u32` is a potentially lossy cast (usize→u32 on 64-bit). Let me fix it to the non-lossy direction:
+Repaired. All 6 behavior tests pass. Summary of fixes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, ...>`
+- **Added `render_summary`**: Separate pure rendering function for the imperative shell boundary
+- **Removed `unwrap()`**: Parse errors now return `Err(SummaryError::Invalid)`
+- **Removed unchecked indexing** (`parts[1]`): Replaced `split`+`collect`+indexing with `split_once`
+- **Removed unchecked arithmetic**: `checked_add` for total and count accumulation
+- **Removed unchecked division**: `checked_div` for average calculation
+- **Removed lossy `as` casts**: Used `u64::from(count)` and `count as usize` (safe widening) for comparisons
+- **Empty input guard**: Returns `Err(SummaryError::Empty)` for empty or all-whitespace input
+- **Overflow detection**: `checked_add` catches u64 overflow, returns `Err(SummaryError::Overflow)`

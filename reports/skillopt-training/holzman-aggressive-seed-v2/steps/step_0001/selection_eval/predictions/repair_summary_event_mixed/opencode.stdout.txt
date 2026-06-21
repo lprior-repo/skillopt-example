@@ -1,0 +1,11 @@
+I see the issues. Tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` (not `Result<String>`), and `render_summary` doesn't exist. Plus forbidden constructs: `unwrap()`, unchecked arithmetic, unchecked indexing. Let me fix.
+All 6 tests pass. Let me write the output.
+Repaired. All 6 tests pass. Key changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- **Removed** `unwrap()` on parse → replaced with `map_err(|_| SummaryError::Invalid)`
+- **Removed** unchecked `parts[1]` indexing → replaced with `split_once(',')`
+- **Removed** unchecked `total += value` → replaced with `checked_add` returning `Overflow`
+- **Removed** unchecked `total / count` → replaced with `u64::try_from` + checked division
+- **Added** `render_summary(Summary) -> String` for functional separation
+- **Added** empty-input check → `SummaryError::Empty`

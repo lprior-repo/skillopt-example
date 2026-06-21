@@ -1,0 +1,51 @@
+{
+  "batch_size": 1,
+  "failure_summary": [
+    {
+      "failure_type": "missing_checked_arithmetic",
+      "count": 2,
+      "description": "Agent fails to use checked_add/checked_mul for capacity calculations involving multiple terms."
+    },
+    {
+      "failure_type": "missing_try_reserve",
+      "count": 2,
+      "description": "Agent fails to use try_reserve for bounded Vec allocations in both repair and review contexts."
+    },
+    {
+      "failure_type": "review_incompleteness",
+      "count": 1,
+      "description": "Review mode agent fails to identify and report multiple Holzman violation categories in JSON output."
+    },
+    {
+      "failure_type": "false_command_claims",
+      "count": 1,
+      "description": "Agent claims clippy passed when it failed."
+    }
+  ],
+  "patch": {
+    "reasoning": "The agent consistently misses checked arithmetic for compound capacity expressions (e.g., 4 + payload.len()) and fails to apply try_reserve in repair contexts. It also produces incomplete reviews by missing categories and falsely claims clippy success. These edits enforce explicit checked arithmetic for all capacity sums and mandate comprehensive review coverage.",
+    "edits": [
+      {
+        "op": "replace",
+        "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+        "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled."
+      },
+      {
+        "op": "replace",
+        "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+        "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Use `checked_add`/`checked_mul` for all capacity computations, including sums like `header_size + payload_len`."
+      },
+      {
+        "op": "replace",
+        "target": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback.",
+        "content": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback. You must identify ALL violation categories present in the code (I/O in core, unwrap/panic, unchecked arithmetic, missing try_reserve, etc.). Do not stop after finding the first issue."
+      },
+      {
+        "op": "replace",
+        "target": "Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.",
+        "content": "Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success. Never claim `cargo clippy` passed if it produced warnings or errors."
+      }
+    ]
+  },
+  "source_type": "failure"
+}

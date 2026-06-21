@@ -1,0 +1,89 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TokenWorkflow uses `status: String` plus `is_validated: bool` and `is_sent: bool` to represent lifecycle state instead of an enum or typestate. This allows illegal state combinations (e.g., status=\"sent\" with is_sent=false, or status=\"sent\" with is_validated=false).",
+      "failure_mode": "Any caller can construct or mutate a TokenWorkflow into an unreachable/inconsistent state, breaking workflow invariants at runtime with no compile-time protection.",
+      "fix": "Replace `status: String`, `is_validated: bool`, `is_sent: bool` with a single `TokenStatus` enum (e.g., `enum TokenStatus { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`) that encodes valid state transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_data_inert",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "TokenWorkflow is a mutable struct with all pub fields. Data is not inert by construction and has no validated-by-construction invariants. `mark_sent` mutates fields in place.",
+      "failure_mode": "Callers can directly mutate id, status, is_validated, is_sent, or sent_at_epoch_ms from any location, bypassing all workflow invariants and making the domain model unreliable.",
+      "fix": "Make fields `pub(crate)` or private. Provide a fallible constructor or builder that enforces invariants. Return a new immutable instance from `mark_sent` rather than mutating in place."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_enum",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a primitive lifecycle flag. Per reference: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.'",
+      "failure_mode": "Boolean flags are ambiguous (what does true mean exactly?) and composable into illegal states. A future flag (`is_revoked`, etc.) multiplies the invalid state space without bounds.",
+      "fix": "Encode lifecycle into a typed enum or typestate. `is_validated` should be a field on a `Validated` variant of a `TokenStatus` enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_string_status_with_enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "`status: String` is a primitive string used as a lifecycle/status marker instead of a typed enum. Per reference: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.'",
+      "failure_mode": "Magic string comparison (`status == \"sent\"`) is error-prone, case-sensitive, and allows invalid values like \"sent!\" or \"SENT\" at runtime.",
+      "fix": "Replace `status: String` with an enum `TokenStatus` that has variants like `Pending`, `Validated`, and `Sent`. Use `split_once`-style parse at boundary into the enum; never compare strings for state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_mutation_not_pure",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes ownership and mutates fields in place (`mut item`), modifying `status` and `is_sent`. This is not a pure functional-core operation and does not validate preconditions (e.g., token must be validated before sent).",
+      "failure_mode": "A token can be marked as sent without ever being validated, violating the workflow invariant. No precondition checks exist.",
+      "fix": "Return `Result<TokenWorkflow, TokenError>` (or use the typestate pattern where `SentToken` is a distinct type from `PendingToken`). Validate that the token is in a valid pre-send state before producing the post-send value."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_type_for_domain_concept",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive for a domain concept. Per reference: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates' — the same principle applies to all domain primitives including IDs.",
+      "failure_mode": "ID strings cannot be validated by the type system. Invalid IDs, empty IDs, or IDs from the wrong token type can be mixed freely at compile time.",
+      "fix": "Introduce a `TokenId` newtype struct with a fallible constructor: `pub struct TokenId(String); impl TokenId { fn new(s: impl Into<String>) -> Result<Self, InvalidTokenIdError> { ... } }`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_domain_error_type",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` returns `TokenWorkflow` directly with no error type. No precondition validation, no fallibility. Violates 'Core errors should be typed domain errors.'",
+      "failure_mode": "Workflow violations (e.g., marking a non-validated token as sent) are silently accepted. Callers cannot distinguish between a valid sent transition and an invalid one.",
+      "fix": "Define `enum TokenError { InvalidTransition { current: String, requested: String } }` and return `Result<TokenWorkflow, TokenError>` from `mark_sent`."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for any performance claims. Per skill: 'Do not cargo-cult Rayon, SmallVec, Cow, or manual loops. Use them only with measured evidence.' No allocations in this tiny crate, but the pattern should be established.",
+      "failure_mode": "Future changes to this crate could introduce allocation-heavy patterns without measurement, violating the performance discipline gate.",
+      "fix": "Add a `benches/` directory with a simple benchmark for `mark_sent` or the core workflow transition, even if trivial."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module exists. No behavior tests for valid/invalid workflow transitions.",
+      "failure_mode": "No evidence that `mark_sent` produces correct results for any input state. No regression protection.",
+      "fix": "Add `#[cfg(test)] mod tests` covering: (1) mark_sent on a valid validated token produces correct state, (2) mark_sent on an unvalidated token is rejected (via typestate or error). Note: do not write tests here per review rules."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for performance claims", "no behavior tests for workflow transitions", "no allocation analysis for TokenWorkflow::status field (String .to_string() allocates on every mark_sent call)", "no profiler evidence for the hot path (mark_sent)"],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental architectural violations: primitive types replace domain types, bool/string lifecycle flags create illegal state spaces, no typestate or enum-based invariants, no error types for workflow transitions, and no test/benchmark evidence. The `mark_sent` function silently accepts invalid state transitions. These are BLOCKER-level issues requiring a typestate/enum redesign before any production use."
+}

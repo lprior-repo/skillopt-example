@@ -1,0 +1,16 @@
+Now I see the issues. The code has multiple Holzman violations: unchecked indexing `parts[1]`, `.unwrap()`, unchecked arithmetic `total += value` and `count += 1`, lossy cast `count as u64`, and uses `split(',').collect()` instead of `split_once`. The function signature also doesn't match tests (returns `String` instead of `Summary`), and `render_summary` is missing.
+Repair complete. All 6 tests pass, clippy clean, zero warnings.
+
+**Violations repaired in `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `parts[1]` unchecked indexing | `split_once(',')` per mandatory pattern |
+| `.unwrap()` on parse | `.map_err(|_| SummaryError::Invalid)?` |
+| `total += value` unchecked add | `total.checked_add(value).ok_or(Overflow)?` |
+| `count += 1` unchecked add | `count.checked_add(1).ok_or(Overflow)?` |
+| `total / count as u64` lossy cast + unchecked div | `u64::try_from(count)` + `total.checked_div(count_u64)` |
+| `line.split(',').collect()` | `split_once` mandatory pattern |
+| Missing `render_summary` | Extracted to separate function |
+| Wrong return type `Result<String>` | Changed to `Result<Summary, SummaryError>` |
+| Empty input not rejected | `input.is_empty()` early guard |

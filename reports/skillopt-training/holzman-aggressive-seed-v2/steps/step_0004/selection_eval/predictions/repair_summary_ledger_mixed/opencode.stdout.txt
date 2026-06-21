@@ -1,0 +1,17 @@
+Now I understand the issues. The source has multiple Holzman violations and a mismatched API. The test expects `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function that doesn't exist.
+
+Let me fix the source:
+All 6 tests pass. Let me write the output:
+Repair complete. All 6 tests pass. Here's what was fixed in `src/lib.rs`:
+
+**API mismatch fixed:**
+- Changed `summarize_metrics` return type from `Result<String, SummaryError>` to `Result<Summary, SummaryError>` to match test contract
+- Added missing `render_summary(Summary) -> String` function
+
+**Holzman violations repaired:**
+- `parts[1]` unchecked indexing replaced with `split_once(',')`
+- `.parse().unwrap()` replaced with `.parse().map_err(|_| SummaryError::Invalid)`
+- `total += value` (unchecked) replaced with `checked_add`
+- `total / count as u64` (division by zero + lossy cast) replaced with `checked_div` + `try_from`
+- Removed unnecessary `Vec` allocation and `.collect()`
+- Added empty-input guard returning `Err(SummaryError::Empty)`

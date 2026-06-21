@@ -1,0 +1,22 @@
+Now I have full understanding of the issues. The problems in `src/lib.rs`:
+
+1. `unwrap()` on parse (line 24) - Holzman violation
+2. Unchecked `parts[1]` indexing - Holzman violation (must use `split_once` or `.get()`)
+3. Returns `Result<String>` but tests expect `Result<Summary>` - API mismatch
+4. Missing `render_summary` function - tests import it
+5. No overflow detection on `total += value`
+6. No empty-input guard (division by zero)
+7. No invalid-line detection ("bad" has no comma)
+8. Uses `split`+`collect`+indexing instead of `split_once`
+Two `as` casts remain. Per Holzman rules, replacing with `try_from`:
+Done. All 6 behavior tests pass. Changes to `src/lib.rs`:
+
+- Removed `unwrap()` - replaced with `map_err` for parse failures
+- Replaced `split`+`collect`+`parts[1]` with `split_once(',')` (Holzman rule)
+- Replaced lossy `as` casts with `try_from`
+- Added `checked_add` for overflow detection on total
+- Added `checked_div` for safe average computation
+- Added empty-input guard returning `SummaryError::Empty`
+- Added invalid-line guard returning `SummaryError::Invalid`
+- Changed return type from `Result<String>` to `Result<Summary>` (test contract)
+- Added `render_summary` function (imported by tests)

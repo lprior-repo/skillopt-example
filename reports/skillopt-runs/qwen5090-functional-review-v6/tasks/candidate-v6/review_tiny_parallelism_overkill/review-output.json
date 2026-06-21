@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/zero-cost-abstractions.md",
+    "references/runtime-performance-architecture.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "hot_path_dependency_gate",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment proposes Rayon for a 4-byte fixed-size input. The function classifies exactly 4 bytes and returns exactly 4 string refs. Rayon scheduling overhead (thread pool dispatch, chunking, result collection) vastly exceeds the cost of the entire sequential operation. This is the exact premature-parallelism anti-pattern the skill rejects: 'Do not add Rayon because parallel is faster; require scaling evidence.'",
+      "failure_mode": "If this comment is acted on, the resulting code will be measurably slower on the stated workload. Rayon adds 500ns-2us of per-job overhead to a task that processes 4 bytes in under 10ns total.",
+      "fix": "Delete the Rayon/SmallVec comment. If a performance claim is made, name workload, measure, and report delta."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "performance_folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Comment proposes SmallVec for a known-size-4 result. SmallVec only provides benefit when the common case stays inline and overflow allocation is rare. Here the size is always exactly 4, so ArrayVec<[&str; 4]> or [(&&str); 4] would eliminate all allocation without the overflow complexity.",
+      "failure_mode": "If this comment is acted on, SmallVec<[&str; N]> requires choosing N. If N<4 it allocates. If N>=4 it is a superset of ArrayVec with extra code. Neither is faster than a plain array or ArrayVec for this bounded case.",
+      "fix": "Replace the comment with a concrete API proposal: fn classify_four(bytes: &[u8; 4]) -> [(&&str); 4] or ArrayVec<[&str; 4]> with zero allocation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_short_functions",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns Vec for a fixed 4-element result, forcing heap allocation on every call. This is a post-init allocation in what is clearly a hot-path utility (classify bytes). Holzman Rule 3: safety-critical paths allocate only during initialization; performance hot paths need an explicit allocation budget with evidence.",
+      "failure_mode": "Every call allocates a Vec on the heap (capacity 4 bytes + allocation header). For a function named classify_four that is clearly intended for tight loops, this allocation dominates the actual classification work and will cause allocator pressure and cache misses.",
+      "fix": "Return [(&&str); 4] or ArrayVec<[&str; 4]>. If caller ownership is needed, accept a mutable output buffer: fn classify_four(bytes: &[u8; 4], out: &mut [(&&str); 4])"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "storage_placement",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function signature forces heap allocation via Vec return type for a known-4-element output. No workload is stated, no allocation budget declared, and no benchmark evidence exists to justify Vec over stack arrays, ArrayVec, or a caller-owned buffer.",
+      "failure_mode": "Caller cannot reuse capacity across calls. Every invocation incurs a heap allocation + deallocation pair. In a tight loop this becomes O(n) allocations for n calls, which is the worst allocation pattern.",
+      "fix": "Use ArrayVec<[&str; 4]> (zero allocation, bounded), [(&&str); 4] (stack-only), or a caller-owned buffer pattern."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No Cargo.toml dependencies declared, no rust-toolchain.toml, no build profile, no tests, and no benchmarks. The skill requires pinned nightly with rust-toolchain.toml (power10_nightly_required) and benchmark evidence for any performance claim (benchmark_proof). The comment on line 2 constitutes a performance claim that cannot be evaluated without these artifacts.",
+      "failure_mode": "Cannot verify the code passes any Holzman gate (format, clippy, test, audit, geiger, machete). Cannot confirm the performance folklore comment is wrong without benchmarks, though the claim is obviously unsound for the stated workload.",
+      "fix": "Add rust-toolchain.toml, [profile.release] with opt-level=3, tests for classify_four, and a benchmark if any performance claim is intended."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "power10_checked_results",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests exist for classify_four. The function takes &[u8; 4] (a reference to a fixed-size array) which means callers can pass any 4 bytes including edge cases like 0x00, 0xFF, single bits set. Without tests, the parity classification correctness is unverified.",
+      "failure_mode": "Incorrect parity classification for specific byte values could propagate silently. The bitwise expression (*byte & 1 == 0) is correct for unsigned parity, but without tests the invariant is unproven.",
+      "fix": "Add unit tests covering 0x00, 0x01, 0x80, 0xFF, and all-odd/all-even byte arrays."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "power10_simple_control_flow",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Iterator chain with .map().collect() is acceptable for a 4-element input, but for a strictly bounded 4-element function, a direct array-based approach would be simpler to analyze and provably zero-allocation if the return type is changed to [(&&str); 4] or ArrayVec.",
+      "failure_mode": "No functional failure. This is a style/boundedness concern: iterators hide the fact that this is a fixed-4-element operation, making static analysis of bounds and allocation less obvious.",
+      "fix": "Replace iterator chain with an explicit bounded loop or array index access that makes the 4-element bound visible in the source."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four; the Rayon/SmallVec comment is an unmeasured performance claim",
+    "no profiler evidence (perf stat, cargo flamegraph, or equivalent) to establish baseline or hot-path shape",
+    "no rust-toolchain.toml to verify pinned nightly policy compliance",
+    "no tests for classify_four to verify parity classification correctness",
+    "no assembly/IR evidence (cargo asm, cargo llvm-ir) for the hot path",
+    "no allocation evidence (heaptrack, DHAT, or cargo llvm-lines) to measure per-call allocation cost",
+    "no CI gate commands run; static review only with no cargo check, clippy, test, audit, geiger, or machete execution",
+    "no workload definition: target hardware, input distribution, latency/throughput target, and acceptance threshold are all absent"
+  ],
+  "residual_risk": "Static review only. No cargo commands were executed. The core finding (Rayon/SmallVec on 4-element input is overkill) is logically verifiable without benchmarks: Rayon job overhead is orders of magnitude larger than 4-byte classification work. However, absence of tests means correctness of the parity check is unverified. Absence of a rust-toolchain.toml means nightly policy compliance is unknown. The crate compiles but has no gates, no benchmarks, no tests, and no CI. The code is functionally simple and correct for its stated purpose, but the comment proposing Rayon/SmallVec is a significant architectural red flag that demonstrates a misunderstanding of when parallelism helps."
+}

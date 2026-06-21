@@ -1,0 +1,94 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow has all pub fields with independent mutable access, making illegal states fully representable: status can be any String, is_validated and is_sent are independent bools, and nothing prevents e.g. status=\"draft\" with is_sent=true, or status=\"sent\" with is_sent=false.",
+      "failure_mode": "Business invariants on budget lifecycle cannot be enforced by the type system; callers can construct or mutate into inconsistent states silently, leading to incorrect downstream decisions (e.g. sending a budget marked as invalid).",
+      "fix": "Replace pub fields with a private struct. Replace status: String and is_sent: bool with a single typed enum or typestate (e.g. enum BudgetState { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }). Provide a fallible constructor that validates initial state and methods that enforce legal transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String rather than a domain-typed enum. Functional-core-performance.md mandates: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates.' The string 'sent' is a magic value that can be misspelled or set without corresponding field updates.",
+      "failure_mode": "Typos in status strings, inconsistent status/flag pairs, and inability to exhaustively match over states at compile time. Every consumer must re-validate the string, violating 'parse at boundaries into trusted data.'",
+      "fix": "Replace `status: String` with `state: BudgetState` where BudgetState is an enum capturing all lifecycle stages (Draft, Validated, Sent). Remove the separate is_sent bool entirely since Sent variant can carry sent_at_epoch_ms."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a standalone bool that duplicates information already in status string. functional-core-performance.md: 'Replace bool lifecycle flags... with enums or typestates.' Combined with the String status, this creates redundant, independently mutable lifecycle information.",
+      "failure_mode": "is_sent and status can diverge (e.g. is_sent=true but status=\"draft\"). Consumers must check both fields and handle all 4 combinations, increasing cognitive load and bug surface.",
+      "fix": "Remove is_sent and is_validated bools. Encode the full lifecycle in a single BudgetState enum with variants that carry any necessary data (e.g. Sent { sent_at_epoch_ms: u64 })."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs an imperative mutation (status = \"sent\".to_string()) that belongs in a pure core but uses a mutable receiver pattern with string allocation. The to_string() on a string literal is a trivial allocation that should be a compile-time enum variant.",
+      "failure_mode": "Every call allocates a new String for a value that should be a compile-time enum variant. The mutation pattern allows arbitrary ordering of operations (set is_sent after status, or vice versa), preventing a deterministic transition model.",
+      "fix": "Replace mark_sent with a pure method on the typed state enum: fn mark_sent(self) -> Result<BudgetWorkflow, TransitionError> that returns a new BudgetWorkflow with the Sent variant, or an error if the current state doesn't allow the transition."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typed_domain_errors",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns BudgetWorkflow unconditionally with no error type. If the workflow is in an invalid state for sending (e.g. not validated), there is no way to represent that failure.",
+      "failure_mode": "Invalid transitions silently succeed, allowing budgets to be sent without validation. No typed error can be returned to the caller.",
+      "fix": "Return Result<BudgetWorkflow, BudgetTransitionError> where BudgetTransitionError is a domain error enum. Only allow transition to Sent from Validated (or whichever is the legal predecessor)."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark module exists. The crate has no benches/ directory, no #[bench] or Criterion benchmarks, and no performance measurement infrastructure.",
+      "failure_mode": "No evidence that the allocation in mark_sent (String::to_string) or the struct layout is performant under load. Cannot validate zero-cost or low-allocation claims.",
+      "fix": "Add a benches/ directory with Criterion benchmarks for mark_sent and any hot-path operations, or confirm this is a small domain model where benchmarks are deferred."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (cargo-flamegraph, perf, or similar) exists for this crate's runtime behavior.",
+      "failure_mode": "Cannot confirm whether the current allocation pattern is a hotspot or irrelevant under real workloads.",
+      "fix": "Run profiler against benchmarked workload to identify actual hot paths before optimizing."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "status = \"sent\".to_string() creates an unnecessary heap allocation when the value is a literal known at compile time. No allocation auditing exists.",
+      "failure_mode": "Every call to mark_sent allocates a new String on the heap for a fixed value, increasing GC pressure and cache misses.",
+      "fix": "Replace with a typestate enum so status is a compile-time variant, eliminating the allocation entirely."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "no_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No CI command evidence or gate automation documented. The Holzman gate (cargo fmt, cargo check, cargo clippy with strict flags) is not run or referenced.",
+      "failure_mode": "No automated enforcement of Holzman Rust constraints on the crate.",
+      "fix": "Add CI configuration that runs the Holzman gate commands against the crate."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any hot path",
+    "no profiler evidence for runtime behavior",
+    "no allocation audit for String::to_string on literal",
+    "no CI gate evidence for Holzman Rust command checks"
+  ],
+  "residual_risk": "The struct fundamentally cannot enforce its domain invariants. Until status is replaced by a typed enum and bool flags by a typestate, illegal states remain fully representable and the code fails the core Holzman Rust contract. The absence of any benchmark, profiler, or allocation evidence means no performance claims can be validated. Static review only; no commands run."
+}

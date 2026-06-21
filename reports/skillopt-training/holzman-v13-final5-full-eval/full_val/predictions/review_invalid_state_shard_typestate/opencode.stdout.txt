@@ -1,0 +1,17 @@
+Now I have all the information needed. The crate has severe Holzman/Functional Rust violations — a struct using raw `String` for status, bare `bool` lifecycle flags, `Option` for lifecycle data, and no typestate or parse boundary.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (8 BLOCKERs):**
+
+| # | Rule | Line | Core issue |
+|---|------|------|------------|
+| 1 | typestate_enums | 1 | No typestate — any state combination representable |
+| 2 | no_status_string | 3 | `status: String` allows arbitrary values |
+| 3 | no_bool_lifecycle | 4 | `is_validated`/`is_sent` booleans lack causal ordering |
+| 4 | option_invalid_state | 6 | `Option<u64>` decoupled from lifecycle state |
+| 5 | newtype_domain_ids | 2 | `id: String` raw primitive, no validation |
+| 6 | parse_boundary | 9 | No smart constructors, raw primitives cross boundaries |
+| 7 | no_encapsulation | 2 | All fields pub, zero encapsulation |
+| 8 | mark_sent_mutation | 9 | In-place mutation, no preconditions, no type change |
+
+All 6 required typestate findings from SKILL.md line 48 are present (enum/typestate, status/String, bool/lifecycle, Option combinations, newtype/domain IDs, parse_boundary), plus 2 additional structural findings (pub fields, mutation without enforcement).

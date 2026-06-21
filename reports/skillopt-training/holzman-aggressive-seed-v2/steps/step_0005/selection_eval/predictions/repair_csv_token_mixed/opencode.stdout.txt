@@ -1,0 +1,9 @@
+Repaired. Changes to `src/lib.rs`:
+
+- Removed `unwrap()` on `.parse()` — now maps parse errors to `ParseError::Invalid` via `?`
+- Added empty-input guard returning `ParseError::Empty`
+- Added `max_items` enforcement returning `ParseError::TooMany`
+- Added empty-trimmed-field guard returning `ParseError::Invalid`
+- Bounded `Vec` with `max_items` capacity
+
+All 4 behavior tests pass. `repair-output.json` written.

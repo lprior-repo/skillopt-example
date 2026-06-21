@@ -1,0 +1,76 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/review-output-contract.md", "references/functional-core-performance.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a free-form `String` — any value is constructable including `\"invalid\"`, `\"\"`, `\"SENT\"`, or any string that does not correspond to a legitimate lifecycle stage",
+      "failure_mode": "A caller can create or mutate a PacketWorkflow into an unparseable or undefined status; downstream match/if-else on status must exhaustively handle every possible UTF-8 string or risk undefined behavior",
+      "fix": "Replace `pub status: String` with a domain enum `PacketStatus` (e.g., `Pending`, `Validated`, `Sent`) with a `FromStr` or fallible `try_from` constructor"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_flags_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a primitive flag that cannot encode the invariant that validation must occur before sending",
+      "failure_mode": "A packet can be `is_sent=true` while `is_validated=false`, representing a violated lifecycle invariant; `mark_sent` does not check validation at all",
+      "fix": "Replace `is_validated: bool` with a typestate or include it as part of a single `PacketStatus` enum so that `Sent` variant inherently implies prior validation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_flags_for_lifecycle",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is a primitive flag that duplicates state already encoded in `status` string and can diverge from it",
+      "failure_mode": "Caller can set `is_sent=true` while `status` remains `\"pending\"`, or call `mark_sent` to set both, creating redundant and conflict-prone mutation; no single source of truth for lifecycle",
+      "fix": "Replace `is_sent: bool` with a single `status: PacketStatus` enum; eliminate the boolean entirely so the enum is the sole lifecycle oracle"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_allows_invalid_transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` blindly sets `status=\"sent\"` and `is_sent=true` without checking `is_validated`, allowing unvalidated packets to enter sent state",
+      "failure_mode": "Business invariant (validate-before-send) is violated at runtime with no compiler or check-level enforcement; a caller can send any packet regardless of validation state",
+      "fix": "Replace `mark_sent` with a fallible function `try_mark_sent(item: PacketWorkflow) -> Result<PacketWorkflow, PacketError>` that rejects non-validated packets, or bake the transition into the `PacketStatus` enum where `Sent` is only reachable from `Validated`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "id_should_be_newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw `String` with no domain semantics — any string is a valid ID including empty or malformed values",
+      "failure_mode": "Callers can construct packets with empty, whitespace-only, or otherwise invalid IDs; no validation at the type boundary",
+      "fix": "Introduce `pub struct PacketId(String)` with a fallible `try_from(String) -> Result<PacketId, ParseError>` constructor that rejects empty/invalid IDs"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`PacketWorkflow` contains owned `String` fields (`id`, `status`) making it heavy to copy and not borrow-friendly; the struct is a data carrier mixed with mutable behavior in `mark_sent`",
+      "failure_mode": "Every pass-by-value of `PacketWorkflow` allocates/copies two `String`s; the pure data is not cleanly separated from the imperative mutation in `mark_sent`",
+      "fix": "Use `Cow<'static, str>` or `&str` at parse boundaries for borrowed use; separate a pure `PacketStatus` data type from shell-side mutation; make `mark_sent` a pure state-transition function returning the new status rather than mutating in place"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_struct_with_duplicated_state",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "`status: String` and `is_sent: bool` encode overlapping lifecycle information — `is_sent` is a boolean projection of `status`, creating redundant state",
+      "failure_mode": "Inconsistency between `status` and `is_sent` is possible; any new boolean flag adds another point of potential divergence as the domain grows",
+      "fix": "Collapse to a single `PacketStatus` enum; derive `is_sent` as a method `fn is_sent(&self) -> bool` on the enum"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any claimed performance or allocation behavior",
+    "no profiler or allocation analysis (e.g., `cargo flamegraph`, `tracalloc`, or `allocations` log) is present",
+    "no second-ring audit or formal typestate proof that lifecycle transitions are exhaustive",
+    "no command evidence (cargo test, cargo fmt, cargo clippy) was run or recorded"
+  ],
+  "residual_risk": "The struct encodes multiple independent primitive flags that can represent illegal combinations (e.g., sent without validated, empty status, divergent status/is_sent). The core domain invariants are not enforced by the type system at all — every transition is unchecked mutable mutation. Without enum-based typestates, no static analysis can guarantee valid lifecycle. Full rewrite of PacketWorkflow into a typestate enum with fallible transitions is required before any production use."
+}

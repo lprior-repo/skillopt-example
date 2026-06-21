@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny_fixed_input_rayon_folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment proposes Rayon for a 4-element fixed-input function. Parallel overhead for 4 bytes will always be slower than sequential iteration.",
+      "failure_mode": "measurable performance regression from task spawn, thread pool coordination, and work distribution overhead on 4-element input",
+      "fix": "remove Rayon proposal entirely. For 4 elements, sequential iteration is optimal. Delete the TODO."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny_fixed_input_smallvec_folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment proposes SmallVec for a function returning exactly 4 elements. SmallVec introduces a heap fallback branch and larger type size for a case where the output is inherently bounded at 4.",
+      "failure_mode": "increased code size, heap-branch misprediction, and zero benefit for fixed-4-element output. The SmallVec fallback path adds a branch that never helps at size 4.",
+      "fix": "return `[&'static str; 4]` instead of `Vec<&'static str>`. The output is provably 4 elements. Use a stack array."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation_discipline_vec_for_fixed_size",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Function returns `Vec<&'static str>` for a known 4-element input. Every call heap-allocates a `Vec` with capacity 4, even though the size is statically known.",
+      "failure_mode": "unbounded per-call heap allocation on a hot path. Each call triggers a heap allocation that can never exceed 4 elements, violating Holzman allocation discipline.",
+      "fix": "change return type to `[&'static str; 4]` and use an array-based map. Zero heap allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "performance_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO claims Rayon+SmallVec 'will be faster' with no workload, target hardware, baseline command, baseline number, new number, or measurement evidence.",
+      "failure_mode": "optimization based on folklore rather than measurement leads to regression. The claim is untestable and unfalsifiable.",
+      "fix": "remove the claim. If performance matters, benchmark the sequential array-returning version first. Rayon only justified at scale with evidence."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, baseline, or profiler evidence exists for the function. The function returns Vec on a fixed 4-element input with no performance justification.",
+      "failure_mode": "performance decisions made without measurement. Cannot verify correctness or improvement of any optimization.",
+      "fix": "add a benchmark comparing Vec return vs `[&'static str; 4]` return. Measure at minimum the 4-element case."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_raw_primitive",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw `[u8; 4]` primitive crosses the parse boundary without fallible smart constructor. Callers can construct invalid domain states directly from raw bytes.",
+      "failure_mode": "no validation of input at the parse boundary. Any 4-byte array is accepted, including zeros or uninitialized data, with no typed error path.",
+      "fix": "introduce a `Classification` newtype or enum. Use a fallible smart constructor to validate or reject raw `[u8; 4]` input at the boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No command evidence (cargo check, cargo fmt --check, cargo clippy) exists. No tests exist. No verification gate has been run.",
+      "failure_mode": "code may not even compile or pass lint gates. Holzman verification gate requires canonical gate execution.",
+      "fix": "run cargo fmt --check, cargo check --workspace, cargo clippy with strict gates, and cargo test."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for the stated performance claim about Rayon/SmallVec",
+    "no profiler data to identify actual bottleneck",
+    "no allocation measurement showing Vec overhead",
+    "no second-ring evidence tying claims to actual symbols/artifacts",
+    "no baseline command with baseline number for any performance comparison",
+    "no test suite exists for the function",
+    "no verification gate commands have been run"
+  ],
+  "residual_risk": "Static review only; no commands run. The function correctly classifies 4 bytes but allocates a Vec per-call unnecessarily. Rayon+SmallVec folklore would regress performance. The code compiles but has zero tests, zero benchmarks, zero clippy evidence, and zero verification gates. The fix is trivially returning `[&'static str; 4]` with zero allocation."
+}

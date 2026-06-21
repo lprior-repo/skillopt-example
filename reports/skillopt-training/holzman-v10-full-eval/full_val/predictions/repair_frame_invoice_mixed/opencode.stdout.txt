@@ -1,0 +1,19 @@
+I'll start by reading the skill bundle, references, and crate structure in parallel.
+Now I have a clear picture. The `encode_frame` function has Holzman violations:
+
+1. **Line 10**: `payload.len() as u32` — lossy `as` conversion
+2. **Missing check**: No `payload.len() > max_payload` guard (test expects `PayloadTooLarge`)
+3. **No checked capacity arithmetic** or `try_reserve`
+
+Let me apply the fix.
+All tests pass. Now let me run the full verification gate.
+All gates pass. Let me read the remaining references and write the output.
+Repair complete. Here's a summary of what was fixed in `src/lib.rs`:
+
+**Violations removed:**
+1. **Lossy `as` conversion** (`payload.len() as u32`) → replaced with `u32::try_from(payload.len())` returning `Overflow`
+2. **Missing payload size guard** → added `payload.len() > max_payload` check returning `PayloadTooLarge`
+3. **Unchecked capacity arithmetic** → `4usize.checked_add(payload.len())` with `ok_or(FrameError::Overflow)`
+4. **Unbounded allocation** → `out.try_reserve(capacity)` with `map_err(|_| FrameError::Allocation)`
+
+**Gates passed:** `cargo fmt`, `cargo test` (2/2), `cargo check`, `cargo clippy` (all strict flags), no production `assert!`/`unreachable!`

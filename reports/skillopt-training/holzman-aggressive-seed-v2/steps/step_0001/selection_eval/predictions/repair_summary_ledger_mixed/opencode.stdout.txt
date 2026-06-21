@@ -1,0 +1,11 @@
+Now I understand the issues. Let me repair the production code to satisfy tests and Holzman constraints.
+All 6 tests pass. Let me write the repair output.
+Repair complete. All 6 tests pass. Changes to `src/lib.rs`:
+
+- Changed `summarize_metrics` return type from `Result<String>` to `Result<Summary>` to match behavior contract
+- Added `render_summary` function to format a `Summary` struct
+- Replaced `unwrap()` on parse with `.map_err(|_| SummaryError::Invalid)`
+- Replaced unchecked `parts[1]` indexing with `split_once(',')` + `.ok_or(SummaryError::Invalid)`
+- Added `input.is_empty()` check returning `Err(SummaryError::Empty)`
+- Replaced unchecked `total += value` with `checked_add` returning `Err(SummaryError::Overflow)`
+- Replaced `total / count` with safe integer division (divisor proven nonzero after empty check)

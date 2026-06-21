@@ -1,0 +1,39 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/latency-throughput-playbook.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/runtime-performance-architecture.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/zero-cost-abstractions.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/simd-patterns.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/mechanical-empathy-toolchain.md",
+    "/tmp/opencode/holzman-skillopt-train/86fa58339344069c/repair_summary_event_mixed/.skill/holzman-rust/SKILL.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock", "status": "passed"},
+    {"command": "rg -n '(assert!|assert_eq!|assert_ne!|unreachable!)' --glob '*.rs' --glob '!**/tests/**' --glob '!**/benches/**' --glob '!**/examples/**' --glob '!build.rs'", "status": "passed"},
+    {"command": "rg -n '(unsafe|\\.unwrap\\(\\)|\\.expect\\(|panic!|todo!|unimplemented!|unreachable!)' --glob '*.rs' --glob '!**/tests/**' --glob '!**/benches/**' --glob '!**/examples/**' --glob '!build.rs'", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe code",
+    "No production unwrap/expect/panic/todo/unimplemented/unreachable",
+    "No unchecked indexing - used .get(1) instead of parts[1]",
+    "No unchecked arithmetic - used checked_add and checked_div",
+    "No lossy as conversions - used try_into() and u64::from()",
+    "All 6 behavior tests pass",
+    "Clippy passes with all Holzman denial flags",
+    "Return type changed to Result<Summary, SummaryError> matching test contract",
+    "Added render_summary() function required by test contract",
+    "Empty input returns Err(SummaryError::Empty)",
+    "Invalid lines (missing comma) return Err(SummaryError::Invalid)",
+    "Parse errors return Err(SummaryError::Invalid)",
+    "Overflow on total addition returns Err(SummaryError::Overflow)",
+    "Exceeding max_rows returns Err(SummaryError::TooMany)",
+    "Division-by-zero guarded via checked_div"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None - all production forbidden patterns removed, all tests pass, clippy clean, checked arithmetic guards all math operations, typed errors cover every failure mode."
+}

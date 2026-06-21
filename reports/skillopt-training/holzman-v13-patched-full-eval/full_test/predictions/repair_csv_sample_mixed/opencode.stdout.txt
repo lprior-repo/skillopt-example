@@ -1,0 +1,10 @@
+Repaired. All 4 behavior tests pass. Changes to `src/lib.rs`:
+
+- Removed `.unwrap()` panic surface
+- Replaced `.split(',').map(...).collect()` with explicit loop (no intermediate Vec)
+- Added empty-input rejection via `ParseError::Empty`
+- Enforced `max_items` cap before each push via `ParseError::TooMany`
+- Bounded allocation via `try_reserve` mapping to `ParseError::Allocation`
+- Parse errors mapped via `map_err` to `ParseError::Invalid`
+
+Output written to `repair-output.json`.

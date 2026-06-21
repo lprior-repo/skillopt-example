@@ -1,0 +1,20 @@
+Now I have a clear picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function, but the source only returns `String` and has numerous Holzman violations. Let me fix it.
+
+**Violations found:**
+1. `unwrap()` on line 24 — panic on parse failure
+2. `split(',')...collect()` + unchecked `parts[1]` — should use `split_once` + `get`
+3. `total += value` — unchecked arithmetic, should use `checked_add`
+4. `total / count as u64` — division without zero check + lossy `as`
+5. Missing `render_summary` function
+6. `summarize_metrics` returns `String` instead of `Summary`
+All 6 tests pass. Let me verify the final source is clean:
+Now writing the output:
+Repaired. All 6 tests pass. Changes in `src/lib.rs`:
+
+- **`summarize_metrics`** now returns `Result<Summary, SummaryError>` (was `Result<String>`)
+- Added `render_summary(Summary) -> String` function
+- `unwrap()` → `map_err(|_| SummaryError::Invalid)?`
+- `split(',')...collect()` + unchecked `parts[1]` → `split_once(',').ok_or(...)`
+- `total += value` → `total.checked_add(value).ok_or(...)`
+- `total / count as u64` → `total.checked_div(count)` with zero check
+- `count as u32` → `u32::try_from(count).map_err(...)`

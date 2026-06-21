@@ -1,0 +1,67 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses raw String status + bool flags (is_validated, is_sent) + Option<u64> sent_at_epoch_ms, allowing illegal states like is_sent=true with status=\"pending\", or is_sent=true with sent_at_epoch_ms=None.",
+      "failure_mode": "Any code path can place a LeaseWorkflow into a logically impossible state (e.g. claimed sent but no timestamp, or conflicting status/flag), breaking downstream invariants and making bugs silent.",
+      "fix": "Replace status String with an enum LeaseStatus, replace is_sent bool with a typestate or derive it from LeaseStatus, and require sent_at_epoch_ms when status=Sent via an enum variant or constructor invariant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle flag that should be a typestate enum. This allows states where is_validated=true but the rest of the workflow is inconsistent.",
+      "failure_mode": "Downstream code cannot rely on is_validated as a reliable indicator; the bool can be set independently of other fields, creating silent state corruption.",
+      "fix": "Replace bool flags with a single typed workflow state enum that encodes valid transitions (e.g. enum LeaseStage { New, Validated, Sent { sent_at: u64 } })."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_booleans",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a lifecycle flag that should be a typestate or derived from a typed status. mark_sent sets status=\"sent\" and is_sent=true but leaves sent_at_epoch_ms=None, an invariant violation.",
+      "failure_mode": "The mark_sent function creates a LeaseWorkflow where is_sent=true but sent_at_epoch_ms is None, violating the implicit invariant that a sent lease must have a timestamp. This is the exact 'invalid state' the task name warns about.",
+      "fix": "Remove is_sent bool entirely. Use a typed state enum where the Sent variant carries sent_at_epoch_ms: u64. mark_sent should be a fallible constructor that requires the timestamp."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates the struct in-place with string literals and side effects. Status is set to a raw string literal \"sent\" instead of a typed value, enabling typos and inconsistent states.",
+      "failure_mode": "String-based status mutations are error-prone (typos, case mismatches) and bypass compile-time guarantees. The function can be called without validation, creating invalid state transitions.",
+      "fix": "Replace with a pure constructor: fn LeaseWorkflow::sent(id: String, sent_at_epoch_ms: u64) -> Result<LeaseWorkflow, LeaseError> that builds an immutable value with a typed state."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "parse_at_boundaries",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String, not a domain newtype or enum. The core repeatedly exposes an unvalidated primitive instead of accepting validated domain data by construction.",
+      "failure_mode": "Every consumer of LeaseWorkflow must re-validate the status string, leading to duplicated validation logic and inconsistent checks across the codebase.",
+      "fix": "Replace status String with an enum LeaseStatus { Pending, Validated, Sent } so status is valid by construction."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_unchecked_indexing_or_unvalidated_input",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no validation. The LeaseWorkflow can be constructed with empty or invalid identifiers.",
+      "failure_mode": "Invalid IDs propagate through the system, potentially causing duplicate key collisions or query failures downstream.",
+      "fix": "Replace id String with a newtype LeaseId that has a fallible constructor rejecting empty/invalid values."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for allocation patterns",
+    "no allocation analysis (struct size, field layout)",
+    "no command execution evidence (cargo fmt, cargo test, cargo clippy)"
+  ],
+  "residual_risk": "Static review only; no commands run. The struct represents the exact class of invalid-state bugs the task title warns about. All state is reachable by construction with zero type-level invariants enforced. The mark_sent function demonstrably creates an invalid state (is_sent=true, sent_at_epoch_ms=None). Full repair requires replacing the struct with a typestate enum and typed domain constructors."
+}

@@ -1,0 +1,16 @@
+Now let me read the task source and manifest:
+Now I have all the information needed. Let me write the review:
+Review complete. Written `review-output.json` with **8 BLOCKER findings**:
+
+| # | Rule | Key Issue |
+|---|------|-----------|
+| 1 | `no-folklore-performance-claims` | TODO proposes Rayon+SmallVec "because it will be faster" — no measurement |
+| 2 | `no-unnecessary-vec-allocation` | `Vec<&'static str>` return for fixed `[u8; 4]` input — heap alloc every call |
+| 3 | `no-parallel-overhead-tiny-data` | Rayon on 4 elements: dispatch cost >> computation cost |
+| 4 | `no-smallvec-folklore` | SmallVec for 4 elements adds struct bloat + branch for negligible benefit |
+| 5 | `missing-benchmark-evidence` | No baseline command, number, or benchmark infrastructure |
+| 6 | `missing-profiler-evidence` | No profiler data for the allocation hot path |
+| 7 | `missing-command-evidence` | No documented workload, hardware, threshold, variance |
+| 8 | `missing-allocation-evidence` | No allocations-per-call or bytes-allocated analysis |
+
+**Recommended fix**: Replace `Vec<&'static str>` return with `[&'static str; 4]` and remove the Rayon/SmallVec TODO.

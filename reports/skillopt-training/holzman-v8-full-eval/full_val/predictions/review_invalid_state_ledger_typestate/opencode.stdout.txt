@@ -1,0 +1,22 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings across 4 severity levels:**
+
+| # | Severity | Rule | File:Line |
+|---|----------|------|-----------|
+| 1 | BLOCKER | domain-model-status-enum | src/lib.rs:3 |
+| 2 | BLOCKER | domain-model-typestate | src/lib.rs:4 |
+| 3 | BLOCKER | domain-model-lifecycle-data-ownership | src/lib.rs:6 |
+| 4 | BLOCKER | domain-model-newtype-id | src/lib.rs:2 |
+| 5 | BLOCKER | make-illegal-states-unrepresentable | src/lib.rs:1 |
+| 6 | MAJOR | typed-error-taxonomy | src/lib.rs:9 |
+| 7 | MAJOR | functional-core-purity | src/lib.rs:9 |
+| 8 | MINOR | allocations-hot-path | src/lib.rs:10 |
+
+**Core architectural defects:**
+- `status: String` + `is_validated: bool` + `is_sent: bool` + `sent_at_epoch_ms: Option<u64>` — 4 independent fields that represent all 64 combinations including impossible states (sent without validation, timestamp without sent flag, etc.)
+- `mark_sent` has no preconditions, no error type, and silently overwrites state
+- All fields are `pub` with no smart constructor
+
+**Missing evidence:** no benchmarks, tests, profiler runs, or allocation counting.

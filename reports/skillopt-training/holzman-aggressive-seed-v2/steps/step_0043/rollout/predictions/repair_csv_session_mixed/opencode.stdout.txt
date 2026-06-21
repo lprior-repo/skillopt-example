@@ -1,0 +1,10 @@
+Let me clean up the dead code:
+Repair complete. All 4 tests pass, all Holzman violations removed.
+
+**Changes to `src/lib.rs`:**
+- Removed `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)?`
+- Added empty input check → `ParseError::Empty`
+- Added invalid parse handling → `ParseError::Invalid`
+- Added `max_items` enforcement → `ParseError::TooMany`
+- Added `try_reserve` for bounded allocation → `ParseError::Allocation`
+- Replaced iterator `.map().collect()` with explicit loop for proper error handling and bounds checking

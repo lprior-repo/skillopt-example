@@ -1,0 +1,84 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/claim-traceability.md",
+    "references/functional-core-performance.md",
+    "references/hardening-checklist.md",
+    "references/review-output-contract.md",
+    "references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses a String status field plus two independent booleans (is_validated, is_sent) instead of an enum-based typestate machine. Callers can construct any combination: status=\"sent\" with is_sent=false, status=\"validated\" with is_validated=false, both booleans true with an unrelated status, etc.",
+      "failure_mode": "Illegal states are representable. A caller can set item.status=\"pending\" and item.is_sent=true simultaneously, producing a shard that is logically both sent and not-sent. No invariant is enforceable across three independent fields.",
+      "fix": "Replace status, is_validated, is_sent, and sent_at_epoch_ms with a single enum: enum ShardState { New { id: ShardId }, Validated { id: ShardId }, Sent { id: ShardId, sent_at_epoch_ms: u64 } }. Each variant owns exactly the data needed for that state. Constructors are the only way to produce instances."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "pub status: String permits any string value. The mark_sent function sets status to the literal \"sent\" but callers can set it to anything, including \"sent\" without setting is_sent=true, or empty string.",
+      "failure_mode": "Domain invariants are encoded in string values instead of types. A string comparison is fragile and unchecked at compile time. Status drift between the status String and the is_sent boolean is silent and untrackable.",
+      "fix": "Replace status: String with the ShardState enum. The enum variants encode the lifecycle stage as a type, eliminating string comparison entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "pub is_validated: bool and pub is_sent: bool are two independent booleans tracking lifecycle stages. They are decoupled from each other and from the status String, creating a three-field lifecycle tracker where no single field is authoritative.",
+      "failure_mode": "Boolean flags are not a state machine. They allow 8 combinations (2^3 including status), only 3-4 of which are valid. Drift between status, is_validated, and is_sent is silent. mark_sent sets is_sent=true and status=\"sent\" but does not check or require is_validated=true first, violating the validated-before-sent invariant.",
+      "fix": "Replace is_validated and is_sent with enum variants. The transition New -> Validated -> Sent is enforced by the type system. mark_sent must consume a Validated ShardState and produce a Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "pub sent_at_epoch_ms: Option<u64> is an optional field that is independent of is_sent. A shard can have is_sent=true with sent_at_epoch_ms=None (sent but no timestamp), or is_sent=false with sent_at_epoch_ms=Some(...) (not sent but has a sent timestamp).",
+      "failure_mode": "The Option decouples the timestamp from the sent state. sent_at_epoch_ms=None is valid with is_sent=true, producing a shard that is sent but has no traceable timestamp. Conversely, sent_at_epoch_ms=Some(...) with is_sent=false is a phantom sent record.",
+      "fix": "Move sent_at_epoch_ms into the Sent variant of the ShardState enum as u64 (not Option). Only a Sent shard has a timestamp. This makes sent_at_epoch_ms present exactly when is_sent would be true."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "pub id: String is a raw primitive. Any string is a valid ShardWorkflow ID. There is no format validation, no uniqueness enforcement, no domain-specific rules (e.g., non-empty, max length, charset).",
+      "failure_mode": "Empty string \"\" or arbitrary whitespace can be a valid shard ID. IDs carry no domain invariants and can be confused with other string fields. The id is exposed publicly so callers can set it to any value.",
+      "fix": "Introduce a ShardId newtype: pub struct ShardId(String); with a private constructor that validates non-empty, bounded length, and valid characters. Make id: ShardId in the enum variants. All id access goes through ShardId methods."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow exposes all fields as pub with raw primitives (String, bool, Option<u64>). There is no smart constructor, no parse boundary, and no validation. Raw primitives cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly.",
+      "failure_mode": "Any caller can construct ShardWorkflow { id: \"\", status: \"\", is_validated: false, is_sent: false, sent_at_epoch_ms: None } or any other nonsensical combination. The domain has no guard at construction time. mark_sent is the only domain function but it does not enforce preconditions (e.g., validated-before-sent).",
+      "fix": "Remove the ShardWorkflow struct entirely. Define the ShardState enum with New, Validated, and Sent variants. Provide fallible constructors: ShardState::new(id: &str) -> Result<ShardState, ShardError> and ShardState::mark_sent(shard: &ShardState) -> Result<ShardState, ShardError> that enforce validated-before-sent. Expose only the enum and constructors publicly."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "mark_sent_no_precondition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts any ShardWorkflow regardless of its prior state. It does not check is_validated before allowing sent transition, does not check for double-sent, and does not require the shard to be in a Validated state first.",
+      "failure_mode": "A shard can be marked sent without ever being validated (is_validated=false). A shard can be marked sent multiple times, silently overwriting status each time. The function mutates state instead of expressing a deterministic transition.",
+      "fix": "mark_sent must take the Validated variant and return Result<Sent, ShardError>. In the enum-based typestate, this is enforced by the type system: mark_sent(ShardState::Validated{...}) -> ShardState::Sent{...}. Double-sent is a compile-time impossibility."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any hot-path function",
+    "no profiler evidence for allocation patterns in mark_sent (String::to_string on status allocation on every call)",
+    "no allocation budget or try_reserve analysis for the domain types",
+    "no second-ring evidence (no baseline, no hardware target, no input distribution)",
+    "no command-truth evidence (no cargo check, cargo clippy, or cargo test results)"
+  ],
+  "residual_risk": "Strict static review only. The entire domain model is unenforceable: illegal states are representable, no typestate guards exist, and mark_sent has no preconditions. Without enum-based typestate, smart constructors, and parse-boundary enforcement, the crate cannot satisfy the Holzman absolute laws. Commands were not run (eval mode)."
+}

@@ -1,0 +1,32 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_frame_invoice_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_frame_invoice_mixed/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_frame_invoice_mixed/.skill/holzman-rust/references/claim-traceability.md",
+    "/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_frame_invoice_mixed/.skill/holzman-rust/references/stress-test-plan.md",
+    "/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_frame_invoice_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/tmp/opencode/holzman-skillopt-train/718a35aa1215ca49/repair_frame_invoice_mixed/.skill/holzman-rust/references/functional-core-performance.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo clippy --lib -- -D warnings", "status": "passed"},
+    {"command": "cargo test", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No lossy as conversion: replaced payload.len() as u32 with u32::try_from(payload.len())",
+    "No unchecked indexing/slicing",
+    "Checked arithmetic: capacity uses checked_add",
+    "try_reserve used on allocation before extend",
+    "max_payload enforced with typed PayloadTooLarge error",
+    "No unwrap/expect/panic/todo/unreachable/assert in production",
+    "No unsafe, FFI, or raw pointers",
+    "All fallible results propagated with ? or map_err",
+    "Frame encoder mandatory pattern satisfied: checked_add + try_reserve present",
+    "All 2 behavior tests pass",
+    "Zero clippy warnings"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All Holzman absolute laws satisfied. Frame encoder follows mandatory repair pattern with checked_add, try_reserve, u32::try_from, and max_payload enforcement."
+}

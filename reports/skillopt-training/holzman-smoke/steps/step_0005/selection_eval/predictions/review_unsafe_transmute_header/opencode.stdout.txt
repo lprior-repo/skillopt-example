@@ -1,0 +1,7 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 4 findings:
+
+- **BLOCKER** `no_production_unsafe` — `std::mem::transmute` in `unsafe` block; violates the no-production-unsafe rule and silently encodes host endianness
+- **BLOCKER** `no_unchecked_indexing` — `input[0..3]` without bounds check; panics on short slices
+- **BLOCKER** `functional_core_parse_boundary` — Returns raw `u32` instead of a trusted newtype; illegal states are representable
+- **MINOR** `no_benchmark_evidence` — No benchmarks, profiler, or allocation evidence exist

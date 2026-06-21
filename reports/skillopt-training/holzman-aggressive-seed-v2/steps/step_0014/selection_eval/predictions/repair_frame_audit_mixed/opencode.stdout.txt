@@ -1,0 +1,9 @@
+Issues identified in `src/lib.rs`:
+1. **Lossy `as` conversion** (line 10): `payload.len() as u32` - violates Holzman rule
+2. **Unused `max_payload` parameter**: `rejects_limit` test expects `PayloadTooLarge` error when payload exceeds `max_payload`, but function ignores it
+Repair complete. Two Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** (`payload.len() as u32`) replaced with safe `try_into()` + `map_err`
+2. **Unused `max_payload` parameter** - added bounds check `payload.len() > max_payload` returning `FrameError::PayloadTooLarge`
+
+All 2 tests pass. Output written to `repair-output.json`.

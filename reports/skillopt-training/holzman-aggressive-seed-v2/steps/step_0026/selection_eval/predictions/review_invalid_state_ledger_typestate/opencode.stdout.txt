@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 findings across 3 severity levels:**
+
+- **3 BLOCKERs:**
+  1. `LedgerWorkflow` allows illegal states via `String` status + independent `bool` flags (line 1-6)
+  2. `id: String` lacks domain newtype wrapper (line 2)
+  3. `mark_sent` has no preconditions, no typed error return — shell mutation masquerading as core logic (line 9)
+
+- **2 MAJORs:**
+  4. Magic string `"sent"` literal instead of typed enum (line 10)
+  5. `Option<u64>` timestamp decoupled from `is_sent` bool, enabling inconsistent states (line 6)
+
+- **2 MINORs:**
+  6. No benchmarks exist
+  7. No dev-dependencies (testing/benchmarking tools)
+
+**Missing evidence:** benchmarks, profiler data, second-ring property tests, command evidence (fmt/test/clippy), allocation audit.

@@ -1,0 +1,19 @@
+Now I have full context. The issues are:
+
+1. **Missing payload-too-large check** — test expects rejection when payload exceeds `max_payload`
+2. **Lossy `as u32`** — silent truncation for payloads > 4GB
+3. **Missing `checked_add`** — mandatory frame/packet encoder pattern
+4. **Missing `try_reserve`** — mandatory frame/packet encoder pattern
+Repair complete.
+
+**Fixes applied to `src/lib.rs`:**
+
+1. **Payload-too-large gate** (line 9-10): Added `payload.len() > max_payload` check returning `Err(FrameError::PayloadTooLarge)` — was missing, causing test failure.
+
+2. **Checked capacity arithmetic** (line 12-14): `4usize.checked_add(payload.len())` — mandatory frame/packet encoder pattern, replaces unbounded addition.
+
+3. **Fallible allocation** (line 16-17): `out.try_reserve(capacity)` — mandatory pattern, prevents unbounded allocation from succeeding silently.
+
+4. **Checked conversion** (line 18): `u32::try_from(payload.len())` — replaces lossy `payload.len() as u32` which truncated silently for payloads > 4GB.
+
+**Gates passed:** `cargo fmt`, `cargo test` (2/2), `cargo clippy --lib -D warnings`. JSON written to `repair-output.json`.

@@ -1,0 +1,121 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_hidden_io_sensor_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_hidden_io_sensor_mixed/.skill/holzman-rust/references/claim-traceability.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_hidden_io_sensor_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_hidden_io_sensor_mixed/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_hidden_io_sensor_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_hidden_io_sensor_mixed/.skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_domain",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string with unwrap fuses file I/O into what is presented as a domain parsing function. The function both reads the filesystem and constructs domain records, violating Data/Calculations/Actions architecture.",
+      "failure_mode": "I/O latency, filesystem errors, and side effects leak into pure domain logic. The function cannot be tested deterministically or composed without an actual file on disk.",
+      "fix": "Separate into a shell function that reads and calls a pure parse_sensors function. Return Result<Vec<Record>, SensorError> instead of Vec<Record>. Remove unwrap and handle I/O errors with a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() is a panic surface on missing or unreadable files.",
+      "failure_mode": "Any absent, permission-denied, or corrupt file path causes a synchronous process panic instead of a typed, recoverable error.",
+      "fix": "Return Result<Vec<Record>, SensorError> and propagate I/O errors: fs::read_to_string(path).map_err(|e| SensorError::Io(e))?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is hidden stdout I/O inside the map closure that processes parsed records. This is pure-logic code that emits side effects.",
+      "failure_mode": "Deterministic pure parsing is contaminated with observable I/O. The output is unstructured, untestable, and cannot be captured or suppressed in downstream consumers.",
+      "fix": "Remove println entirely. If logging is needed, it belongs in the shell layer outside the pure parsing closure."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_mandatory_for_one_semicolon",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates an intermediate Vec and uses split with collect instead of split_once for a two-field (name, value) grammar.",
+      "failure_mode": "Every line allocates a Vec<String>, all parts are allocated and trimmed even though only two are needed. Extra commas or missing fields silently produce wrong-indexed access or unparseable second fields.",
+      "fix": "Use let (_name, value_str) = line.split_once(',').ok_or(SensorError::Invalid)?; then parse value_str.trim().parse::<u16>().map_err(|_| SensorError::Invalid). Eliminate the intermediate Vec entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are unchecked index accesses on a Vec built from split. Zero-length or single-element lines from empty lines or malformed CSV cause panic.",
+      "failure_mode": "Any blank line, trailing newline, or single-field line in the input file triggers an index-out-of-bounds panic at runtime.",
+      "fix": "Replace with split_once and ok_or to produce a typed parse error instead of index panic."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 parses into u32 then performs a lossy as-cast to u16. Values in range [65536, 4294967295] silently truncate.",
+      "failure_mode": "A sensor value of 70000 parses successfully, then silently truncates to 4448 due to wrapping on the as cast. No overflow detection or typed error.",
+      "fix": "Parse directly as u16: parts[1].trim().parse::<u16>().map_err(|_| SensorError::Invalid). If u16 cannot represent the domain range, use a newtyped domain value with validated constructor."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Record uses raw primitives (String, u16) for domain fields. No typestate, no validated constructor, no newtype for value. Any caller can construct a Record with an empty name or an out-of-range value via String::from and a raw u16.",
+      "failure_mode": "Illegal domain states are representable: Record with name=\"\" or name=String with arbitrary content, and value as any u16 including values outside the sensor's valid operating range.",
+      "fix": "Use newtype for name: struct SensorName(String) with a smart constructor that rejects empty strings. Use a validated SensorValue type or at minimum a smart constructor for u16 that rejects out-of-range values. Replace Record fields with these domain types."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "shell_leakage_fused_parsing",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sensors fuses filesystem I/O (line 9), stdout logging (line 16), CSV parsing (lines 12-15), domain construction (lines 17-20), and unbounded allocation (no cap on Vec size) into a single function.",
+      "failure_mode": "No architectural separation between shell and core. Cannot unit-test parsing without a file. Cannot control allocation size. Cannot suppress or redirect logging. Every caller inherits all side effects.",
+      "fix": "Split into: (1) shell fn load_sensors(path: &str) -> Result<Vec<Record>, SensorError> that reads the file, (2) pure fn parse_records(text: &str) -> Result<Vec<Record>, SensorError> that parses lines, (3) bounded allocation: validate max_rows cap, use Vec::new then try_reserve(max_rows).map_err(|_| SensorError::Allocation)? before the parse loop."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "text.lines().map(...).collect() performs unbounded allocation with no max_rows cap and no try_reserve. A file with millions of lines allocates unboundedly.",
+      "failure_mode": "A large or malicious input file causes unbounded heap allocation, potential OOM kill, and denial of service with no graceful degradation.",
+      "fix": "Validate a trusted max_rows cap before the parse loop. Use Vec::new(), then out.try_reserve(max_rows).map_err(|_| SensorError::Allocation)?, and enforce a per-record count check with count > max_rows before each push."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists. The function performs filesystem I/O, string allocations (one Vec per line), and domain construction. Without measurement, performance characteristics are unknown.",
+      "failure_mode": "Unmeasured allocation pattern (one Vec<String> per line via split + map + collect) may be the dominant cost. No baseline exists to validate any future optimization claim.",
+      "fix": "Add a criterion or custom benchmark measuring throughput (lines/sec) and allocation count (bytes/line) for representative sensor file sizes (small: <100 lines, medium: 10K lines, large: 1M lines). Compare against the split_once + Vec::new + try_reserve approach."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo fmt, cargo check, cargo clippy, or cargo test evidence exists. The code uses unwrap() and as-casts which strict clippy gates would flag.",
+      "failure_mode": "Without strict lint evidence, hidden violations of Holzman gates (unwrap, indexing_slicing, as_conversions, panic_in_result_fn) are undetected at tooling level.",
+      "fix": "Run cargo fmt --check, cargo clippy with -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::as_conversions -D clippy::indexing_slicing, and cargo check --workspace --all-targets --all-features."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sensors allocation and throughput characteristics",
+    "no profiler evidence showing hot path dominance of split+collect allocation pattern",
+    "no allocation profiling evidence for per-line Vec<String> intermediate allocations",
+    "no second-ring evidence tied to actual symbols (no cargo clippy --all-features -- -D warnings output)",
+    "no command-truth evidence: no cargo fmt, cargo check, clippy, or test runs recorded",
+    "no workload definition: sensor file size distribution, update frequency, and latency requirements are unspecified"
+  ],
+  "residual_risk": "This is a static code review of a crate that has not been compiled, linted, or tested. The code exhibits 8 BLOCKER-level violations of Holzman absolute laws (hidden I/O, unwrap panic surfaces, lossy as-cast, unchecked indexing, split_once mandate violation, fused shell/core architecture, missing domain newtypes, unbounded allocation) and 3 WARNING-level findings (missing benchmark/profiler evidence, missing command evidence). All blockers must be resolved before any delivery gate. Without running cargo fmt, cargo check, clippy strict gates, and tests, residual risk includes undetected compilation failures, clippy warning surfaces, and behavioral correctness gaps not visible in static review."
+}

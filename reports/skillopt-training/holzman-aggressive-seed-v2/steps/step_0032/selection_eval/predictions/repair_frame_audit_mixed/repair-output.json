@@ -1,0 +1,24 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/b3ab21fb8ca67a8b/repair_frame_audit_mixed/.skill/holzman-rust/SKILL.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe, unwrap, expect, panic, todo, unimplemented, unreachable",
+    "No lossy as conversions — replaced payload.len() as u32 with u32::try_from(payload.len())",
+    "No unchecked indexing",
+    "No unchecked arithmetic",
+    "Payload length checked against max_payload before encoding",
+    "All 2 behavior tests pass",
+    "Clippy passes with all strict lints enabled",
+    "Smallest source change: added bounds check and checked cast only"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. Both behavior tests pass, clippy clean, no Holzman violations remain. The only changes were: (1) added payload.len() > max_payload guard returning FrameError::PayloadTooLarge, and (2) replaced usize-to-u32 lossy cast with u32::try_from returning FrameError::Overflow on failure."
+}

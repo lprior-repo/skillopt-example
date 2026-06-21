@@ -1,0 +1,12 @@
+{
+  "reasoning": "The agent consistently misses `try_reserve` in repair tasks and occasionally misses checked arithmetic for capacity. The current skill text mentions these but agents are not applying them. I will add a specific, high-visibility checklist item in Repair Mode that forces the agent to explicitly check for `Vec` allocation patterns and replace `with_capacity` with `try_reserve` + error handling, and ensure capacity math uses checked arithmetic.",
+  "edits": [
+    {
+      "op": "insert_after",
+      "target": "## Repair Mode",
+      "content": "\n### Repair Mode Checklist\n\nBefore finalizing any repair, verify these specific patterns are fixed:\n1. **Allocation:** Any `Vec::with_capacity` must be replaced with `try_reserve` (or `try_from`/`try_into` for capacity calculation) and the allocation error must be handled (returned or mapped to a domain error). Never use `with_capacity` for bounded allocations.\n2. **Capacity Math:** Any calculation of `Vec` capacity (e.g., `header + payload`) must use `checked_add`/`checked_mul` and handle overflow.\n3. **Arithmetic:** All integer division must use `checked_div`. All width-reducing casts must use `try_from`.\n4. **Parsing:** Use `split_once` and `get`. No unchecked indexing.\n5. **Safety:** No `unwrap`, `expect`, `panic!`, `unsafe`, or `as` for casts.\n",
+      "source_type": "failure",
+      "support_count": 24
+    }
+  ]
+}

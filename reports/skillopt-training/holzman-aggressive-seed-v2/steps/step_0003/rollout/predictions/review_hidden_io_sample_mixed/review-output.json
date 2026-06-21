@@ -1,0 +1,95 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permission denied, too-long path, etc.)",
+      "failure_mode": "untrusted file path can abort the entire program instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, IoError> and propagate with ? or map_err to a typed domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on any non-numeric value in the second field",
+      "failure_mode": "malformed CSV line with non-numeric value aborts the caller instead of returning a typed ParseError",
+      "fix": "use .parse::<u32>().map_err(|_| RecordError::Parse) or similar typed error, then map_or/ok_or to a domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 on a u32 parse result is a lossy cast that silently truncates values above 65535",
+      "failure_mode": "a value like 70000 silently becomes 4424, producing corrupt data with no error signal",
+      "fix": "use u16::try_from(parsed) or (0..=65535).contains(&parsed).then_some(parsed as u16).ok_or(RecordError::Overflow)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the vector by index without bounds check; a blank line or empty input panics",
+      "failure_mode": "a single empty line in the file panics the calling thread",
+      "fix": "use parts.first().copied() or split_once(',') and match the result"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses the vector by index without bounds check; a line with only one field panics",
+      "failure_mode": "a line missing the second comma panics the calling thread",
+      "fix": "use parts.get(1) or split_once(',') and match both arms"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side effect (I/O/logging) inside a data-loading function that should be pure parsing logic",
+      "failure_mode": "hidden I/O side effect in core data logic makes the function non-deterministic from an external observer, breaks referential transparency, and mixes shell concerns into what should be a calculation",
+      "fix": "remove println! entirely; if logging is needed, return a (Vec<Record>, Vec<String>) or use an explicit logger parameter in the shell layer"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "borrowed_data_preferred",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collects all split parts into Vec<String> when only two fields are needed; unnecessary heap allocation per line",
+      "failure_mode": "allocates a Vec and multiple String heap objects per line instead of reusing or borrowing from the input line",
+      "fix": "use split_once(',') to get two &str slices directly, avoiding intermediate Vec and per-part allocations"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_samples mixes filesystem I/O (fs::read_to_string) with data parsing; the shell should own I/O and the core should own parsing",
+      "failure_mode": "the function cannot be tested as pure logic; file-system dependency forces integration tests or mocking for unit coverage",
+      "fix": "split into shell fn load_samples(path: &str) -> Result<Vec<Record>, IoError> that reads the file, and pure fn parse_records(text: &str) -> Result<Vec<Record>, RecordError> that does parsing"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "type_discipline",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String and u16 instead of domain newtypes; the value field has no domain-level range guarantee at the type level",
+      "failure_mode": "any code can construct Record { name: \"\".into(), value: 0 } or value: 99999 via the lossy cast, making illegal states representable at call sites",
+      "fix": "introduce a value object newtype like struct RecordValue(u16) with a constructor that validates range, and consider a Name newtype if domain rules apply"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_samples throughput or allocation profile",
+    "no profiler data (flamegraph, perf, or similar) to validate performance claims",
+    "no allocation tracking (e.g., allocative analysis or custom allocator) for the Vec<String> per-line allocation pattern",
+    "no second-ring behavior tests (property tests, proptest, or fuzz) for malformed input lines",
+    "no command evidence for cargo fmt, cargo clippy, or cargo test"
+  ],
+  "residual_risk": "static review only; no commands run. Multiple BLOCKER findings (unwrap, lossy cast, unchecked indexing, hidden I/O) make the crate unsafe for production use without fixes. The function has no error taxonomy and cannot fail gracefully on any external input."
+}

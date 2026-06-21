@@ -1,0 +1,11 @@
+Issues in `src/lib.rs`:
+1. `payload.len() as u32` — lossy `as` conversion (line 10)
+2. `max_payload` parameter is completely unused
+3. `Vec::new()` without `try_reserve` before growth
+
+Fixing now:
+Repair complete. Two tests pass. Changes to `src/lib.rs`:
+
+1. **Added `PayloadTooLarge` check** — `max_payload` was ignored; now rejects when `payload.len() > max_payload`
+2. **Replaced lossy `as` cast** — `payload.len() as u32` → `u32::try_from(payload.len())` with `Overflow` error on failure
+3. **Added `try_reserve`** — `Vec::new()` → `Vec::new()` + `try_reserve(4 + payload.len())` with `Allocation` error mapping

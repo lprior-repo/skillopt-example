@@ -1,0 +1,2 @@
+    Checking repair_headers_zero_copy v0.1.0 (/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/candidate-v6/repair_headers_zero_copy)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s

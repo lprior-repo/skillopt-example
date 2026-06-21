@@ -1,0 +1,142 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() uses unwrap() on fallible I/O",
+      "failure_mode": "Corrupted, missing, or unreadable metric file panics the entire program instead of returning a typed I/O error",
+      "fix": "Return Result<Vec<Record>, std::io::Error> (or a domain error enum) and propagate the I/O error with ?"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden side effect / I/O in a data-loading function",
+      "failure_mode": "The function has logging side effects that are not expressed in the type signature, making it impossible to compose purely and causing uncontrolled stdout output in tests and production",
+      "fix": "Remove the println! entirely. If metrics/logging are needed, pass an observer callback or return a log event in the result type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Unchecked indexing parts[0] without bounds check",
+      "failure_mode": "If a line has no comma, parts.len() == 1 and subsequent parts[1] access will panic at runtime",
+      "fix": "Use split_once(',') to get exactly two parts, returning an error for malformed lines"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() + indexed access instead of split_once for a two-field CSV line",
+      "failure_mode": "Allocates a Vec<String> for all fields even though only two are needed. If the line has more or fewer than 2 comma-separated values, indexing [0] and [1] is either wasteful or panics",
+      "fix": "Use split_once(',') to extract the name and value parts in one operation, then trim and parse only those two"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() uses unwrap() on fallible numeric parsing",
+      "failure_mode": "Non-numeric content in the value field (e.g., 'abc', empty string, floating point) panics instead of returning a typed parse error",
+      "fix": "Return Result<Vec<Record>, ParseError> (or a domain error enum) and propagate parse failure with ? or map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy cast as u16 on a u32 parse result",
+      "failure_mode": "Values in range 65536..=u32::MAX silently truncate to u16::MAX, producing incorrect records without any error or warning",
+      "fix": "Use u16::try_from(parsed_u32) to return a typed error when the value exceeds u16::MAX"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics mixes I/O (fs::read_to_string, println!) with data parsing and validation in a single function",
+      "failure_mode": "The function cannot be tested purely (unit tests would need filesystem access and capture stdout). Parsing logic is coupled to I/O side effects, violating the functional core / imperative shell separation",
+      "fix": "Split into: (1) a pure fn parse_records(lines: impl Iterator<Item=&str>) -> Result<Vec<Record>, RecordError> in the core, and (2) a shell fn load_metrics(path: &str) -> Result<Vec<Record>, AppError> that handles I/O and delegates to the parser"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String and u16 instead of typed domain newtypes",
+      "failure_mode": "No type-level guarantee that name is non-empty or value is in valid range. Any code can construct an invalid Record, making illegal states representable",
+      "fix": "Introduce a non-empty Name newtype with a fallible constructor, and validate value range in the constructor or use a domain error enum to reject out-of-range values"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics returns Vec<Record> with no error type, forcing unwrap/panic on every failure path",
+      "failure_mode": "All failure modes (file not found, read error, parse error, invalid format, out-of-range value) collapse into a single panic with no way for callers to distinguish or handle them",
+      "fix": "Define a domain error enum (e.g., MetricsError { Io(std::io::Error), Parse { line: usize, field: &'static str, reason: String } }) and return Result<Vec<Record>, MetricsError>"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Collects every line field into Vec<String> unnecessarily; no try_reserve or bounded capacity handling",
+      "failure_mode": "Wastes heap allocation per line. If the capacity were bounded, allocation failure would be silently ignored rather than handled as a recoverable error",
+      "fix": "Use split_once(',') and avoid Vec allocation entirely. If Vec is ever needed for batch operations, use try_reserve with Allocation error handling"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists to validate performance characteristics of load_metrics",
+      "failure_mode": "Without benchmark evidence, allocation patterns (per-line Vec<String>, String allocations for trim+clone) cannot be verified as acceptable for the intended workload size",
+      "fix": "Add a cargo bench benchmark that measures parse throughput for representative file sizes (small, medium, large) to establish baselines and detect regressions"
+    },
+    {
+      "severity": "INFO",
+      "rule": "profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence or flamegraph provided for the metrics loading path",
+      "failure_mode": "Cannot confirm that hot path allocations (String::trim, String::to_string, Vec collect) are the actual bottleneck vs. I/O latency",
+      "fix": "Run cargo flamegraph or perf record on load_metrics with realistic input to identify the true hot path before optimizing"
+    },
+    {
+      "severity": "INFO",
+      "rule": "allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation audit (e.g., heaptrack, jemalloc stats) for the hot path",
+      "failure_mode": "Hidden O(n) per-line allocations may cause excessive GC pressure or heap fragmentation at scale",
+      "fix": "Use heaptrack or jemalloc profiling to measure per-line allocation count and total heap usage"
+    },
+    {
+      "severity": "INFO",
+      "rule": "command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring evidence: no miri, clippy, or cargo test run to validate correctness of the reviewed code",
+      "failure_mode": "Static review alone cannot confirm the absence of data races, UB, or that clippy has no additional warnings on this crate",
+      "fix": "Run cargo fmt, cargo clippy --all-targets, and cargo miri test if applicable to produce second-ring evidence"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_metrics throughput",
+    "no profiler/flamegraph evidence for the metrics loading path",
+    "no allocation audit (heaptrack/jemalloc) for the hot path",
+    "no cargo test execution evidence",
+    "no cargo clippy --all-targets execution evidence",
+    "no cargo fmt check evidence",
+    "no second-ring tooling evidence (miri, etc.)"
+  ],
+  "residual_risk": "High: six BLOCKER findings remain unresolved, including three uses of unwrap() on fallible operations (I/O, parse, and implicit indexing), a lossy as cast, hidden I/O side effects, missing error types, and no functional core/shell separation. The code as written will panic on any malformed input, missing file, or out-of-range value. Static review only — no commands were run."
+}

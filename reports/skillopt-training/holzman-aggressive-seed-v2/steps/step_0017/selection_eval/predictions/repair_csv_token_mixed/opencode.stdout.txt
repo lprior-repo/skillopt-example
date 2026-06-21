@@ -1,0 +1,11 @@
+Now I have full context. The source has multiple Holzman violations: `unwrap()` on parse, ignores `max_items`, no empty check, no checked allocation. Let me fix it.
+All 4 tests pass. Let me run the remaining verification gates.
+Repair complete. Here's what was fixed in `src/lib.rs`:
+
+**Violations removed:**
+- `unwrap()` on `parse::<u16>()` → replaced with `map_err(|_| ParseError::Invalid)`
+- Ignored `max_items` parameter → now returns `Err(ParseError::TooMany)` when exceeded
+- No empty-input check → now returns `Err(ParseError::Empty)` for blank/whitespace-only input
+- No bounded allocation → added `try_reserve` with `ParseError::Allocation` handling
+
+**Gates passed:** `cargo fmt`, `cargo fmt --check`, `cargo check --all-targets`, `cargo clippy -D warnings -D unsafe_code`, all 4 behavior tests.

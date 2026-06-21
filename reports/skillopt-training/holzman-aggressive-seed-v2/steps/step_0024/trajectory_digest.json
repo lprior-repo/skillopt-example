@@ -1,0 +1,31 @@
+{
+  "step": 24,
+  "action": "reject",
+  "n_total": 4,
+  "n_fail": 2,
+  "failure_patterns": [
+    {
+      "pattern": "missing_try_reserve: Agent fails to use try_reserve for bounded Vec allocations in repair contexts.",
+      "count": 1,
+      "task_ids": [
+        "repair_frame_order_mixed"
+      ]
+    },
+    {
+      "pattern": "missing_checked_arithmetic: Agent fails to use checked_add/checked_mul for capacity/summary math.",
+      "count": 1,
+      "task_ids": [
+        "repair_frame_quote_mixed"
+      ]
+    }
+  ],
+  "score_before": 0.8,
+  "score_after": 0.4,
+  "rejected_edits": [
+    {
+      "op": "insert_after",
+      "content": "\n### Repair Mode Checklist\n\nBefore finalizing any repair, verify these specific patterns are fixed:\n1. **Allocation:** Any `Vec::with_capacity` must be replaced with `try_reserve` (or `try_from`/`try_into` for capacity calculation) and the allocation error must be handled (returned or mapped to a domain error). Never use `with_capacity` for bounded allocations.\n2. **Capacity Math:** Any calculation of `Vec` capacity (e.g., `header + payload`) must use `checked_add`/`checked_mul` and handle overflow.\n3. **Arithmetic:** All integer division must use `checked_div`. All width-reducing casts must use `try_from`.\n4. **Parsing:** Use `split_once` and `get`. No unchecked indexing.\n5. **Safety:** No `unwrap`, `expect`, `panic!`, `unsafe`, or `as` for casts.\n",
+      "target": "## Repair Mode"
+    }
+  ]
+}

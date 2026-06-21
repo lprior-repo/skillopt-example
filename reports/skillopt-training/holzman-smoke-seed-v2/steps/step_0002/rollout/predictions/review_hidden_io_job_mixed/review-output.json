@@ -1,0 +1,113 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on fallible I/O is a forbidden construct that panics on any read error",
+      "failure_mode": "Unreadable file, permission denied, or path errors abort the entire process instead of returning a typed error the caller can handle",
+      "fix": "Return a typed Result<Record, JobError> (e.g. JobError::Io(io::Error)) and propagate with ? through the caller"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap() on fallible parse panics on non-numeric input",
+      "failure_mode": "A malformed CSV line with non-numeric second field causes a panic instead of returning a ParseError",
+      "fix": "Use parts[1].parse::<u32>().map_err(|e| JobError::Parse(e)) and propagate the error through the Result chain"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy as cast from u32 to u16 — as u16 silently truncates values > 65535",
+      "failure_mode": "A valid u32 value like 70000 is silently truncated to 63536, silently corrupting data with no error reported",
+      "fix": "Use u16::try_from(parsed_u32).map_err(|_| JobError::ValueOutOfRange) or parse directly as u16 and check the range"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexing into a Vec with no bounds check",
+      "failure_mode": "Empty lines or lines with fewer than 2 comma-separated fields panic with index-out-of-bounds",
+      "fix": "Use parts.first() or split_once(',') and handle the None case by skipping or returning a ParseError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing into a Vec with no bounds check before accessing second field",
+      "failure_mode": "Lines with only one comma-separated field panic with index-out-of-bounds",
+      "fix": "Check parts.len() >= 2 or use parts.get(1) before parsing, returning a typed parse/field-missing error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — I/O side effect embedded in data-loading logic",
+      "failure_mode": "Logging is mixed into the data pipeline, making the function non-deterministic, impossible to test in isolation, and coupling the core to console output",
+      "fix": "Remove println! from load_jobs. If logging is needed, return a separate metadata field or handle logging in the imperative shell at the call site"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_jobs mixes I/O (fs::read_to_string), parsing, logging, and data construction in a single function returning Vec — no clear separation of concerns",
+      "failure_mode": "Cannot unit-test the parsing/validating core without spawning real filesystem I/O and capturing console output; violations of illegal states go undetected because raw String fields are exposed publicly",
+      "fix": "Split into: (1) a pure fn parse_record(line: &str) -> Result<Record, ParseError> that takes &str and returns a validated Record; (2) an action fn load_jobs(path: &str) -> Result<Vec<Record>, JobError> that reads the file, calls parse_record per line, and handles errors"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "pub struct Record with pub name: String and pub value: u16 — raw public fields allow construction of invalid records",
+      "failure_mode": "Callers can construct Record { name: String::new(), value: 0 } or Record { name: \"\".into(), value: 0 } which may violate domain invariants (empty name, zero value); no type-level guarantee that values are in valid range",
+      "fix": "Make fields private and provide a fn new(name: String, value: u16) -> Result<Record, RecordError> that validates invariants; or use newtypes for domain-constrained values"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_path",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string is a blocking I/O call hidden inside a fn returning Vec<Record> — no Result, no async, no indication of fallibility in the signature",
+      "failure_mode": "The function signature claims to return Vec<Record> but can actually panic; callers have no way to handle I/O failures, and the blocking call can starve an async runtime if used in one",
+      "fix": "Change signature to fn load_jobs(path: &str) -> Result<Vec<Record>, JobError> (or use async fn) so fallibility is explicit in the type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_jobs collects into Vec<Record> with no try_reserve or capacity hint, and per-line Vec<String> allocations on every line",
+      "failure_mode": "Unbounded memory growth on large files; repeated per-line Vec allocations add allocation pressure and potential OOM; no graceful handling of allocation failure",
+      "fix": "Estimate capacity from file metadata or line count, call Vec::try_reserve before collecting, and use &str slices with split_once instead of collecting parts into Vec<String>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, no profiler evidence, no allocation metrics — the function performs file I/O, string splitting, per-line allocation, parsing, and logging with zero performance measurement",
+      "failure_mode": "Cannot determine if this is suitable for hot paths, large files, or constrained memory environments; performance-regression-prone design with no baseline to validate against",
+      "fix": "Add a criterion/benchmark measuring throughput (lines/sec), allocation count, and memory usage for typical and edge-case inputs; add an allocation audit with #[global_allocator] tracking or dhat-rs"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists — no throughput, latency, or allocation baseline for load_jobs",
+    "no profiler evidence — hot path is not profiled for CPU hotspots in the parsing loop",
+    "no allocation analysis — no evidence that per-line Vec<String> allocations are bounded or minimal",
+    "no command evidence — cargo check, clippy, and test gates have not been executed",
+    "no tests — no unit tests, integration tests, or behavior tests exist for any parsing path or error case"
+  ],
+  "residual_risk": "Static review only — no commands run. All 10 findings are BLOCKERs requiring repair before delivery. The function as written violates multiple Holzman Rust non-negotiables: unwrap() on I/O and parse, unchecked indexing, lossy as cast, hidden I/O in the core path, no functional core/shell separation, public mutable fields enabling illegal states, no bounded allocation, and zero performance or test evidence."
+}

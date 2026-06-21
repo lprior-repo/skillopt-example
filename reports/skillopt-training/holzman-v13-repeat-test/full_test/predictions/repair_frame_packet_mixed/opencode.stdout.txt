@@ -1,0 +1,10 @@
+Now I understand the crate. Let me apply the Holzman frame-encoder patterns from skill.md:30. The current code has: lossy `as u32`, no payload-size check, no overflow check, and no `try_reserve`.
+Repair complete. All changes align with the Holzman frame-encoder pattern from skill.md:30.
+
+**Changes to `src/lib.rs`:**
+- Added `payload.len() > max_payload` check → returns `FrameError::PayloadTooLarge`
+- Replaced lossy `payload.len() as u32` with `u32::try_from(...).map_err(...)` → `FrameError::Overflow`
+- Added `4usize.checked_add(payload.len())` → `FrameError::Overflow` on overflow
+- Added `out.try_reserve(capacity)` → `FrameError::Allocation` on OOM
+
+**Results:** `cargo fmt` passed, `cargo test` — 2/2 tests passed.

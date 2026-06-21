@@ -1,0 +1,10 @@
+Repair complete. All 6 tests pass. Changes made to `src/lib.rs`:
+
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- Replaced `split(',').collect()` with mandatory `split_once(',')`
+- Removed unchecked indexing `parts[1]` and `.unwrap()` panic
+- Used `checked_add` for both `total` and `count`
+- Used `u64::try_from` and `u32::try_from` instead of lossy `as` casts
+- Used `checked_div` for average calculation
+- Added `render_summary(Summary) -> String` pure formatting function
+- Empty input check returns `Err(SummaryError::Empty)`

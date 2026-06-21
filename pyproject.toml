@@ -1,0 +1,197 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skill-moo"
+version = "0.1.0"
+description = "Holzman Rust SkillOpt generated dataset and candidate evaluation harness"
+requires-python = ">=3.12"
+dependencies = [
+    "attrs>=25.0",
+    "deal>=4.24",
+    "expression>=5.6",
+    "icontract>=2.7",
+    "openai>=1.0",
+    "outcome>=1.3",
+    "pygments>=2.17",
+    "pyyaml>=6.0",
+    "pyrsistent>=0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "crosshair-tool>=0.0.84",
+    "hypothesis>=6.100",
+    "mutmut>=3.2",
+    "mypy>=1.11",
+    "pyright>=1.1.390",
+    "pytest>=8",
+    "pytest-benchmark>=4.0",
+    "refurb>=2.1",
+    "ruff>=0.5",
+    "semgrep>=1.100",
+    "vulture>=2.11",
+]
+test = ["hypothesis>=6.100", "pytest>=8", "pytest-benchmark>=4.0"]
+
+[dependency-groups]
+dev = [
+    "crosshair-tool>=0.0.84",
+    "hypothesis>=6.100",
+    "mutmut>=3.2",
+    "mypy>=1.11",
+    "pyright>=1.1.390",
+    "pytest>=8",
+    "pytest-benchmark>=4.0",
+    "refurb>=2.1",
+    "ruff>=0.5",
+    "semgrep>=1.100",
+    "vulture>=2.11",
+]
+test = ["hypothesis>=6.100", "pytest>=8", "pytest-benchmark>=4.0"]
+
+[tool.uv]
+package = false
+dev-dependencies = [
+    "mypy>=1.11",
+    "ruff>=0.5",
+    "pytest>=8",
+]
+
+[tool.pyright]
+include = [
+    "scripts/generate_holzman_rust_dataset.py",
+    "scripts/run_holzman_candidate_eval.py",
+    "vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py",
+]
+exclude = [
+    ".benchmarks",
+    ".git",
+    ".hypothesis",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "candidates",
+    "data",
+    "dist",
+    "docs",
+    "reports",
+    "vendor",
+]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+reportMatchNotExhaustive = "error"
+reportUnusedCallResult = "error"
+reportMissingTypeArgument = "error"
+reportMissingParameterType = "error"
+reportUnknownArgumentType = "error"
+reportUnknownLambdaType = "error"
+reportUnknownMemberType = "error"
+reportUnknownParameterType = "error"
+reportUnknownVariableType = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+executionEnvironments = [
+    { root = ".", extraPaths = ["scripts", "vendor/SkillOpt"] },
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_unused_ignores = false
+disallow_any_explicit = false
+disallow_any_generics = false
+ignore_missing_imports = true
+follow_imports = "skip"
+files = [
+    "scripts/generate_holzman_rust_dataset.py",
+    "scripts/run_holzman_candidate_eval.py",
+    "vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py",
+]
+exclude = "^(vendor|data|docs|reports|candidates|dist|\\.venv)/"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["scripts", "vendor/SkillOpt/skillopt/envs/holzman_rust"]
+extend-exclude = [
+    ".benchmarks",
+    ".git",
+    ".hypothesis",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "candidates",
+    "data",
+    "dist",
+    "docs",
+    "reports",
+    "vendor",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP", "SIM", "RUF"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"bench/**/*.py" = ["S101"]
+"tests/**/*.py" = ["S101"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = []
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+pythonpath = ["scripts"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+    "--tb=short",
+]
+markers = [
+    "benchmark: marks tests as benchmarks (deselect with '-m \"not benchmark\"')",
+    "integration: marks integration tests that may be slow",
+    "property: marks property-based tests using hypothesis",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:provider.*",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.crosshair]
+analysis_kind = ["icontract"]
+per_condition_timeout = 5
+per_path_timeout = 30
+report_all = false
+
+[tool.vulture]
+paths = ["scripts", "vendor/SkillOpt/skillopt/envs/holzman_rust"]
+exclude = [
+    ".benchmarks",
+    ".git",
+    ".hypothesis",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "candidates",
+    "data",
+    "dist",
+    "docs",
+    "reports",
+    "vendor",
+]
+min_confidence = 100
+sort_by_size = true
+
+[tool.refurb]
+enable_all = true
+python_version = "3.12"

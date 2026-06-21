@@ -1,0 +1,82 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses primitive String for status and separate bool flags (is_validated, is_sent), allowing illegal state combinations such as is_sent=true with status=\"pending\" or is_validated=false with status=\"validated\". The bool flags are redundant with status but not enforced by the type system.",
+      "failure_mode": "Domain invariants are not enforced at compile time; callers can construct or mutate shards into inconsistent states that violate business logic (e.g., a shard marked sent but with a non-sent status, or validated but not marked sent).",
+      "fix": "Replace `status: String` and `is_validated: bool` and `is_sent: bool` with a single `ShardStatus` enum (e.g., `enum ShardStatus { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }`). Use a fallible constructor to enforce invariants. Remove redundant bool flags."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_at_boundaries_into_trusted_types",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Id field is a raw `String` with no domain-level validation or newtype wrapping. Any caller can supply an invalid, empty, or malformed shard id.",
+      "failure_mode": "Downstream logic may panic, misroute, or silently corrupt data when given an invalid id. No compile-time guarantee that ids are well-formed.",
+      "fix": "Introduce a newtype `ShardId(String)` or `ShardId(NonEmptyString)` with a fallible constructor that validates id format. Accept the newtype everywhere in the core."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_string_status",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`mark_sent` hardcodes `status = \"sent\"` as a raw string comparison/assignment. There is no enum or validated type for status, and no Result return. The function silently accepts any input state without checking whether \"sent\" is a valid transition.",
+      "failure_mode": "A shard in any state (including already sent) can be marked sent again (idempotency bug), or a shard that should not be sent can transition. No error path for invalid transitions.",
+      "fix": "Replace `mark_sent` with a method that operates on the `ShardStatus` enum, using pattern matching to reject invalid transitions. Return a `Result<ShardWorkflow, TransitionError>` for invalid transition attempts."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is a clock/timestamp field embedded in the core data struct. Time-related data in the pure core couples it to the imperative shell.",
+      "failure_mode": "Core data becomes impure; tests cannot be deterministic without mocking or injecting timestamps. Pure calculations cannot be unit-tested in isolation.",
+      "fix": "Move `sent_at_epoch_ms` out of the core struct. The pure core should only hold the transition state (enum variant indicating Sent). The shell layer injects the timestamp when persisting or serializing."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_public_mutability_in_core_structs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes ownership and mutates fields directly (`item.status = ...`, `item.is_sent = true`) then returns the struct. This is imperative mutation, not pure functional transformation. Combined with public fields, any caller can mutate the struct directly.",
+      "failure_mode": "The struct's invariants can be violated by any caller that accesses public fields. No encapsulation of state transitions.",
+      "fix": "Make fields private. Provide domain methods (e.g., `fn mark_sent(self) -> Result<ShardWorkflow, TransitionError>`) that enforce transitions. Or use an enum-based typestate that makes invalid states unrepresentable."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark_profiler_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler data, or allocation analysis exist for this crate. The `mark_sent` function performs `\"sent\".to_string()` allocations on every call.",
+      "failure_mode": "Allocation behavior is unmeasured. In hot paths, repeated `.to_string()` on a literal string could be replaced with a static enum variant or string literal comparison to eliminate heap allocation.",
+      "fix": "Add a simple allocation benchmark. Replace `\"sent\".to_string()` with a static enum variant. Add `try_reserve` evidence if collections are introduced."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No `cargo fmt`, `cargo clippy`, or `cargo test` evidence exists. The crate has no test targets defined in Cargo.toml.",
+      "failure_mode": "No automated verification that the code compiles cleanly, passes linting, or meets behavior contracts.",
+      "fix": "Add test targets and run `cargo fmt --check`, `cargo clippy`, and `cargo test`. Report actual command outcomes in the review."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for allocation analysis of mark_sent",
+    "no profiler data for hot-path behavior",
+    "no behavior test suite",
+    "no cargo fmt/clippy/test command evidence",
+    "no bounded-allocation handling (try_reserve) evidence",
+    "no command-line execution evidence for any lint or test gate"
+  ],
+  "residual_risk": "This is a static review only. No commands were run. The struct has no compile-time enforcement of domain invariants — all state combinations are valid by construction of the compiler, which is the opposite of what Holzman Rust requires. The absence of tests means even basic compilation and lint gates are unverified."
+}

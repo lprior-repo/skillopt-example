@@ -1,0 +1,7 @@
+Now I have all the references and source. Let me write the review.
+Review complete. Written 13 findings to `review-output.json`:
+
+- **6 BLOCKER findings**: typestate machine (1:1), status string (1:3), bool lifecycle (1:4,5), Option invalid-state combos (1:6), newtype domain ID (1:2), parse boundary (1:1), hidden mutation (1:9), public data fields (1:1)
+- **4 MAJOR findings**: missing benchmark/profiler/allocation/command evidence, no typed errors
+
+All 6 required typestate findings present (SKILL.md:79-80). Parse boundary finding contains both words `parse` and `boundary`. Every finding includes severity, rule, file, line, problem, failure_mode, and fix.

@@ -1,0 +1,108 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "functional-core-performance.md", "hardening-checklist.md", "review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_required",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub struct MetricWorkflow { pub status: String, pub is_validated: bool, pub is_sent: bool, ... }",
+      "problem": "MetricWorkflow uses status: String plus two lifecycle booleans (is_validated, is_sent) instead of an enum typestate. This permits illegal state combinations like status=\"sent\" with is_sent=false, or is_validated=true with is_sent=true and no sent_at_epoch.",
+      "failure_mode": "Any code checking item.status == \"sent\" ignores the booleans entirely, while code checking is_sent ignores the status string. No invariant enforces a consistent lifecycle. The struct represents an unbounded state space including states that should be impossible.",
+      "fix": "Replace the three fields with a single `State` enum: `enum State { Created, Validated { validated_at_ms: u64 }, Sent { sent_at_ms: u64 } }`. Remove status, is_validated, is_sent, and sent_at_epoch_ms. Make mark_sent consume the validated variant and return Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "pub status: String",
+      "problem": "Raw String for workflow status. Status is a domain concept that must be an enum to make illegal states unrepresentable.",
+      "failure_mode": "Arbitrary strings like \"SENT\", \"\", \"sent_pending\" compile and pass any equality check. No compiler enforcement of valid transitions.",
+      "fix": "Replace with a `State` enum (see typestate_enum_required finding). Remove the String field entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "construct": "pub is_validated: bool",
+      "problem": "Lifecycle boolean on struct. Booleans encoding lifecycle phases must be transitions inside an enum variant.",
+      "failure_mode": "is_validated can be true while is_sent is also true, with no recorded sent_at_epoch, or status could be something other than \"sent\". The boolean carries no proof of when validation occurred.",
+      "fix": "Fold lifecycle data into enum variants: `State::Validated { validated_at_ms: u64 }`. The presence of the variant encodes the boolean."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_booleans",
+      "file": "src/lib.rs",
+      "line": 5,
+      "construct": "pub is_sent: bool",
+      "problem": "Lifecycle boolean on struct. Same as is_validated — must be an enum variant, not a bare bool.",
+      "failure_mode": "is_sent can be true with sent_at_epoch_ms=None, or with status != \"sent\". No invariant ties the flag to timestamp or status.",
+      "fix": "Replace with `State::Sent { sent_at_ms: u64 }`. The variant presence encodes is_sent and the timestamp lives inside the variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "construct": "pub sent_at_epoch_ms: Option<u64>",
+      "problem": "Optional lifecycle timestamp on a struct that already has is_sent: bool. Option outside the state machine decouples the timestamp from its lifecycle gate.",
+      "failure_mode": "is_sent=true and sent_at_epoch_ms=None is a valid struct, representing a sent metric with no record of when. Conversely is_sent=false but sent_at_epoch_ms=Some(...) is also valid.",
+      "fix": "Move the timestamp inside the Sent enum variant as a required field: `State::Sent { sent_at_ms: u64 }`. The Option disappears because the variant cannot exist without the value."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_id_required",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub id: String",
+      "problem": "MetricWorkflow ID is a bare String with no domain constraints. No uniqueness, format, or length rules encoded in the type.",
+      "failure_mode": "Empty strings, duplicate IDs, and non-metric identifiers all type-check. No compile-time distinction between a MetricWorkflow ID and any other string.",
+      "fix": "Introduce a `MetricId` newtype: `pub struct MetricId(String);` with a smart constructor that validates format/length. Use `MetricId` as the field type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_smart_constructor",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "pub fn mark_sent(mut item: MetricWorkflow) -> MetricWorkflow",
+      "problem": "mark_sent takes a fully-formed MetricWorkflow and mutates fields directly. No smart constructor validates preconditions or returns typed errors. The function silently accepts any state and overwrites status string.",
+      "failure_mode": "Calling mark_sent on a MetricWorkflow that hasn't been validated (is_validated=false) is a domain violation with no compile-time or runtime enforcement. The function also loses the original sent_at_epoch_ms if it was Some.",
+      "fix": "Define mark_sent as `fn mark_sent(state: State) -> Result<State, TransitionError>` that consumes the validated state variant and returns Sent. Remove the struct-level mutation entirely."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "construct": "item.status = \"sent\".to_string();",
+      "problem": "mark_sent uses .to_string() allocation and direct field mutation. In a typed-domain design the state transition would be a pure function from one enum variant to another with no String allocation.",
+      "failure_mode": "Every call allocates a new String for the status field even though the value is always the same literal \"sent\". With a State enum the Sent variant would be zero-allocation.",
+      "fix": "Replace with enum-based transition: `State::Validated { validated_at_ms } => State::Sent { sent_at_ms }` — zero allocation, no String, no .to_string()."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "No benchmark module or criterion/criterion-like dependency",
+      "problem": "No benchmark exists for any performance claim or allocation analysis. The mark_sent function allocates a String on every call which is suboptimal for a hot path.",
+      "failure_mode": "Without a baseline benchmark, there is no evidence that the allocation in mark_sent matters, or that replacing it with an enum variant actually improves performance.",
+      "fix": "Add a criterion benchmark for mark_sent on a representative workload. After typestate refactor, benchmark again to measure allocation elimination."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "No test, clippy, or fmt evidence",
+      "problem": "No tests, no clippy run, no cargo fmt check. The review is static only.",
+      "failure_mode": "Cannot verify that the proposed typestate refactor compiles or passes lint gates. Cannot confirm current code meets clippy strictness.",
+      "fix": "Run `cargo fmt --check`, `cargo check --all-targets`, `cargo clippy` with strict lint gates, and `cargo test` to establish a verification baseline before and after any refactor."
+    }
+  ],
+  "missing_evidence": ["no benchmark for mark_sent allocation", "no clippy or cargo check evidence", "no fmt check evidence", "no test suite exists", "no allocation profiling evidence"],
+  "residual_risk": "Static review only — no commands were executed. The struct as written permits all illegal state combinations through status/is_validated/is_sent/sent_at_epoch_ms independence. The typestate enum refactor fully eliminates these illegal states at compile time. Without running clippy and cargo check, lint-level compliance is unverified."
+}

@@ -1,0 +1,12 @@
+Now I understand the issues. Let me check the references directory too, then apply the fix.
+The code has 5 violations: missing payload-size check, lossy `as` cast, no `checked_add`, no `try_reserve`, and no overflow error path. Fixing now.
+Source is clean — no violations remaining. Writing the output JSON.
+Repair complete. Summary of changes to `src/lib.rs:8-19`:
+
+1. **Payload-size gate** — added `payload.len() > max_payload` check returning `FrameError::PayloadTooLarge`
+2. **Checked arithmetic** — `payload.len().checked_add(4)` replaces unbounded capacity computation
+3. **Checked conversion** — `u32::try_from(payload.len()).map_err(...)` replaces lossy `as u32`
+4. **Fallible allocation** — `Vec::new()` + `try_reserve(capacity)` replaces unbounded Vec growth
+5. All `FrameError::Overflow` / `FrameError::Allocation` paths wired via `?` and `map_err`
+
+Both behavior tests pass. No Holzman laws violated.

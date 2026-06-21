@@ -1,0 +1,86 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow status is a bare String, allowing any arbitrary string value. The domain invariant that status must be a known lifecycle state (e.g. 'pending', 'validated', 'sent') is not enforced by the type system.",
+      "failure_mode": "Any code can set item.status to an invalid value like 'x' or '', corrupting downstream logic that assumes valid lifecycle strings.",
+      "fix": "Replace `pub status: String` with a newtype enum like `pub status: PacketStatus` where PacketStatus is an enum with explicit variants (Pending, Validated, Sent) and a from_str constructor that rejects unknown values."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive lifecycle flag. Combined with is_sent: bool and status: String, the struct allows contradictory states such as is_validated=false, is_sent=true with status='pending'.",
+      "failure_mode": "Downstream consumers cannot rely on the structural invariants of the packet. A packet could appear unsent (is_validated=false) while also appearing sent (is_sent=true), leading to double-processing or skipped validation.",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typestate enum `pub state: PacketState` with ordered variants (e.g. Pending, Validated, Sent). The typestate enum encodes the allowed transitions so contradictory states are unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a primitive lifecycle flag that is redundant with status and independently mutable, allowing the struct to reach states where status='sent' but is_sent=false, or status='pending' but is_sent=true.",
+      "failure_mode": "The split boolean+string lifecycle representation creates a class of illegal states that the compiler cannot catch. Consumers of either field will see inconsistent signals.",
+      "fix": "Remove `is_sent: bool` entirely. The typestate enum (replacing both bool and String) is the single source of truth for lifecycle. If epoch tracking is needed, embed sent_at: Option<Instant> inside the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_invariants",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent has no preconditions — it accepts any PacketWorkflow regardless of current state and unconditionally mutates status and is_sent. There is no domain enforcement that the packet must be validated before it can be sent.",
+      "failure_mode": "A packet that has never been validated (is_validated=false) can be directly marked as sent, bypassing the validation step entirely. This is a correctness bug, not a performance issue.",
+      "fix": "Replace mark_sent with a fallible method on the typestate-enum version, e.g. `fn validate(self) -> Result<PacketState::Validated, Error>` and `fn send(self) -> Result<PacketState::Sent, Error>` where each step checks the previous state via pattern matching on the typestate enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_domain_invariants",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow struct fields are all pub with no private constructor. Any code can create a PacketWorkflow with any combination of fields, including logically impossible ones.",
+      "failure_mode": "The struct has no invariant enforcement at construction time. A caller can construct PacketWorkflow { id: \"\", status: \"\", is_validated: false, is_sent: true, sent_at_epoch_ms: None } which is simultaneously unsent (is_sent=true is contradictory) and has an empty id and status.",
+      "fix": "Make fields private, provide a fallible constructor (e.g. `PacketWorkflow::new(id: &str) -> Result<Self, Error>`) that initializes the struct to a known valid initial state (Pending), and expose only state-transition methods."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare String with no domain constraints. Packet IDs have implicit requirements (non-empty, valid format) that are not encoded in the type.",
+      "failure_mode": "Empty or malformed IDs can flow through the entire pipeline undetected, causing silent data corruption or indexing failures downstream.",
+      "fix": "Replace `pub id: String` with `pub id: PacketId` where PacketId is a newtype wrapping a validated string (e.g. via a `PacketId::new(id: &str) -> Result<Self, Error>` constructor). Parse and validate at the boundary."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_allocation_without_try_reserve",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent uses `\"sent\".to_string()` which performs an unbounded heap allocation every time the function is called. For a fixed-string lifecycle state, this is an unnecessary allocation pattern.",
+      "failure_mode": "In a high-throughput path, repeated allocation of identical short strings creates unnecessary GC pressure and cache misses. While not a safety issue, it violates the performance discipline of avoiding unmeasured allocations.",
+      "fix": "After refactoring to the typestate enum, the state transitions become zero-allocation enum value replacements. The `to_string()` call should be eliminated entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_checked_conversions",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> stores epoch milliseconds. If any consumer converts this to u32, usize, or smaller types, there is no checked conversion in place. The type itself permits values that cannot fit in u32.",
+      "failure_mode": "If the system runs long enough, epoch milliseconds will overflow u32 on 32-bit platforms, or a consumer doing `as u32` will silently truncate. This is a silent data corruption path.",
+      "fix": "Add a helper accessor that returns `u64` and document that conversions to smaller types must use `u32::try_from(val)` with error handling. If the domain only needs u32-range timestamps, store as u32 directly."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any lifecycle throughput claim",
+    "no profiler evidence for allocation patterns in PacketWorkflow construction",
+    "no second-ring evidence (Kani/Verus/Flux) validating state-transition invariants",
+    "no command evidence (cargo test, cargo clippy) confirming the crate compiles or passes checks",
+    "no allocation audit showing try_reserve usage or bounded capacity reasoning"
+  ],
+  "residual_risk": "The struct is a primitive bag of fields with no domain invariants, no typestate, no constructor, and no lifecycle enforcement. mark_sent silently accepts any state. This is the textbook example of a struct where illegal states are fully representable. The entire design must be refactored before any delivery review — not a repair-level change."
+}

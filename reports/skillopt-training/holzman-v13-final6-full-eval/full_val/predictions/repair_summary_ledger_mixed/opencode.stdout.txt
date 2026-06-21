@@ -1,0 +1,21 @@
+Now I understand the issues. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function. Let me also read the remaining references before repairing.
+Now I'll repair `src/lib.rs`. The tests reveal `summarize_metrics` must return `Result<Summary, SummaryError>` and a `render_summary` function is required. The source has multiple Holzman violations: `unwrap()`, unchecked indexing, lossy casts, `count += 1`, `split(',').collect()`, no empty check, no overflow detection.
+All 6 tests pass. Let me verify strict lint gates.
+Repair complete. Here's a summary of what was fixed in `src/lib.rs`:
+
+**Test contract fixes:**
+- `summarize_metrics` return type changed from `Result<String, ...>` to `Result<Summary, ...>` to match test contract
+- Added required `render_summary(Summary) -> String` function
+
+**Holzman law violations removed:**
+| Violation | Fix |
+|---|---|
+| `parts[1].parse().unwrap()` | `split_once(',')` with `ok_or(SummaryError::Invalid)` |
+| `count += 1` (unchecked arithmetic) | `count = count.checked_add(1).ok_or(Overflow)?` |
+| `total += value` (unchecked arithmetic) | `total = total.checked_add(value).ok_or(Overflow)?` |
+| `total / count` (unchecked division) | `total.checked_div(count_u64).ok_or(Invalid)?` |
+| `count as u32`, `count as u64` (lossy casts) | `u32::try_from(count)`, `u64::try_from(count)` |
+| `split(',').map(...).collect()` into Vec | Direct iteration over `split_once` |
+| No empty input check | `if input.is_empty() { return Err(Empty); }` |
+
+**Gates:** `cargo fmt` ✓, `cargo test` 6/6 ✓, `cargo clippy` strict ✓, no production panic surfaces ✓

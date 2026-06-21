@@ -1,0 +1,21 @@
+Now I have full context. Let me write the review output.
+Review complete. Written to `review-output.json` with:
+
+- **13 findings** (11 BLOCKER, 2 MAJOR, 1 MINOR)
+- **5 missing evidence** items
+- **Residual risk** documented
+
+Key violations found in `src/lib.rs`:
+
+| Line | Severity | Rule | Issue |
+|------|----------|------|-------|
+| 9 | BLOCKER | `no_unwrap_or_panic` | `fs::read_to_string().unwrap()` |
+| 12 | BLOCKER | `split_once_mandatory` | `split(',').collect()` instead of `split_once` |
+| 16 | BLOCKER | `hidden_io_in_pure_logic` | `println!` in data-processing closure |
+| 16 | BLOCKER | `unchecked_indexing` | `parts[0]`, `parts[1]` without bounds check |
+| 19 | BLOCKER | `no_unwrap_or_panic` | `.parse().unwrap()` on CSV field |
+| 19 | BLOCKER | `lossy_cast` | `as u16` silently truncates >65535 |
+| 8 | BLOCKER | `hidden_io_pure_logic` | I/O + parsing + logging fused in one function |
+| 8 | BLOCKER | `typed_error_taxonomy` | No error type, all failures panic |
+| 8 | BLOCKER | `bounded_allocation` | Unbounded Vec, no `try_reserve` |
+| 11 | BLOCKER | `parse_boundary` | Raw primitives cross boundary, no smart constructor |

@@ -1,0 +1,18 @@
+Now I see the issues. Let me analyze and repair:
+
+1. `summarize_metrics` returns `Result<String, SummaryError>` but tests expect `Result<Summary, SummaryError>`
+2. `render_summary` is missing from the module
+3. `parts[1]` is unchecked indexing
+4. `.unwrap()` on parse is banned
+5. `total += value` and `total / count` are unchecked arithmetic
+6. No handling for empty input or invalid lines
+All 6 tests pass. Let me verify the final state of the source and write the output.
+Repair complete. All 6 tests pass. Changes made to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- **Added `render_summary`**: Extracted string formatting into a pure shell function
+- **Unchecked indexing → `split_once`**: Replaced `parts[1]` with `line.split_once(',')`
+- **`.unwrap()` → `map_err`**: Parse failures return `Err(Invalid)`
+- **Unchecked `+=` → `checked_add`**: Overflow on total returns `Err(Overflow)`
+- **Unchecked `/` → `checked_div`**: Division by zero returns `Err(Overflow)`
+- **Empty input handling**: Returns `Err(Empty)` for empty or whitespace-only input

@@ -1,0 +1,11 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+- **6 BLOCKERs**: Illegal states are fully representable — `status: String`, `is_validated: bool`, and `is_sent: bool` are independent primitives that allow impossible combinations (e.g., sent-but-not-validated). `mark_sent` has no precondition check and can send unvalidated budgets. Fields are `pub` allowing direct mutation.
+- **2 MINORs**: No encapsulation, no error taxonomy.
+- **2 INFOs**: No benchmarks, no tests.
+- **6 missing_evidence**: No benchmarks, profiler, allocation audit, second-ring artifacts, test suite, or command evidence.
+
+The core fix: replace the three primitive fields with a typestate enum (`Budget { Draft | Validated { id } | Sent { id, sent_at: u64 } }`), making illegal states unrepresentable at compile time.

@@ -1,0 +1,19 @@
+Now I have a clear picture. The tests expect:
+- `summarize_metrics` returns `Result<Summary, SummaryError>` (not `String`)
+- `render_summary` function (missing entirely)
+- Proper error handling: Empty, Invalid, TooMany, Overflow
+
+Current code has: returns `String`, uses `unwrap()`, no overflow checks, no invalid handling, no empty handling.
+Wait, I need to fix the empty check placement - it should be before the loop, not after.
+All 6 tests pass. Now writing the repair output.
+Repair complete. All 6 behavior tests pass. Summary of changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- **Added `render_summary`**: Pure formatting function for the `Summary` struct
+- **Empty check**: Returns `Err(SummaryError::Empty)` when input has no lines
+- **Invalid handling**: Uses `parts.get(1).ok_or(SummaryError::Invalid)` instead of unchecked `parts[1]`
+- **Parse safety**: Uses `map_err` instead of `unwrap()` on `parse::<u64>()`
+- **Overflow safety**: Uses `checked_add` with `ok_or(SummaryError::Overflow)` instead of unchecked `+=`
+- **Checked division**: Uses `checked_div` instead of raw `/`
+- **No lossy casts**: Uses `u32::try_from(count)` instead of `count as u32`
+- **Borrowed data**: Uses `Vec<&str>` instead of `Vec<String>` for split parts

@@ -1,0 +1,18 @@
+Now I have a clear picture. The current `parse_tokens` has multiple Holzman violations: `unwrap()`, no `max_items` check, no empty check, no invalid handling, no allocation safety. Let me fix it.
+All 4 tests pass. Now running the full Holzman verification gate.
+Clippy flags arithmetic side-effects. Let me fix with checked arithmetic and also replace `with_capacity` with `try_reserve`.
+All verification gates pass. Now writing the output.
+Repair complete. All gates passed.
+
+**Changes made to `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.parse().map_err(\|_\| ParseError::Invalid)?` |
+| No empty-input check | Returns `Err(ParseError::Empty)` |
+| No `max_items` enforcement | Counts delimiters via `checked_add`, returns `Err(ParseError::TooMany)` |
+| No invalid-value handling | Returns `Err(ParseError::Invalid)` on bad parse or empty field |
+| No allocation safety | `Vec::new()` + `try_reserve()` returning `Err(ParseError::Allocation)` |
+| Unchecked `+= 1` | `checked_add(1).ok_or(ParseError::TooMany)?` |
+
+All 4 behavior tests pass, `cargo fmt --check`, `cargo check`, and strict `cargo clippy` all pass with zero violations.

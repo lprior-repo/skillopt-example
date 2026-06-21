@@ -1,0 +1,18 @@
+The test expects `summarize_metrics` to return `Result<Summary, SummaryError>` and a `render_summary` function — both missing from production. Plus many Holzman violations: `unwrap()`, unchecked arithmetic, lossy casts, no checked conversions.
+All 6 tests pass. Writing the output.
+Repair complete. All 6 tests pass.
+
+**Key fixes in `src/lib.rs`:**
+
+| Violation | Fix |
+|---|---|
+| `summarize_metrics` returned `Result<String, ...>` instead of `Result<Summary, ...>` | Changed return type to match test contract |
+| Missing `render_summary` function | Added pure formatting function |
+| `parts[1].parse().unwrap()` — unchecked indexing + unwrap | `split_once(',')` + `map_err(\|_| Overflow)` |
+| `total += value` — unchecked arithmetic | `checked_add` with `Overflow` error |
+| `count += 1` — unchecked arithmetic | `checked_add` with `Overflow` error |
+| `count as u32` — lossy cast | `u32::try_from(count).map_err(Overflow)` |
+| `total / count as u64` — lossy cast + unchecked division | `u64::try_from(count)` + `checked_div` |
+| No empty-input check | `count == 0` → `Err(Empty)` |
+| Collected `Vec<String>` per line | `split_once` — zero-allocation parse |
+| Discarded `name.trim()` `#[must_use]` | Bound to `_` variable |

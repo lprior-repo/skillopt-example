@@ -1,0 +1,11 @@
+Analysis complete. Issues in `src/lib.rs`:
+1. Line 10: lossy `as u32` cast (forbidden by absolute laws)
+2. No `payload.len() > max_payload` check (test `rejects_limit` fails)
+3. No capacity arithmetic checking or `try_reserve` (SKILL.md Frame/packet encoder pattern)
+Repair complete. Three Holzman violations fixed in `src/lib.rs:8-21`:
+
+1. **Lossy cast** (`payload.len() as u32`) → `u32::try_from(payload.len()).map_err(...)`
+2. **Missing payload size gate** → `if payload.len() > max_payload { return Err(FrameError::PayloadTooLarge); }`
+3. **No checked capacity** → `4usize.checked_add(payload.len())` + `try_reserve(capacity)`
+
+All 2 tests pass, formatting clean, no forbidden constructs remain.

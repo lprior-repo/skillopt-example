@@ -1,0 +1,118 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "illegal-states-representable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "RouteWorkflow uses pub status: String, allowing any arbitrary string value. The domain invariant — a route can only be in one lifecycle state at a time — is not enforced by the type system.",
+      "failure_mode": "A caller can set status to any value (e.g., \"sent\", \"pending\", \"\", \"SENT\", \"null\"), enabling illegal states like status=\"sent\" with is_sent=false, or status=\"\" with no lifecycle meaning.",
+      "fix": "Replace status: String with a sealed enum RouteStatus { Pending, Validated, Sent } that makes every value a valid state and prevents invalid combinations."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool-lifecycle-flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that can be set in impossible combinations (validated=false, sent=true; validated=true, is_sent=true but status still \"pending\").",
+      "failure_mode": "The struct can represent logically impossible states (e.g., sent without validated, or validated and sent simultaneously if the domain requires ordering). These booleans are redundant with the status field, creating inconsistency surface area.",
+      "fix": "Eliminate is_validated and is_sent entirely. Derive all lifecycle questions from a single RouteStatus enum. If ordering matters (validated before sent), encode the ordering in the typestate transitions or use a single enum with ordered variants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-violation-mutate-return",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates fields in place (item.status = ..., item.is_sent = ...) instead of returning a new pure value. This couples the imperative shell with the core and prevents reasoning about the value at each point.",
+      "failure_mode": "In a concurrent or async context, in-place mutation of owned data loses immutability guarantees. Callers cannot reason about the pre-mutation state after the call, breaking pure-core properties.",
+      "fix": "Change mark_sent to accept the current value and return a new RouteWorkflow (or RouteStatus::Sent variant) with the updated fields. The shell layer handles mutation; the core function is pure and deterministic."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-parse-boundary-constructor",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "RouteWorkflow has no private constructor or smart constructor. Any code in the crate can construct RouteWorkflow with arbitrary String values for id and status, bypassing all domain invariants.",
+      "failure_mode": "Callers can construct RouteWorkflow { id: \"\", status: \"malicious\", is_validated: false, is_sent: false, sent_at_epoch_ms: None } — an entirely invalid domain object with no validation gate.",
+      "fix": "Make all fields private (remove pub) and provide a public fallible constructor fn try_new(id: String, initial_status: RouteStatus) -> Result<RouteWorkflow, NewError> that validates invariants. Use newtype for id: struct RouteId(String)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-typed-domain-errors",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns RouteWorkflow with no error type. There is no typed error taxonomy for invalid transitions (e.g., already_sent, not_validated).",
+      "failure_mode": "Invalid state transitions (marking a pending route as sent without validation) are silently allowed because there is no error path. The function has no way to reject illegal transitions.",
+      "fix": "Add a domain error enum: pub enum RouteError { InvalidTransition, AlreadySent, NotValidated }. Change mark_sent to return Result<RouteWorkflow, RouteError> and reject invalid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-typestate-machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The struct combines id (String), status (String), lifecycle booleans (is_validated, is_sent), and optional timestamp (sent_at_epoch_ms) as flat public fields with no typestate encoding of valid transitions.",
+      "failure_mode": "The compiler cannot prevent any transition sequence. There is no compile-time guarantee that sent_at_epoch_ms is set only when sent, no guarantee that is_sent implies status==\"sent\", and no guarantee that only validated routes can be sent.",
+      "fix": "Replace the flat struct with a typestate pattern: use a single RouteStatus enum with ordered variants, or use Rust typestate structs (PendingRoute, ValidatedRoute, SentRoute) where each type only exposes valid next-step methods. Use sent_at: Option<Instant> or u64 as a typed value, not raw Option<u64>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pub-mutable-fields-no-invariants",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All five fields of RouteWorkflow are pub, allowing any code to mutate id, status, is_validated, is_sent, or sent_at_epoch_ms directly without going through any domain method.",
+      "failure_mode": "External code can set item.is_sent = true without updating status, set item.status = \"\" to nullify the state, or set item.is_validated = true on a route that should never have been validated — all without any validation or error tracking.",
+      "fix": "Make all fields private. Expose only domain methods (e.g., fn status(&self) -> RouteStatus, fn is_sent(&self) -> bool, fn validate(&self) -> Result<ValidatedRoute, RouteError>). Fields become invariants enforced by the type system."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-newtype-for-id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is pub id: String — a raw primitive with no domain semantics. Route IDs can be confused with any other string field.",
+      "failure_mode": "A caller can pass a status string where an id is expected, or vice versa. No compile-time distinction between route identifiers and other text.",
+      "fix": "Introduce a newtype: pub struct RouteId(String) with Display and other needed impls. Use RouteId in the struct: id: RouteId."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent-allocates-string",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent creates a new heap-allocated String via \"sent\".to_string() on every call. This allocates even for an operation that should be a state transition on a known enum variant.",
+      "failure_mode": "Hot-path allocation on every mark_sent call, defeating zero-cost abstraction and increasing GC pressure in a high-throughput scenario.",
+      "fix": "After replacing status with a RouteStatus enum, the transition becomes zero-cost — no String allocation needed, just a variant change."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, allocation, or second-ring evidence exists for this crate. There is no benches/ directory, no Cargo.toml [dev-dependencies] for criterion or similar, and no allocation tracking.",
+      "failure_mode": "Performance claims (or lack thereof) cannot be verified. The crate may be deployed in hot paths without measured bounds on allocation or latency.",
+      "fix": "Add a benches/ directory with a criterion benchmark for mark_sent, measuring allocation count, throughput, and hot-path latency under realistic payload distributions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo fmt, cargo check, cargo clippy, or cargo test evidence has been produced. The crate compiles without dependencies but has no verification gates run.",
+      "failure_mode": "Untested, unlinted code may contain hidden issues (dead code, missing derives, clippy warnings) that only surface at integration or deployment time.",
+      "fix": "Run cargo fmt --check, cargo clippy --workspace --lib --all-features -- -D warnings, and cargo test --workspace --all-features before any delivery."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent throughput or allocation",
+    "no profiler evidence for hot-path analysis",
+    "no allocation tracking (e.g., criterion or alloc-tracker)",
+    "no command evidence (cargo fmt, cargo clippy, cargo test not run)",
+    "no benches/ directory or Cargo.toml benchmark configuration",
+    "no second-ring evidence for zero-cost claims"
+  ],
+  "residual_risk": "Static review only — no commands run. The entire struct is a flat bag of public fields with no typestate encoding, no domain error taxonomy, no parse boundary, and no proof that mark_sent enforces any lifecycle invariant. Every field combination is legal. The crate as written can represent every possible illegal state. All findings are BLOCKER because the domain contract is entirely absent."
+}

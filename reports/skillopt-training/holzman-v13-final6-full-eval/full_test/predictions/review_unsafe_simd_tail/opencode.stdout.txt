@@ -1,0 +1,12 @@
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/8ef4c92c371b46ab/review_unsafe_simd_tail/review-output.json`.
+
+**6 findings, all BLOCKER severity:**
+
+1. **No production `unsafe`** (`src/lib.rs:3`) — SIMD intrinsics in `unsafe` block violate absolute laws with no waiver path.
+2. **Remainder handling missing** (`src/lib.rs:7`) — Loop steps by 4, silently dropping tail elements for non-multiple-of-4 lengths.
+3. **No safe scalar fallback** (`src/lib.rs:1`) — Function absent on non-x86_64; SKILL.md mandates safe fallback or stop.
+4. **No `target_feature` gate** (`src/lib.rs:1`) — Only `#[cfg(target_arch = "x86_64")]`, no SSE runtime detection.
+5. **Missing benchmark/profiler evidence** (`src/lib.rs:2`) — No performance claim supported by workload/hardware/baseline data.
+6. **No behavior tests** (`src/lib.rs:2`) — No test coverage for empty, single, aligned, remainder, NaN/inf cases.
+
+**Residual risk:** The function contains production `unsafe` SIMD code violating absolute laws, is incomplete (wrong results for non-aligned lengths), has no safe fallback, no tests, and no benchmark evidence. Cannot be promoted.

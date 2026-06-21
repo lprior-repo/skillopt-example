@@ -1,0 +1,13 @@
+Now I have all references and the full source. Writing the review.
+Review complete. Written 6 BLOCKER findings to `review-output.json`:
+
+| # | Rule | Line | Core Issue |
+|---|------|------|------------|
+| 1 | `typestate_enum_state_machine` | 1 | No enum state machine; illegal combinations possible |
+| 2 | `no_status_string` | 3 | `status: String` allows arbitrary values |
+| 3 | `no_bool_lifecycle` | 4 | `is_validated`/`is_sent` booleans are independent, no ordering |
+| 4 | `no_option_invalid_state_combos` | 6 | `sent_at_epoch_ms` Option decoupled from `is_sent` |
+| 5 | `newtype_domain_ids` | 2 | `id: String` raw primitive, no validation |
+| 6 | `parse_boundary` | 9 | `mark_sent` accepts pub fields; raw primitives cross boundary |
+
+5 missing evidence items flagged (benchmark, profiler, allocation, second-ring, command evidence). All 6 findings are structural violations of the Holzman absolute laws and Functional Rust typestate requirements.

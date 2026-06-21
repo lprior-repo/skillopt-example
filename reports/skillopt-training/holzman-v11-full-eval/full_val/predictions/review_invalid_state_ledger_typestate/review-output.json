@@ -1,0 +1,96 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/hardening-checklist.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-to-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary string values (e.g. \"sent\", \"deleted\", \"poisoned\") that are not valid ledger states",
+      "failure_mode": " callers construct LedgerWorkflow with any string for status, producing legally impossible or corrupt ledger states that bypass all workflow invariants",
+      "fix": "Replace with a sealed enum: enum LedgerStatus { New, Validated, Sent } with smart constructor and no arbitrary string construction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent lifecycle booleans that can be set to any combination (e.g. is_validated=false, is_sent=true, or both true)",
+      "failure_mode": " callers can create a ledger that is sent but not validated, or validated and sent simultaneously, violating the strict lifecycle order New -> Validated -> Sent",
+      "fix": "Replace both booleans with a single typestate enum carrying optional data: enum LedgerState { New, Validated { validated_at_ms: u64 }, Sent { sent_at_ms: u64 } }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-option-invalid-state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a bare optional field separate from lifecycle booleans; sent_at can be None while is_sent is true, or Some while is_sent is false",
+      "failure_mode": " the three fields (status, is_validated, is_sent, sent_at) are independently mutable, producing 2^3 * N_string unreachable/inconsistent state combinations",
+      "fix": "Fold sent_at_ms into the Sent variant of the typestate enum so the timestamp co-exists with the sent state and cannot be out of sync"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain semantics; any string (empty, whitespace, arbitrary length) is accepted as a ledger ID",
+      "failure_mode": " callers can create ledgers with empty or malformed IDs; string equality is used instead of domain-semantic comparison",
+      "fix": "Introduce a newtype `LedgerId(String)` with a smart constructor that validates non-empty and exposes only domain-safe methods"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "raw primitives cross the parse boundary without fallible smart constructors; callers can construct invalid domain states directly via LedgerWorkflow { .. }",
+      "failure_mode": " untrusted input bypasses all validation; no constructor enforces invariants so illegal states are trivially representable",
+      "fix": "Add a smart constructor `LedgerWorkflow::new(id: &str) -> Result<Self, LedgerError>` that validates the ID and initializes all fields to valid default state; make struct fields private"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "railway-error-taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns LedgerWorkflow directly with no Result; it mutates status to \"sent\" without checking the current state is valid for transition",
+      "failure_mode": " calling mark_sent on an already-sent or invalid-state ledger silently overwrites status to \"sent\" with no error, producing duplicate-sent corruption",
+      "fix": "Return `Result<LedgerWorkflow, LedgerError>` with an enum like { InvalidTransition, AlreadySent }; check current typestate before mutating"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "encapsulation-illegal-states",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "all struct fields are pub, allowing external mutation of every field independently",
+      "failure_mode": " external code can set `item.status = \"foo\"; item.is_sent = false;` after construction, breaking any invariants the type was supposed to enforce",
+      "fix": "Make all fields private; expose only state-transition methods that maintain invariants"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark or profiler evidence exists for the workload; mark_sent allocates a String via \"sent\".to_string() on every call",
+      "failure_mode": " performance characteristics are unknown; repeated allocations in a hot path may cause measurable overhead",
+      "fix": "Add a criterion or custom micro-benchmark for mark_sent measuring allocations and wall time; consider using a static str for the sent state"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no cargo fmt --check, cargo check, clippy, or cargo test evidence provided for the crate",
+      "failure_mode": " the crate may have latent warnings, dead code, or compile errors not caught in this review",
+      "fix": "Run and report evidence for: cargo fmt --check, cargo check --workspace --all-targets --all-features, cargo clippy with strict lint gates, cargo test"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation cost",
+    "no cargo fmt --check evidence",
+    "no cargo check --workspace --all-targets --all-features evidence",
+    "no clippy strict lint gate evidence",
+    "no cargo test evidence",
+    "no command-truth evidence for any claim"
+  ],
+  "residual_risk": "The LedgerWorkflow struct permits any combination of status string, lifecycle booleans, and optional timestamp — all public and independently mutable. This violates every core Holzman principle: illegal states are fully representable, no typestate machine, no enum status, no newtype IDs, no smart constructor, no railway error taxonomy, and no encapsulation. The code is a flat data bag, not a domain type. Fixing requires replacing the struct fields with a typestate enum, a LedgerId newtype, private fields, a validated smart constructor, and a Result-returning mark_sent with proper transition guards."
+}

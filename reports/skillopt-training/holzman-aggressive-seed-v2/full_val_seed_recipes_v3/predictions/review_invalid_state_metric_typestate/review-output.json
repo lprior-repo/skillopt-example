@@ -1,0 +1,51 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "MetricWorkflow uses status: String plus is_validated: bool and is_sent: bool, allowing illegal combinations at compile time (e.g. status=\"sent\" with is_sent=false, or is_validated=true with status=\"draft\"). SKILL.md line 35 explicitly requires enum/typestate state machine for this pattern.",
+      "failure_mode": "Any caller can construct a MetricWorkflow with contradictory fields, producing a domain state the rest of the system cannot reason about correctly. No invariant is enforced at the type level.",
+      "fix": "Replace status: String with a sealed MetricStatus enum (Draft, Validated, Sent). Replace is_validated: bool and is_sent: bool with a MetricState enum (Init, Validated, Sent) that encodes the lifecycle as a typestate. Remove sent_at_epoch_ms and add it only on the Sent variant, or use a newtype timestamp value object."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain semantics. Functional-core-performance reference line 16: 'Replace bool lifecycle flags, status strings, and Option lifecycle fields with enums or typestates' — the same principle applies to IDs: they should be newtyped.",
+      "failure_mode": "Any String can be used as a metric ID, including empty strings, malformed IDs, or IDs from the wrong namespace. The core cannot assume validity by construction.",
+      "fix": "Introduce a newtype struct MetricId(String) with a fallible constructor that validates the ID format, and use MetricId instead of String in MetricWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_lifecycle",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes MetricWorkflow by value and mutates fields directly (item.status = \"sent\".to_string(), item.is_sent = true) instead of using an enum-based state transition. This is a mutation-based lifecycle, not a state machine.",
+      "failure_mode": "mark_sent can be called on a MetricWorkflow in any state, including ones that should not be markable-as-sent (e.g. not yet validated). There is no compile-time guarantee that the workflow is in the correct pre-state for the transition.",
+      "fix": "Replace mark_sent with an enum-driven state machine. Use a fallible transition method like fn validate(self) -> Result<MetricWorkflow<Validated>, MetricError> and fn send(self) -> Result<MetricWorkflow<Sent>, MetricError> that enforce pre-state requirements at compile time. The struct should be generic over a state type parameter (typestate pattern)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe_unwrap_expect",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a new String on every call and discards the previous status string without any error handling or state transition validation. This is hidden side-effect allocation with no typed error path.",
+      "failure_mode": "Allocation failure is silently ignored (the panic would only occur on OOM). More importantly, the previous status is lost without any audit trail or error, violating the railway error taxonomy.",
+      "fix": "Remove the mutable status field entirely. Use an enum variant to carry the state. Eliminate String allocation in state transitions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler evidence for allocation patterns",
+    "no allocation audit (no try_reserve, no capacity planning anywhere in the crate)",
+    "no second-ring evidence (no formal verification, no property tests, no Kani/Verus/Flux artifacts)",
+    "no command evidence (no cargo test, cargo fmt, or cargo clippy output)",
+    "no error taxonomy defined — ParseError, FrameError, Allocation, or domain error types are absent"
+  ],
+  "residual_risk": "The struct admits every illegal state combination at compile time with no enforcement. mark_sent is a blind mutation with no pre-condition check. Static review only; no commands run. Without enum/typestate state machine, any downstream code reading status and is_sent independently will see contradictory values and cannot safely branch on them."
+}

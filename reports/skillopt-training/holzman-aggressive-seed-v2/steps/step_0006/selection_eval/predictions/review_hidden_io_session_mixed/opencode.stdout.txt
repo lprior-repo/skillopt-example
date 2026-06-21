@@ -1,0 +1,16 @@
+I've read SKILL.md, both reference files, Cargo.toml, and src/lib.rs. Now writing the review.
+Review complete. Written to `review-output.json`.
+
+**10 BLOCKER findings** across 6 Holzman rules:
+
+| Rule | Issues |
+|---|---|
+| `zero_forbidden_constructs` | 6 findings: 2x `unwrap()`, 1x lossy `as u16`, 2x unchecked `parts[]` indexing, 1x `println!` side effect in core |
+| `allocation_pattern` | 1 finding: unnecessary `Vec<String>` collect per line |
+| `functional_core_shell` | 1 finding: I/O + parsing mixed in single function |
+| `error_propagation` | 1 finding: returns `Vec<Record>` with no `Result` despite multiple fallible ops |
+| `checked_arithmetic` | 1 finding: parse to `u32` then cast to `u16` bypasses overflow guard |
+
+**4 missing evidence items**: no benchmark, profiler, allocation tracking, or command evidence.
+
+**Residual risk**: High — every fallible boundary panics, silent truncation on values >65535, impure core.

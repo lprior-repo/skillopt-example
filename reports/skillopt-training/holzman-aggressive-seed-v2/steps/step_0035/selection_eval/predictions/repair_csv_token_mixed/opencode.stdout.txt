@@ -1,0 +1,8 @@
+Repair complete. All 4 behavior tests pass.
+
+**Changes in `src/lib.rs`:**
+- Removed `.unwrap()` — replaced with `map_err(|_| ParseError::Invalid)` for parse failures
+- Added empty-input check → `Err(ParseError::Empty)`
+- Added `max_items` guard → `Err(ParseError::TooMany)` when count exceeds limit
+- Added `try_reserve` for bounded allocation → `Err(ParseError::Allocation)` on OOM
+- Replaced `.collect()` + `.unwrap()` with explicit for-loop and checked push

@@ -1,0 +1,12 @@
+Now I have the full picture. The production code has multiple Holzman violations: `unwrap()`, no empty check, no max_items check, no allocation safety. Let me fix it.
+All 4 tests pass. Let me verify the final source and write the output.
+Repaired. Here's what was fixed in `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on `.parse()` | `map_err(\|_\| ParseError::Invalid)` |
+| No empty input check | Returns `ParseError::Empty` |
+| No `max_items` enforcement | Returns `ParseError::TooMany` if count exceeds limit |
+| No allocation safety | `try_reserve(count)` with `ParseError::Allocation` |
+
+All 4 behavior tests pass. JSON output written to `repair-output.json`.

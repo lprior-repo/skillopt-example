@@ -1,0 +1,9 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Wrote `review-output.json` with **10 findings** across the crate:
+
+- **6 BLOCKERs**: primitive obsession (`String` for status/id), boolean lifecycle flags (`is_validated`, `is_sent`), no typestate, in-place mutation in `mark_sent`, no precondition checks, all-public mutable fields
+- **2 WARNINGs**: raw `u64` timestamp without newtype, no benchmark evidence
+- **1 INFO**: no test/dev-dependency configuration
+- **5 missing evidence items**: no benchmarks, profiler data, allocation tracking, behavior tests, or CI command evidence
+
+Residual risk: the entire domain model needs a typestate/enum refactor before production use — illegal states are trivially constructible.

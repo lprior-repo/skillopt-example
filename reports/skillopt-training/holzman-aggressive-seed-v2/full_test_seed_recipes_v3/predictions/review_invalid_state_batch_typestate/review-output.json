@@ -1,0 +1,99 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow uses status: String plus is_validated: bool and is_sent: bool, allowing any combination of status string and boolean flags including contradictions (e.g. status=\"pending\" with is_sent=true, or is_validated=true with status=\"deleted\"). No constructor enforces invariants.",
+      "failure_mode": "Any caller can construct a BatchWorkflow with logically inconsistent state, breaking workflow invariants and enabling incorrect downstream behavior such as sending an unvalidated batch or double-sending.",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single BatchStatus enum (e.g. Pending, Validated, Sent) using a timestamp field. Remove all three fields and add a single status field typed as BatchStatus. Provide a fallible constructor that only creates valid initial states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a lifecycle boolean flag that allows the type system to express no constraint on validation state. Combined with the String status, the validation flag is redundant and contradictable.",
+      "failure_mode": "The domain invariant 'a batch must be validated before it can be sent' cannot be enforced at compile time. Logic must add redundant runtime checks everywhere is_validated is read.",
+      "fix": "Subsume is_validated into the BatchStatus enum (e.g. Pending -> Validated transition). Use a typestate enum so that validation state is part of the type, not a separate boolean."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a lifecycle boolean flag that duplicates information already present in status: String. Together with status it creates contradiction space and with status alone it is redundant.",
+      "failure_mode": "A batch can be marked is_sent=true while status is not 'sent', or status='sent' while is_sent=false. Callers cannot rely on either field independently.",
+      "fix": "Subsume is_sent into the BatchStatus enum. Let status = BatchStatus::Sent encode both facts. Remove is_sent entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_types_over_primitives",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a primitive wrapper with no domain identity type. There is no BatchId newtype to enforce that IDs follow domain rules, cannot be empty, and carry no accidental aliasing.",
+      "failure_mode": "Any string can be used as a batch ID, including empty strings, malformed IDs, or IDs from unrelated domains. No compile-time protection against mixing ID types.",
+      "fix": "Introduce a BatchId newtype (e.g. pub struct BatchId(String)) with a fallible constructor that rejects empty/invalid IDs. Use BatchId as the field type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_fallible_constructor",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has no constructor (new/fallible constructor). All fields are pub, so any code can instantiate the struct with arbitrary values, bypassing all invariants.",
+      "failure_mode": "Illegal states are constructable at any call site. The struct is invalid-by-construction with no validation gate.",
+      "fix": "Make fields private and provide a fallible constructor: pub fn new(id: BatchId) -> Result<BatchWorkflow, WorkflowError> that sets status to BatchStatus::Pending and initializes all fields to their valid starting values."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_purity_with_domain_types",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes BatchWorkflow by value and mutates it in place. While the function is technically pure (returns a new value), it operates on a struct with no type safety and uses String mutations instead of an enum variant transition.",
+      "failure_mode": "mark_sent can be called on a batch in any state (including already-sent or deleted), with no compile-time guard. The String assignment `.to_string()` allocates on every call and does not express a state transition.",
+      "fix": "With the BatchStatus typestate, mark_sent becomes: pub fn mark_sent(batch: BatchWorkflow) -> Result<BatchWorkflow, WorkflowError> { match batch.status { BatchStatus::Validated => Ok(BatchWorkflow { status: BatchStatus::Sent, sent_at_epoch_ms: Some(clock::now_ms()), ..batch }), _ => Err(WorkflowError::InvalidTransition) } }. This enforces the Validated->Sent transition at compile time."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns BatchWorkflow directly with no error type. There is no WorkflowError or similar enum to represent InvalidTransition, AlreadySent, or similar domain errors.",
+      "failure_mode": "Callers cannot distinguish between success and failure. If mark_sent needs to reject a transition, it has no typed way to communicate the reason.",
+      "fix": "Define pub enum WorkflowError { InvalidTransition, AlreadySent } and change the return type to Result<BatchWorkflow, WorkflowError>."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "sent_at_epoch_ms_without_clock_abstraction",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a concrete timestamp field but mark_sent does not populate it. There is no clock abstraction for production use, making the field unreachable in practice.",
+      "failure_mode": "The sent_at_epoch_ms field is never set by mark_sent, so sent batches have no timestamp. Any code that reads this field for audit/retry purposes will get None and behave incorrectly.",
+      "fix": "In mark_sent, set sent_at_epoch_ms via a clock abstraction (e.g. a Clock trait with now_ms() -> u64) rather than a direct time call. Or require the caller to inject the timestamp as a parameter."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "public_fields_expose_internal_state",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All fields of BatchWorkflow are pub, exposing internal state to any caller. This prevents future invariants from being enforced through API changes.",
+      "failure_mode": "External code can read and mutate internal fields directly, bypassing any future method-level guards.",
+      "fix": "Make all fields private. Expose behavior through methods on BatchWorkflow (e.g. status(), mark_sent()) rather than public field access."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler data (flamegraph, perf, cargo-bench) is present",
+    "no allocation analysis (allocations, heap usage) is provided",
+    "no second-ring evidence (Kani, Miri, property tests) exists",
+    "no command-line evidence (cargo test, cargo clippy, cargo fmt) was run"
+  ],
+  "residual_risk": "The BatchWorkflow struct is fundamentally untyped at the domain level. Any boolean/String combination is constructable, making it impossible to guarantee workflow invariants without pervasive runtime checks. This is the primary risk: the type system offers zero protection against illegal state combinations."
+}

@@ -1,0 +1,5 @@
+   Compiling repair_checked_average v0.1.0 (/tmp/opencode/holzman-skillopt/full1/tasks/candidate-v1/repair_checked_average)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/41eeccad663e2d7b/debug/deps/repair_checked_average-aa0166dfbb1ba2dd)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/41eeccad663e2d7b/debug/deps/behavior-04e721e4b8219076)
+error: test failed, to rerun pass `--test behavior`

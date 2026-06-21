@@ -1,0 +1,62 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/review-output-contract.md",
+    "references/functional-core-performance.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow uses primitive `status: String` and boolean flags `is_validated: bool`, `is_sent: bool` instead of an enum/typestate. Any combination of these fields is constructible, including contradictory states (e.g. status=\"draft\" with is_sent=true, or is_validated=true with status=\"invalid\").",
+      "failure_mode": "Invalid lease state machines are representable at the type level, allowing business logic to act on contradictory or impossible states without runtime checks.",
+      "fix": "Replace `status: String`, `is_validated: bool`, `is_sent: bool` with a single `LeaseStatus` enum with explicit variants (e.g. `Draft`, `Validated`, `Sent { sent_at: u64 }`). Remove the redundant boolean fields entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain semantics. There is no `LeaseId` newtype enforcing format, uniqueness, or ownership rules at the type level.",
+      "failure_mode": "Any string value can be used as a lease ID, enabling collisions, injection, or silent misrouting. No compile-time distinction between a lease ID and an arbitrary string.",
+      "fix": "Introduce `pub struct LeaseId(String)` with a fallible constructor that validates format/length, and use `LeaseId` in place of `String` for the `id` field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` takes ownership and mutates the struct in place (`mut item`), modifying fields directly rather than returning a new state from a pure calculation. The struct is a mutable bag of primitives with no domain invariants.",
+      "failure_mode": "No pure functional core exists; the function has side-effect-like mutation semantics and no invariant enforcement. The same struct can be mutated multiple times with no state machine guard.",
+      "fix": "Define `LeaseStatus` enum with a `Sent { sent_at_epoch_ms: u64 }` variant. Replace `mark_sent` with a pure function `fn mark_sent(lease: LeaseWorkflow) -> Result<LeaseWorkflow, LeaseTransitionError>` that returns a new struct with the validated transition."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "boolean_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` and `is_sent: bool` are boolean lifecycle flags. The Holzman skill requires replacing these with enums or typestates to encode the state machine.",
+      "failure_mode": "Boolean flags allow independent toggling, enabling states like is_validated=true AND is_sent=false (validated but not sent) or is_validated=false AND is_sent=true (sent without validation) — both likely domain violations.",
+      "fix": "Eliminate both boolean fields. Encode the full lifecycle in a `LeaseStatus` enum: `Draft`, `Validated`, `Sent { sent_at_epoch_ms: u64 }`. The enum makes it impossible to be 'validated' without a corresponding status, and 'sent' carries the timestamp intrinsically."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "pub_field_access",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of `LeaseWorkflow` are `pub`. Any caller can mutate or construct arbitrary field combinations, bypassing any constructor invariants.",
+      "failure_mode": "External crates can construct `LeaseWorkflow` with inconsistent fields without going through any validation or transition logic.",
+      "fix": "Make fields private and provide a public constructor (or use a builder) that enforces domain invariants. Or better: use the enum typestate so construction itself is invariant-correct by default."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for `mark_sent` or any state transition",
+    "no profiler data for allocation patterns in the lease workflow",
+    "no allocation analysis (try_reserve evidence, SmallVec justification, or Vec capacity rationale)",
+    "no command-level evidence (no `cargo fmt`, `cargo test`, or `cargo clippy` output)"
+  ],
+  "residual_risk": "The crate has no enum typestate, no domain newtypes, and no functional core. All lease invariants are enforced only by runtime convention rather than by the type system. The code compiles and runs but permits any contradictory state combination at zero compile-time cost. Static review only; no commands were run."
+}

@@ -1,0 +1,208 @@
+{
+  "run_id": "smoke3",
+  "run_root": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke3",
+  "sandbox_run_root": "/tmp/opencode/holzman-skillopt/smoke3",
+  "model": "minimax-coding-plan/MiniMax-M2.7-highspeed",
+  "tasks": [
+    "review_unbounded_parser",
+    "repair_byte_at"
+  ],
+  "aggregates": [
+    {
+      "bundle": "baseline",
+      "task_count": 2,
+      "hard": 0.0,
+      "soft": 0.6625000000000001,
+      "mixed": 0.33125000000000004,
+      "passed_tasks": 0
+    },
+    {
+      "bundle": "candidate-v1",
+      "task_count": 2,
+      "hard": 0.0,
+      "soft": 0.7250000000000001,
+      "mixed": 0.36250000000000004,
+      "passed_tasks": 0
+    }
+  ],
+  "gate": {
+    "action": "accept_new_best",
+    "current_score": 0.36250000000000004,
+    "best_score": 0.36250000000000004,
+    "best_step": 1
+  },
+  "results": [
+    {
+      "task_id": "review_unbounded_parser",
+      "kind": "review",
+      "bundle": "baseline",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/smoke3/tasks/baseline/review_unbounded_parser",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke3/tasks/baseline/review_unbounded_parser",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": null,
+      "grade": {
+        "kind": "review",
+        "hard": 0.0,
+        "soft": 0.375,
+        "matched_groups": 3,
+        "total_groups": 4,
+        "missing_groups": [
+          [
+            "external input",
+            "untrusted input",
+            "boundary"
+          ]
+        ],
+        "json_valid": true,
+        "json_errors": [],
+        "mutation_errors": [
+          "added:Cargo.lock",
+          "added:target/.rustc_info.json",
+          "added:target/CACHEDIR.TAG",
+          "added:target/debug/.cargo-build-lock",
+          "added:target/debug/.cargo-lock",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/dep-lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/invoked.timestamp",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/lib-review_unbounded_parser.json",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/dep-test-lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/invoked.timestamp",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/test-lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/test-lib-review_unbounded_parser.json",
+          "added:target/debug/deps/libreview_unbounded_parser-1d65dba4dc395e52.rmeta",
+          "added:target/debug/deps/libreview_unbounded_parser-f7e588900e84b211.rmeta",
+          "added:target/debug/deps/review_unbounded_parser-1d65dba4dc395e52.d",
+          "added:target/debug/deps/review_unbounded_parser-f7e588900e84b211.d",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08-3lnxev9p3g3zhr0gmfbkrh4c9/dep-graph.bin",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08-3lnxev9p3g3zhr0gmfbkrh4c9/query-cache.bin",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08-3lnxev9p3g3zhr0gmfbkrh4c9/work-products.bin",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt11ike0-0rvwu08.lock",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/dep-graph.bin",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/metadata.rmeta",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/query-cache.bin",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict-byty6mu83mka2rgig6alaergb/work-products.bin",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt11ik2k-1iv1ict.lock",
+          "added:target/flycheck0/stderr",
+          "added:target/flycheck0/stdout"
+        ],
+        "execution_errors": []
+      }
+    },
+    {
+      "task_id": "repair_byte_at",
+      "kind": "repair",
+      "bundle": "baseline",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/smoke3/tasks/baseline/repair_byte_at",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke3/tasks/baseline/repair_byte_at",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.9500000000000002,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 0,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": true,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": false,
+        "json_errors": [
+          "status_not_repaired"
+        ],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 2,
+        "total_groups": 2,
+        "missing_groups": []
+      }
+    },
+    {
+      "task_id": "review_unbounded_parser",
+      "kind": "review",
+      "bundle": "candidate-v1",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/smoke3/tasks/candidate-v1/review_unbounded_parser",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke3/tasks/candidate-v1/review_unbounded_parser",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": null,
+      "grade": {
+        "kind": "review",
+        "hard": 0.0,
+        "soft": 0.5,
+        "matched_groups": 4,
+        "total_groups": 4,
+        "missing_groups": [],
+        "json_valid": true,
+        "json_errors": [],
+        "mutation_errors": [
+          "added:Cargo.lock",
+          "added:target/.rustc_info.json",
+          "added:target/CACHEDIR.TAG",
+          "added:target/debug/.cargo-build-lock",
+          "added:target/debug/.cargo-lock",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/dep-lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/invoked.timestamp",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-1d65dba4dc395e52/lib-review_unbounded_parser.json",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/dep-test-lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/invoked.timestamp",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/test-lib-review_unbounded_parser",
+          "added:target/debug/.fingerprint/review_unbounded_parser-f7e588900e84b211/test-lib-review_unbounded_parser.json",
+          "added:target/debug/deps/libreview_unbounded_parser-1d65dba4dc395e52.rmeta",
+          "added:target/debug/deps/libreview_unbounded_parser-f7e588900e84b211.rmeta",
+          "added:target/debug/deps/review_unbounded_parser-1d65dba4dc395e52.d",
+          "added:target/debug/deps/review_unbounded_parser-f7e588900e84b211.d",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt2cfc55-12p8zex-91ldx6993orxam6hs7f1v74je/dep-graph.bin",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt2cfc55-12p8zex-91ldx6993orxam6hs7f1v74je/query-cache.bin",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt2cfc55-12p8zex-91ldx6993orxam6hs7f1v74je/work-products.bin",
+          "added:target/debug/incremental/review_unbounded_parser-0bb46b2xyoys5/s-hjmt2cfc55-12p8zex.lock",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt2cfc4z-0q0ygv2-1axoqnsfk6sk5icjp782gtrrc/dep-graph.bin",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt2cfc4z-0q0ygv2-1axoqnsfk6sk5icjp782gtrrc/metadata.rmeta",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt2cfc4z-0q0ygv2-1axoqnsfk6sk5icjp782gtrrc/query-cache.bin",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt2cfc4z-0q0ygv2-1axoqnsfk6sk5icjp782gtrrc/work-products.bin",
+          "added:target/debug/incremental/review_unbounded_parser-24yf2ntbc318h/s-hjmt2cfc4z-0q0ygv2.lock",
+          "added:target/flycheck0/stderr",
+          "added:target/flycheck0/stdout"
+        ],
+        "execution_errors": []
+      }
+    },
+    {
+      "task_id": "repair_byte_at",
+      "kind": "repair",
+      "bundle": "candidate-v1",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/smoke3/tasks/candidate-v1/repair_byte_at",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/smoke3/tasks/candidate-v1/repair_byte_at",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.9500000000000002,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 0,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": true,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": false,
+        "json_errors": [
+          "status_not_repaired"
+        ],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 2,
+        "total_groups": 2,
+        "missing_groups": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "tiny-fixed-performance-folklore",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO claims Rayon and SmallVec will be faster for a fixed [u8; 4] input without any benchmark, workload, or measurement evidence",
+      "failure_mode": "Rayon task-scheduling overhead, thread-pool setup cost, and SmallVec heap allocation fallback will all exceed the work of classifying four bytes, producing a measurable regression rather than improvement",
+      "fix": "Remove the Rayon/SmallVec TODO; return [&'static str; 4] directly to eliminate all allocation and parallel overhead for this fixed-size input"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-allocation-for-fixed-size",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function returns Vec<&'static str> for a fixed [u8; 4] input, forcing a heap allocation on every call",
+      "failure_mode": "Every invocation allocates a Vec header plus four &str pointers on the heap, causing allocator pressure, cache misses, and unpredictable tail latency for a computation that produces exactly four known-size elements",
+      "fix": "Change signature to fn classify_four(bytes: &[u8; 4]) -> [&'static str; 4] and build the result as a fixed array, eliminating all heap allocation"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "performance-claim-without-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO makes a performance claim (\"it will be faster\") without workload description, target hardware, baseline measurement, regression threshold, or any benchmark command evidence",
+      "failure_mode": "Unmeasured optimization introduces complexity (Rayon thread pool, SmallVec dependency) that may degrade latency, increase binary size, and violate the Holzman rule that faster code wins only when measured",
+      "fix": "Delete the claim; if parallelism is genuinely needed for a different workload, add a benchmark with workload/hardware/baseline/new-number evidence before introducing Rayon"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "intermediate-allocation-avoidance",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Iterator .collect() into Vec creates an intermediate heap-allocated collection for four elements that could be stored in a stack array",
+      "failure_mode": "Unnecessary heap allocation per call; .collect() must guess capacity or grow, adding branching and memory traffic for a fixed four-element output",
+      "fix": "Replace iterator+collect with a fixed array [\"even\"; 4] built via a bounded loop or explicit array construction, returning the array by value"
+    },
+    {
+      "severity": "INFO",
+      "rule": "todo-comment-in-production",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "A TODO comment in production source encodes an incorrect optimization strategy (Rayon + SmallVec for 4-byte input) that will mislead future edits",
+      "failure_mode": "Future developers may implement the suggested change, regressing performance and adding an external dependency (rayon crate) for no benefit",
+      "fix": "Remove the TODO and replace the body with a correct fixed-array implementation"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four or any performance claim about Rayon/SmallVec",
+    "no profiler data showing classify_four as a hot path bottleneck",
+    "no allocation profile (e.g., flamegraph or heaptrack) comparing Vec vs fixed-array return",
+    "no second-ring evidence (assembly, cache-miss counters, or p50/p95/p99 latency measurements) supporting the performance claim"
+  ],
+  "residual_risk": "Static review only; no cargo commands executed. The code compiles and has no panic surfaces, unchecked arithmetic, or unsafe. The primary risk is that the TODO comment drives future developers to implement Rayon/SmallVec, which will measurably regress performance on this fixed-4-element workload. Removing the TODO and returning a fixed array eliminates all identified issues."
+}

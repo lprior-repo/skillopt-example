@@ -1,0 +1,12 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 8 BLOCKER findings and 5 missing evidence items.
+
+Key violations found in `src/lib.rs`:
+- **Lines 4-5**: `is_validated: bool` and `is_sent: bool` allow illegal state combinations (e.g., sent without validated)
+- **Line 3**: `status: String` permits arbitrary/unvalidated values instead of a typed enum
+- **Line 2**: `id: String` is an unvalidated raw primitive — no newtype
+- **Lines 9-12**: `mark_sent()` has no validation gate — can transition to sent without validated
+- **Line 1**: All pub fields with no constructor — any code can construct invalid states
+- No typestate, no enum-based lifecycle, no invariants enforced by the type system
+
+Missing evidence: no benchmarks, no profiler data, no allocation audit, no command evidence (cargo test/clippy not run).

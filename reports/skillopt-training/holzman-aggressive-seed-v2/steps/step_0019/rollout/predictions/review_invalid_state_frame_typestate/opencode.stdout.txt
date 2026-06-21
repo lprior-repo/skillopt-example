@@ -1,0 +1,15 @@
+Now I have all the information needed. Let me write the review output.
+I see a typo -- missing closing bracket on line 51. Let me fix the JSON.
+Review complete. Written to `review-output.json`.
+
+**5 findings** (3 BLOCKER, 2 MINOR):
+
+| Severity | Rule | Line | Issue |
+|----------|------|------|-------|
+| BLOCKER | `make_illegal_states_unrepresentable` | 1 | Raw `String` + `bool` flags allow contradictory states (e.g., `is_sent=true` with `status="deleted"`) |
+| BLOCKER | `primitive_obsession` | 2 | `id: String` and `status: String` instead of typed newtypes/enums |
+| BLOCKER | `no_pub_fields` | 1 | All fields `pub` -- any caller can mutate into illegal states |
+| MINOR | `unnecessary_allocation` | 10 | `"sent".to_string()` instead of enum variant |
+| MINOR | `functional_core_purity` | 9 | In-place mutation instead of pure state transition |
+
+**Key finding**: The entire crate is an architectural anti-pattern -- a typestate problem solved with primitive fields that are publicly mutable. The fix is type-level: domain enum for status, typestate enum for lifecycle, private fields, and a fallible constructor.

@@ -1,0 +1,81 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String is a primitive lifecycle flag. Any arbitrary string value (\"\", \"deleted\", \"sent\", \"SENT\") is valid, making illegal states representable and unenforceable by the compiler.",
+      "failure_mode": "A caller can construct LedgerWorkflow with status=\"foo\" or status=\"\" and no code path can reject it at compile time; runtime logic must string-compare against magic literals everywhere.",
+      "fix": "Replace `status: String` with an enum typestate, e.g. `pub enum LedgerStatus { New, Validated, Sent }` and make invalid transitions constructors reject them."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a primitive lifecycle flag orthogonal to status: String. The struct can hold status=\"new\" with is_validated=true, which is an illegal state with no invariant enforcement.",
+      "failure_mode": "Business logic that checks `is_validated` to gate downstream actions runs on a field whose value can diverge from `status`, causing silent authorization bypasses or duplicate validation.",
+      "fix": "Fold validation into the enum typestate so the compiler forbids invalid combinations (e.g., `LedgerStatus::Validated` carries the validation invariant)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a primitive lifecycle flag orthogonal to status: String. The struct can hold status=\"sent\" with is_sent=false or status=\"new\" with is_sent=true.",
+      "failure_mode": "Divergent state between `status` and `is_sent` causes callers checking one field but not the other to make incorrect decisions (double-sending or missed sends).",
+      "fix": "Eliminate `is_sent` entirely; encode sent state in the enum typestate. Store sent_at_epoch_ms only in the Sent variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make-illegal-states-unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "id: String is a raw primitive with no domain newtype. Any string (empty, \" \", malformed UUIDs) is accepted with no compile-time guarantee of validity.",
+      "failure_mode": "Downstream code must re-parse or re-validate the ID on every access; empty IDs slip through silently.",
+      "fix": "Introduce a `LedgerId` newtype with a fallible constructor that validates the ID format at the boundary. The struct field becomes `pub id: LedgerId`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional-core-no-side-effects",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs `.to_string()` allocation on every call, which is a heap allocation in what should be a pure, deterministic core function. The function is labeled as a pure transformation but allocates on the hot path.",
+      "failure_mode": "Unbounded allocation on a pure-function hot path defeats zero-cost abstraction expectations and causes unpredictable GC/allocator pressure.",
+      "fix": "Replace `item.status = \"sent\".to_string()` with an enum assignment (zero allocation). If the enum carries `sent_at_epoch_ms`, use the variant constructor directly."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-redundant-state",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent sets both `status = \"sent\"` and `is_sent = true`, duplicating state that represents the same domain fact. This is the anti-pattern that makes illegal states possible.",
+      "failure_mode": "A partial update (e.g., setting one field but not the other via struct update syntax or a bug) leaves the struct in a self-contradictory state that no single boolean or string check can detect.",
+      "fix": "Use a single enum typestate so the domain fact \"sent\" is represented exactly once. The function becomes a pure transition: `LedgerWorkflow -> Result<LedgerWorkflow, TransitionError>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-void-functions-must-be-fallible",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes any LedgerWorkflow regardless of its current state. It can be called on a workflow that is already sent, never validated, or in any other state, with no precondition check.",
+      "failure_mode": "Domain invariants are violated at runtime (e.g., sending an unvalidated ledger). Errors are silently ignored instead of being surfaced to the caller.",
+      "fix": "Change the signature to `pub fn mark_sent(item: &LedgerWorkflow) -> Result<LedgerWorkflow, TransitionError>` and validate the pre-condition (e.g., must be Validated) before transitioning."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent hot-path performance",
+    "no profiler data to quantify .to_string() allocation frequency on the hot path",
+    "no allocation tracing evidence (e.g., heaptrack/valgrind) for the current implementation",
+    "no second-ring evidence (assembly/allocator) proving the enum refactor eliminates heap allocation",
+    "no command-level evidence (cargo bench / cargo asm) for any stated performance claim"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has fundamental typestate violations that make illegal states representable at compile time. The functional core is contaminated with I/O-adjacent allocations (.to_string()). All 7 findings are BLOCKER severity — the crate requires structural repair (enum typestate, domain newtypes, fallible transitions) before it can pass Holzman gates. No benchmark or profiler evidence exists to validate any performance claim."
+}

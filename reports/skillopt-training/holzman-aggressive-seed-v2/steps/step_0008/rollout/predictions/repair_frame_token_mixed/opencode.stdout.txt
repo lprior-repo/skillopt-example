@@ -1,0 +1,10 @@
+Now let me read the second reference file and run the initial test to see failures.
+Clear picture. Two Holzman violations: lossy `as u32` and `max_payload` unused (no bounds check). Need `PayloadTooLarge` variant. Fixing now.
+All 2 tests pass. Writing repair output.
+Repair complete. Three Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** — `payload.len() as u32` replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)`
+2. **Unused `max_payload`** — Added bounds check `if payload.len() > max_payload { return Err(FrameError::PayloadTooLarge) }`
+3. **Unbounded allocation** — `Vec::new()` replaced with `Vec::new()` + `try_reserve(4usize.saturating_add(payload.len())).map_err(|_| FrameError::Allocation)`
+
+All 2 tests pass. Output written to `repair-output.json`.

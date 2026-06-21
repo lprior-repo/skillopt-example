@@ -1,0 +1,8 @@
+Now I have all the context. Let me write the review output.
+Review complete. Wrote `review-output.json` with 5 findings:
+
+- **BLOCKER** `no_production_unsafe` (line 2): `std::mem::transmute` in production code — Holzman forbidden. Ignores endianness, silently corrupts on big-endian targets.
+- **BLOCKER** `no_unchecked_indexing` (line 2): `input[0..3]` panics on short inputs instead of returning a typed error.
+- **WARNING** `functional_core_performance` (line 1): Implicit little-endian assumption in API with no visible endianness contract.
+- **INFO** `missing_benchmark_evidence`: No benchmark comparing transmute vs safe alternatives.
+- **INFO** `missing_test_evidence`: No tests in the crate for any edge cases.

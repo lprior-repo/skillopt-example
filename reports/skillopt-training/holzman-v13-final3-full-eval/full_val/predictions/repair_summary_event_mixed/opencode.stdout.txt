@@ -1,0 +1,20 @@
+Now I have full context. The current code has many Holzman violations: `unwrap()`, unchecked arithmetic, `count += 1`, `count as u32` cast, `total / count` unchecked division, `split(',').collect()` instead of `split_once`, no empty check, no `Invalid` error for bad lines, missing `render_summary`, and returns `String` instead of `Summary`.
+
+Let me write the repaired source:
+All 6 tests pass. Now writing the required output:
+**Repair complete. All 6 tests pass.**
+
+Changes to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `unwrap()` on parse | `.map_err(\|_\| SummaryError::Invalid)` |
+| `split(',').collect()` + `parts[1]` | `line.split_once(',').ok_or(...)` |
+| `total += value` | `total.checked_add(value).ok_or(Overflow)?` |
+| `count += 1` | `count.checked_add(1).ok_or(Overflow)?` |
+| `total / count as u64` | `total.checked_div(count_u64).ok_or(Invalid)?` |
+| `count as u32` | `u32::try_from(count).map_err(Overflow)?` |
+| No empty check | Early `input.is_empty() → Empty` |
+| Invalid line format accepted | `split_once` with `ok_or(Invalid)` |
+| Returns `String` | Returns `Result<Summary, SummaryError>` |
+| Missing `render_summary` | Added pure formatting function |

@@ -1,0 +1,71 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Function body contains an `unsafe` block calling `get_unchecked` on a slice range, directly violating the zero-unsafe production code rule.",
+      "failure_mode": "Undefined behavior on out-of-bounds or overflowed slice indexing; caller can trigger UB with trivially constructed inputs without any error path.",
+      "fix": "Remove `unsafe` and `get_unchecked`. Replace with `input.get(start..start+len)` returning `Result<&[u8], SliceError>` (or `Option`) so bounds violations produce a typed error instead of UB."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_arithmetic",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`start + len` performs unchecked addition with no overflow check before use as a slice bound.",
+      "failure_mode": "Arithmetic overflow wraps to a small value, producing a range that may be in-bounds for the wrong length or panic on debug builds; in unsafe context this is UB.",
+      "fix": "Use `start.checked_add(len).ok_or(ArithError::Overflow)` before computing the range, and return a typed error on overflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`get_unchecked` bypasses all bounds validation, returning raw pointers into potentially invalid memory.",
+      "failure_mode": "Caller supplies `start > input.len()` or `start + len > input.len()`, yielding a dangling/overlength slice that propagates UB to any downstream read.",
+      "fix": "Use `input.get(start..end)` (safe `Option`) or a dedicated error type, and return `Result<&[u8], FieldError>` from the public API."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_purity",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Public function has no error type and returns a raw `&[u8]` that silently encodes a potential failure mode (out-of-bounds access) behind `unsafe` rather than through the type system.",
+      "failure_mode": "Type signature promises a slice always; the only protection is caller discipline, which cannot be verified at compile time. Illegal states (invalid ranges) are representable.",
+      "fix": "Define a domain error enum (e.g., `enum FieldError { OOB, Overflow }`) and change the signature to `fn field(input: &[u8], start: usize, len: usize) -> Result<&[u8], FieldError>`."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for this function despite it being a raw slice-accessor that could appear in hot paths.",
+      "failure_mode": "If later wrapped or inlined into performance-critical code, regressions or allocation behavior changes go undetected.",
+      "fix": "Add a `cargo bench` benchmark under `[dev-dependencies]` criterion or similar, measuring the safe equivalent path."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No allocation or profiler analysis exists. The unsafe path avoids allocation but the safe replacement path (error construction, Result boxing in shell layers) has unmeasured costs.",
+      "failure_mode": "Performance characterization of the safe replacement is unknown; could introduce unexpected allocation patterns in hot loops.",
+      "fix": "Add allocation tracking (e.g., `mimalloc-stats` or `dhat` in dev) and a benchmark comparing safe vs unsafe paths."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No tests, benchmarks, or CI gates defined in Cargo.toml. The crate has no `[dev-dependencies]` and no test targets.",
+      "failure_mode": "No automated verification exists that any fix preserves behavior or doesn't regress.",
+      "fix": "Add `criterion` or `iai-callgrind` to `[dev-dependencies]`, define a `[[bench]]` target, and add at minimum a behavior test for the safe path."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for the slice-accessor path", "no profiler or allocation analysis for safe replacement", "no tests or CI gates defined in Cargo.toml", "no command evidence (cargo test/cargo bench/cargo clippy) was run"],
+  "residual_risk": "Static review only; no commands run. The crate contains a single unsafe function with no bounds checks, no arithmetic guards, and no error type. The entire API contracts to UB on invalid input. A correct fix replaces get_unchecked with safe get() or checked access, wraps in Result with a domain error type, adds checked_add for start+len, and adds behavior tests."
+}

@@ -1,0 +1,13 @@
+Now I have full context. The code has multiple Holzman violations: unchecked indexing `parts[1]`, `unwrap()`, unchecked arithmetic `+=`, unchecked division, `split + collect` instead of `split_once`, wrong return type (`String` instead of `Summary`), and missing `render_summary` function. Tests expect `Result<Summary, SummaryError>`.
+All 6 tests pass. Now writing the required output.
+Repair complete. All 6 behavior tests pass.
+
+**Violations fixed in `src/lib.rs`:**
+- `parts[1]` unchecked indexing → `split_once` (line 25)
+- `.unwrap()` on parse → `.map_err(|_| SummaryError::Invalid)` (line 29)
+- `split+collect+to_string` Vec allocation → single `split_once` + `trim` (line 25-28)
+- `total += value` unchecked arithmetic → `checked_add` with Overflow error (line 30)
+- `total / count` unchecked division → count checked > 0 before division (line 34, 42)
+- Wrong return type `Result<String>` → `Result<Summary>` to match test contract (line 16)
+- Missing `render_summary` function added (line 51-55)
+- Empty input → explicit `Empty` error check (line 34-36)

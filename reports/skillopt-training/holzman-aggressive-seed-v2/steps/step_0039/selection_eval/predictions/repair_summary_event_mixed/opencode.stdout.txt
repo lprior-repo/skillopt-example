@@ -1,0 +1,15 @@
+Now I have the full picture. Tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and import `render_summary`. Source has multiple Holzman violations: `.unwrap()`, unchecked arithmetic, unchecked indexing, integer division. Let me fix.
+All 6 tests pass. Let me fix the unused variable warning.
+Repaired. Summary of changes:
+
+**`src/lib.rs`** — 3 fixes:
+1. **`.unwrap()` → `map_err`**: Parse failures now return `Err(SummaryError::Invalid)` instead of panicking
+2. **Unchecked arithmetic → checked**: `total += value` replaced with `checked_add`, count increment uses `checked_add`, division is safe after empty-input guard
+3. **`parts[1]` unchecked indexing → `split_once`**: Uses `split_once(',')` with `ok_or` instead of `split().collect()[1]`
+
+**Structural fixes to match tests:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- New `render_summary(Summary) -> String` function (imported by tests)
+- `Summary` struct populated with `count`, `total`, `average` (was plain formatting)
+
+All 6 tests pass with zero warnings.

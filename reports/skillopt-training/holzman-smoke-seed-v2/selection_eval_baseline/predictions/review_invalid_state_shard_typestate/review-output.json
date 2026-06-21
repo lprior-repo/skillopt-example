@@ -1,0 +1,53 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "ShardWorkflow uses String for status and bool flags (is_validated, is_sent) instead of typed enums or typestates. This allows illegal states such as status='sent' with is_validated=false, or is_sent=true with sent_at_epoch_ms=None.",
+      "failure_mode": "Domain invariants are not enforced by the type system; callers can construct and persist shards in inconsistent states that break downstream assumptions about shard lifecycle ordering.",
+      "fix": "Replace status: String with an enum ShardStatus { Created, Validated, Sent { sent_at: EpochMs } } and remove is_validated/is_sent bools. Replace sent_at_epoch_ms: Option<u64> with a newtype EpochMs. The sent state carries its timestamp as a required field, making sent-without-timestamp unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "push_logic_into_pure_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent is a mutating function that takes and returns the same struct type instead of transitioning between typestates. It does not enforce preconditions (e.g., shard must be validated before sent) and does not set sent_at_epoch_ms.",
+      "failure_mode": "Any caller can call mark_sent on an unvalidated shard, creating a sent shard without a timestamp. The mutation pattern hides the state transition and allows invariant violations at every call site.",
+      "fix": "Define typestate transitions: fn try_validate(self) -> Result<ShardWorkflowValidated, ValidationErr> and fn try_sent(self) -> Result<ShardWorkflowSent, SentErr>. The try_sent method should require the validated typestate as input and produce a typestate carrying the timestamp. Return a Result so invalid transitions are typed errors, not silent no-ops."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "primitive_ownership_boundary",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id field uses raw String instead of a domain newtype like ShardId. The domain has no name-level invariants documented, but a newtype prevents accidental confusion with other string fields and enables trait impls (Display, Serialize, etc.) on the domain type.",
+      "failure_mode": "String arguments are interchangeable at the API boundary, increasing the risk of passing the wrong string value to a field. No compile-time distinction between shard IDs and other strings.",
+      "fix": "Replace pub id: String with pub id: ShardId where ShardId is a zero-copy or owned newtype wrapping String or &'_ str, with Display and FromStr implementations."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for mark_sent or any performance claim. The function does String::to_string on every call, which allocates. For a hot-path shard lifecycle operation, this allocation is unmeasured and unoptimized.",
+      "failure_mode": "If mark_sent is called in a hot loop, repeated heap allocations for status strings will cause latency spikes and GC pressure. No evidence base to justify allocation strategy.",
+      "fix": "Add a benchmark measuring mark_sent throughput and allocation count. If the string allocation is hot, replace with a static str &'static str for the \"sent\" literal, or better yet, make status an enum variant (no allocation needed). Add allocation counting to the benchmark."
+    },
+    {
+      "severity": "INFO",
+      "rule": "behavior_tests_absent",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test module in the crate. There is no behavior test coverage for valid transitions, invalid transitions, or the mark_sent function itself.",
+      "failure_mode": "Regression risks: any future changes to ShardWorkflow or mark_sent have no automated correctness guard. Invalid state construction cannot be tested against.",
+      "fix": "Add a #[cfg(test)] module with tests for: (1) valid lifecycle transitions, (2) invalid transitions returning errors, (3) typestate enforcement (cannot call sent() on non-validated shard), (4) sent state requires timestamp."
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for mark_sent throughput or allocation profile", "no profiler data for hot-path analysis", "no behavior tests in the crate", "no second-ring evidence (property tests, fuzz, or formal specs)"],
+  "residual_risk": "Static review only with no commands run. The crate compiles and has no unsafe/unwrap/panic, but the type system permits all illegal state combinations. The core violation is architectural: String and bool fields instead of enums/typestates mean no code change can fix this without a type-level redesign. Benchmark and test evidence gaps mean performance and correctness claims are unsubstantiated."
+}

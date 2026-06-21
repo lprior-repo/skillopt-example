@@ -1,0 +1,68 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a bare String, allowing any value including invalid transitions. The LeaseWorkflow typestate permits states like {status:\"sent\",is_sent:false} or {status:\"draft\",is_sent:true}.",
+      "failure_mode": "Invalid lease lifecycle states are constructible and silently persist; callers cannot rely on status meaning anything without manual invariant checks.",
+      "fix": "Replace String status with a sealed LeaseStatus enum (Draft, Validated, Sent, Revoked) and remove is_sent/is_validated booleans. Only the enum variant encodes the lifecycle."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "replace_bool_lifecycle_flags_with_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are independent flags that do not form a proper typestate. All four boolean combinations are valid, but the domain has fewer legitimate states.",
+      "failure_mode": "A lease can be both validated and unsent, or neither validated nor sent but marked sent_at_epoch_ms, violating domain invariants without compiler enforcement.",
+      "fix": "Collapse is_validated and is_sent into a single LeaseStatus enum. Remove both bool fields. This makes every representable state a valid state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from the lifecycle state. It can be Some when status != \"sent\".",
+      "failure_mode": "sent_at_epoch_ms can hold a timestamp for a non-sent lease, producing incorrect audit trails and violating the invariant that a sent timestamp only exists when sent.",
+      "fix": "Move the epoch timestamp into the Sent variant of a LeaseStatus enum so it only exists when the lease is actually sent. Example: enum LeaseStatus { Draft, Validated, Sent { sent_at_epoch_ms: u64 } }"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_discipline_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a bare String with no domain newtype. There are no invariants on id format, uniqueness, or lifetime.",
+      "failure_mode": "Id values from different domains or invalid formats mix freely; no compile-time distinction between lease ids, workflow ids, or other string identifiers.",
+      "fix": "Introduce a LeaseId newtype: pub struct LeaseId(String); or use an existing Uuid/OpaqueId type. All APIs should accept/return LeaseId instead of String."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_discipline_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String instead of an enum, meaning mark_sent can only mutate by writing a magic string literal.",
+      "failure_mode": "Typos in string literals (e.g., \"snt\" instead of \"sent\") silently produce invalid states. Refactoring the status vocabulary requires hunting for string literals across the codebase.",
+      "fix": "Replace with a LeaseStatus enum. mark_sent becomes a constructor returning LeaseWorkflow { id, status: LeaseStatus::Sent { sent_at_epoch_ms: now() } }"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "encapsulation_pub_fields",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of LeaseWorkflow are pub, allowing external code to mutate lifecycle state without domain methods.",
+      "failure_mode": "Callers can directly assign item.status = \"foo\" or item.is_sent = false, bypassing any workflow logic and creating invalid states.",
+      "fix": "Make fields private. Provide domain constructors and state-transition methods (e.g., fn validate(), fn send()) as the only way to mutate the struct."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for LeaseWorkflow lifecycle performance",
+    "no profiler data for mark_sent allocation profile",
+    "no allocation audit for String/Vec usage in LeaseWorkflow",
+    "no second-ring evidence (sanitizer, miri, fuzz) for state transitions",
+    "no command evidence (cargo fmt, cargo test, cargo clippy) was run or claimed"
+  ],
+  "residual_risk": "The entire domain model uses primitive types (String, bool) instead of type-enforced invariants. Every state transition is a string assignment with zero compile-time safety. This is the canonical 'invalid state lease typestate' anti-pattern. The code is functionally correct for a trivial single-call scenario but architecturally broken for any real system where invariants must be enforced by the type system."
+}

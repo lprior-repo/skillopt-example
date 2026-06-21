@@ -1,0 +1,16 @@
+Now I understand the issues. The current code:
+1. Ignores `max_payload` check (test `rejects_limit` expects `PayloadTooLarge`)
+2. Uses lossy `payload.len() as u32` conversion
+3. Missing `checked_add` and `try_reserve` per frame/encoder repair pattern
+
+Let me fix it:
+Both tests pass. Now writing the required output:
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added `max_payload` validation** — `payload.len() > max_payload` returns `Err(FrameError::PayloadTooLarge)` before any allocation
+2. **Replaced lossy `as u32`** — `payload.len() as u32` → `u32::try_from(payload.len()).map_err(...)`
+3. **Added `checked_add`** — `4usize.checked_add(payload.len())` with `FrameError::Overflow` fallback
+4. **Added `try_reserve`** — `out.try_reserve(capacity)` with `FrameError::Allocation` fallback
+5. **Kept `Vec::new`** (no `Vec::with_capacity`) — per frame/encoder repair pattern
+
+All 2 tests pass (`encodes`, `rejects_limit`). Output written to `repair-output.json`.

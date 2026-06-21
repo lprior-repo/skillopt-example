@@ -1,0 +1,89 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "absolute_no_unsafe",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "unsafe { ... }",
+      "problem": "Production SIMD code uses `unsafe` block with x86_64 intrinsics (`_mm_setzero_ps`, `_mm_add_ps`, `_mm_loadu_ps`, `_mm_storeu_ps`)",
+      "failure_mode": "Unsafe SIMD bypasses Rust's memory and type safety guarantees; any bug in pointer arithmetic, alignment, or register use is UB with no safe fallback path",
+      "fix": "Rewrite as a safe scalar `while i < input.len() { acc += input[i]; i += 1; }` that handles arbitrary lengths and alignment without any unsafe block"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_no_scalar_fallback",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "unsafe { use std::arch::x86_64::*; ... }",
+      "problem": "SIMD implementation has no safe scalar fallback path, no target-feature gate, no tests, and no benchmark proof",
+      "failure_mode": "On non-x86_64 targets the function is completely unavailable; on x86_64 without AVX-compatible feature the code is gated only by cfg but there are no tests proving correctness on any target",
+      "fix": "Provide a safe scalar fallback function for all targets; gate the SIMD path with `#[target_feature(enable = \"sse\")]` and call it conditionally; add tests exercising the scalar path on all architectures"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_slice_tail_oob",
+      "file": "src/lib.rs",
+      "line": 8,
+      "construct": "_mm_loadu_ps(input.as_ptr().add(i))",
+      "problem": "When `input.len()` is not a multiple of 4, `_mm_loadu_ps` reads 16 bytes (4 f32s) past the last valid element, causing out-of-bounds memory access",
+      "failure_mode": "Buffer over-read of uninitialised or adjacent memory; returns garbage in the accumulator; potential information leak or crash depending on page protections",
+      "fix": "Process `input.len() / 4` full SIMD chunks then handle `input.len() % 4` tail elements with a safe scalar loop; or use `chunks_exact(4)` with a safe remainder"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "construct": "pub fn sum(input: &[f32]) -> f32",
+      "problem": "No benchmark, profiler, or allocation evidence exists for this SIMD function; no workload definition, baseline comparison, target hardware, or regression threshold",
+      "failure_mode": "Cannot verify the SIMD path is actually faster than scalar; may be slower due to SSE load/store overhead on small inputs; no way to catch regressions",
+      "fix": "Add a criterion or custom benchmark comparing SIMD vs scalar across input sizes (16, 64, 256, 1024, 4096 elements); report baseline numbers, variance, and regression threshold"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "pub fn sum(input: &[f32]) -> f32",
+      "problem": "No test module exists for the SIMD sum function; no test coverage for empty input, single element, non-multiple-of-4 lengths, or large inputs",
+      "failure_mode": "Tail-element bug and other correctness regressions go undetected; no evidence the function produces correct results for any input",
+      "fix": "Add `#[cfg(test)] mod tests` covering: empty slice, 1-3 elements, exactly 4 elements, 5 elements (tail), and a known-4-element slice with hand-computed sum"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "hidden_cfg_gate",
+      "file": "src/lib.rs",
+      "line": 1,
+      "construct": "#[cfg(target_arch = \"x86_64\")]",
+      "problem": "Function is silently absent on all non-x86_64 targets; callers get no compile error, only a missing symbol",
+      "failure_mode": "Binary built for aarch64 or wasm32 links or runs without this function, causing silent fallback to a slower path or link failure at runtime",
+      "fix": "Provide the same function signature on all targets; use a safe scalar implementation as the universal path and gate the SIMD optimisation inside the function body"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_target_feature_gate",
+      "file": "src/lib.rs",
+      "line": 3,
+      "construct": "use std::arch::x86_64::*; ... _mm_loadu_ps",
+      "problem": "SSE intrinsics used without `#[target_feature(enable = \"sse\")]` guard; the `cfg` only checks the architecture, not whether SSE is available at runtime",
+      "failure_mode": "On x86_64 CPUs that lack SSE (extremely rare but possible in virtualised or future cores), the function triggers an illegal instruction fault at runtime",
+      "fix": "Add `#[target_feature(enable = \"sse\")]` to the SIMD inner function and dispatch via `if std::arch::is_x86_feature_detected!(\"sse\")`"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark comparing SIMD vs scalar for any workload",
+    "no profiler data showing hot path is actually the SIMD loop",
+    "no allocation analysis (this function allocates zero heap but proof is missing)",
+    "no second-ring review or black-hat review artifact",
+    "no command evidence that `cargo fmt --check`, `cargo clippy`, or `cargo test` were run"
+  ],
+  "residual_risk": "The function contains `unsafe` code with out-of-bounds reads on non-multiple-of-4 input lengths, no scalar fallback, no tests, and no benchmark evidence. This is a BLOCKER-level review: the code must be rewritten as safe Rust with a scalar fallback, proper tail handling, tests, and benchmark proof before acceptance."
+}

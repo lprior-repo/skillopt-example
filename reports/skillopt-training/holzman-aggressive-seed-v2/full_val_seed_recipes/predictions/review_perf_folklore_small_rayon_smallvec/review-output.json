@@ -1,0 +1,59 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no-cargo-cult-rayon",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment explicitly declares intent to use Rayon for a function operating on a &[u8; 4] — a fixed 4-byte array. Rayon introduces thread-pool dispatch, task creation, and synchronization overhead that dwarfs any benefit for four elements. The functional-core-performance reference mandates: 'Use Rayon only for large pure transforms with scaling evidence; it is not a default for tiny fixed-size data.'",
+      "failure_mode": "Adding Rayon to a 4-element workload will be measurably slower than the sequential iterator, negating the stated performance goal. Thread pool contention on a hot path with tiny payloads degrades latency predictability.",
+      "fix": "Remove the Rayon TODO. If a parallel primitive is genuinely needed, prove it with a benchmark showing scaling past a measured threshold (hundreds of elements minimum). For 4 elements, sequential iter is optimal."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "smallvec-justification-required",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO comment declares intent to use SmallVec without evidence. The functional-core-performance reference states: 'Use SmallVec only when small-size distribution is known and measured.' The output size is deterministically 4 (one per byte), so SmallVec<[&'static str; 4]> would eliminate the heap allocation, but this must be justified by the allocation budget and measured, not asserted.",
+      "failure_mode": "Unmeasured SmallVec adoption adds compile-time complexity and an inline-cap constant without proven benefit. If the distribution is always exactly 4 elements, SmallVec with capacity 4 is correct but unproven; if the distribution varies, the inline capacity must match the measured mode.",
+      "fix": "Replace Vec with SmallVec<[&'static str; 4]> only after confirming the output distribution is always exactly 4 elements. Add a benchmark comparing Vec vs SmallVec before asserting improvement."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "no-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO makes a performance claim ('it will be faster') but no benchmark, profiler, or allocation evidence exists. Holzman Rust requires: 'Require benchmark or profiler evidence for performance claims' and 'name workload, hot path, target hardware, baseline command, baseline number, threshold, and variance before optimizing.'",
+      "failure_mode": "Optimizations driven by assertions rather than measurements lead to regressions. Without a baseline, there is no way to verify that any change actually improves performance on the target workload.",
+      "fix": "Write a benchmark in benches/ that measures classify_four with representative 4-byte inputs. Establish a baseline with the current sequential implementation before introducing Rayon or SmallVec."
+    },
+    {
+      "severity": "INFO",
+      "rule": "functional-core-purity",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function classify_four is a pure calculation (good), but it is the sole item in the crate with no separation into functional core / imperative shell. The Holzman contract requires: 'Push logic into a pure deterministic core. Keep I/O, async, logging, persistence, clocks, randomness, retries, and external calls in the imperative shell.'",
+      "failure_mode": "Not a current risk for this tiny crate, but as the crate grows, mixing I/O and calculation will reduce testability and introduce hidden side effects. The pure core shape is already correct here.",
+      "fix": "Keep classify_four as a pure function. If shell actions are added later, keep them in a separate module (e.g., shell.rs) and import the pure core."
+    },
+    {
+      "severity": "INFO",
+      "rule": "no-error-taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "The function takes &[u8; 4] which is infallibly sized, so no fallible paths exist currently. However, the Holzman contract requires typed domain errors at parse boundaries. If the input signature changes from &[u8; 4] to &[u8] or &str, unchecked indexing or width-casts could appear.",
+      "failure_mode": "Future callers passing unsized slices without checked bounds could introduce panic or UB. The current signature is safe but fragile to signature changes.",
+      "fix": "If the function signature is extended to accept unsized input, add a typed error enum and use split/get with map_err instead of unchecked indexing."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four — the TODO performance claim ('it will be faster') has no measured baseline",
+    "no profiler evidence for the hot path — no flamegraph, samply, or perf output",
+    "no allocation evidence — no alloc-tracker or --report-time output showing Vec heap allocation cost for 4-element output",
+    "no second-ring evidence — no assembly listing proving bounds-check elimination or vectorization from any proposed change",
+    "no command evidence — no cargo bench, cargo flamegraph, or similar command was run during review"
+  ],
+  "residual_risk": "Static review only with no commands run. The most material risk is the explicit intent to add Rayon for a 4-element workload, which will be a net performance regression. SmallVec adoption without measured distribution evidence may add complexity without benefit. The pure function itself is correct and safe."
+}

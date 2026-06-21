@@ -1,0 +1,20 @@
+Now I understand the issues. The current `parse_frames` has: `unwrap()`, no empty check, no `max_items` enforcement, uses `collect()` instead of direct iteration with `try_reserve`, and no `Allocation` error path.
+All 4 tests pass. Now running strict verification gates.
+Now writing the required output JSON.
+Repair complete. Summary:
+
+**Original issues in `src/lib.rs`:**
+- `unwrap()` on parse (panic on invalid input)
+- `Vec::with_capacity` via `.collect()` (no fallible reserve)
+- `max_items` parameter ignored
+- Empty input not rejected
+- No `Allocation` error path
+
+**Fix applied (single smallest change):**
+- Rejected empty input first with `ParseError::Empty`
+- Created `Vec::new()` + `try_reserve(max_items).map_err(ParseError::Allocation)?`
+- Iterated directly over `input.split(',')` (no intermediate collect)
+- Checked `values.len() >= max_items` before each push → `ParseError::TooMany`
+- Used `map_err(|_| ParseError::Invalid)` instead of `unwrap()`
+
+**Gates passed:** `cargo fmt`, `cargo test` (4/4), `cargo clippy` (all flags), forbidden-macro scan.

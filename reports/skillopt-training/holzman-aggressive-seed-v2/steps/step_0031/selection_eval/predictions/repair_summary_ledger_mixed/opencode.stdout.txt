@@ -1,0 +1,11 @@
+Now I understand the issues. The code has: no `render_summary` function, wrong return type for `summarize_metrics`, `unwrap()`, unchecked indexing, unchecked arithmetic, and missing error handling. Let me repair it.
+All 6 tests pass. Writing the output.
+Repair complete. All 6 tests pass. Changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, ...>`
+- **Added `render_summary`**: Pure function that formats a `Summary` into a string (was previously inline in `summarize_metrics`)
+- **Removed `unwrap()`**: Parse errors now return `SummaryError::Invalid`
+- **Removed unchecked indexing**: `parts[1]` replaced with `split_once` + `ok_or`
+- **Removed unchecked arithmetic**: `total += value` replaced with `checked_add` returning `Overflow`
+- **Removed unchecked division**: `total / count` replaced with `checked_div` returning `Overflow`
+- **Added empty input detection**: Returns `SummaryError::Empty` when no lines parsed

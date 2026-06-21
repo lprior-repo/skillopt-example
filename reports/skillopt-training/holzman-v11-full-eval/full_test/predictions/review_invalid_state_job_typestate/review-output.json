@@ -1,0 +1,127 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "status-string-to-enum",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a `String` allowing any arbitrary value; no domain-enforced state machine.",
+      "failure_mode": "Callers can set status to any string (e.g. \"cancelled\" through mark_sent), producing invalid workflow states that the type system cannot reject.",
+      "fix": "Replace `status: String` with a domain enum `JobStatus { Pending, Validated, Sent }` where each variant represents a valid state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-to-typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "`is_validated: bool` is a standalone lifecycle boolean; its meaning depends on ordering relative to other booleans.",
+      "failure_mode": "A job can have `is_validated=false` and `is_sent=true` simultaneously, representing an impossible workflow state (sent before validated).",
+      "fix": "Replace booleans with a typestate enum or staged struct hierarchy: `JobStatus::Validated { validated_at: u64 }` encodes lifecycle invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "lifecycle-bools-to-typestate",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "`is_sent: bool` is a standalone lifecycle boolean parallel to `is_validated`.",
+      "failure_mode": "No type-level guarantee that sent jobs are also validated; `mark_sent` sets `is_sent=true` but does not prove `is_validated` was true, enabling a state where the job was sent without validation.",
+      "fix": "Remove `is_sent: bool`; encode sent state in the `JobStatus` enum variant (e.g. `JobStatus::Sent { sent_at_epoch_ms: u64 }`). Transition requires consuming the validated state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional-lifecycle-data-in-variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` is an optional field that logically belongs only to the sent state, but lives on the struct alongside all states.",
+      "failure_mode": "A `Pending` or `Validated` job can carry a non-None `sent_at_epoch_ms` (set by a caller), creating contradictory state where the job is not marked sent but has a sent timestamp. This is the Option-invalid-state combination.",
+      "fix": "Move `sent_at_epoch_ms` into the `Sent` enum variant so it only exists when the job is actually sent: `JobStatus::Sent { sent_at_epoch_ms: u64 }`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "id-newtype",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a raw primitive with no domain semantics; any string (empty, whitespace, malformed) is accepted.",
+      "failure_mode": "Empty or invalid IDs pass through to domain logic; no validation at construction time, and string IDs are trivially confused with other string fields.",
+      "fix": "Introduce `newtype JobId(String)` or `JobId(Box<str>)` with a smart constructor returning a typed error on empty/invalid input."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives cross the parse boundary without fallible smart constructors; callers can construct `JobWorkflow` with any invalid combination of fields directly.",
+      "failure_mode": "No constructor enforces domain invariants (e.g. sent implies validated, status enum values, non-empty id). External input or internal callers can create illegal states that the type system cannot represent but the struct can hold.",
+      "fix": "Add a `JobWorkflow::new(id: impl Into<JobId>, status: JobStatus, sent_at: Option<u64>) -> Result<Self, JobError>` smart constructor that validates invariants, or make all fields private with enum-based construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent-pure-mutation",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates `status` to a hardcoded string and sets `is_sent=true` as separate operations; it does not validate preconditions (e.g. job must be validated before sending) and does not set `sent_at_epoch_ms`.",
+      "failure_mode": "A job can be marked sent without being validated (is_validated remains unchanged). The `sent_at_epoch_ms` is never populated despite being available. This silently produces an invalid workflow: `is_sent=true, sent_at_epoch_ms=None`.",
+      "fix": "Replace with a pure function `fn mark_sent(job: JobWorkflow) -> Result<JobWorkflow, JobError>` that consumes the validated state and produces a sent state with timestamp, using enum-based typestate transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-typed-error-taxonomy",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No domain error types exist; `mark_sent` returns `JobWorkflow` directly with no way to express failure (e.g. cannot reject sending an unvalidated job).",
+      "failure_mode": "Error conditions are silently ignored or would require panics/unwrap at call sites, violating the no-panic absolute law.",
+      "fix": "Define `enum JobError { InvalidTransition, InvalidId, Allocation }` and return `Result<JobWorkflow, JobError>` from factory/transition functions."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "No benchmark module or benchmark evidence exists for the transition function.",
+      "failure_mode": "Performance characteristics of state transitions are unknown; changes to enum vs String representation could introduce regressions undetected.",
+      "fix": "Add a `benches/` directory with a simple benchmark for `mark_sent` comparing current vs refactored implementations, or document why micro-benchmarking is unnecessary for this pure function."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler data or allocation evidence exists; `status: String` uses heap allocation on every struct and every `mark_sent` call.",
+      "failure_mode": "String allocation overhead is invisible without profiling; enum-based replacement could be zero-cost if the domain has few states.",
+      "fix": "Run `cargo bench` with `criterion` or `tiny-bench` to measure allocation patterns; consider `enum JobStatus` with `Copy` if states are few and known."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-second-ring-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No Miri, Kani, or concurrency safety evidence exists; while the code is single-threaded now, the absence of any formal or bounded verification evidence for state transitions means latent bugs in transition logic are unproven.",
+      "failure_mode": "State machine invariants (e.g. sent implies validated) cannot be mechanically verified; refactoring to enums may introduce new transition bugs.",
+      "fix": "Add Kani proof harnesses for state transition invariants once the enum typestate is in place."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing-command-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests exist in the crate; `cargo test` has nothing to run. The behavior of `mark_sent` and the invariant that sent jobs must be validated is untested.",
+      "failure_mode": "Behavior changes to `mark_sent` or the domain model have no regression gate; the current implementation may already violate workflow invariants.",
+      "fix": "Add tests covering: (1) valid transition from validated to sent, (2) rejected transition from non-validated to sent, (3) sent_at_epoch_ms is set on transition, (4) typestate enum exhaustiveness."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for state transition performance",
+    "no profiler or allocation evidence for String vs enum representation",
+    "no Miri/Kani/concurrency safety evidence for state transitions",
+    "no tests exercise mark_sent or domain invariants",
+    "no command-truth evidence: no test output or cargo test results"
+  ],
+  "residual_risk": "The struct `JobWorkflow` can hold any combination of status, validation, and sent flags that violates workflow invariants. Raw `String` fields accept hostile inputs. The `mark_sent` function silently produces invalid state (sent without validated, sent without timestamp). No tests, benchmarks, or verification exist. The entire domain model must be refactored to enums/typestates before this crate is production-ready."
+}

@@ -1,0 +1,12 @@
+Now I understand the issues. The test expects `summarize_metrics` to return `Result<Summary, SummaryError>` and `render_summary` to exist. Current code has `.unwrap()`, no overflow checking, no empty/invalid handling, and division by zero risk.
+All 6 tests pass. Let me verify the final source and write the output.
+Repair complete. All 6 tests pass.
+
+**Changes in `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- Added empty-input check → `SummaryError::Empty`
+- Added invalid-line detection (missing comma) → `SummaryError::Invalid`
+- Replaced `.unwrap()` on parse with `map_err` → `SummaryError::Invalid`
+- Replaced unchecked `+=` with `checked_add` → `SummaryError::Overflow`
+- Division by zero eliminated (empty input rejected first)
+- Added `render_summary(Summary) -> String` pure formatting function

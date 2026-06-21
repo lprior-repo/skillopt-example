@@ -1,0 +1,10 @@
+Now let me run `cargo test` to see the current state:
+Repaired. All 6 tests pass, zero forbidden constructs remain.
+
+**Changes in `src/lib.rs`:**
+- `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>`
+- Added `render_summary(Summary) -> String` function
+- Replaced `parts[1].parse().unwrap()` with safe `split_once(',')` + `map_err`
+- Replaced unchecked `total += value` with `checked_add` returning `Overflow`
+- Replaced unchecked `total / count` division with safe integer division (count proven nonzero)
+- Added empty-input validation and per-line format validation

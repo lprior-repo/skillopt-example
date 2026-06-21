@@ -1,0 +1,15 @@
+Review complete. Written to `review-output.json`.
+
+**Summary: 7 findings (5 BLOCKER, 1 MINOR, 1 INFO)**
+
+| # | Rule | File:Line | Issue |
+|---|------|-----------|-------|
+| 1 | zero_forbidden_constructs | `src/lib.rs:9` | `fs::read_to_string().unwrap()` — panics on I/O failure |
+| 2 | zero_forbidden_constructs | `src/lib.rs:13` | `.parse().unwrap()` — panics on malformed numeric field |
+| 3 | zero_forbidden_constructs | `src/lib.rs:13` | `as u16` — lossy cast silently truncates values >65535 |
+| 4 | zero_forbidden_constructs | `src/lib.rs:12` | `parts[0]`, `parts[1]` — unchecked indexing panics on short lines |
+| 5 | functional_core_imperative_shell | `src/lib.rs:12` | `println!` inside pure parsing function — hidden I/O side effect |
+| 6 | performance_discipline | `src/lib.rs:11` | `Vec<String>` collect instead of `split_once` + borrowed `&str` |
+| 7 | verification_evidence | `src/lib.rs:8` | No benchmark, profiler, or allocation evidence |
+
+**5 missing evidence items** flagged (benchmarks, profiler, allocation audit, fuzz harness, command evidence).

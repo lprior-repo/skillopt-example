@@ -1,0 +1,141 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap() on an I/O Result panics on file-not-found, permission errors, or truncated reads",
+      "failure_mode": "external file path can abort the process instead of returning a typed I/O error",
+      "fix": "return Result<Vec<Record>, io::Error> and use ? to propagate the I/O error, or map_err into a domain error type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap() on ParseIntError panics on non-numeric or out-of-range input for the second field",
+      "failure_mode": "a single malformed CSV line aborts the entire sensor load instead of returning a typed Parse error",
+      "fix": "use .parse::<u16>() with ? or map_err, and return Result<Vec<Record>, ParseError> or a domain error enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>().unwrap() as u16 — lossy `as` cast from u32 to u16 silently truncates values >65535",
+      "failure_mode": "a sensor value of 70000 silently becomes 4436, corrupting data without any error signal",
+      "fix": "parse directly as u16 via .parse::<u16>() and use checked arithmetic or try_from for safe conversion"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0] — unchecked indexing into a Vec produced by split; if the line is empty or contains no comma, this panics with index out of bounds",
+      "failure_mode": "a blank line or a line without a comma causes a panic, not a typed error",
+      "fix": "use split_once(',') and match on the Some/None variant, or use .get(0) with map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing; if the line has only one comma-separated field, this panics",
+      "failure_mode": "a line like 'sensor_name,' or 'sensor_name' panics instead of returning a Parse or MalformedData error",
+      "fix": "use split_once(',') and destructure the two fields explicitly; reject lines with fewer than 2 fields"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — I/O side effect inside the parsing/map logic that also does data construction",
+      "failure_mode": "the parser has hidden side effects, making it non-deterministic and untestable without capturing stdout; violates pure core principle",
+      "fix": "remove println from the core parsing path; log in the shell layer after parsing, or return parsed records and let the caller handle logging"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sensors mixes I/O (fs::read_to_string) with parsing logic in a single function — the functional core should be pure and the shell should handle all I/O",
+      "failure_mode": "the parsing logic cannot be unit-tested in isolation; any change to file reading affects the parser tests",
+      "fix": "split into (a) a pure fn parse_records(input: &str) -> Result<Vec<Record>, ParseError> and (b) a shell fn load_sensors(path: &str) -> Result<Vec<Record>, io::Error> that reads the file and delegates to the pure parser"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw String and u16 — no domain newtypes, no validation at construction, no typestate for sensor lifecycle",
+      "failure_mode": "any code can construct Record with empty names, negative values, or invalid data; the illegal state of a Record with an empty name is representable",
+      "fix": "introduce newtype wrappers like SensorName(String) with a fallible constructor that rejects empty/whitespace, and validate value range at construction"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec<String> = line.split(',').map(...).collect() — unbounded intermediate Vec allocation per line; no try_reserve, no capacity hint",
+      "failure_mode": "a single malformed line with many commas causes unbounded heap allocation; allocation failure is not handled",
+      "fix": "use split_once(',') to parse exactly two fields without collecting into a Vec; eliminates the intermediate allocation entirely"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "return_typed_errors",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_sensors returns Vec<Record> with no Result — all error paths use panic instead of typed errors",
+      "failure_mode": "consumers cannot distinguish between I/O failure, parse failure, and malformed data; all collapse into panic",
+      "fix": "change return type to Result<Vec<Record>, SensorError> where SensorError is an enum with variants like Io(io::Error), Parse(…) and MalformedLine(String)"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_hidden_side_effects",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! is a visible I/O side effect that is not part of the function signature or return type — it is a hidden effect from the caller's perspective",
+      "failure_mode": "function behavior changes based on external console state; stdout capture may fail; non-deterministic in tests",
+      "fix": "remove println entirely from the data-loading path; push logging to the imperative shell layer"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_sensors — the function allocates per-line (Vec<String>, multiple String::to_string, clone)",
+      "failure_mode": "unknown allocation profile; per-line double-String overhead may be a performance bottleneck at scale",
+      "fix": "add a criterion or divan benchmark measuring allocations for a realistic CSV input; profile with flamegraph; consider &str-based parsing to eliminate per-line allocations"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [dev-dependencies] or [profile] sections — no benchmark framework, no test harness configured",
+      "failure_mode": "no way to run behavior tests or benchmarks for this crate; performance claims cannot be verified",
+      "fix": "add criterion or divan as dev-dependency and a [[bench]] section if benchmarks are required by the delivery contract"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "borrowed_data_preferred",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0].clone() — unnecessary clone from already-owned String in the collected Vec",
+      "failure_mode": "wasted allocation per record; Record already owns the String so the clone is redundant",
+      "fix": "use parts[0].clone() only when needed; after refactoring to split_once, the owned string from split can be moved directly into Record"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sensors or any pure-parsing path",
+    "no profiler data (flamegraph, cargo-flamegraph, perf) for allocation profile",
+    "no allocation analysis (e.g., cargo-bench --benchmarks with --allocations) for the parsing loop",
+    "no command evidence: cargo fmt, cargo test, cargo clippy were not executed in this review-only context",
+    "no second-ring analysis: no Miri, Kani, or loom evidence for unsafe or concurrent usage of Record",
+    "no command-layer evidence: no integration test showing end-to-end load_sensors with valid and malformed inputs"
+  ],
+  "residual_risk": "The crate has 10 blockers and 4 major findings: unwrap() on I/O and parse, lossy as cast, unchecked indexing, println! side effects, mixed I/O and parsing, no Result return type, no bounded allocation, and no benchmarks. Static review only; no commands executed. All blockers require source changes to reach Holzman compliance. Residual risk is HIGH — the code will panic on any malformed input, silently corrupt large values, and cannot be tested without stdout interference."
+}

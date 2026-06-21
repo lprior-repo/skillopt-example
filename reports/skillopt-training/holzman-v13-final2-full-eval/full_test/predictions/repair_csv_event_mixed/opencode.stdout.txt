@@ -1,0 +1,18 @@
+Now let me read the remaining references quickly, then apply the repair.
+The source has critical violations: `.unwrap()` on parse, no empty check, no max_items bound, no `try_reserve`. The mandatory CSV repair pattern requires all of these. Let me apply the fix.
+All 4 tests pass. Let me verify no Holzman violations remain in the final source.
+Source is clean — no violations. Now writing the required output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+**Before** (3 violations):
+- `.unwrap()` on `parse::<u16>()` — panics on invalid input
+- No empty-input check — never returned `ParseError::Empty`
+- No `max_items` bound — never returned `ParseError::TooMany`
+- No `try_reserve` — unbounded allocation
+
+**After** (0 violations):
+- Empty input rejected first → `ParseError::Empty`
+- Pre-count fields, reject `count > max_items` → `ParseError::TooMany`
+- `Vec::new()` + `try_reserve(count)` → `ParseError::Allocation`
+- Per-value parse with `.map_err(|_| ParseError::Invalid)`
+- All 4 tests pass, clippy clean

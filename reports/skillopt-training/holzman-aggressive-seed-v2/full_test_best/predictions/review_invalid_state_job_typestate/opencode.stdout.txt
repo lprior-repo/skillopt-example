@@ -1,0 +1,6 @@
+Now I have all the information. Let me write the review output.
+Review complete. Wrote valid JSON to `review-output.json` with:
+
+- **5 BLOCKER findings**: illegal states representable (pub primitives), boolean lifecycle flags, primitive string for domain concept, missing validation gate on `mark_sent`, and `sent_at_epoch_ms` not set on transition
+- **3 MAJOR/MINOR findings**: functional core/shell separation, no behavioral tests, missing benchmark/profiler/allocation/command evidence
+- **Residual risk**: crate fundamentally broken — cannot enforce domain invariants, allows any illegal state, zero tests, complete refactor needed before production use

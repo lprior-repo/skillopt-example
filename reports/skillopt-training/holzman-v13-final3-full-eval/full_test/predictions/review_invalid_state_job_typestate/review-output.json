@@ -1,0 +1,85 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_invalid_state_job_typestate/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_invalid_state_job_typestate/.skill/holzman-rust/references/claim-traceability.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_invalid_state_job_typestate/.skill/holzman-rust/references/hardening-checklist.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_invalid_state_job_typestate/.skill/holzman-rust/references/review-output-contract.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_invalid_state_job_typestate/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/5ca4deea5d700ee5/review_invalid_state_job_typestate/.skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "JobWorkflow is a plain struct with mutable fields representing a workflow lifecycle, but there is no enum or typestate to enforce valid state transitions. Any combination of fields is representable, including invalid states like status=\"sent\" with is_sent=false, or status=\"pending\" with is_sent=true.",
+      "failure_mode": "Callers can construct and mutate JobWorkflow into logically impossible states. mark_sent does not prevent partial mutation (e.g. setting is_sent without status), and the struct admits no compile-time guarantee that the lifecycle is in a consistent state at any point.",
+      "fix": "Replace JobWorkflow with a single JobWorkflow enum with variants for each lifecycle stage (e.g. Pending, Validated, Sent), and replace mark_sent with a function that takes the pre-state variant and returns the post-state variant. Use pattern matching to enforce exhaustive transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String field that allows any arbitrary string value. The mark_sent function hardcodes the literal \"sent\" (src/lib.rs:10), meaning callers can set status to anything else (e.g. \"sent \", \"SENT\", \"\"), and there is no validation.",
+      "failure_mode": "Invalid status strings slip through the domain boundary. Pattern matching on status is impossible since the full string space is not enumerable. The hardcoded literal in mark_sent is a magic string that can be mismatched by typos or whitespace.",
+      "fix": "Replace `status: String` with an enum: `pub enum JobStatus { Pending, Validated, Sent }`. Remove is_sent boolean entirely since Sent variant owns that state. mark_sent should take JobStatus::Validated and return JobStatus::Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are lifecycle booleans that encode workflow stage information as independent flags. They can be inconsistent with each other and with the status string (e.g. is_validated=true, is_sent=false, status=\"pending\").",
+      "failure_mode": "Callers can set is_validated=true and is_sent=true simultaneously, representing an impossible lifecycle path. The three fields (status, is_validated, is_sent) form a 3*2*2=12 state space where only a subset of combinations are valid, yet all are representable.",
+      "fix": "Remove both booleans. Encode the lifecycle as a single typestate enum variant. If validated state needs to carry data, use a variant like `Validated { validated_at: Instant }`. Each lifecycle stage should be a distinct enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is an independent optional field that can be Some(value) while is_sent=false, or None while is_sent=true. This decouples the timestamp from the sent state entirely.",
+      "failure_mode": "A JobWorkflow can report sent_at_epoch_ms=Some(12345) but is_sent=false, or is_sent=true but sent_at_epoch_ms=None. Both represent logically impossible states. The Option is owned at the struct level rather than inside the variant that needs it.",
+      "fix": "Move sent_at_epoch_ms inside the Sent variant: `Sent { sent_at_epoch_ms: u64 }`. This makes illegal states unrepresentable — sent_at_epoch_ms can only exist when the job is actually in the Sent state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain constraints. Any string is accepted including empty strings, duplicate IDs, or malformed identifiers. There is no newtype to distinguish JobId from arbitrary strings.",
+      "failure_mode": "Callers can pass empty strings, null-like values, or non-identifier strings as job IDs. Domain functions cannot enforce ID invariants (uniqueness, format, length bounds) because the type carries no semantic meaning.",
+      "fix": "Replace with `pub id: JobId` where JobId is a newtype wrapping String with a smart constructor: `pub struct JobId(String); impl JobId { fn from(s: &str) -> Result<Self, ParseError> { ... } }`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String, bool, Option<u64>) cross the parse boundary without fallible smart constructors. There is no constructor on JobWorkflow and no parse layer that validates inputs before they enter the domain. Callers can construct invalid domain states directly via struct literal.",
+      "failure_mode": "The domain accepts invalid states at construction time. There is no smart constructor, no ParseError type, no validation at the boundary. External input flows directly into domain struct fields without transformation or checking.",
+      "fix": "Make JobWorkflow fields private and provide a smart constructor `JobWorkflow::new(id: &str, status: JobStatus, sent_at: Option<u64>) -> Result<Self, ParseError>` that validates all inputs. Replace raw primitive fields with domain-typed fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "hidden_side_effects_mark_sent",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership of JobWorkflow and returns a modified copy, but the function name implies an action/effect while the signature is a pure transform. This conflates Data/Calculations/Actions architecture.",
+      "failure_mode": "Callers cannot distinguish whether mark_sent performs I/O or is a pure transform. The function both mutates state (\"sent\" string, is_sent flag) and returns the full struct, leaking internal representation details.",
+      "fix": "If mark_sent is a pure transition, rename to `transition_to_sent` and return only the new state variant. If it performs I/O, move it to the shell layer and return Result<(), ActionError> instead of the mutated struct."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim (none stated, but the crate has no benchmarks at all)",
+    "no profiler evidence for the hot path (none identified, but no evidence exists)",
+    "no allocation analysis — JobWorkflow owns a String (id) and String (status) on every instance with no bounded allocation strategy",
+    "no command evidence — no cargo test, cargo clippy, or cargo check output was produced",
+    "no typed error taxonomy — no ParseError, WorkflowError, or similar types exist for the domain",
+    "no bounded resource cap — no max_items, max_id_length, or similar constraints on any field"
+  ],
+  "residual_risk": "Typestate violation is architectural — the entire struct is a single-file representation of a workflow state machine using raw primitives. All six typestate findings are independent blockers. Without enum-based state machine, the struct can represent every logically impossible combination of status, is_validated, is_sent, and sent_at_epoch_ms. No commands were run; static review only confirms the structural violations but cannot verify absence of additional defects in dependent crates or integration points."
+}

@@ -1,0 +1,119 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "domain-model-enums",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status field uses String instead of a domain enum, allowing arbitrary invalid states",
+      "failure_mode": "any string value can be assigned to status, producing unreachable or invalid workflow states like 'sent' without validation, 'foobar', or empty string",
+      "fix": "Replace `status: String` with a `RouteStatus` enum with explicit variants (e.g., `Pending`, `Validated`, `Sent`) and make `mark_sent` a method on the enum or a function that takes an enum"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate-machine",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Lifecycle booleans `is_validated` and `is_sent` represent workflow state but are independent flags, not a typestate machine",
+      "failure_mode": "Invalid state combinations are representable: validated=false + sent=true, validated=true + sent=true with status='sent', or all flags inconsistent. No compiler-enforced transition ordering",
+      "fix": "Replace `is_validated: bool` and `is_sent: bool` with a single typestate enum or a typestate type pattern where the compiler prevents invalid transitions (e.g., `Pending`, `Validated`, `Sent` as distinct types or enum variants)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "optional-lifecycle-inside-variant",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Optional lifecycle data `sent_at_epoch_ms: Option<u64>` is a bare optional field instead of being owned by the variant that needs it",
+      "failure_mode": "sent_at_epoch_ms can be Some when status is not sent, or None when status is sent. The timestamp is decoupled from the lifecycle state it describes, producing inconsistent observations",
+      "fix": "Embed optional lifecycle data inside the typestate enum variant: e.g., `RouteStatus::Sent { sent_at: Timestamp }` or keep the optional only on the variant that owns it"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-domain-ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "ID field uses raw `String` primitive instead of a domain newtype",
+      "failure_mode": "Route IDs are interchangeable with any other string (names, descriptions, raw input), enabling semantic confusion and accidental misuse across the codebase",
+      "fix": "Introduce `pub struct RouteId(String)` or `pub struct RouteId(&'static str)` with a smart constructor, and use it as the field type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype-timestamps",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "Timestamp field uses raw `u64` epoch milliseconds instead of a domain newtype",
+      "failure_mode": "Epoch milliseconds are interchangeable with durations, counts, or other u64 domain values. No unit safety at compile time",
+      "fix": "Introduce a newtype like `pub struct SentAtEpochMs(u64)` and convert at the boundary with `u64::try_from` or checked conversion"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "smart-constructor-boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No smart constructor or constructor validation exists. The struct has all public fields with no validation, making illegal states trivially representable",
+      "failure_mode": "Any code can construct a RouteWorkflow with empty id, arbitrary status string, and inconsistent flags, bypassing all domain invariants at the parsing boundary",
+      "fix": "Add a private constructor or `fn new(...)` smart constructor that validates inputs, returns typed errors, and produces the trusted domain type. Make fields private or use an enum-only type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "marksent-no-transition-guards",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` directly mutates status string and is_sent flag with no transition validation or guards",
+      "failure_mode": "Can be called on any RouteWorkflow regardless of current state. A non-validated item can be marked sent. An already-sent item can be re-sent. No transition validation, no error return, no typestate enforcement",
+      "fix": "Make `mark_sent` return a typed result or use a typestate pattern where only a validated item can transition to sent. Either `fn try_mark_sent(item: &RouteWorkflow) -> Result<RouteWorkflow, RouteError>` or encode transitions in the type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "panic-string-allocation",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "String allocation via `.to_string()` in hot path without bounded resources or pre-allocated buffer",
+      "failure_mode": "Unbounded heap allocation on every `mark_sent` call with no capacity check, no allocation failure handling, and no resource bound. In a high-throughput path this causes unbounded memory growth",
+      "fix": "Replace String with an enum variant or use a fixed-set enum for status. Eliminate heap allocation from the core workflow type entirely"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "public-fields-no-encapsulation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All struct fields are `pub`, exposing internal state to direct mutation from any module",
+      "failure_mode": "Any downstream module can mutate id, status, is_validated, is_sent, or sent_at_epoch_ms directly, bypassing all domain invariants and transition logic",
+      "fix": "Make fields private, provide controlled accessors, or use an enum-based type where all transitions go through defined constructors/methods"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No `[dev-dependencies]` or `[[bench]]` section defining benchmarks. No criterion, proptest, or micro-benchmark infrastructure exists",
+      "failure_mode": "No baseline exists to measure the impact of any future changes. Performance claims cannot be verified or regressed",
+      "fix": "Add `criterion` or `iai-callgrind` to dev-dependencies and define a `[[bench]]` section, even a trivial one, to establish a measurement baseline"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-test-targets",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests, no `#[cfg(test)]` module, no behavior tests for the workflow type or mark_sent function",
+      "failure_mode": "No regression protection exists. Any change to RouteWorkflow or mark_sent cannot be validated against expected behavior",
+      "fix": "Add a `#[cfg(test)] mod tests` module with tests covering: valid transition from validated to sent, rejected transition from non-validated to sent, typestate invariants, and smart constructor validation"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim",
+    "no profiler evidence for allocation patterns on RouteWorkflow",
+    "no second-ring evidence for zero-cost claims",
+    "no command evidence: cargo fmt/check/clippy/test not run",
+    "no proptest or property-based tests for typestate invariants",
+    "no Miri or Loom concurrency evidence (safe Rust, lower risk but absent)"
+  ],
+  "residual_risk": "The crate is a textbook case of illegal-state-representable domain modeling: raw String status, independent lifecycle booleans, bare primitive fields, no smart constructors, no transition guards, and no tests. This is a BLOCK_GLOBAL prerequisite repair - the domain model must be rebuilt as an enum/typestate pattern with typed errors before any advancement. Static review only; no verification commands were executed."
+}

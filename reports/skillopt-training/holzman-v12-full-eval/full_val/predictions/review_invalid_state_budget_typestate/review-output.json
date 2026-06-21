@@ -1,0 +1,73 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BudgetWorkflow uses flat String status + bool flags instead of an enum-based typestate machine, allowing illegal state combinations such as status='sent' with is_sent=false, or status='draft' with is_validated=true.",
+      "failure_mode": "Callers can construct any BudgetWorkflow with arbitrary field combinations at runtime; no compiler enforces valid lifecycle transitions; invalid state propagates silently into downstream logic.",
+      "fix": "Replace the entire struct with a typed state machine enum such as enum BudgetState { Draft { validated: bool }, Validated { sent_at_epoch_ms: Option<u64> }, Sent { sent_at_epoch_ms: u64 } } with a newtype BudgetWorkflow { id: BudgetId, state: BudgetState } and transition methods that consume the old state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_string_status",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a String, allowing arbitrary values ('draft', 'DRAFT', 'SENT', '', 'deleted', etc.) that the domain does not recognize as valid states.",
+      "failure_mode": "Pattern matches and conditional logic on status must handle every possible string; typos in state names silently create new states; no exhaustiveness checking; invalid strings pass through the system.",
+      "fix": "Replace `status: String` with an explicit enum `enum BudgetStatus { Draft, Validated, Sent }` and use match on the enum for all status-dependent logic."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a standalone bool that can be true while status is 'draft', and false while status is 'sent', representing two independent booleans that the domain treats as a single lifecycle property.",
+      "failure_mode": "The bool can be flipped independently of other lifecycle fields, creating incoherent states like (status='validating', is_validated=true, is_sent=false) that have no domain meaning and may cause silent logic errors.",
+      "fix": "Eliminate `is_validated` as a separate field. Fold it into the typestate enum variants so that validated-ness is represented by the variant itself, not an independent boolean."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is an Option<u64> on a struct that also has is_sent: bool and status: String, splitting lifecycle data across three separate fields instead of placing it inside the variant that owns it.",
+      "failure_mode": "When is_sent=true but sent_at_epoch_ms=None, the budget is marked sent without a timestamp (data integrity loss). When is_sent=false but sent_at_epoch_ms=Some(...), the data is stale and inconsistent. Three fields encoding one lifecycle concept cannot guarantee consistency.",
+      "fix": "Place `sent_at_epoch_ms: u64` (non-optional) inside a Sent variant of a typestate enum. All other variants omit it entirely. This makes the invalid state (sent without timestamp) unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String, allowing empty strings, arbitrarily long strings, strings with special characters, and no domain invariants on the identifier.",
+      "failure_mode": "Budget IDs can be empty or malformed; no validation is enforced at construction; ID comparison and display are raw string operations with no domain semantics.",
+      "fix": "Replace `id: String` with a newtype `struct BudgetId(String)` or `struct BudgetId(String)` with a smart constructor that validates non-empty and rejects invalid characters, returning a typed error."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent accepts and returns BudgetWorkflow with raw String fields and bools, bypassing any parse boundary. Callers can construct invalid BudgetWorkflow instances directly via struct literal initialization without any smart constructor or fallible parse logic, so invalid domain states are constructible at will.",
+      "failure_mode": "Any caller can create BudgetWorkflow { id: \"\", status: \"\", is_validated: true, is_sent: false, sent_at_epoch_ms: None } without validation; the domain's parse boundary is entirely absent, so callers can construct invalid domain states directly.",
+      "fix": "Remove public struct construction. Replace with a smart constructor `BudgetWorkflow::parse(id: &str, initial_status: BudgetStatus) -> Result<BudgetWorkflow, ParseError>` that validates inputs at the parse boundary and returns typed errors for invalid inputs."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark/profiler/allocation evidence exists for mark_sent or any hot path",
+    "no command-truth evidence (cargo fmt, cargo check, cargo clippy, cargo test) was provided",
+    "no allocation budget or capacity analysis for the type, which stores a String id"
+  ],
+  "residual_risk": "Static review only; no commands run. The typestate violation is a structural blocker: all six findings are independent, semantic, and independently gradable. Without enum-based typestate, no amount of testing can enumerate invalid state combinations, and the domain model is unrepresentable by construction."
+}

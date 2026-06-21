@@ -1,0 +1,207 @@
+{
+  "run_id": "qwen3090-functional-repair-v6",
+  "run_root": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-functional-repair-v6",
+  "sandbox_run_root": "/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6",
+  "model": "qwen36-3090/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+  "candidate_name": "candidate-v6",
+  "candidate_overlay_dir": "candidates/holzman-rust-candidate-v6",
+  "resume": true,
+  "tasks": [
+    "repair_headers_zero_copy",
+    "repair_metric_summary_layers"
+  ],
+  "aggregates": [
+    {
+      "bundle": "baseline",
+      "task_count": 2,
+      "hard": 0.0,
+      "soft": 0.6828571428571428,
+      "mixed": 0.3414285714285714,
+      "passed_tasks": 0
+    },
+    {
+      "bundle": "candidate-v6",
+      "task_count": 2,
+      "hard": 0.0,
+      "soft": 0.8200000000000002,
+      "mixed": 0.4100000000000001,
+      "passed_tasks": 0
+    }
+  ],
+  "gate": {
+    "action": "accept_new_best",
+    "current_score": 0.4100000000000001,
+    "best_score": 0.4100000000000001,
+    "best_step": 1
+  },
+  "promotion_gate": {
+    "action": "reject",
+    "blockers": [
+      "candidate_has_hard_failures"
+    ]
+  },
+  "results": [
+    {
+      "task_id": "repair_headers_zero_copy",
+      "kind": "repair",
+      "bundle": "baseline",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_headers_zero_copy",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-functional-repair-v6/tasks/baseline/repair_headers_zero_copy",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+      "task_digest": "36470ffc223bbbfa789c38b7e1e3da55bd00c739763b625f531a038d8f484fdc",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.6857142857142857,
+        "cargo_fmt_returncode": 1,
+        "cargo_clippy_returncode": 101,
+        "cargo_test_returncode": 0,
+        "fmt_passed": false,
+        "clippy_passed": false,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 5,
+        "total_groups": 7,
+        "missing_groups": [
+          [
+            "split_once"
+          ],
+          [
+            "try_reserve"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "repair_metric_summary_layers",
+      "kind": "repair",
+      "bundle": "baseline",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_metric_summary_layers",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-functional-repair-v6/tasks/baseline/repair_metric_summary_layers",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "eba0d28f330e2bc4fbf8d4db77905ffea8b84a9a335a371d2ad30e6f2aa6a0c0",
+      "task_digest": "3b05d0a6a5e84a2d9be578733b535832ee890ec475cd6eea941bba4bea68ea8f",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.68,
+        "cargo_fmt_returncode": 1,
+        "cargo_clippy_returncode": 101,
+        "cargo_test_returncode": 0,
+        "fmt_passed": false,
+        "clippy_passed": false,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 6,
+        "total_groups": 10,
+        "missing_groups": [
+          [
+            "read_to_string",
+            "summarize_file"
+          ],
+          [
+            "split_once"
+          ],
+          [
+            "try_fold",
+            "fold"
+          ],
+          [
+            "u32::try_from",
+            "try_from"
+          ]
+        ]
+      }
+    },
+    {
+      "task_id": "repair_headers_zero_copy",
+      "kind": "repair",
+      "bundle": "candidate-v6",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/candidate-v6/repair_headers_zero_copy",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-functional-repair-v6/tasks/candidate-v6/repair_headers_zero_copy",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "e9bd2f9b1f72c8540dd4c2a89248d8c8e6d3f327514ba49b702d2ae2bf85ba57",
+      "task_digest": "36470ffc223bbbfa789c38b7e1e3da55bd00c739763b625f531a038d8f484fdc",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.9000000000000002,
+        "cargo_fmt_returncode": 1,
+        "cargo_clippy_returncode": 0,
+        "cargo_test_returncode": 0,
+        "fmt_passed": false,
+        "clippy_passed": true,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 7,
+        "total_groups": 7,
+        "missing_groups": []
+      }
+    },
+    {
+      "task_id": "repair_metric_summary_layers",
+      "kind": "repair",
+      "bundle": "candidate-v6",
+      "sandbox_workdir": "/tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/candidate-v6/repair_metric_summary_layers",
+      "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/qwen3090-functional-repair-v6/tasks/candidate-v6/repair_metric_summary_layers",
+      "opencode_returncode": 0,
+      "opencode_timed_out": false,
+      "initial_cargo_returncode": 101,
+      "bundle_digest": "e9bd2f9b1f72c8540dd4c2a89248d8c8e6d3f327514ba49b702d2ae2bf85ba57",
+      "task_digest": "3b05d0a6a5e84a2d9be578733b535832ee890ec475cd6eea941bba4bea68ea8f",
+      "grade": {
+        "kind": "repair",
+        "hard": 0.0,
+        "soft": 0.7400000000000001,
+        "cargo_fmt_returncode": 0,
+        "cargo_clippy_returncode": 101,
+        "cargo_test_returncode": 0,
+        "fmt_passed": true,
+        "clippy_passed": false,
+        "tests_passed": true,
+        "forbidden_matches": [],
+        "protected_changed": [
+          "tests/behavior.rs"
+        ],
+        "json_valid": true,
+        "json_errors": [],
+        "execution_errors": [],
+        "initial_failed": true,
+        "matched_groups": 8,
+        "total_groups": 10,
+        "missing_groups": [
+          [
+            "try_fold",
+            "fold"
+          ],
+          [
+            "u32::try_from",
+            "try_from"
+          ]
+        ]
+      }
+    }
+  ]
+}

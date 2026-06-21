@@ -1,0 +1,2 @@
+    Checking repair_frame_sensor_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/0dfb90c2a1313b09/repair_frame_sensor_mixed)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s

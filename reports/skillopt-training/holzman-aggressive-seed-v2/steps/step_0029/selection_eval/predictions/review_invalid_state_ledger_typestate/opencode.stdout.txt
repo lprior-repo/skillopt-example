@@ -1,0 +1,15 @@
+The issue is the `"lines"` field name and possibly Unicode em-dashes. Let me rewrite the file with proper JSON.
+Review complete. Written valid JSON to `review-output.json`.
+
+**6 findings** across `src/lib.rs`, all stemming from the same root cause:
+
+| Severity | Rule | Lines |
+|---|---|---|
+| BLOCKER | Typestate discipline — `status: String` allows any value | :2 |
+| BLOCKER | Bool lifecycle flags — `is_validated: bool` | :4 |
+| BLOCKER | Bool lifecycle flags — `is_sent: bool` | :5 |
+| BLOCKER | Functional core — `mark_sent` mutates in-place with `to_string()` allocation | :9 |
+| BLOCKER | Primitive domain API — `sent_at_epoch_ms: Option<u64>` no newtype | :6 |
+| MAJOR | All fields `pub` — no encapsulation | :2 |
+
+The `LedgerWorkflow` struct has **three redundant fields** (status, is_validated, is_sent) describing a single dimension of state, all independently mutable. The compiler cannot prevent contradictory configurations like `status="sent"` with `is_sent=false`. `mark_sent` is shell-style mutation with heap allocation, not a pure typestate transition.

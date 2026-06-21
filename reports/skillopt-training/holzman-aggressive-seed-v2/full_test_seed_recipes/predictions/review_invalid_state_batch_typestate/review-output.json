@@ -1,0 +1,126 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow uses pub status: String, is_validated: bool, is_sent: bool — any combination of these fields is legal, including impossible states like status=\"new\" with is_sent=true, or status=\"sent\" with is_sent=false",
+      "failure_mode": "Corrupted or partial updates produce logically inconsistent batch records that silently pass validation; downstream consumers cannot rely on status or boolean flags",
+      "fix": "Replace status: String, is_validated: bool, is_sent: bool with a single BatchStatus enum (e.g., Pending, Validated, Sent) and a typestate wrapper so sent-at is only constructable in the Sent state"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are primitive lifecycle booleans that encode a workflow state machine; they are orthogonal to status: String and can drift out of sync",
+      "failure_mode": "Booleans can be set independently of status string, allowing states like (status=\"validated\", is_sent=true) or (status=\"\", is_validated=false, is_sent=false) which violate domain invariants",
+      "fix": "Remove both bool fields; encode lifecycle transitions in a single enum or a typestate enum (BatchStatus::Pending | BatchStatus::Validated | BatchStatus::Sent)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows any arbitrary value (e.g., \"SENT\", \"\", \"deleted\", \"pending2\"); no domain discipline or exhaustive matching at the type level",
+      "failure_mode": "Typos, external input, or race-condition partial writes produce unrecognized status values that break downstream match/exhaustive checks; no compile-time guarantee of valid states",
+      "fix": "Replace with a non-exhaustive or exhaustive enum: pub enum BatchStatus { Pending, Validated, Sent } and derive Display for formatting"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pure_function_mutates_state",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes ownership and mutates item.status and item.is_sent directly without any validation or atomic transition; caller can also mutate fields freely since all are pub",
+      "failure_mode": "mark_sent can be called when status is already \"sent\" or when the batch was never validated; no preconditions enforced, so the function is a blind state mutation",
+      "fix": "Replace with a fallible constructor or method on a typestate-aware enum: fn into_sent(self) -> Result<BatchWorkflow, BatchError> that checks the prior state and returns a typed error on invalid transitions"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No typestate enum or state machine exists; the struct represents a workflow that should have a linear lifecycle (Pending → Validated → Sent) but the compiler cannot enforce ordering or prevent backward transitions",
+      "failure_mode": "Callers can skip Validated, re-validate, or unset sent state via direct field mutation; the lifecycle is enforced by convention, not the type system",
+      "fix": "Define an enum with ordered states and make transitions fallible; use associated functions like BatchWorkflow::validate() -> Result<BatchWorkflow, BatchError> and BatchWorkflow::send() -> Result<BatchWorkflow, BatchError>"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "domain_newtype_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String provides no domain typing; any string is accepted with no length, format, or uniqueness constraint enforced at the type level",
+      "failure_mode": "Empty strings, duplicated IDs, or malformed IDs pass silently; downstream lookups and dedup logic must re-validate raw string constraints",
+      "fix": "Introduce a BatchId newtype struct with a fallible constructor (fn new(s: &str) -> Result<BatchId, BatchError>) that enforces length/format rules"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "public_fields_on_domain_struct",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields of BatchWorkflow are pub, allowing external code to set any field directly, bypassing the type system entirely",
+      "failure_mode": "External callers can construct arbitrary invalid states without going through the type's constructors or transition methods",
+      "fix": "Make fields private (no pub) and provide constructor + transition methods that enforce invariants"
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist for mark_sent or any performance claim about the batch workflow",
+      "failure_mode": "Cannot verify allocation behavior or performance characteristics of the typestate migration or transition methods",
+      "fix": "Add a criterion or minijohn benchmark for state transitions, especially after typestate migration"
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler data (flamegraph, cachegrind, perf) exists to validate the hot path of the batch workflow",
+      "failure_mode": "Cannot confirm whether enum-based state transitions improve or degrade cache locality vs the current String-based approach",
+      "fix": "Run cargo flamegraph or perf record on representative batch processing workloads after typestate migration"
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent allocates via \"sent\".to_string() on every call; no allocation budget or measured claim about whether this is acceptable",
+      "failure_mode": "In a hot path processing thousands of batches, repeated String allocation for a constant literal is wasteful; enum-based status would eliminate all allocation",
+      "fix": "Replace with an enum variant (BatchStatus::Sent) which is zero-cost; if string representation is needed, derive Display on the enum"
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_second_ring_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No second-ring test or integration evidence exists to validate the typestate migration preserves all expected behaviors",
+      "failure_mode": "Typestate migration could silently change transition semantics if not validated against integration test scenarios",
+      "fix": "Add integration/behavior tests covering all valid and invalid transition paths (Pending→Sent directly should fail, etc.)"
+    },
+    {
+      "severity": "INFO",
+      "rule": "no_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No cargo test, cargo fmt, or cargo clippy evidence exists for this crate",
+      "failure_mode": "Cannot verify the crate compiles, passes tests, or meets clippy standards",
+      "fix": "Run cargo fmt, cargo clippy --workspace, and cargo test to establish baseline quality gates"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for state transitions after typestate migration",
+    "no profiler data for batch workflow hot paths",
+    "no allocation analysis for String-based status vs enum-based status",
+    "no second-ring integration tests for transition invariants",
+    "no cargo test/fmt/clippy evidence for this crate"
+  ],
+  "residual_risk": "Static review only — no commands run. The crate has severe type discipline violations: mutable String status, orphan boolean lifecycle flags, and no typestate machine. The typestate migration is straightforward (enum + fallible constructors) but untested and unmeasured."
+}

@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_production_unsafe",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Production function body contains an `unsafe` block invoking x86_64 SIMD intrinsics",
+      "failure_mode": "Unsafe SIMD bypasses the borrow checker and safety guarantees; any misuse (unaligned access, out-of-bounds reads, missing scalar fallback) causes undefined behavior with no safe recovery path",
+      "fix": "Remove the `unsafe` block entirely and replace with a safe scalar loop or use a safe SIMD crate that provides bounds-checked operations"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "simd_requires_scalar_fallback_and_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SIMD path has no safe scalar fallback, no target-feature gate, no remainder handling, and no tests or benchmarks",
+      "failure_mode": "On non-x86_64 targets the function does not compile at all (only `#[cfg(target_arch = \"x86_64\")]` guards it); on x86_64 with input length not divisible by 4, the loop reads 4 `f32`s past the slice end causing UB; no scalar path means the function silently produces wrong results or UB on small/odd-length inputs",
+      "fix": "Split into a safe scalar fallback for all paths and a gated SIMD path; handle the remainder with scalar tail; add tests covering lengths 0..=8 and non-multiples of 4; add benchmark evidence proving the SIMD path is faster"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "unchecked_slice_access_in_unsafe",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "`_mm_loadu_ps(input.as_ptr().add(i))` reads 16 bytes (4 `f32`s) per iteration without checking that `i + 4 <= input.len()`",
+      "failure_mode": "When `input.len()` is not a multiple of 4, the final iteration reads past the slice allocation, causing undefined behavior (heap buffer over-read) in unsafe code",
+      "fix": "Cap the loop to `input.len() & !3` (or `input.len() / 4 * 4`) for the SIMD tail and process the remainder with a safe scalar loop after the SIMD loop"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_perf_claim_without_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SIMD implementation makes implicit performance claims but has no benchmark, baseline, profiler, or workload evidence",
+      "failure_mode": "Without measured evidence the SIMD path could be slower than scalar (branch misprediction on tail, cache effects, no unrolling); callers cannot assess tradeoffs and the claim is unverifiable",
+      "fix": "Add a criterion benchmark comparing this SIMD function against a reference scalar implementation across input sizes (10, 100, 1000, 10000 elements), report ops/sec or latency, and include the benchmark command and results"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_tests_or_command_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No tests, no benchmark binary, no test evidence, and no command evidence in the task crate",
+      "failure_mode": "Without tests the SIMD correctness (especially for non-multiple-of-4 lengths) cannot be verified; without command evidence the review cannot confirm any gate passed",
+      "fix": "Add unit tests for lengths 0, 1, 2, 3, 4, 5, 7, 8, 16, 17 and a benchmark; run `cargo test` and report the command output"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_target_feature_gate",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Only `#[cfg(target_arch = \"x86_64\")]` guards the SIMD code but no `#[target_feature(enable = \"sse\")]` is used",
+      "failure_mode": "On x86_64 SSE is guaranteed by the architecture, but without explicit `target_feature` the function signature does not convey the requirement to callers at the type level, and cross-compiler or future-portability assumptions are hidden",
+      "fix": "Add `#[target_feature(enable = \"sse\")]` to the function signature and gate the call site with `std::is_x86_feature_detected!(\"sse\")` for a safe public API, or provide the scalar fallback as the default and the SIMD path behind the detection"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark binary or benchmark command evidence exists for the SIMD path",
+    "no profiler evidence (no flame graph, no perf data) to justify SIMD over scalar",
+    "no allocation analysis (function appears allocation-free but this is unmeasured)",
+    "no second-ring evidence (no assembly listing, no compiler vectorization reports) to verify SSE instructions are actually emitted",
+    "no command evidence: no `cargo test`, `cargo clippy`, or `cargo bench` output reported"
+  ],
+  "residual_risk": "CRITICAL: The function contains production `unsafe` that reads past slice bounds on non-multiple-of-4 inputs, causing undefined behavior. There is no scalar fallback, no tests, no benchmarks, and no command evidence. This code must not ship. The unsafe SIMD must be replaced with a safe scalar path at minimum, or fully redesigned with safe SIMD, remainder handling, tests, benchmarks, and verified evidence before any consideration of unsafe code."
+}

@@ -1,0 +1,23 @@
+Now I have full understanding. Let me read the references as required, then repair.
+Issues identified:
+1. `summarize_metrics` returns `String` but tests expect `Summary`
+2. Missing `render_summary` function
+3. Unchecked `parts[1]` indexing
+4. `.unwrap()` on parse
+5. Unchecked `+=` arithmetic (overflow)
+6. Division-by-zero on empty input
+7. No `split_once` usage
+Clippy flagged arithmetic side-effects, unwrap, and as-conversions. Fixing all:
+All 6 tests pass. Let me run the final Holzman gate checks:
+All gates clean. Writing repair output:
+**Repair complete.** All gates passed.
+
+**Changes to `src/lib.rs`:**
+1. **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+2. **Added `render_summary`**: Pure formatting function producing `"count=N total=T average=A"`
+3. **Parsing**: `split_once(',')` replaces `split(',').collect()` + unchecked `parts[1]`
+4. **Error handling**: `.map_err(|_| SummaryError::Invalid)` replaces `.unwrap()` on parse
+5. **Arithmetic safety**: `checked_add` for sum/count, `checked_div` for average
+6. **Conversion safety**: `try_into().map_err()` replaces `count as u32` / `count as u64`
+7. **Division-by-zero**: Early return on `count == 0` before division
+8. **Overflow**: All accumulation paths return `SummaryError::Overflow`

@@ -1,0 +1,69 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses status: String and two independent bool flags (is_validated, is_sent) so any combination of values is constructable, including impossible states like status=draft with is_sent=true or is_validated=true with status=invalid.",
+      "failure_mode": "Downstream code cannot assume valid packet lifecycle; callers may observe or propagate logically impossible state, causing silent correctness bugs or unexpected branch execution.",
+      "fix": "Replace status: String, is_validated: bool, and is_sent: bool with a single enum typestate (e.g., enum PacketStatus { Created, Validated, Sent { sent_at_epoch_ms: u64 } }) so invalid combinations are unconstructable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_discipline_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a boolean lifecycle flag that should be an enum or typestate. Booleans carry no domain semantics and allow ambiguous transitions (e.g., transitioning back from validated).",
+      "failure_mode": "Callers can flip is_validated in either direction without domain enforcement, enabling state regression (e.g., re-processing an already-validated packet).",
+      "fix": "Replace with a typestate enum or fold into the unified PacketStatus enum so transitions are explicit and one-way."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "type_discipline_bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a boolean lifecycle flag. Independent of status: String, this creates dual representation of sent-state and allows the flags to diverge.",
+      "failure_mode": "item.status and item.is_sent can disagree (e.g., status=sent but is_sent=false), breaking any code that checks one but not the other.",
+      "fix": "Fold is_sent into the PacketStatus enum variant (e.g., PacketStatus::Sent { sent_at_epoch_ms: u64 }) so sent-state and its timestamp are a single atomic value."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "domain_newtypes",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no domain constraints. Packet IDs should carry length limits, format rules, or uniqueness invariants.",
+      "failure_mode": "Invalid, duplicate, or oversized IDs are accepted at the type level, pushing validation burden to every call site instead of enforcing it at construction.",
+      "fix": "Create a PacketId newtype with a fallible constructor that enforces length/format constraints, and use it in PacketWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_state_transitions",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates fields directly with string assignment (item.status = sent.to_string()) instead of returning a typed state transition. The function takes ownership and returns the same struct type, bypassing any type-level invariant enforcement.",
+      "failure_mode": "No validation that the packet is in a pre-sent state before marking sent. Any PacketWorkflow instance can be marked sent regardless of prior lifecycle, enabling double-sent or out-of-order transitions.",
+      "fix": "Change to a pure function that takes the current typed state and returns the next typed state: fn mark_sent(state: PacketStatus) -> Result<PacketStatus, TransitionError> using enum pattern matching for valid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_pure_calculation",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No functional core / imperative shell separation. PacketWorkflow and mark_sent mix data representation with state mutation in a single module with no clear boundary between inert domain data and action logic.",
+      "failure_mode": "Domain invariants cannot be tested independently of I/O side effects; refactoring or adding new state transitions requires changing the data type itself.",
+      "fix": "Define PacketStatus as an inert enum (Data layer). Implement mark_sent as a pure function in a Calculations module that takes PacketStatus and returns Result<PacketStatus, TransitionError>. Shell code handles I/O and persistence."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any PacketWorkflow operation",
+    "no profiler evidence for allocation patterns in PacketWorkflow construction or mark_sent",
+    "no allocation analysis for String allocations on id and status fields",
+    "no second-ring analysis for downstream consumers of PacketWorkflow",
+    "no command evidence (no cargo fmt/test/clippy run)",
+    "no test suite or behavior tests to verify state machine invariants"
+  ],
+  "residual_risk": "Review identified 6 BLOCKER findings. The crate has no type-level state enforcement, uses raw primitives for domain values, and lacks a functional core. No commands were run; all findings are from static analysis only. Without enum-based typestates the packet lifecycle is fully unenforced at compile time."
+}

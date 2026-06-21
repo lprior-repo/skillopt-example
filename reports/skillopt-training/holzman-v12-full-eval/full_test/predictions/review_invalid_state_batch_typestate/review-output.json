@@ -1,0 +1,84 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow has no typestate enum. Status, validation flags, and timestamp are flat booleans/strings instead of an explicit state machine with valid transitions.",
+      "failure_mode": "Callers can construct any combination of fields including impossible states like status=draft with is_sent=true, or status=validated with is_validated=false. No invariant enforcement exists at the type level.",
+      "fix": "Replace status/is_validated/is_sent/sent_at_epoch_ms with a single BatchStatus enum (e.g. Draft, Validated, Sent) whose variants own their lifecycle data. Use a smart constructor or Result-returning parse fn as the only path to BatchWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status: String allows arbitrary strings including invalid lifecycle values. Status must be an enum to prevent impossible domain states.",
+      "failure_mode": "Callers set status to any string (\"sent\", \"SENT\", \"deleted\", \"\"). No compile-time guarantee that status reflects a valid lifecycle stage. mark_sent sets it to \"sent\" but callers can set it to anything else afterwards.",
+      "fix": "Replace `status: String` with `status: BatchStatus` enum (Draft, Validated, Sent). Remove is_validated and is_sent as redundant booleans. Enum variant owns the lifecycle data."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool encode lifecycle as independent booleans, creating impossible state combinations that the type system cannot prevent.",
+      "failure_mode": "States like (is_validated=true, is_sent=true, status=\"draft\") or (is_validated=false, is_sent=true) are impossible in the domain but fully representable. mark_sent does not set is_validated, so callers can send without validating.",
+      "fix": "Replace both booleans with a single typestate enum. Each enum variant represents one valid lifecycle stage. Variant data (e.g. sent timestamp) lives in the variant, not as separate fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from the state machine. The Option exists independently of whether the batch is actually in the Sent state.",
+      "failure_mode": "A batch in Draft status can have sent_at_epoch_ms = Some(12345) which is semantically wrong. Conversely, a Sent batch could have None. The timestamp should only exist when the Sent variant is active.",
+      "fix": "Move sent timestamp into the BatchStatus::Sent variant: `BatchStatus::Sent { sent_at_epoch_ms: u64 }`. Remove the standalone Option field entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive with no newtype wrapper, validation, or domain constraints. Empty strings, duplicated IDs, and malformed IDs are all allowed.",
+      "failure_mode": "Callers create BatchWorkflow with id=\"\", id=\"   \", or duplicate IDs. No uniqueness or format enforcement at any layer. The domain rule for valid IDs is invisible in the type.",
+      "fix": "Replace with `id: BatchId` newtype containing a validated String or a fixed-size byte array. Provide a parse constructor `BatchId::from_str(s) -> Result<BatchId, ParseError>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_mutates_raw_fields",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates status (String) and is_sent (bool) directly instead of performing a typed state transition. No validation, no state machine, no error on invalid transitions.",
+      "failure_mode": "Callers can call mark_sent on a Draft, Validated, or already-Sent batch with no guard. mark_sent also does not set sent_at_epoch_ms, creating a Sent batch without a timestamp. Callers can call mark_sent multiple times with no observable difference.",
+      "fix": "Replace with `fn try_transition_to_sent(item: BatchWorkflow) -> Result<BatchWorkflow, TransitionError>` that validates preconditions (e.g. must be Validated first) and returns a new state via the typestate enum."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives cross the parse boundary without fallible smart constructors. BatchWorkflow fields (String, bool, Option<u64>) are directly constructible by callers, so callers can construct invalid domain states directly.",
+      "failure_mode": "No constructor, parser, or factory exists. Any code can `BatchWorkflow { id: String::new(), status: \"anything\", is_validated: false, is_sent: false, sent_at_epoch_ms: None }` and the compiler accepts it. Domain invariants are unenforced at every call site.",
+      "fix": "Add a private struct or private fields with a single public constructor `BatchWorkflow::new(id: &str) -> Result<Self, ParseError>` that validates all invariants. Or use a typestate enum with smart constructors on each variant."
+    }
+  ],
+  "missing_evidence": [
+    "no tests exist to verify state machine transitions or error paths",
+    "no benchmark exists for any claimed performance behavior",
+    "no profiler evidence for hot-path analysis or allocation profiling",
+    "no second-ring evidence for allocation patterns or command behavior",
+    "no benchmark/baseline/profiler evidence for any performance claims"
+  ],
+  "residual_risk": "Review is static analysis only. All fields are public with no type-level invariants. The typestate pattern must be implemented and tested to close these violations. Without typestate, the domain is fully representable in illegal states with zero compiler protection."
+}

@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary:** 11 BLOCKER findings across the crate. The core issues:
+
+1. **No typestate** — `status: String` allows every arbitrary value; compiler cannot enforce lifecycle invariants
+2. **Bool lifecycle flags** — `is_validated` + `is_sent` are independent and can form impossible combinations
+3. **Flat public fields** — no parse boundary, no constructor, any code can construct illegal states
+4. **No typed errors** — `mark_sent` has no error taxonomy for invalid transitions
+5. **In-place mutation** — `mark_sent` mutates in place instead of returning a pure value
+6. **Heap allocation** — `"sent".to_string()` allocates per call
+7. **No newtype for ID** — `id: String` has no domain semantics
+8. **Missing evidence** — no benchmarks, profiler, allocation tracking, or command evidence
+
+Residual risk is high: the struct represents every illegal state combination and enforces zero domain invariants.

@@ -1,0 +1,8 @@
+Now I have all the information. Writing the review output.
+Review complete. Written valid JSON to `review-output.json`.
+
+**8 findings across the crate** in `src/lib.rs`:
+- **5 BLOCKERs**: Raw `String`/`bool` fields instead of typed domain enums/typestates, no fallible constructor, `mark_sent` enforces no preconditions, no error contract for invalid transitions
+- **2 MAJORs**: No functional core separation (side effects + allocation mixed), missing `PacketId` newtype
+- **1 MINOR**: `Option<u64>` allows `Some(0)` ambiguity for `sent_at_epoch_ms`
+- **3 INFO**: Missing benchmark, profiler, and allocation evidence

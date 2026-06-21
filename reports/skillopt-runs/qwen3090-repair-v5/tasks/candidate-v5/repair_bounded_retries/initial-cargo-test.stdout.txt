@@ -1,0 +1,33 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test builds_bounded_delays ... ok
+test rejects_attempts_above_max ... FAILED
+test rejects_shift_overflow ... FAILED
+
+failures:
+
+---- rejects_attempts_above_max stdout ----
+
+thread 'rejects_attempts_above_max' (789248) panicked at tests/behavior.rs:10:5:
+assertion `left == right` failed
+  left: Ok([1, 2, 4, 8, 16, 32, 64, 128, 256])
+ right: Err(TooManyAttempts)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- rejects_shift_overflow stdout ----
+
+thread 'rejects_shift_overflow' (789249) panicked at src/lib.rs:10:18:
+attempt to shift left with overflow
+
+
+failures:
+    rejects_attempts_above_max
+    rejects_shift_overflow
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

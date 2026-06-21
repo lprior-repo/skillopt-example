@@ -1,0 +1,15 @@
+   Compiling repair_csv_audit_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/b75537242ecc7986/repair_csv_audit_mixed)
+warning: unused variable: `max_items`
+ --> src/lib.rs:9:34
+  |
+9 | pub fn parse_audits(input: &str, max_items: usize) -> Result<Vec<u16>, ParseError> {
+  |                                  ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_max_items`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `repair_csv_audit_mixed` (lib test) generated 1 warning (run `cargo fix --lib -p repair_csv_audit_mixed --tests` to apply 1 suggestion)
+warning: `repair_csv_audit_mixed` (lib) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (/tmp/opencode/holzman-skillopt-targets/2963c8d9fbc11986/debug/deps/repair_csv_audit_mixed-03dc3be90d06d870)
+     Running tests/behavior.rs (/tmp/opencode/holzman-skillopt-targets/2963c8d9fbc11986/debug/deps/behavior-a1eab2853311edc5)
+error: test failed, to rerun pass `--test behavior`

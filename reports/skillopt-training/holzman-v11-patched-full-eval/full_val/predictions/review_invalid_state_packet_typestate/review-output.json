@@ -1,0 +1,73 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow lifecycle is represented by independent booleans (is_validated, is_sent) instead of an enum typestate that enforces valid transitions",
+      "failure_mode": "callers can set is_validated and is_sent in any combination, including validated-but-not-sent then unsent, or both false then both true, with no enforcement of the intended lifecycle order",
+      "fix": "replace status + is_validated + is_sent with a single `enum PacketState { Created, Validated, Sent }` and remove the booleans entirely"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public `String` field set to a literal string (`\"sent\"`) at line 10 instead of an enum variant",
+      "failure_mode": "any caller can set status to an arbitrary string like `\"cancelled\"` or `\"\"` that the domain never recognizes, creating inconsistent state that mark_sent and future functions cannot reason about safely",
+      "fix": "replace `pub status: String` with a `pub state: PacketState` enum and use the enum variant in `mark_sent` instead of string assignment"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lifecycle_booleans",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated and is_sent are independent booleans that encode lifecycle phase but can reach invalid combinations (e.g. is_sent=true, is_validated=false, status=\"created\")",
+      "failure_mode": "runtime logic that checks is_sent assumes validation happened, but the booleans allow a packet to be marked sent without ever being validated, silently bypassing the validation gate",
+      "fix": "eliminate both booleans; fold lifecycle into the `PacketState` enum where `Sent` variant implies prior validation, or use an enum with explicit phase transitions"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a bare `Option<u64>` outside the lifecycle enum, decoupled from whether the packet is actually in the sent state",
+      "failure_mode": "the timestamp can be None while is_sent is true, or present while status is still \"created\", so any code reading sent_at_epoch_ms cannot trust it without also cross-checking three other fields",
+      "fix": "move the timestamp into the typestate enum as `Sent { sent_at_epoch_ms: u64 }` so the timestamp is only present when the packet is genuinely in the sent state"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw `String` with no domain wrapper, allowing empty strings, arbitrary lengths, and no validation at construction",
+      "failure_mode": "callers can construct a PacketWorkflow with id=\"\" or id containing whitespace, which downstream systems may treat as a valid packet identifier, causing data corruption or duplicate keys",
+      "fix": "introduce `pub struct PacketId(String)` with a private constructor that validates non-empty and returns a typed error, then use `PacketId` as the field type"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "raw primitives (String, bool, Option<u64>) cross the parse boundary without fallible smart constructors, so callers can construct invalid domain states directly from hostile input",
+      "failure_mode": "external callers can create PacketWorkflow with any combination of invalid fields (empty id, arbitrary status strings, contradictory booleans) at any call site, not just at a single parsing boundary, violating the parse-once principle",
+      "fix": "add a private `PacketWorkflow` constructor or a `PacketWorkflowBuilder` / smart constructor that takes parsed/validated fields and returns `Result<PacketWorkflow, PacketError>`, making all field construction go through a single validated entry point"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for PacketWorkflow lifecycle operations",
+    "no profiler baseline for mark_sent allocation profile",
+    "no allocation analysis proving mark_sent does not heap-allocate on the hot path",
+    "no second-ring evidence (Kani/Verus/proptest) for state-transition invariants",
+    "no command evidence (cargo test, clippy) was run to verify the crate compiles and passes"
+  ],
+  "residual_risk": "static review only; no commands run. The struct has zero smart constructors, zero typestate enforcement, and zero error types. Any consumer can build inconsistent PacketWorkflow values at any call site. Six BLOCKER findings require refactoring to enum typestate, newtype IDs, and a single validated constructor before any production use."
+}

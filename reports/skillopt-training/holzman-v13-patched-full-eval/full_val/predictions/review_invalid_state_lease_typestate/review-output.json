@@ -1,0 +1,84 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_state_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LeaseWorkflow has no typestate type to enforce a legal lifecycle. Any combination of fields is representable, so callers can construct and mutate the struct into states like status='new' with is_sent=true, or status='sent' with is_validated=false.",
+      "failure_mode": "The protocol allows illegal state transitions at compile-time silence. Callers can set is_sent=true without sending, leave is_validated=false after an apparent send, or set status to any arbitrary string including values that bypass all workflow invariants.",
+      "fix": "Replace the single struct with a typestate enum or separate newtype structs per lifecycle phase (e.g., LeasePending, LeaseValidated, LeaseSent), each exposing only the fields valid for that phase. Transition functions return the next typestate struct/enum variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string_enums",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String field. Any string value is allowed, including empty strings, typos, and values that do not correspond to any valid workflow state.",
+      "failure_mode": "Callers can assign `item.status = \"banana\"` or `\"\"` or any arbitrary string at any time. Pattern matching on status requires string comparison or exhaustive checks that are impossible to verify as complete. There is no compile-time guarantee that status reflects a real state.",
+      "fix": "Replace `status: String` with a sealed enum `LeaseStatus { Pending, Validated, Sent }`. Use `#[non_exhaustive]` to allow future states without breaking callers. Remove all string assignment in favor of typed transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_typestate",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are lifecycle booleans. They encode independent bits that can be in any combination (00, 01, 10, 11), but the workflow only allows a linear progression through them.",
+      "failure_mode": "is_sent=true with is_validated=false is a valid bit pattern but represents an invalid workflow state. is_validated=true with is_sent=false is also allowed. The booleans are independently mutable, so callers can flip them in any order, bypassing the required transition sequence.",
+      "fix": "Replace both booleans with a single typestate enum that encodes the workflow phase. Each lifecycle milestone becomes a variant. Remove individual mutability of lifecycle booleans entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is decoupled from is_sent: bool. The struct allows is_sent=true with sent_at_epoch_ms=None, and is_sent=false with sent_at_epoch_ms=Some(123). Both are logically inconsistent.",
+      "failure_mode": "Readers of sent_at_epoch_ms cannot trust it as a reliable record of when the lease was sent. The Option field leaks lifecycle data outside the typestate boundary, creating a hidden invariant that callers cannot see or enforce at compile time.",
+      "fix": "Move sent_at_epoch_ms into the typestate variant that represents the Sent phase. If the typestate enum has a `Sent { sent_at_epoch_ms: u64 }` variant, the timestamp is required and consistent by construction. Remove Option<u64> from the struct entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_ids",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a plain String with no domain constraints. Lease IDs carry invariants (uniqueness, format, non-empty) that are not enforced by the type.",
+      "failure_mode": "Callers can create a LeaseWorkflow with id=\"\", id=None-encoded-as-string, or any arbitrary string that is not a valid lease identifier. The id can be mutated to any value, breaking any index or lookup that depends on id stability.",
+      "fix": "Replace `id: String` with a newtype `struct LeaseId(String)` or `struct LeaseId(pub String)` with a private inner field. Provide a smart constructor `LeaseId::parse(s: &str) -> Result<LeaseId, LeaseError>` that validates format. Store the newtype in the typestate structs."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Raw String primitives cross the parse boundary without fallible smart constructors. The struct accepts unvalidated String for id, status, and no validation on any field. No parse boundary exists to transform DTO primitives into trusted domain values.",
+      "failure_mode": "Callers can construct invalid domain states directly. There is no parsing function that validates input and returns a typed error on failure. Invalid data propagates into the domain without detection, making it impossible to guarantee domain invariants hold.",
+      "fix": "Add a fallible `LeaseWorkflow::parse(id: &str, ...)` or `LeaseWorkflow::try_from(dto)` constructor that validates all inputs, creates domain newtypes, and returns a typed `LeaseError`. The public API should accept only parsed domain types, not raw primitives."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns LeaseWorkflow directly with no Result type. There is no error taxonomy for a workflow that could fail (e.g., not validated, already sent, invalid state).",
+      "failure_mode": "The function silently accepts any input state including invalid ones (e.g., marking something sent when it was never validated). Failures are impossible to communicate to callers without panicking, which violates the absolute laws.",
+      "fix": "Add a `LeaseError` enum with variants like `NotValidated`, `AlreadySent`, `InvalidState`. Change `mark_sent` to return `Result<LeaseWorkflow, LeaseError>`. Validate the preconditions for the send transition and return a typed error on failure."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated performance claim",
+    "no profiler data for the hot path analysis",
+    "no allocation evidence or allocation budget for LeaseWorkflow lifecycle",
+    "no second-ring evidence for any runtime claim",
+    "no command evidence (cargo fmt, cargo check, cargo clippy, cargo test) was run"
+  ],
+  "residual_risk": "Static review only. The crate has no domain contracts, no typestate enforcement, no error taxonomy, no benchmarks, and no command evidence. The struct represents every illegal state combination at compile time. Delivery is blocked."
+}

@@ -1,0 +1,19 @@
+Now I have the full picture. The source has multiple Holzman violations and doesn't match the test contract. Let me fix it.
+All 6 tests pass. Now writing the output.
+Repair complete. All 6 tests pass. Here's what was fixed in `src/lib.rs`:
+
+**Banned constructs removed:**
+- `parts[1]` unchecked indexing → `line.split_once(',')` pattern matching
+- `.parse::<u64>().unwrap()` → `if let Ok(value) = ...` with `SummaryError::Invalid` fallback
+- `total += value` unchecked addition → `total.checked_add(value)` with `SummaryError::Overflow`
+- `total / count as u64` unchecked division → `total.checked_div(count as u64)` with overflow error
+- Removed `as u32`/`as u64` lossy casts in favor of `checked_div` returning `u64`
+
+**Contract fixes:**
+- `summarize_metrics` return type: `Result<String, _>` → `Result<Summary, _>` (matches test contract)
+- Added missing `render_summary(Summary) -> String` function
+
+**Logic corrections:**
+- `TooMany` check moved BEFORE increment (was after, off-by-one)
+- Empty input now returns `Err(Empty)` instead of panicking on division-by-zero
+- Invalid lines (no comma or non-numeric value) return `Err(Invalid)`

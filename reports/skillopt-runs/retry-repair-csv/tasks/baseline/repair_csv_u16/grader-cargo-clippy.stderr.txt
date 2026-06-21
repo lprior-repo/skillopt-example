@@ -1,0 +1,21 @@
+    Checking repair_csv_u16 v0.1.0 (/tmp/opencode/holzman-skillopt/retry-repair-csv/tasks/baseline/repair_csv_u16)
+error: unused variable: `max_items`
+ --> src/lib.rs:8:35
+  |
+8 | pub fn parse_numbers(input: &str, max_items: usize) -> Result<Vec<u16>, ParseNumbersError> {
+  |                                   ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_max_items`
+  |
+  = note: `-D unused-variables` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: used `unwrap()` on a `Result` value
+  --> src/lib.rs:11:21
+   |
+11 |         .map(|part| part.trim().parse::<u16>().unwrap())
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: if this value is an `Err`, it will panic
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+   = note: requested on the command line with `-D clippy::unwrap-used`
+
+error: could not compile `repair_csv_u16` (lib) due to 2 previous errors

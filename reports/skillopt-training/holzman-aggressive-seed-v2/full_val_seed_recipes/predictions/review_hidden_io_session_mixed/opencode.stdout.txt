@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 11 findings (4 BLOCKER, 4 WARNING, 3 MISSING_EVIDENCE)**
+
+**BLOCKERs:**
+1. `src/lib.rs:9` — `unwrap()` on I/O Result panics on missing/unreadable file
+2. `src/lib.rs:19` — `unwrap()` on `.parse()` panics on non-numeric value
+3. `src/lib.rs:19` — `as u16` lossy cast silently truncates values > 65535
+4. `src/lib.rs:16` — Unchecked `parts[0]` indexing panics on short lines
+
+**Warnings:**
+5. `src/lib.rs:16` — `println!` hidden I/O in core parsing function (functional core violation)
+6. `src/lib.rs:12` — `Vec<String>` per-line allocation where `split_once` + `&str` would avoid it
+7. `src/lib.rs:3` — `String` name field with no domain newtype or validation
+
+**Missing evidence:** benchmark, profiler, allocation profiling, test file.

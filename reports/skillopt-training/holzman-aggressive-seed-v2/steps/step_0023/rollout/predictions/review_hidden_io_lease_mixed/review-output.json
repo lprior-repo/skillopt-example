@@ -1,0 +1,105 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on missing/unreadable file",
+      "failure_mode": "An unavailable lease file aborts the entire process instead of returning a typed I/O error the caller can handle",
+      "fix": "Return Result<Vec<Record>, std::io::Error> and propagate with ? instead of unwrap"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric value",
+      "failure_mode": "A malformed lease line with a non-numeric second field crashes the thread instead of yielding a typed parse error",
+      "fix": "Use result propagation (map_err) to return a typed parse error; change return type to Result<Vec<Record>, ParseError>"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy as u16 cast discards high bits silently on values > 65535",
+      "failure_mode": "A valid u32 value in range 65536..u32::MAX silently truncates to a wrong u16, corrupting lease data with no error signal",
+      "fix": "Use u16::try_from(parsed) and propagate the error via ? or map_err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(\\',\\').collect() then parts[0] and parts[1] — allocates Vec and uses unchecked indexing",
+      "failure_mode": "Allocates a Vec for every line (wasteful), then parts[0] and parts[1] panic on lines with fewer than 2 comma-separated fields (e.g., empty lines or malformed entries)",
+      "fix": "Use line.split_once(\\',\\') to get name and value_str, handle None via ?, and avoid the Vec allocation entirely"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexing into split result",
+      "failure_mode": "Same as above: a line with zero commas panics at runtime",
+      "fix": "Eliminated by switching to split_once with proper None handling"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing into split result",
+      "failure_mode": "A line with one or zero commas panics at runtime",
+      "fix": "Eliminated by switching to split_once with proper None handling"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println! side effect inside data-parsing logic",
+      "failure_mode": "I/O is mixed into the core data pipeline, making the function non-deterministic and untestable without capturing stdout",
+      "fix": "Remove println! from the parsing path; logging belongs in the imperative shell layer that calls load_leases"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_leases returns Vec<Record> instead of Result — no way to propagate any of the above failures",
+      "failure_mode": "All errors must panic because the return type cannot carry failure information; the function cannot distinguish success from error at the call site",
+      "fix": "Change signature to fn load_leases(path: &str) -> Result<Vec<Record>, LeaseError> where LeaseError is an enum covering I/O and parse variants"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 13,
+      "problem": "map(|part| part.trim().to_string()) allocates String for every field",
+      "failure_mode": "Unnecessary heap allocation per field during parsing; small strings could be borrowed with &str from the line",
+      "fix": "Use split_once and trim to produce &str slices for name and value_str, then only allocate the final Record String for name"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 18,
+      "problem": "parts[0].clone() — unnecessary clone from already-owned String in Vec",
+      "failure_mode": "Redundant allocation; the String in the Vec is already owned",
+      "fix": "Eliminated by switch to split_once which yields &str directly, then use .to_string() only on the final name field"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_leases throughput or latency",
+    "no profiler data for allocation hotspots in the parsing path",
+    "no allocation tracing evidence (e.g., jemalloc/batchmalloc stats) for Vec<String> churn",
+    "no command evidence that cargo fmt, cargo clippy, or cargo test were run",
+    "no second-ring review (black-hat or formal) evidence",
+    "no error-typology documentation defining LeaseError or equivalent"
+  ],
+  "residual_risk": "The entire function is a violation cluster: every line either panics, silently corrupts, or mixes I/O into data logic. Without a Result return type and split_once-based parsing, the code is not safe for any untrusted or production input. No benchmarks or profiling evidence exist. Static review only; no commands run."
+}

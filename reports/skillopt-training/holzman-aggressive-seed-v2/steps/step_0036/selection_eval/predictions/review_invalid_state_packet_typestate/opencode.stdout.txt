@@ -1,0 +1,10 @@
+Now I have the full crate. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**8 findings** (6 BLOCKER, 2 MINOR), **6 missing evidence** items.
+
+Key violations:
+- `status: String` and `is_validated: bool` / `is_sent: bool` make illegal states representable — any string is valid, booleans are independently mutable creating impossible state combinations
+- `mark_sent` has no preconditions — a packet can be sent without validation
+- `PacketWorkflow` has all `pub` fields with no constructor enforcing invariants — data is not valid-by-construction
+- No benchmarks, profiler data, or allocation analysis exist for any performance claims

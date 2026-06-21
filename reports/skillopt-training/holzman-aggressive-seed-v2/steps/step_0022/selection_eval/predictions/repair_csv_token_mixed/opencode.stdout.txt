@@ -1,0 +1,9 @@
+Now I have the full picture. The function has `unwrap()`, ignores `max_items`, no empty check, and no allocation handling. Let me fix it.
+Now run `cargo fmt` and `cargo test`:
+All 4 tests pass. Writing the output:
+Repaired. The fix to `src/lib.rs:9-24` addressed all Holzman violations:
+
+- **Removed `unwrap()`** — parse failures now return `ParseError::Invalid`
+- **Added empty-input guard** → `ParseError::Empty`
+- **Enforced `max_items` limit** → `ParseError::TooMany`
+- **Removed `split + collect` pattern** — uses iterator with early-exit instead

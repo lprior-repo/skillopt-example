@@ -1,0 +1,18 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/b3704044de63ed14/review-invalid_state_budget_typestate/review-output.json`.
+
+**Summary: 7 findings across the 13-line crate.**
+
+All findings stem from the same root cause: the `BudgetWorkflow` struct uses primitive types (`String`, `bool`, `Option<u64>`) where the type system should enforce domain invariants:
+
+| Severity | Line | Issue |
+|----------|------|-------|
+| BLOCKER | 2 | `id: String` — no domain newtype |
+| BLOCKER | 3 | `status: String` — arbitrary strings representable, should be enum |
+| BLOCKER | 4 | `is_validated: bool` — redundant with status, should be typestate |
+| MAJOR | 5 | `is_sent: bool` — duplicate state, conflicts with status |
+| MAJOR | 9 | `mark_sent` mutates in-place with pub fields — no transition guards |
+| MAJOR | 10 | `"sent".to_string()` — unnecessary allocation for constant status |
+| MINOR | 6 | `sent_at_epoch_ms: Option<u64>` — should be scoped to enum variant |
+
+**5 missing evidence items:** no benchmarks, profiler data, allocation audits, formal reviews, or behavior tests.

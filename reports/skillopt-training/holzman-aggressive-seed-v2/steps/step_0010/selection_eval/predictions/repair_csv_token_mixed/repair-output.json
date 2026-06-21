@@ -1,0 +1,28 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/5d11578ba54f015f/repair_csv_token_mixed/.skill/holzman-rust/SKILL.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/zero-cost-abstractions.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/mechanical-empathy-toolchain.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe",
+    "No unwrap/expect/panic/todo/unimplemented/unreachable in production",
+    "Checked arithmetic via parse error mapping",
+    "Empty input returns Err(ParseError::Empty)",
+    "Invalid values return Err(ParseError::Invalid)",
+    "Exceeding max_items returns Err(ParseError::TooMany)",
+    "All 4 behavior tests pass",
+    "Clippy passes with strict deny flags",
+    "Smallest change: only src/lib.rs modified"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "ParseError::Allocation variant defined but unused; harmless dead code, no runtime risk"
+}

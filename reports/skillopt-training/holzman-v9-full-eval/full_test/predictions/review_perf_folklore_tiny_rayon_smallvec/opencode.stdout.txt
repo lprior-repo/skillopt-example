@@ -1,0 +1,8 @@
+Review complete. Wrote valid JSON to `review-output.json` with 8 findings across 4 reference files read.
+
+Key findings:
+- **4 BLOCKERs**: `Vec` return for known-size output, Rayon folklore anti-pattern on 4 elements, SmallVec folklore anti-pattern on 4 elements, unsubstantiated performance claim in TODO
+- **3 MAJORs**: missing benchmark, missing allocation evidence, missing command/test evidence
+- **1 MINOR**: zero test coverage on pure function
+
+The core issue: the TODO proposes Rayon + SmallVec for `[u8; 4]` input returning `Vec<&'static str>`. Both will degrade performance vs a `[&'static str; 4]` stack array.

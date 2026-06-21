@@ -1,0 +1,10 @@
+{
+  "last_completed_step": 43,
+  "current_skill_path": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/skills/skill_v0043.md",
+  "current_score": 0.8,
+  "current_origin": "step_0007",
+  "best_skill_path": "/home/lewis/src/skill-moo/reports/skillopt-training/holzman-aggressive-seed-v2/best_skill.md",
+  "best_score": 0.8,
+  "best_step": 7,
+  "best_origin": "step_0007"
+}

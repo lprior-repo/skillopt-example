@@ -1,0 +1,11 @@
+Now I have full context. The issues in `src/lib.rs`:
+1. `payload.len() as u32` — lossy `as` conversion (absolute law violation)
+2. `max_payload` parameter is ignored — test `rejects_limit` expects it enforced
+3. Missing `checked_add` and `try_reserve` per frame/packet encoder pattern
+Repaired. Three issues fixed in `src/lib.rs`:
+
+1. **Lossy `as` cast removed** (line 18): `payload.len() as u32` replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+2. **`max_payload` now enforced** (lines 9-11): Returns `Err(FrameError::PayloadTooLarge)` when `payload.len() > max_payload`
+3. **Frame/packet encoder pattern applied** (lines 13-17): `checked_add` for capacity arithmetic and `try_reserve` for bounded allocation
+
+All 2 tests pass, clippy clean, JSON output written.

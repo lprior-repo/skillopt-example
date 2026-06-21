@@ -1,0 +1,33 @@
+{
+  "reasoning": "The primary failure is the omission of `try_reserve` and checked arithmetic for bounded allocations. The secondary failure is incomplete review outputs that miss violation categories. The edits strengthen the allocation rules in Core Contract and Repair Mode, and add a specific instruction for Review Mode to ensure comprehensive violation detection.",
+  "edits": [
+    {
+      "op": "replace",
+      "target": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`.",
+      "content": "- **Allocation:** For `Vec` with known/bounded capacity, use `try_reserve` (not `with_capacity`) and handle `Allocation` errors. Compute capacity with `checked_add`/`checked_mul`. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "source_type": "failure",
+      "support_count": 3
+    },
+    {
+      "op": "replace",
+      "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+      "content": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled. Use `checked_add`/`checked_mul` for all capacity computations.",
+      "source_type": "failure",
+      "support_count": 3
+    },
+    {
+      "op": "insert_after",
+      "target": "In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback.",
+      "content": "\n- **Review Completeness:** In review mode, you must identify ALL violation categories present in the code (I/O in core, unwrap/panic, unchecked arithmetic, missing try_reserve, etc.). Do not stop after finding the first issue. Report all findings in the JSON output.",
+      "source_type": "failure",
+      "support_count": 3
+    },
+    {
+      "op": "replace",
+      "target": "For real repositories, use the strongest repo gate. For isolated eval crates, obey the prompt-scoped gate and do not self-expand into audit/deny/vet/geiger/machete/hack/mutants/bench/doc/nightly gates unless asked.",
+      "content": "For real repositories, use the strongest repo gate. For isolated eval crates, obey the prompt-scoped gate and do not self-expand into audit/deny/vet/geiger/machete/hack/mutants/bench/doc/nightly gates unless asked.\n\n- **Review JSON Output:** In review mode, ensure the `findings` array includes entries for every violation category detected. Missing categories in findings is a failure mode.",
+      "source_type": "failure",
+      "support_count": 3
+    }
+  ]
+}

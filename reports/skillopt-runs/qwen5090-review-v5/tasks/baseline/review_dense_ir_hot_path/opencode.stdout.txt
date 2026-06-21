@@ -1,0 +1,11 @@
+Now I have all the information needed to perform the review. Let me analyze the crate:
+
+The task crate `review_dense_ir_hot_path` contains a single function `route()` in `src/lib.rs` that:
+1. Takes `serde_json::Value` (arbitrary JSON) as input
+2. Iterates a `HashMap<String, serde_json::Value>` (rules)
+3. Uses string-keyed lookups and allocations in the hot path
+4. This is the anti-pattern the "dense IR hot path" task name flags
+
+Let me also check the remaining references quickly for completeness.
+Now I have all the data. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt/qwen5090-review-v5/tasks/baseline/review_dense_ir_hot_path/review-output.json`.

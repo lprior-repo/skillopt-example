@@ -1,0 +1,16 @@
+Now let me examine the task crate source code:
+Now I have all the information needed. Let me write the review.
+Review complete. Written `review-output.json` to the required output path with:
+
+- **6 findings** covering the exact typestate anti-patterns called out in SKILL.md:
+  1. `typestate_state_machine` — BLOCKER: no enum-based state machine, illegal states representable
+  2. `status_string` — BLOCKER: `status: String` allows arbitrary values, mark_sent hardcodes `"sent"`
+  3. `bool_lifecycle` — BLOCKER: `is_validated` + `is_sent` booleans can be contradictory
+  4. `option_invalid_state` — BLOCKER: `sent_at_epoch_ms: Option<u64>` decoupled from `is_sent`
+  5. `newtype_domain_id` — WARNING: `id: String` raw primitive, no validation
+  6. `parse_boundary` — BLOCKER: all pub fields, no smart constructor, raw primitives enter domain unchecked
+  7. `functional_core_shell_breach` — WARNING: mark_sent mutates in-place without precondition checks
+
+- **5 missing evidence** items: benchmarks, profiler, allocation audit, command-truth, second-ring
+
+- **Residual risk**: static review only, no type-level invariants, coordination burden on callers

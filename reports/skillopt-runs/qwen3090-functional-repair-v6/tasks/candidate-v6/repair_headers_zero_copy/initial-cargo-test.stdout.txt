@@ -1,0 +1,43 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test enforces_header_limit ... FAILED
+test parses_headers_as_borrowed_fields ... ok
+test rejects_invalid_line_without_panic ... FAILED
+test rejects_empty_input ... ok
+test rejects_empty_header_name ... FAILED
+
+failures:
+
+---- enforces_header_limit stdout ----
+
+thread 'enforces_header_limit' (1399006) panicked at tests/behavior.rs:33:5:
+assertion `left == right` failed
+  left: Ok([Header { name: "a", value: "1" }, Header { name: "b", value: "2" }])
+ right: Err(TooMany)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- rejects_invalid_line_without_panic stdout ----
+
+thread 'rejects_invalid_line_without_panic' (1399010) panicked at src/lib.rs:29:40:
+index out of bounds: the len is 1 but the index is 1
+
+---- rejects_empty_header_name stdout ----
+
+thread 'rejects_empty_header_name' (1399008) panicked at tests/behavior.rs:28:5:
+assertion `left == right` failed
+  left: Ok([Header { name: "", value: "value" }])
+ right: Err(EmptyName)
+
+
+failures:
+    enforces_header_limit
+    rejects_empty_header_name
+    rejects_invalid_line_without_panic
+
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

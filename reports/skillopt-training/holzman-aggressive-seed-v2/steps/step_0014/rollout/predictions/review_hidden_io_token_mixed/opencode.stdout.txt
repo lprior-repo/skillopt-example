@@ -1,0 +1,10 @@
+I've read all skill and reference files, plus the full crate. Now writing the review.
+The issue is `"line": 8-22` which is invalid JSON. Let me fix it.
+Review complete. Written valid JSON to `/tmp/opencode/holzman-skillopt-train/3a38650695811583/review_hidden_io_token_mixed/review-output.json`.
+
+**Summary of findings in `src/lib.rs` (23 lines):**
+
+- **5 BLOCKERs**: `unwrap()` on IO (line 9), `unwrap()` on parse (line 19), lossy `as u16` cast (line 19), unchecked `parts[0]` index (line 16), unchecked `parts[1]` index (line 19)
+- **2 MAJORs**: `println!` side effect in pure data pipeline (line 16), I/O+parsing mixed in single function (lines 8-22)
+- **1 MINOR**: unnecessary `.clone()` on already-owned String (line 18)
+- **5 missing evidence items**: no benchmarks, no profiler/allocation tracking, no Miri/sanitizers, no cargo fmt/clippy/test command evidence

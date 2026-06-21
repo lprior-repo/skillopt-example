@@ -1,0 +1,29 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/dabdedd77cfd79a5/repair_csv_sensor_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/dabdedd77cfd79a5/repair_csv_sensor_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/dabdedd77cfd79a5/repair_csv_sensor_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/zero-cost-abstractions.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "cargo fmt --check", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap/expect/panic/todo/unimplemented/unreachable",
+    "Empty input returns Err(ParseError::Empty)",
+    "Invalid parse returns Err(ParseError::Invalid)",
+    "Exceeding max_items returns Err(ParseError::TooMany)",
+    "try_reserve used for bounded allocation with Allocation error handling",
+    "All 4 behavior tests pass",
+    "cargo fmt --check passes",
+    "No assert!/unreachable! in production source",
+    "Smallest source change satisfying all tests and Holzman constraints"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "No residual risk. All production forbidden patterns removed. All tests pass. Allocation error mapped to ParseError::Allocation."
+}

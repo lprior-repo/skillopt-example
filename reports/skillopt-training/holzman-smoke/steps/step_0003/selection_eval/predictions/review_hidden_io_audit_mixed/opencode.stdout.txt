@@ -1,0 +1,13 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 9 findings, 0 passing.** The crate is a single-file function with pervasive Holzman violations:
+
+| Severity | Count | Key Issues |
+|----------|-------|------------|
+| BLOCKER | 7 | `unwrap()` on I/O and parse (lines 9, 13), lossy `as u16` cast (line 13), unchecked indexing (line 12), I/O side effects mixed into parsing (line 12), fused shell+core (line 8), no domain validation (line 3) |
+| MAJOR | 2 | Unnecessary `Vec` allocation per line via `.collect()` (line 11), redundant intermediate collections (line 11) |
+
+**5 missing evidence items**: no benchmarks, profiler data, allocation audit, property/Kani tests, or CLI integration evidence.
+
+**Residual risk**: High. Every line of production code violates a Holzman rule. The entire function needs refactoring to separate pure parsing from I/O, return `Result` types, and eliminate all `unwrap`/unchecked-index/lossy-cast patterns.

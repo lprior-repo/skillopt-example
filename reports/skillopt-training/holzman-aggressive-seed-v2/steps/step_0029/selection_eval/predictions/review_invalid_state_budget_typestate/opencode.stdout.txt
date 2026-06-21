@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 BLOCKER findings** across the crate:
+
+1. **All fields pub** (`src/lib.rs:1`) — illegal states representable by any caller
+2. **Bool flags instead of typestate** (`src/lib.rs:4`) — `is_validated`+`is_sent` pair allows (false, true) inconsistency
+3. **Freeform String status** (`src/lib.rs:3`) — no exhaustive matching, no validation
+4. **mark_sent has no validation** (`src/lib.rs:9`) — accepts any state, overwrites without prereq checks
+5. **String ID** (`src/lib.rs:2`) — no newtype, no format validation
+6. **No typed errors** (`src/lib.rs:9`) — void return, callers cannot detect rejected transitions
+7. **Direct field mutation** (`src/lib.rs:1`) — bypasses all domain API
+
+**6 missing evidence items**: no benchmarks, profiler, allocation analysis, second-ring evidence, command evidence, or performance claims.
+
+**Residual risk**: The domain model is fundamentally underspecified — every field combination is legal, no invariants are enforced by types. Requires full typestate redesign.

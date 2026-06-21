@@ -1,0 +1,41 @@
+{
+  "batch_size": 1,
+  "failure_summary": [
+    {
+      "failure_type": "missing_try_reserve",
+      "count": 3,
+      "description": "Agents failed to identify or flag missing try_reserve in review tasks and used Vec::with_capacity without try_reserve in repair tasks."
+    },
+    {
+      "failure_type": "missing_checked_arithmetic",
+      "count": 1,
+      "description": "Agents failed to use checked_add/checked_div/try_from in summary/frame logic despite explicit skill instructions."
+    },
+    {
+      "failure_type": "missing_split_once",
+      "count": 1,
+      "description": "Agents used manual find/slicing instead of split_once for string parsing where applicable."
+    },
+    {
+      "failure_type": "false_command_claims",
+      "count": 1,
+      "description": "Agent claimed cargo clippy passed when it failed, or failed to verify command outcomes."
+    }
+  ],
+  "patch": {
+    "reasoning": "The previous edits were too verbose and didn't sufficiently emphasize the *review* aspect of try_reserve for review tasks, nor did they strongly enough link split_once/checked_div/try_from to specific parsing patterns. The new edits consolidate these into a single, high-impact 'Safety Checklist' that agents must mentally run through, and explicitly forbid claiming command success without verification.",
+    "edits": [
+      {
+        "op": "replace",
+        "target": "## Review Mode\n\nFindings must be independently gradable: severity, rule, file, line, problem, concrete failure mode, and smallest compliant fix. Flag missing evidence as a finding. Review outputs requested as JSON must be valid. In reviews, explicitly call out missing bounded-allocation handling (`try_reserve`), missing checked capacity/summary arithmetic, missing checked conversions, and unsafe/SIMD paths without a scalar fallback.",
+        "content": "## Review Mode\n\nFindings must be independently gradable: severity, rule, file, line, problem, concrete failure mode, and smallest compliant fix. Flag missing evidence as a finding. Review outputs requested as JSON must be valid.\n\n**Mandatory Review Checklist:**\n1. **Allocation:** Any `Vec` with a known or bounded capacity must use `try_reserve` (not `with_capacity`) to handle `Allocation` errors.\n2. **Arithmetic:** All accumulators, sizes, and totals must use `checked_add`/`checked_mul`. Division must use `checked_div` after verifying non-zero divisors.\n3. **Conversions:** Width changes (e.g., `usize` to `u32`) must use `try_from`, not `as`.\n4. **Parsing:** String splitting for first-delimiter or fixed-field parsing must use `split_once` or `get`, not manual indexing or `split` + `collect`.\n5. **Safety:** No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.\n\nExplicitly call out any violations of these rules as BLOCKER findings."
+      },
+      {
+        "op": "replace",
+        "target": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints. Run `cargo fmt`, then `cargo test`; run `cargo fmt --check` and strict source `cargo clippy` when feasible. JSON command claims must match actual command outcomes; if a command fails, report the failure and do not claim success.\n\nBefore reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_div` is required by the error taxonomy, `as` width casts instead of `try_from`, unchecked `parts[i]` indexing instead of `split_once`/`get`, and production tests or manifests changed unnecessarily. Always prefer `try_reserve` over `Vec::with_capacity` when the capacity is bounded and allocation failure must be handled.",
+        "content": "## Repair Mode\n\nRead tests and production source before editing. **NEVER edit test files** (`tests/*.rs`, `*_test.rs`, `tests/behavior.rs`). Tests are the immutable behavior contract. Make the smallest source change that satisfies tests and Holzman constraints.\n\n**Pre-Commit Safety Audit:**\nBefore finalizing, verify the source contains:\n- `try_reserve` (not `with_capacity`) for any `Vec` with bounded capacity.\n- `checked_add`/`checked_mul` for all accumulators and size calculations.\n- `checked_div` for all divisions, with explicit non-zero checks.\n- `try_from` for all width conversions (e.g., `usize` to `u32`).\n- `split_once` or `get` for string field extraction, not manual indexing.\n- No `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, unchecked indexing, or lossy `as`.\n\n**Command Verification:**\nRun `cargo fmt`, then `cargo test`. Run `cargo clippy` if feasible. **Do not claim success unless the command output explicitly confirms it.** If a command fails, report the failure, do not claim success, and do not fabricate output."
+      }
+    ]
+  },
+  "source_type": "failure"
+}

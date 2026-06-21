@@ -1,0 +1,16 @@
+[0m
+> build · MiniMax-M2.7-highspeed
+[0m
+[0m→ [0mRead .skill/holzman-rust/SKILL.md
+[0m→ [0mRead .skill/holzman-rust/references
+[0m→ [0mRead .skill/holzman-rust/references/nasa-jpl-standards.md
+[0m→ [0mRead .skill/holzman-rust/references/latency-throughput-playbook.md
+[0m→ [0mRead .skill/holzman-rust/references/evaluation-and-repair-protocol.md
+[0m→ [0mRead .
+[0m→ [0mRead src
+[0m→ [0mRead Cargo.toml
+[0m→ [0mRead src/lib.rs
+[0m
+[0m← [0mWrite review-output.json
+Wrote file successfully.
+[0m

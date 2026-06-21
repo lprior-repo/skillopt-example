@@ -1,0 +1,17 @@
+Now I understand the issues. The current `lib.rs` has:
+1. `unwrap()` on parse (line 12) - violates Holzman safety
+2. No empty-input check (test expects `ParseError::Empty`)
+3. No `max_items` enforcement (test expects `ParseError::TooMany`)
+
+Let me fix `src/lib.rs`:
+All 4 tests pass. Writing the output JSON:
+Repaired. Summary of changes to `src/lib.rs`:
+
+| Issue | Fix |
+|---|---|
+| `unwrap()` on `.parse::<u16>()` | Replaced with `.map_err(|_| ParseError::Invalid)?` |
+| No empty-input check | Added `input.is_empty()` → `Err(ParseError::Empty)` |
+| No `max_items` enforcement | Added token count comparison → `Err(ParseError::TooMany)` |
+| Empty token after split | Added `trimmed.is_empty()` → `Err(ParseError::Invalid)` |
+
+All 4 behavior tests pass, `cargo fmt` clean, no forbidden constructs remain. Output written to `repair-output.json`.

@@ -1,0 +1,12 @@
+Review complete. Written valid JSON to `review-output.json` with 6 BLOCKER findings:
+
+| # | Rule | Line | Issue |
+|---|------|------|-------|
+| 1 | `make_illegal_states_unrepresentable` | 3 | `status: String` allows any value |
+| 2 | `no_bool_lifecycle_flags` | 4 | `is_validated: bool` allows inconsistent combos |
+| 3 | `no_pub_struct_fields` | 2 | All fields pub, no encapsulation |
+| 4 | `primitive_obsession_in_domain_api` | 1 | Raw `String`/`u64` instead of domain newtypes |
+| 5 | `functional_core_purity` | 9 | `mark_sent` does unconditional mutation with string literal |
+| 6 | `no_raw_string_id` | 2 | `id` has no domain validity constraint |
+
+6 missing evidence items noted (no benchmarks, profiler, allocation traces, test runs, or formal evidence).

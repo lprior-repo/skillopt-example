@@ -1,0 +1,10 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings: 7 findings (4 BLOCKER, 2 MAJOR, 1 MINOR)**
+
+The primary violation is that `PacketWorkflow` at `src/lib.rs:1` uses a data-bag anti-pattern: `status: String` + `is_validated: bool` + `is_sent: bool` makes all illegal state combinations representable. The compiler enforces zero lifecycle invariants. A typestate enum would make invalid combinations unrepresentable at the type level.
+
+Secondary violations: raw `String` for `id`, raw `Option<u64>` for `sent_at_epoch_ms` (no domain newtypes), no functional core/imperative shell separation, and all fields publicly mutable.
+
+**Missing evidence:** no benchmarks, profiler data, CLI command evidence, or integration/smoke test exercise of the packet lifecycle.

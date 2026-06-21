@@ -1,0 +1,14 @@
+Now I have the full picture. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/ed4ac7735f44d13a/review-invalid_state_metric_typestate/review-output.json`.
+
+**4 BLOCKER findings:**
+1. **Illegal state representable** (lib.rs:1) - Four primitive fields (`status: String`, `is_validated: bool`, `is_sent: bool`, `sent_at_epoch_ms: Option<u64>`) allow impossible combinations
+2. **No typestate state machine** (lib.rs:3) - `status: String` accepts any value with no lifecycle constraints
+3. **Mutator has no precondition** (lib.rs:9) - `mark_sent` sets status without checking validated state and fails to set `sent_at_epoch_ms`
+4. **No tests** (lib.rs:1) - Zero test files in the crate
+
+**3 additional findings:** primitive `id: String`, public fields with no encapsulation, no typed error domain.
+
+**Missing evidence:** no benchmarks, profiler data, tests, mutation coverage, or CI command evidence.
+
+**Residual risk: HIGH** - requires enum typestate migration and test implementation.

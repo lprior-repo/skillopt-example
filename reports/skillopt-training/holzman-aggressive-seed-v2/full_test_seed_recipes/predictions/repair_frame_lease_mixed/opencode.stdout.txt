@@ -1,0 +1,8 @@
+Repaired. Changes to `src/lib.rs`:
+
+1. **Added `max_payload` gate** (line 9-11) — returns `PayloadTooLarge` when `payload.len() > max_payload`
+2. **Checked capacity arithmetic** (line 13-15) — `4usize.checked_add(payload.len())` prevents overflow
+3. **Bounded allocation** (line 16-17) — `try_reserve(capacity)` with `Allocation` error
+4. **Removed lossy cast** (line 18) — `payload.len() as u32` replaced with `u32::try_from()`
+
+All 2 tests pass. Output written to `repair-output.json`.

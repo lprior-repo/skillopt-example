@@ -1,0 +1,13 @@
+Repaired. All 6 tests pass with zero warnings.
+
+**Changes to `src/lib.rs`:**
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, ...>`
+- **Added `render_summary`**: formats a `Summary` into the expected string
+- **`split_once`**: replaced `split(',').collect()` with `split_once(',')` per Holzman mandatory repair pattern
+- **No unchecked indexing**: `_name, value_str` unpacking replaces `parts[1]`
+- **No `unwrap`**: `.map_err(|_| SummaryError::Invalid)` on all parses
+- **Checked arithmetic**: `checked_add` for total/count, `checked_div` for average
+- **Checked conversions**: `u64::try_from(count)` and `u32::try_from(count)` instead of lossy `as` casts
+- **No `Vec::with_capacity`**: no temporary Vec allocation
+- **Empty detection**: first line checked for empty before parsing

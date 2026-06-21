@@ -1,0 +1,11 @@
+Now I have all references and the source. Let me write the review.
+Review complete. Written to `review-output.json` with **11 BLOCKER findings** and **5 missing evidence** entries. Key violations:
+
+- **Panic surfaces** (lines 9, 19): `unwrap()` on I/O and parse operations
+- **Unchecked indexing** (line 18): `parts[0]`, `parts[1]` without bounds
+- **Lossy cast** (line 19): `as u16` truncating from u32
+- **Hidden I/O** (line 16): `println!` in parsing logic
+- **Architecture violation** (line 8): I/O/parsing/domain fused in one function
+- **Raw primitive** (line 5): `u16` in domain struct without newtype
+- **Parse boundary** (line 11): no fallible smart constructors
+- **Unbounded allocation** (line 9): no `try_reserve`, no cap

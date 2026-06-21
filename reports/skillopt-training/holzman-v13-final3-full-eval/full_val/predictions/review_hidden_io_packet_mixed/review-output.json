@@ -1,0 +1,101 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string is called inside load_packets with unwrap, fusing file I/O into a function that presents as a data parser; unwrap on external input panics on missing/corrupt files.",
+      "failure_mode": "Missing or unreadable packet file aborts the entire program with a panic instead of returning a typed I/O error that the caller can handle gracefully.",
+      "fix": "Return Result<Vec<Record>, IoError> and propagate fs::read_to_string errors with map_err; separate the I/O action from pure parsing so the core consumes only &str."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() uses unwrap on a Result from file I/O, violating the absolute law against unwrap in production.",
+      "failure_mode": "Any filesystem error (permission denied, missing file, truncated file) causes a panic instead of a recoverable typed error.",
+      "fix": "Replace unwrap() with map_err(|e| IoError::ReadFailed { path: path.to_string(), source: e }) and return Result<Vec<Record>, IoError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_logging",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) embeds console I/O (logging) inside the data-processing closure, mixing shell effects into what should be pure logic.",
+      "failure_mode": "Side-effectful logging is fused into the parsing/calculation path; output order becomes non-deterministic across iterators, and the pure-data contract is broken. The function cannot be unit-tested in isolation without capturing stdout.",
+      "fix": "Move all println/logging to the shell boundary. The parser closure must be side-effect-free; return data only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] use unchecked indexing on a split collect with no bounds check; a line without at least 2 comma-separated fields will panic at runtime.",
+      "failure_mode": "Malformed input line (fewer than 2 fields) causes index-out-of-bounds panic instead of returning a typed ParseError::Invalid.",
+      "fix": "Use line.split_once(',') and bind (name, value_str) with .ok_or(ParseError::Invalid) to guarantee two fields before access."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_cast",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() as u16 combines unwrap on parse with a lossy as conversion from u32 to u16; values above 65535 silently truncate.",
+      "failure_mode": "A valid u32 value like 70000 parses successfully, then truncates to 34464 silently, corrupting data without any error signal to the caller.",
+      "fix": "Use u16::from_str_radix(value_str.trim(), 10).map_err(|_| ParseError::Invalid)? and remove the as cast entirely. Or parse to u32 then use u16::try_from(val).map_err(|_| ParseError::Invalid)?."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Raw String and u16 primitives cross the parse boundary into the domain; Record { name: String, value: u16 } accepts any string and any u16, so callers can construct invalid domain states directly without fallingible smart constructors.",
+      "failure_mode": "Callers outside this module can instantiate Record with empty names, negative values, or other invalid states because no validation or domain newtype enforces invariants at the type level.",
+      "fix": "Introduce a Name newtype with a smart constructor that validates non-empty and trim, make Record fields private, and expose only a parse fn(&str) -> Result<Record, ParseError> that validates all invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation_try_reserve",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "line.split(',').map(...).collect() allocates an unbounded Vec<String> from every line with no domain cap, no try_reserve, and no bounded allocation strategy; combined with the outer .collect() there is no upper bound on total allocation.",
+      "failure_mode": "A file with millions of lines exhausts heap memory before any record is processed, causing OOM instead of rejecting input at a known domain cap.",
+      "fix": "Validate a domain cap/max rows first (e.g., const MAX_RECORDS: usize = 100_000); use Vec::new(), call values.try_reserve(max_rows).map_err(|_| ParseError::Allocation)? after cap validation, enforce max before each push, and return typed TooMany or Allocation errors. Each line should use split_once and Vec::new with try_reserve for any intermediate collection."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_packets returns Vec<Record> with no Result wrapper and no typed error type; all failures (I/O, parse, bounds, allocation) are collapsed into panics.",
+      "failure_mode": "The caller has no way to distinguish between a missing file, a malformed line, an out-of-range value, or an allocation failure — every failure path is a panic.",
+      "fix": "Define a ParseError enum with variants { Io(IoError), Invalid, Overflow, TooMany, Allocation } and change the return type to Result<Vec<Record>, ParseError>. All fallible operations must map_err to the appropriate variant."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmarks, profiler evidence, or allocation measurements exist for load_packets; the function allocates a Vec per line and an outer Vec with no measured workload profile.",
+      "failure_mode": "Performance characteristics (allocation count, memory footprint, throughput) are unknown; any claim about speed or zero-allocation is ungrounded.",
+      "fix": "Add a criterion or similar benchmark measuring lines/sec, allocations/line, and peak memory across realistic input sizes; report baseline before any optimization."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_packets throughput or allocation profile",
+    "no profiler evidence for hot-path analysis",
+    "no allocation audit (no try_reserve, no bounded Vec, no capacity checks)",
+    "no second-ring evidence (no assembly, no SBOM, no release provenance)"
+  ],
+  "residual_risk": "Static review only — no commands run. All five absolute-law violations (unwrap on I/O, unwrap on parse, lossy as cast, unchecked indexing, hidden I/O via fs::read_to_string and println) remain unremediated. The function fuses shell I/O with parsing, has no typed error taxonomy, no domain newtypes, and no bounded allocation. Every violation is a BLOCKER requiring full repair before any delivery gate passes."
+}

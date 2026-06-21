@@ -1,0 +1,13 @@
+Now I have full picture. The code has many Holzman violations: `unwrap()`, unchecked indexing (`parts[1]`), lossy `as` casts, unchecked arithmetic, wrong return type (tests expect `Summary` not `String`), and missing `render_summary`. Let me fix it.
+All 6 tests pass. Now let me write the required output.
+Repaired. All 6 tests pass. Changes to `src/lib.rs`:
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`)
+- **Added `render_summary`**: Pure formatting function for the `Summary` struct
+- **`Summary::new` smart constructor**: Validates non-zero count, uses `try_from` for width conversions, `checked_div` for average
+- **Empty input**: Returns `Err(SummaryError::Empty)` early
+- **Parsing**: Uses `split_once(',')` with `.ok_or(Invalid)` instead of `split(',').collect()[1].unwrap()`
+- **Checked arithmetic**: `checked_add` for both `total` and `count`
+- **No lossy casts**: All `as` conversions replaced with `try_from`
+- **Typed errors**: `Display` + `std::error::Error` impls on `SummaryError`
+- **Removed**: `unwrap()`, unchecked indexing (`parts[1]`), lossy `as`, unchecked `+=`, unchecked `/`

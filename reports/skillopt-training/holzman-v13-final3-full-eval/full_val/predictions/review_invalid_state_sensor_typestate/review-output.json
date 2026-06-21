@@ -1,0 +1,92 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enum_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "SensorWorkflow uses a String for status and bools for lifecycle instead of an explicit enum/typestate state machine. Any string value (e.g. \"\", \"deleted\", \"pending_sent\") is accepted, and booleans allow arbitrary combinations like is_validated=true, is_sent=false with status=\"sent\".",
+      "failure_mode": "Callers can construct SensorWorkflow with contradictory or impossible states (e.g. status=\"foo\", is_sent=true), and mark_sent cannot enforce a valid transition—it only overwrites status text without checking prior state.",
+      "fix": "Define a sealed enum SensorStatus { Pending, Validated, Sent } and remove is_sent and is_validated booleans. mark_sent should take a SensorStatus and return Result<SensorStatus, TransitionError> enforcing valid transitions only."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is pub status: String. Holzman + Functional Rust requires replacing status strings with enums. The mark_sent function on line 10 sets status via string mutation (\"sent\".to_string()) which is both an allocation and an untyped transition.",
+      "failure_mode": "Any caller can set item.status to any string, including invalid values. The mark_sent function does string comparison logic encoded in a literal, making state transitions opaque to the compiler and runtime.",
+      "fix": "Replace pub status: String with pub status: SensorStatus where SensorStatus is a non-exhaustive enum { Pending, Validated, Sent }. Remove String allocation in mark_sent; set via enum variant assignment."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool and is_sent: bool are lifecycle booleans on a public struct. Holzman doctrine mandates replacing lifecycle booleans with typestate transitions so invalid combinations are unrepresentable.",
+      "failure_mode": "The struct allows contradictory states: is_validated=false, is_sent=true (sent but never validated); is_validated=true, is_sent=false, status=\"sent\" (sent flag false but status says sent). The compiler cannot prevent these combinations.",
+      "fix": "Remove both bool fields. Encode lifecycle in the enum typestate. If validated data is needed at send time, carry it in the Sent variant as an associated value: Sent { sent_at_epoch_ms: u64, validated: true }. The enum variant itself guarantees validity."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state_combinations",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a separate optional field alongside is_sent: bool and status: String. Option fields on the same struct as lifecycle booleans allow invalid combinations: Option::Some(timestamp) with is_sent=false, or None with is_sent=true.",
+      "failure_mode": "A SensorWorkflow can have sent_at_epoch_ms=Some(12345) while is_sent=false and status=\"pending\", representing a sensor that recorded a sent timestamp but was never actually sent. This is an impossible domain state.",
+      "fix": "Move sent_at_epoch_ms into the enum variant that owns it: enum SensorStatus { Pending, Validated, Sent { sent_at_epoch_ms: u64 } }. Then Some(timestamp) is only possible inside the Sent variant where is_sent is guaranteed by construction."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive carrying domain identity rules. Holzman + Functional Rust requires newtypes for values with invariants. Any string (empty, whitespace, malformed UUID) is accepted as a valid sensor ID.",
+      "failure_mode": "Callers can create SensorWorkflow with id=\"\", id=\"   \", or id=\"not-a-uuid\". There is no parse boundary or validation, so invalid IDs propagate through the system without error.",
+      "fix": "Define a SensorId newtype with a private field and a smart constructor: pub struct SensorId(String); impl SensorId { pub fn new(s: impl Into<String>) -> Result<Self, ParseError> { ... } }. Or better, parse the ID at the boundary into the newtype before constructing SensorWorkflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Raw primitives (String for id, status, and bool flags) cross the parse boundary without fallible smart constructors. Callers can construct SensorWorkflow directly with invalid domain states from any call site—there is no factory or constructor enforcing domain invariants.",
+      "failure_mode": "Every caller of SensorWorkflow { .. } can build illegal states (empty id, nonsense status strings, contradictory lifecycle booleans). The module exposes its internal representation directly via pub fields, making the type unrepresentable as a correct domain abstraction. There is no parse boundary to convert external primitives into trusted domain values.",
+      "fix": "Make all fields private. Provide a constructor or smart factory: impl SensorWorkflow { pub fn from_parts(id: SensorId, status: SensorStatus, sent_at: Option<u64>) -> Result<Self, InvalidWorkflow> { ... } }. Make SensorId and SensorStatus newtypes/enums with their own constructors. The parse boundary moves external validation into fallible smart constructors."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "mark_sent_allows_duplicate_transition",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes SensorWorkflow by value, unconditionally overwrites status to \"sent\" and is_sent to true, and returns the struct. It has no guard against calling it on an already-sent item, and does not return a Result indicating transition success or failure.",
+      "failure_mode": "Calling mark_sent twice on the same item has no visible effect beyond redundant string allocation, but if the function were extended (e.g. with side effects like sending a network message), the second call would be a silent duplicate. The absence of a Result return means callers cannot detect that no valid transition occurred.",
+      "fix": "Change mark_sent to accept an enum-based state and return Result<SensorStatus, TransitionError>. Only allow transition from Validated (or Pending) to Sent. Reject repeated transitions with a typed error. Carry sent_at_epoch_ms as a parameter or derive it in the shell layer."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_benchmark_or_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, profiler output, or allocation analysis exists for this crate. The mark_sent function allocates a String via \"sent\".to_string() on every call. Without benchmark or second-ring evidence, this allocation cannot be classified as acceptable overhead or proven unnecessary.",
+      "failure_mode": "If mark_sent is called in a hot path (e.g. per-packet processing), the String allocation on line 10 becomes a measurable performance defect. Without benchmark evidence, there is no basis to retain or eliminate this allocation.",
+      "fix": "Add a benchmark comparing String allocation vs enum variant assignment. If enum wins (expected), replace status: String with SensorStatus enum and remove .to_string(). If benchmark shows the allocation is negligible relative to overall latency, document the measurement and retain with justification."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent allocation (String::to_string on every call)",
+    "no profiler evidence for hot-path classification of mark_sent",
+    "no allocation analysis for SensorWorkflow struct size and layout",
+    "no command-truth evidence (no cargo check/clippy/test commands run)",
+    "no second-ring evidence for zero-cost claims or enum replacement viability"
+  ],
+  "residual_risk": "The SensorWorkflow type is fundamentally broken: it uses raw primitives (String, bool, Option) on a public struct with no parse boundary, no typestate machine, and no constructor validation. Callers can construct any combination of invalid states at compile time. The mark_sent function silently allows duplicate transitions. This is not repairable with a patch—it requires a typestate enum redesign, newtype for id, private fields with a smart constructor, and Result-based transitions. Without this redesign, all callers are building on an invalid domain model."
+}

@@ -1,0 +1,85 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_enums",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a public String field, allowing illegal states such as \"sent\" -> \"draft\" or any arbitrary string value.",
+      "failure_mode": "Caller can set status to any string, violating the ledger workflow invariant that transitions must be well-ordered and terminal states irreversible.",
+      "fix": "Replace `pub status: String` with a sealed enum `LedgerStatus { New, Validated, Sent { sent_at_epoch_ms: u64 } }` and make status the only field controlling workflow state."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a public bool, independently mutable from status. The struct can represent (status=\"sent\", is_validated=false) or (status=\"draft\", is_validated=true), which are illegal composite states.",
+      "failure_mode": "Independent boolean flags create a cartesian product of states where only a subset is valid. Callers can construct or mutate into invalid state combinations.",
+      "fix": "Remove `is_validated` and `is_sent` entirely. Encode validated/sent as enum variants of the status typestate (e.g., `LedgerStatus::Validated` and `LedgerStatus::Sent { sent_at_epoch_ms: u64 }`). The `sent_at_epoch_ms` field on the struct is also redundant once encoded in the typestate."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a public bool, independently mutable from status. Can represent (status=\"draft\", is_sent=true), an illegal state.",
+      "failure_mode": "Independent boolean flag allows the ledger to be marked sent without the status field reflecting it, or vice versa. No invariant enforcement at the type level.",
+      "fix": "Fold `is_sent` into the `LedgerStatus::Sent` variant. The enum variant itself is the proof of sent status. Remove the bool field."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_discipline",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw `String` with no domain type. Any string, including empty or malformed IDs, is acceptable.",
+      "failure_mode": "Empty or invalid ledger IDs can be constructed, leading to silent data integrity issues or collisions downstream.",
+      "fix": "Introduce `pub struct LedgerId(String)` with a fallible constructor that rejects empty/whitespace-only IDs. Use `LedgerId` in the struct."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_discipline",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a bare `Option<u64>` on the struct instead of being encoded in the typestate. It can be Some while status is not \"sent\", or None while status is \"sent\".",
+      "failure_mode": "Timestamp is decoupled from the sent state. The struct can hold a sent_at value for a non-sent ledger, or be sent with no timestamp.",
+      "fix": "Move `sent_at_epoch_ms` into `LedgerStatus::Sent { sent_at_epoch_ms: u64 }`. The struct no longer needs this field as a separate member."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_pure_core",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes `mut LedgerWorkflow` by value and mutates internal fields directly. It bypasses any typestate discipline — it can set status to \"sent\" regardless of prior state (e.g., without validation).",
+      "failure_mode": "Callers can skip the validation step entirely and mark any ledger as sent, violating the workflow invariant that ledgers must be validated before sending.",
+      "fix": "Design `mark_sent` as a fallible function that takes a `LedgerWorkflow` in the `Validated` typestate and returns `LedgerWorkflow` in the `Sent` typestate, or a `LedgerError::NotValidated`. Example: `fn mark_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, LedgerError>`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_string_status",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent assigns a magic string literal `\"sent\"` to status. String literals are error-prone — typos produce silent state bugs with no compile-time detection.",
+      "failure_mode": "A typo like `\"snt\"` compiles but produces an invalid/unrecognized state. No caller can be confident the status string matches expected values without string comparison.",
+      "fix": "Replace with enum variant assignment. `item.status = LedgerStatus::Sent { sent_at_epoch_ms: ... }`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "data_valid_by_construction",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow fields are all `pub`, allowing external code to construct arbitrary invalid instances (e.g., `LedgerWorkflow { id: \"\", status: \"\", is_validated: false, is_sent: false, sent_at_epoch_ms: None }`).",
+      "failure_mode": "No constructor enforcement means every field is independently mutable to illegal values. The struct cannot guarantee any domain invariant.",
+      "fix": "Make all fields `pub(crate)` or private. Provide a single constructor `LedgerWorkflow::new(id: LedgerId) -> Self` that initializes the struct to the `New` typestate. All state transitions go through typed functions."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any performance claim on LedgerWorkflow operations",
+    "no profiler data for allocation patterns in mark_sent (`.to_string()` allocates on every call)",
+    "no allocation audit — `id: String` and `status` string allocations have no capacity management or `try_reserve` usage",
+    "no command-level evidence (cargo test, cargo clippy, cargo fmt) was produced for this crate"
+  ],
+  "residual_risk": "The struct encodes an invalid state model where status and boolean flags are independently mutable, allowing all illegal composite states. No typestate enum, no constructor, no fallible transitions. The core is not pure — mark_sent mutates by value with no invariant checks. Without enum typestates and typed transitions, this code cannot guarantee ledger workflow invariants at compile time. Static review only; no commands run."
+}

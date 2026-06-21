@@ -1,0 +1,44 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/2e94da1ef6fc7dfb/repair_summary_ledger_mixed/.skill/holzman-rust/SKILL.md",
+    "/tmp/opencode/holzman-skillopt-train/2e94da1ef6fc7dfb/repair_summary_ledger_mixed/.skill/holzman-rust/references/functional-core-performance.md",
+    "/tmp/opencode/holzman-skillopt-train/2e94da1ef6fc7dfb/repair_summary_ledger_mixed/.skill/holzman-rust/references/review-output-contract.md",
+    "/home/lewis/.opencode/skill/holzman-rust/SKILL.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/latency-throughput-playbook.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/runtime-performance-architecture.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/zero-cost-abstractions.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/simd-patterns.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/mechanical-empathy-toolchain.md"
+  ],
+  "changed_files": [
+    "src/lib.rs"
+  ],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo check --workspace --all-targets --all-features", "status": "passed"},
+    {"command": "cargo clippy --workspace --lib --bins --examples --all-features -- -D warnings -D unsafe_code -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::panic_in_result_fn -D clippy::todo -D clippy::unimplemented -D clippy::dbg_macro -D clippy::indexing_slicing -D clippy::string_slice -D clippy::get_unwrap -D clippy::arithmetic_side_effects -D clippy::as_conversions -D clippy::let_underscore_must_use -D clippy::await_holding_lock", "status": "passed"},
+    {"command": "cargo test --workspace --all-features", "status": "passed"},
+    {"command": "rg -n '(^|[^A-Za-z0-9_])(assert!|assert_eq!|assert_ne!|unreachable!)' --glob '*.rs' --glob '!**/tests/**' --glob '!**/benches/**' --glob '!**/examples/**'", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unsafe removed",
+    "No unwrap/expect/panic/todo/unimplemented/unreachable/assert in production",
+    "No unchecked indexing - replaced parts[1] with split_once",
+    "No unchecked arithmetic - replaced += with checked_add, replaced division with checked_div",
+    "No lossy as conversions - replaced count as u64 / count as u32 with try_from",
+    "summarize_metrics returns Result<Summary, SummaryError> matching test contract",
+    "render_summary function implemented matching test contract",
+    "Empty input returns Err(SummaryError::Empty)",
+    "Invalid lines return Err(SummaryError::Invalid)",
+    "Overflow in total accumulation returns Err(SummaryError::Overflow)",
+    "TooMany rows returns Err(SummaryError::TooMany)",
+    "Zero-cost: no unnecessary Vec allocations, split_once used instead of split+collect",
+    "All 6 behavior tests pass",
+    "Clippy passes with strictest lint configuration",
+    "Functional core: pure domain logic in core, I/O-free"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. All production code uses checked arithmetic, safe string parsing, and typed error handling. No unsafe, unwrap, panic, or unchecked access remains. All behavior tests pass. Clippy strictest configuration passes."
+}

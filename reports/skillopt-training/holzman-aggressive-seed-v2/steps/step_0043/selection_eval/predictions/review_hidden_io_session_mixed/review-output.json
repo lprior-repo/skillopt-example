@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [".skill/holzman-rust/SKILL.md", ".skill/holzman-rust/references/functional-core-performance.md", ".skill/holzman-rust/references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on I/O failure (file not found, permission denied, truncated file).",
+      "failure_mode": "Untrusted or missing file path aborts the entire process instead of returning a typed error the caller can handle.",
+      "fix": "Change return type to Result<Vec<Record>, io::Error> (or a domain error enum) and use fs::read_to_string(path).map_err(...)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or out-of-range CSV field.",
+      "failure_mode": "A single malformed CSV line aborts the entire session load, losing all previously parsed records.",
+      "fix": "Use .parse::<u32>().map_err(|e| ...)? or match to return a typed parse error. Propagate via Result return type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 cast on the result of parse::<u32>() silently truncates values > 65535.",
+      "failure_mode": "A valid u32 value like 70000 becomes 4448 with no warning, silently corrupting domain data.",
+      "fix": "Use u16::try_from(parts[1].parse::<u32>()?) or parse directly into u16 via .parse::<u16>().map_err(...). Return the error to the caller."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses Vec by index with no bounds check. If the line has zero bytes before a comma, parts could be empty.",
+      "failure_mode": "IndexOutOfBounds panic on an empty or whitespace-only CSV line.",
+      "fix": "Use .first().copied() or .get(0) and handle None with a typed error or skip."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses Vec by index with no bounds check. A line with only one field (no comma) produces parts with length 1.",
+      "failure_mode": "IndexOutOfBounds panic on any CSV line missing the second column.",
+      "fix": "Use .get(1) and handle None with a typed error (e.g., 'expected 2 columns')."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_not_split_collect",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Uses split(',').map(...).collect() to extract two fields. Over-allocates into a Vec<String> for a two-field line. split_once handles first-delimiter extraction without collecting all parts.",
+      "failure_mode": "Unnecessary heap allocation per line. On lines with extra commas, collect includes all split parts, silently ignoring extra columns instead of rejecting them.",
+      "fix": "Use line.split_once(',').ok_or(Error::BadLine)? to extract exactly two parts, then trim and parse each."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_no_hidden_io",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a hidden side effect inside a data-loading map closure. The functional core (parsing logic) must not perform I/O.",
+      "failure_mode": "Side effects leak into the parsing pipeline, making the function non-deterministic, harder to test, and producing stdout noise in tests or production.",
+      "fix": "Remove println! entirely. If logging is needed, make it explicit at the shell boundary (e.g., log the records after loading, or accept a logger callback)."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects_in_core",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "The function load_sessions mixes file I/O (fs::read_to_string), console I/O (println!), and data parsing in a single pipeline with no explicit boundary between shell and core.",
+      "failure_mode": "Cannot unit-test the parsing logic without mocking the filesystem and capturing stdout. Violates functional-core/imperative-shell separation.",
+      "fix": "Split into a pure parse_record(line: &str) -> Result<Record, ParseError> function and a shell function load_sessions(path: &str) -> Result<Vec<Record>, Error> that calls fs::read_to_string, iterates lines, and delegates to parse_record."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "encapsulation",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "pub struct Record with all pub fields exposes internal representation. No validation at construction time.",
+      "failure_mode": "Callers can create Record { name: String::new(), value: 0 } or any invalid combination, violating invariants.",
+      "fix": "Make fields private and provide a constructor or derive builder. Add domain validation if name must be non-empty or value must be in range."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "typed_error_domain",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "Return type Vec<Record> gives no way to report errors. All fallible operations (file read, parse, index access) are hidden behind unwrap().",
+      "failure_mode": "No error taxonomy exists for callers to distinguish I/O errors, parse errors, or malformed input.",
+      "fix": "Return Result<Vec<Record>, LoadError> where LoadError is an enum with I/O, Parse, and Malformed variants."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions file-reading and CSV parsing performance",
+    "no profiler evidence for allocation profile per line in load_sessions",
+    "no allocation analysis for Vec<String> per-line allocation in split().collect() path",
+    "no command evidence (no cargo fmt check, cargo check, cargo clippy run)",
+    "no benchmark/profiler for whether the function is a hot path requiring optimization"
+  ],
+  "residual_risk": "Static review only; no commands run. All production unwrap(), as casts, unchecked indexing, and hidden I/O side effects identified as BLOCKER findings requiring repair before delivery. The entire function is a single monolithic pipeline with no functional-core/imperative-shell separation, no typed errors, no bounds checking, and no performance evidence."
+}

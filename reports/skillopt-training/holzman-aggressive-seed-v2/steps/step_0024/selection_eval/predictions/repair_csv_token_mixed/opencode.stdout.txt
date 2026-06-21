@@ -1,0 +1,15 @@
+All 4 tests pass. Let me fix the clippy warning about the unused `count` assignment in the final token branch.
+All 4 tests pass with zero warnings. Writing the output.
+Repair complete. Changes made to `src/lib.rs`:
+
+**Violations removed:**
+- `unwrap()` on parse → `.map_err(|_| ParseError::Invalid)`
+- Missing empty-input check → returns `ParseError::Empty`
+- Missing `max_items` enforcement → returns `ParseError::TooMany`
+- Missing `Invalid` error handling → parse errors mapped properly
+
+**Approach:**
+- Uses `split_once` for delimiter extraction (no `split` + `collect` + indexing)
+- Pure core: deterministic parsing loop with checked errors
+- No `unsafe`, `unwrap`, `expect`, `panic!`, or lossy casts
+- All 4 behavior tests pass, zero warnings

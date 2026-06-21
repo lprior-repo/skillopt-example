@@ -1,0 +1,104 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap on fallible I/O",
+      "failure_mode": "Corrupted or missing file silently panics the caller instead of returning a typed I/O error",
+      "fix": "Return a Result<Record, FrameError> or similar typed error; use map_err or ? to propagate IOError as a domain error"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on parse of untrusted field",
+      "failure_mode": "Non-numeric value in field 1 panics the caller instead of returning a typed ParseError",
+      "fix": "Replace with parts[1].parse::<u16>().map_err(|e| ParseError::Value(e)) or similar typed error path"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Lossy `as u16` cast after parse — truncated range, silently wraps or truncates values >65535",
+      "failure_mode": "A valid u32 value in range 65536..=4294967295 silently truncates to u16, producing incorrect data with no error",
+      "fix": "Parse directly as u16 via `.parse::<u16>()`, or use `u16::try_from(val)` and map overflow to a typed OverflowError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_access",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] — unchecked indexing into split result",
+      "failure_mode": "A line with zero comma-separated fields panics via IndexOutOfBounds",
+      "fix": "Use split_once(',') and match on (name, value) Option, or use get(0) and map_err to a MalformedLineError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "checked_access",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] — unchecked indexing into split result",
+      "failure_mode": "A line with only one comma-separated field panics via IndexOutOfBounds",
+      "fix": "Use split_once(',') and handle the missing second field as a MalformedLineError"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) — I/O side effect inside data-loading function",
+      "failure_mode": "Purity is broken: the function has a hidden stdout side effect, making it non-deterministic, untestable in isolation, and unusable in contexts where stdout is captured or redirected",
+      "fix": "Remove println! entirely from the parsing pipeline. If logging is needed, return a separate log/result struct or push logs through an explicit callback/lifecycle in the imperative shell"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "allocation_awareness",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Vec::collect() from split without try_reserve or capacity bounds",
+      "failure_mode": "A single line with an enormous number of commas triggers unbounded allocation, potentially OOM",
+      "fix": "Use split_once(',') for single-separator parsing, or use try_reserve on the Vec with a documented per-line cap, returning Allocation error on failure"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_frames returns Vec<Record> with no error type — all failures are panics",
+      "failure_mode": "Every failure mode (IO, parse, index, overflow) collapses into a panic, making error handling impossible for callers",
+      "fix": "Change signature to `pub fn load_frames(path: &str) -> Result<Vec<Record>, FrameError>` and define a typed FrameError enum (Io, Parse, MalformedLine, Overflow, Allocation)"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for load_frames throughput or latency",
+      "failure_mode": "Any performance claim about this parser is ungrounded; regressions in allocation or parsing speed are undetectable",
+      "fix": "Add a criterion or custom benchmark measuring lines-per-second and per-line allocation count for typical and adversarial input sizes"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, perf, or similar) for hot-path allocation profile",
+      "failure_mode": "Intermediate Vec/String allocations per line cannot be proven unnecessary; Cow or pre-borrowed patterns may be beneficial but are unmeasured",
+      "fix": "Run flamegraph or perf record on representative input; use &str and split_once to avoid per-field String allocation if profiler shows it matters"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_frames throughput or latency",
+    "no profiler evidence for allocation profile of the parsing hot path",
+    "no second-ring evidence (assembly/symbol inspection) confirming bounds-check removal or allocation elimination",
+    "no command evidence (cargo check/clippy/test) for current crate state",
+    "no typed error taxonomy defined for the domain"
+  ],
+  "residual_risk": "This crate has 8 blockers and 2 warnings. Every public error path is a panic via unwrap or unchecked indexing. The function mixes I/O (fs::read_to_string, println!) with data parsing, violating the functional core / imperative shell boundary. Even a minimal fix would require: (1) adding a typed FrameError enum, (2) changing load_frames to return Result<Vec<Record>, FrameError>, (3) replacing all unwrap() calls with ?/map_err, (4) replacing parts[0]/parts[1] indexing with split_once, (5) replacing `as u16` with checked conversion, (6) removing println! from the parsing pipeline. Without benchmarks or profiler data, performance characteristics of the fixed implementation are unproven. Static review only; no commands were run."
+}

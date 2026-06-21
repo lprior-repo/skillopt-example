@@ -1,0 +1,7 @@
+Two issues: `max_payload` is ignored, and `as u32` is a lossy conversion. Let me fix both.
+Repaired. Two fixes in `src/lib.rs`:
+
+1. **Added `max_payload` enforcement** — the function ignored `max_payload` entirely, failing `rejects_limit`
+2. **Replaced lossy `as u32`** with `u32::try_from(payload.len())` mapped to `FrameError::Overflow`
+
+All gates pass: fmt, check, clippy (strict deny), and both behavior tests.

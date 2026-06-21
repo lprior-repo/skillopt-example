@@ -1,0 +1,13 @@
+Now I have all source and references. Let me write the review output.
+Review complete. Wrote valid JSON to `review-output.json` with 6 BLOCKER findings:
+
+| # | Rule | File | Line | Issue |
+|---|------|------|------|-------|
+| 1 | enum-typestate-state-machine | src/lib.rs | 1 | No typestate; booleans allow invalid combinations |
+| 2 | status-string-domain-value | src/lib.rs | 3 | `String` status accepts arbitrary values, allocates |
+| 3 | bool-lifecycle-state | src/lib.rs | 4 | Independent `is_validated`/`is_sent` booleans |
+| 4 | option-invalid-state-combination | src/lib.rs | 6 | `Option<u64>` disconnected from lifecycle flags |
+| 5 | newtype-domain-id | src/lib.rs | 2 | `id: String` has no domain validation |
+| 6 | parse-boundary-validation | src/lib.rs | 9 | Raw primitives cross parse boundary with no smart constructors |
+
+5 missing evidence items flagged (benchmark, profiler, allocation, second-ring, command evidence).

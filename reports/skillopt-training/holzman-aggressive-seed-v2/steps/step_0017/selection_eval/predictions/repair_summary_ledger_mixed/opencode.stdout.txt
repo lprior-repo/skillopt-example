@@ -1,0 +1,19 @@
+Now I have the full picture. The source has multiple Holzman violations: `unwrap()`, unchecked indexing, `split`+`collect`+indexing, unchecked arithmetic, lossy casts, and wrong return type. Tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a missing `render_summary` function.
+
+Let me fix the source:
+All 6 tests pass. Now writing the output file.
+Repair complete. All 6 tests pass. Summary of changes to `src/lib.rs`:
+
+**Violations removed:**
+- `.unwrap()` on `parse::<u64>()` → `.map_err(|_| SummaryError::Invalid)`
+- Unchecked `parts[1]` indexing → `split_once(',')` with `Option` destructuring
+- Unchecked `total += value` → `checked_add()` → `ok_or(Overflow)`
+- Unchecked `count += 1` → `checked_add()` → `ok_or(Overflow)`
+- Lossy `count as u64` → `u64::try_from(count)` → `map_err(Overflow)`
+- Lossy `count as u32` → `u32::try_from(count)` → `map_err(Overflow)`
+- Unchecked `total / count` → `checked_div()` → `ok_or(Overflow)`
+
+**Contract fixes:**
+- `summarize_metrics` return type: `Result<String, ...>` → `Result<Summary, ...>` (matches test contract)
+- Added `render_summary(Summary) -> String` function (expected by test)
+- Added `Summary { count, total, average }` construction with checked arithmetic

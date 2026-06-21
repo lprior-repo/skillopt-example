@@ -1,0 +1,14 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 6 BLOCKERs, 3 MAJORs, 5 missing evidence items.**
+
+Key findings:
+- **Line 9**: `unwrap()` on I/O — panics on filesystem errors
+- **Line 19**: `unwrap()` on parse + lossy `as u16` cast — panics on bad input, silently truncates on overflow
+- **Lines 16-19**: Unchecked `parts[0]`/`parts[1]` indexing — panics on malformed lines
+- **Line 16**: `println!` in core — hidden I/O side effect violating functional-core
+- **Lines 3-6**: Raw `String`/`u16` — no newtypes, enums, or typestates; illegal states are representable
+- **Line 8**: `Vec<Record>` return with no error taxonomy — zero typed error paths
+- **Lines 12-15**: Intermediate `Vec<String>` with no `try_reserve` — unbounded allocations, no allocation-failure handling
+- No tests, no benchmarks, no profiler data, no allocation evidence

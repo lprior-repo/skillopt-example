@@ -1,0 +1,19 @@
+Now I understand the issues. The current `encode_frame` has multiple Holzman violations:
+
+1. **Lossy `as` cast** on line 10: `payload.len() as u32`
+2. **No `max_payload` check**: parameter is unused, but test expects `PayloadTooLarge` rejection
+3. **No checked arithmetic** for total frame size
+4. **No `try_reserve`** for bounded capacity allocation
+
+Let me fix all issues:
+Both tests pass. Let me write the repair output:
+Repair complete. Here's a summary of the fixes applied to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| Lossy `as u32` cast (line 10) | `u32::try_from(payload.len())` with `map_err` |
+| Unused `max_payload` parameter | Bounds check returns `PayloadTooLarge` |
+| No checked arithmetic for frame size | `usize::checked_add` for header+payload |
+| No bounded allocation | `try_reserve(total)` returning `Allocation` error |
+
+Both behavior tests pass. Output written to `repair-output.json`.

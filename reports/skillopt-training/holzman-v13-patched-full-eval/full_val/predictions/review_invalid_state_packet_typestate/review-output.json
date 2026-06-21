@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "typestate_machine",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow has no typestate enum to enforce the valid lifecycle order of packet states. Any caller can construct a PacketWorkflow with status='sent', is_validated=false, is_sent=true, creating an invalid state where a packet is marked sent but never validated.",
+      "failure_mode": "Protocol violation: packets reach downstream consumers without validation, causing data corruption or security bypass in the network layer.",
+      "fix": "Replace PacketWorkflow with a typestate enum (e.g., enum PacketState { Unvalidated, Validated, Sent }) and provide constructors that enforce transition order."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "status_string",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a pub String field that accepts any arbitrary string value. The mark_sent function on line 10 assigns \"sent\".to_string() by value rather than through a typed transition, and callers can set status to any string (\"\", \"pending\", \"deleted\", etc.).",
+      "failure_mode": "Pattern match exhaustiveness is impossible in callers. Any string literal can be assigned, and match arms will never be exhaustive, leading to unhandled states at runtime.",
+      "fix": "Replace with an enum: pub enum PacketStatus { New, Validating, Validated, Sent }. Remove the String field entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated: bool is a standalone lifecycle boolean that allows invalid combinations like (is_validated=false, is_sent=true). This violates the typestate invariant that sent packets must have been validated.",
+      "failure_mode": "Callers cannot pattern-match on lifecycle phase. Invalid states (validated=false, sent=true) silently pass through without any runtime or compile-time error, violating mission-critical protocol guarantees.",
+      "fix": "Replace is_validated and is_sent with a single typestate enum that encodes all valid lifecycle phases and makes illegal states unrepresentable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bool_lifecycle_sent",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent: bool is a standalone lifecycle boolean that, combined with is_validated: bool, creates four possible boolean states but only two are valid (not sent/not sent; sent+validated). The other two combinations (sent+not validated, not sent+validated) are illegal but unpreventable.",
+      "failure_mode": "The boolean pair allows the impossible state where is_validated=false && is_sent=true, representing a packet that was transmitted without passing validation. This is a critical protocol violation.",
+      "fix": "Merge is_validated and is_sent into a single typestate enum with ordered transitions: New -> Validated -> Sent."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "option_invalid_state",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms: Option<u64> is a standalone optional lifecycle field that permits (sent=true, sent_at_epoch_ms=None) and (sent=false, sent_at_epoch_ms=Some(123)), both of which are invalid. Optional lifecycle data belongs in the enum variant that owns it.",
+      "failure_mode": "A packet can be marked as sent (is_sent=true) without a timestamp, or have a timestamp without being sent. Callers must defensively check both fields independently, and any omission leads to silent data loss or incorrect audit trails.",
+      "fix": "Move sent_at_epoch_ms into the typestate enum variant: Sent { sent_at_epoch_ms: u64 }. This makes the timestamp mandatory exactly when the packet is sent, and eliminates the Option entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "There is no parse boundary in this module. Raw primitives (String, bool, Option<u64>) are directly exposed as pub struct fields, and mark_sent constructs PacketWorkflow by direct mutation rather than through a fallible smart constructor. Any caller can construct invalid domain states by setting status to an arbitrary string or creating boolean combinations that violate the protocol lifecycle.",
+      "failure_mode": "External callers and shell code can bypass all domain invariants. The parse boundary is the single point where hostile/untrusted input must be validated and converted into trusted domain values. Without it, every function in the call chain must re-validate, and the core cannot assume any invariants hold.",
+      "fix": "Define a private PacketWorkflow inner struct with the raw fields, and a public PacketWorkflow type exposed via a fallible constructor (e.g., fn try_new(id: String, ...) -> Result<Self, PacketError>) that validates all inputs. Replace mark_sent with a method that performs a typed state transition and returns Result<Self, TransitionError>."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_typed_errors",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns PacketWorkflow by direct mutation with no error type. There is no PacketError enum for transition failures, validation errors, or domain violations. The function signature cannot express that a transition may fail.",
+      "failure_mode": "Error conditions (invalid transition, duplicate send, missing validation) must either panic or be silently ignored. Neither option is acceptable in mission-critical code.",
+      "fix": "Define pub enum PacketError { InvalidTransition, AlreadySent, NotValidated } and change the signature to fn mark_sent(self) -> Result<PacketWorkflow, PacketError>."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "newtype_domain_id",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String is a raw primitive that carries no domain rules. There is no PacketId newtype to enforce format, length, uniqueness, or validation constraints on the identifier.",
+      "failure_mode": "Callers can pass empty strings, null bytes, or arbitrarily long strings as packet IDs. No domain-level validation of the identifier format is enforced at the type level.",
+      "fix": "Replace with pub struct PacketId(String) and a smart constructor fn PacketId::try_new(s: String) -> Result<Self, PacketError::InvalidId> that enforces format constraints."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "no_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark module exists for PacketWorkflow or mark_sent. There is no baseline measurement, no workload description, no target hardware specification, and no performance claim to validate.",
+      "failure_mode": "Any future performance optimization is unmeasured and unverifiable. Allocation patterns in mark_sent (String::to_string on line 10) cannot be assessed for hot-path impact.",
+      "fix": "Add a benches/ directory with a benchmark for mark_sent that measures allocation count, memory throughput, and latency across a representative workload of PacketWorkflow transitions."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "hidden_allocation_string",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "mark_sent performs an unbounded heap allocation via \"sent\".to_string() on every call. In a hot-path packet processing pipeline, this allocation cannot be avoided without a typestate enum and method-taking-self-by-value pattern.",
+      "failure_mode": "High-throughput packet processing accumulates heap allocations proportional to the packet rate. Without try_reserve, allocation budgets, or benchmark evidence, this allocation pattern cannot be bounded or optimized.",
+      "fix": "Replace the String-based status with an enum (no allocation needed). Change mark_sent to take self by value and return the new enum-typed state directly, eliminating all heap allocation."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or PacketWorkflow lifecycle",
+    "no profiler data for allocation patterns in mark_sent",
+    "no allocation budget or try_reserve usage",
+    "no benchmark/baseline command evidence for any performance claim",
+    "no second-ring evidence (profiler, assembly, or allocation tracing) for any claim"
+  ],
+  "residual_risk": "The domain model makes illegal states representable. All lifecycle invariants (validated before sent, timestamp present when sent) are enforced by neither types nor runtime checks. Without the typestate enum, parse boundary, typed errors, and newtype guards, any consumer of PacketWorkflow can silently construct invalid protocol states. This is a fundamental architectural defect that cannot be patched with local fixes."
+}

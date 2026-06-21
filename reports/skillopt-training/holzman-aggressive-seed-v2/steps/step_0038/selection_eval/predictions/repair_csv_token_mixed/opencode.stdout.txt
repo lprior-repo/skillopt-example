@@ -1,0 +1,11 @@
+I see the issues. The current `parse_tokens` has `.unwrap()`, ignores `max_items`, and doesn't handle empty input or parse errors. Let me fix it.
+All 4 tests pass. Now writing the required output.
+Repair complete. All 4 tests pass. Key changes to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| ParseError::Invalid)?` |
+| No empty check | `input.is_empty()` → `ParseError::Empty` |
+| `max_items` ignored | `count > max_items` → `ParseError::TooMany` |
+| No allocation handling | `try_reserve` + `.map_err(\|_\| ParseError::Allocation)` |
+| `.map().collect()` pattern | Split into explicit loop with per-element error handling |

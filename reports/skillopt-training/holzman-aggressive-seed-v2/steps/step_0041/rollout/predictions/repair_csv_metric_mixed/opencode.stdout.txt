@@ -1,0 +1,13 @@
+Now I understand the issues. Let me read the review contract reference and then fix the production code.
+Now I'll fix the production source. The issues are: `.unwrap()` panics, no empty check, no `max_items` enforcement, no checked allocation.
+All 4 tests pass. Let me run the remaining verification gates.
+All gates pass. Now writing the required output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Removed `.unwrap()`** — replaced with `.map_err(|_| ParseError::Invalid)` on `parse::<u16>()`
+2. **Added empty-input check** — returns `Err(ParseError::Empty)` when input is empty/whitespace
+3. **Added max_items enforcement** — returns `Err(ParseError::TooMany)` when item count exceeds limit
+4. **Added `try_reserve`** — handles allocation failure with `ParseError::Allocation`
+5. **Empty field guard** — returns `Err(ParseError::Invalid)` on empty fields after split
+
+All 4 behavior tests pass, formatting clean, no forbidden constructs in production.

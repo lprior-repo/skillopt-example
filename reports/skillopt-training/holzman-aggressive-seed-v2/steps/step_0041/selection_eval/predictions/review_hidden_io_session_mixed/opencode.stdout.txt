@@ -1,0 +1,19 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**10 findings** (9 BLOCKER, 1 MAJOR) across `src/lib.rs`:
+
+| Line | Violation |
+|------|-----------|
+| 9 | `unwrap()` on `fs::read_to_string` — I/O panics |
+| 12 | `split(',')` + `collect()` + indexing — should use `split_once` |
+| 16 | Unchecked `parts[0]` indexing — panics on malformed lines |
+| 16 | `println!` inside iterator chain — side effect in pure logic |
+| 19 | Unchecked `parts[1]` indexing — panics on missing fields |
+| 19 | `parse().unwrap()` — parse panics on non-numeric input |
+| 19 | `as u16` lossy cast — silent truncation above 65535 |
+| 8 | No `Result` return type — no typed error surface |
+| 8 | No `try_reserve` / bounded capacity — uncontrolled allocation |
+| 3 | `pub` Record fields — illegal states representable |
+
+**6 missing evidence** items: no benchmarks, profiler data, allocation audit, mutation tests, command evidence, or `try_reserve` usage.

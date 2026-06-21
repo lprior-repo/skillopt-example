@@ -1,0 +1,16 @@
+Now let me write the review output.
+Done. Review output written to `/tmp/opencode/holzman-skillopt-train/9c8915c49a66fd41/review_hidden_io_shard_mixed/review-output.json`.
+
+**7 BLOCKER findings** across the task crate `src/lib.rs`:
+
+| Severity | File:Line | Rule |
+|---|---|---|
+| BLOCKER | `src/lib.rs:16` | hidden I/O (`println!` in pure logic) |
+| BLOCKER | `src/lib.rs:9` | `unwrap()` on `fs::read_to_string` — panics on missing/unreadable files |
+| BLOCKER | `src/lib.rs:19` | `unwrap()` on `.parse::<u32>()` — panics on non-numeric fields |
+| BLOCKER | `src/lib.rs:19` | lossy `as u16` cast from `u32` — silent truncation for values ≥65536 |
+| BLOCKER | `src/lib.rs:18` | unchecked `parts[0]`/`parts[1]` indexing — OOB panic on malformed lines |
+| BLOCKER | `src/lib.rs:8` | shell leakage — I/O, parsing, allocation, domain construction, and logging fused in one function |
+| BLOCKER | `src/lib.rs:12` | unnecessary intermediate `Vec<String>` allocation — should use `split_once` |
+
+**5 missing evidence items**: no benchmarks, no profiler data, no allocation audit with `try_reserve`, no command execution evidence, no second-ring evidence.

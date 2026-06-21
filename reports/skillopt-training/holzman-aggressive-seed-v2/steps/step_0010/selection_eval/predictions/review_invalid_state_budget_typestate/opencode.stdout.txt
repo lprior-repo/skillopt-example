@@ -1,0 +1,14 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Wrote `review-output.json` with 6 findings:
+
+**3 BLOCKERs:**
+1. **Illegal states representable** (`src/lib.rs:1`) — `status: String` + `is_validated: bool` + `is_sent: bool` can form inconsistent combinations (e.g., sent but not validated). Fix: collapse to a single `BudgetStatus` enum + typestates.
+2. **Primitive obsession** (`src/lib.rs:2`) — `id: String` should be `BudgetId` newtype. Fix: typed newtype with validated constructor.
+3. **No precondition in `mark_sent`** (`src/lib.rs:9`) — ignores `is_validated`, allowing unvalidated budgets to be sent. Fix: typestate-gated transitions (`Validated → Sent`).
+
+**3 MINORs:**
+4. Unnecessary `"sent".to_string()` allocation — replace with enum variant.
+5. All fields `pub` — bypasses all invariants. Make private with controlled constructors.
+6. Redundant flags (`is_validated`, `is_sent`) alongside `status` — collapse into enum with derived query methods.
+
+**Missing evidence:** no benchmarks, profiler data, allocation audit, or CLI binary.

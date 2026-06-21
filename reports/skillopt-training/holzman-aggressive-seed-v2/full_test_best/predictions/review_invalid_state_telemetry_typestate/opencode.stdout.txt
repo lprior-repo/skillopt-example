@@ -1,0 +1,18 @@
+Review complete. Written to `review-output.json`.
+
+**8 findings, 6 missing evidence items.**
+
+Summary of violations:
+
+| Severity | Rule | Line | Issue |
+|---|---|---|---|
+| BLOCKER | make_illegal_states_unrepresentable | :3 | `status: String` allows arbitrary values |
+| BLOCKER | no_bool_lifecycle_flags | :4 | `is_validated: bool` - no ordering enforcement |
+| BLOCKER | no_bool_lifecycle_flags | :5 | `is_sent: bool` - 4-state boolean lattice, only 3 valid |
+| BLOCKER | mark_sent_validates_preconditions | :9 | `mark_sent` unconditionally mutates - no precondition checks |
+| MAJOR | no_primitive_externals | :6 | `sent_at_epoch_ms: Option<u64>` raw timestamp |
+| MAJOR | functional_core_imperative_shell | :9 | Clock-dependent operation in functional core |
+| MAJOR | no_unsafe_constructors | :1 | All fields public, no constructor, no invariant enforcement |
+| MAJOR | no_benchmark_evidence | :1 | No benchmarks or performance baseline |
+
+**Residual risk: High.** The entire type is leaky - all fields public, no constructor, no typestate, `mark_sent` is a blind state overwrite. The compiler cannot enforce validated-before-sent.

@@ -1,0 +1,16 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written 9 BLOCKER findings to `review-output.json` covering:
+
+| # | Rule | File:Line | Core Issue |
+|---|------|-----------|------------|
+| 1 | typestate_state_machine | lib.rs:1 | No enum state machine, just ad-hoc fields |
+| 2 | status_String | lib.rs:3 | `pub status: String` accepts any value |
+| 3 | bool_lifecycle | lib.rs:4 | `is_validated: bool` independently mutable |
+| 4 | bool_lifecycle | lib.rs:5 | `is_sent: bool` independently mutable |
+| 5 | option_invalid_state | lib.rs:6 | `sent_at_epoch_ms: Option<u64>` orthogonal to flags |
+| 6 | newtype_domain_id | lib.rs:2 | `id: String` not a newtyped domain ID |
+| 7 | parse_boundary | lib.rs:9 | Raw primitives cross boundary, no smart constructor |
+| 8 | public_fields_encapsulation | lib.rs:2 | All fields pub, zero encapsulation |
+| 9 | mark_sent_no_guard | lib.rs:9 | `mark_sent` validates nothing, ignores sent_at |
+
+All 9 findings are BLOCKER severity. 6 missing evidence items and residual risk documented.

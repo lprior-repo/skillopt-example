@@ -1,0 +1,35 @@
+{
+  "task_id": "repair_bounded_retries",
+  "kind": "repair",
+  "bundle": "baseline",
+  "sandbox_workdir": "/tmp/opencode/holzman-skillopt/full1/tasks/baseline/repair_bounded_retries",
+  "artifact_dir": "/home/lewis/src/skill-moo/reports/skillopt-runs/full1/tasks/baseline/repair_bounded_retries",
+  "opencode_returncode": 0,
+  "opencode_timed_out": false,
+  "initial_cargo_returncode": 101,
+  "grade": {
+    "kind": "repair",
+    "hard": 0.0,
+    "soft": 0.9833333333333335,
+    "cargo_fmt_returncode": 0,
+    "cargo_clippy_returncode": 0,
+    "cargo_test_returncode": 0,
+    "fmt_passed": true,
+    "clippy_passed": true,
+    "tests_passed": true,
+    "forbidden_matches": [],
+    "protected_changed": [],
+    "json_valid": true,
+    "json_errors": [],
+    "execution_errors": [],
+    "initial_failed": true,
+    "matched_groups": 2,
+    "total_groups": 3,
+    "missing_groups": [
+      [
+        "try_reserve",
+        "reserve"
+      ]
+    ]
+  }
+}

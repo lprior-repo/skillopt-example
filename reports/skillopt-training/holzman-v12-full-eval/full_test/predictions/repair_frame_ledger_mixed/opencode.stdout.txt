@@ -1,0 +1,10 @@
+Repair complete. Summary of changes:
+
+**`src/lib.rs`** - Fixed `encode_frame` to satisfy Holzman laws and tests:
+
+1. **Payload bound check** - Added `payload.len() > max_payload` gate returning `FrameError::PayloadTooLarge` (enables `rejects_limit` test)
+2. **Checked capacity arithmetic** - Replaced implicit allocation with `4usize.checked_add(payload.len())` returning `FrameError::Overflow`
+3. **No lossy cast** - Replaced `payload.len() as u32` with `u32::try_from(payload.len())` returning `FrameError::Overflow`
+4. **Fallible allocation** - Added `try_reserve(capacity)` returning `FrameError::Allocation`
+
+All gates pass: `cargo fmt`, `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` (2/2).

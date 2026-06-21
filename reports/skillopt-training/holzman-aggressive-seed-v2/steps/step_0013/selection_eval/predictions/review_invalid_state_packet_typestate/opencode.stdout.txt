@@ -1,0 +1,6 @@
+Now I have all the information needed. Let me write the review output.
+Done. Written `review-output.json` with 7 findings:
+
+- **3 BLOCKERs**: illegal states representable (`String` status + independent `bool` flags), no typed domain status enum, `mark_sent` mutates in-place instead of returning a pure transition
+- **2 MINORs**: all fields are `pub` allowing direct mutation bypass, `.to_string()` allocation without budget
+- **2 INFOs**: missing benchmark evidence and profiler/allocation command evidence

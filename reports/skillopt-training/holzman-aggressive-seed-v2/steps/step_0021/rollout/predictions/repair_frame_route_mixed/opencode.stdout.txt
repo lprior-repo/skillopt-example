@@ -1,0 +1,9 @@
+Now I understand the issues. The current `encode_frame` ignores `max_payload` and uses a lossy `as` cast. Let me fix the production code.
+All tests pass. Writing the output JSON.
+Repair complete. Three Holzman violations fixed in `src/lib.rs`:
+
+1. **Lossy `as` cast** — `payload.len() as u32` → `u32::try_from(payload.len())` with `Overflow` error
+2. **Missing `max_payload` enforcement** — added bounds check returning `PayloadTooLarge`
+3. **Unchecked capacity arithmetic** — `checked_add` for total size + `try_reserve` with `Allocation` error
+
+All 2 tests pass. Output written to `repair-output.json`.

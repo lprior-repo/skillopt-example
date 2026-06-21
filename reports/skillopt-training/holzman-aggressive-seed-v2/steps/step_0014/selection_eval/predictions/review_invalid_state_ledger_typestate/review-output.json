@@ -1,0 +1,63 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "LedgerWorkflow uses three independent fields (status: String, is_validated: bool, is_sent: bool) that allow inconsistent state combinations. For example, is_sent=true with status=\"pending\" is silently representable, and there is no enforced ordering (e.g., cannot send without validating first).",
+      "failure_mode": "Programmer can construct or mutate a LedgerWorkflow into an invalid state without compiler enforcement, leading to undefined workflow semantics and silent data corruption at runtime.",
+      "fix": "Replace status, is_validated, and is_sent with a single enum typestate (e.g., enum LedgerState { Pending, Validated, Sent { sent_at: u64 } }). Remove the bool/String fields entirely so only valid states are constructable."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id: String and status: String are primitive types with no domain invariants encoded in their types. Any string value is accepted for id, and status has no compile-time guarantees.",
+      "failure_mode": "Invalid IDs or unrecognized status values propagate through the system undetected. No domain validation at the type boundary.",
+      "fix": "Introduce newtype wrappers: pub struct LedgerId(String) with a fallible constructor that validates format, and replace the status field entirely with a domain enum typestate as noted above."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_untyped_return_in_action",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent returns LedgerWorkflow directly instead of Result<LedgerWorkflow, LedgerError>. There is no precondition check (e.g., item must be validated before being sent) and no typed error for invalid transitions.",
+      "failure_mode": "Calling mark_sent on an unvalidated ledger silently transitions it to sent, violating domain workflow invariants. No caller can handle the failure case with a typed error.",
+      "fix": "Change the signature to pub fn mark_sent(item: LedgerWorkflow) -> Result<LedgerWorkflow, LedgerError>. Validate the pre-state in the typestate enum and return a domain error (e.g., LedgerError::NotValidated) if the transition is invalid."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent performs a side-effect-bearing mutation (setting is_sent=true, updating status) inside what should be a pure calculation layer. The function has no separation between domain validation (pure) and the action of recording the transition.",
+      "failure_mode": "Business logic is entangled with mutation, making it impossible to unit-test the state transition rules in isolation from the workflow struct mutation.",
+      "fix": "Separate into pure validation: pub fn can_send(&LedgerWorkflow) -> bool (or better, use pattern matching on the typestate enum), and a shell action that applies the transition with explicit error handling."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "pub_fields_expose_internal_state",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All struct fields are pub, allowing external code to mutate id, status, is_validated, is_sent, and sent_at_epoch_ms directly without any domain logic or validation.",
+      "failure_mode": "Any caller can set item.is_sent = true without going through mark_sent, completely bypassing the (already-absent) validation logic. Fields are mutable from outside the module.",
+      "fix": "Make all fields private. Provide only domain-approved constructors and transition methods. With the typestate enum approach, construction itself enforces validity."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for any stated or implied performance claim",
+    "no profiler evidence for hot-path analysis",
+    "no allocation evidence (no try_reserve or measured allocation paths)",
+    "no behavior tests or integration tests exist",
+    "no command-layer API specification or test evidence"
+  ],
+  "residual_risk": "The typestate model is entirely absent — illegal states (sent-but-not-validated, inconsistent status/flag pairs) are fully representable and constructable. This is a fundamental DDD contract violation that prevents any meaningful correctness guarantees. Proof obligations cannot be derived until the type model is repaired."
+}

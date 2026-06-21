@@ -1,0 +1,38 @@
+    Checking repair_summary_sensor_mixed v0.1.0 (/tmp/opencode/holzman-skillopt-train/5b916eaeb1b447f7/repair_summary_sensor_mixed)
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:35:9
+   |
+35 |         count += 1;
+   |         ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+   = note: requested on the command line with `-D clippy::arithmetic-side-effects`
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:45:21
+   |
+45 |     let count_u32 = count as u32;
+   |                     ^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+   = note: requested on the command line with `-D clippy::as-conversions`
+
+error: arithmetic operation that can potentially result in unexpected side-effects
+  --> src/lib.rs:46:19
+   |
+46 |     let average = total / count_u32 as u64;
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#arithmetic_side_effects
+
+error: using a potentially dangerous silent `as` conversion
+  --> src/lib.rs:46:27
+   |
+46 |     let average = total / count_u32 as u64;
+   |                           ^^^^^^^^^^^^^^^^
+   |
+   = help: consider using a safe wrapper for this conversion
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#as_conversions
+
+error: could not compile `repair_summary_sensor_mixed` (lib) due to 4 previous errors

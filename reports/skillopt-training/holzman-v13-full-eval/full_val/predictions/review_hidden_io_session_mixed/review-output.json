@@ -1,0 +1,92 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md",
+    ".skill/holzman-rust/references/stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() — unwrap on fallible I/O",
+      "failure_mode": "Missing or unreadable file path aborts the entire program with a panic instead of returning a typed error the caller can handle gracefully",
+      "fix": "Return Result<Vec<Record>, LoadError> and use map_err to convert io::Error into a typed error such as LoadError::Io"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() — unwrap on fallible parse of external input",
+      "failure_mode": "A non-numeric second CSV field panics at runtime instead of returning a typed parse error the caller can report to the user",
+      "fix": "Use .map_err(|e| LoadError::InvalidValue) or similar to return a typed parse error from the Result chain"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "lossy `as u16` conversion: .parse::<u32>().unwrap() as u16",
+      "failure_mode": "A u32 value greater than 65535 silently truncates to u16, corrupting the data silently with no error indication to the caller",
+      "fix": "Use u16::try_from(parsed_u32).map_err(|_| LoadError::ValueOutOfRange) or parse directly as u16 via .parse::<u16>()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Unchecked indexing parts[0] on a collected Vec from split",
+      "failure_mode": "If a line has zero comma-separated fields (empty line), parts[0] will panic with index-out-of-bounds. Even if lines are non-empty, empty string name is accepted without validation",
+      "fix": "Use split_once(',') and .ok_or(LoadError::InvalidLine) to fail gracefully; validate the name is non-empty"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "Unchecked indexing parts[1] — accessing second CSV field without bounds check",
+      "failure_mode": "A line with only one field (no comma) produces a Vec with length 1; parts[1] panics with index-out-of-bounds",
+      "fix": "Replace split+collect with split_once(',') and use .ok_or(LoadError::InvalidLine) to return a typed error when the field is missing"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_architecture",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "Hidden I/O: println!(\"loaded {}\", parts[0]) inside the parsing closure",
+      "failure_mode": "Logging (side effect) is fused into the data-parsing pipeline, violating Data/Calculations/Actions separation. This makes the function untestable in isolation and couples pure parsing to console output",
+      "fix": "Remove println! from the parsing pipeline. Return parsed Records; let the shell layer handle logging/metrics separately"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_architecture",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record struct uses raw primitives (String, u16) with no parse boundary — callers can construct invalid states directly",
+      "failure_mode": "No smart constructor or validation means any caller can create a Record with an empty name or any u16 value, bypassing domain invariants. This is a parse-boundary violation",
+      "fix": "Add a private constructor or named impl fn new(name: &str, value: u16) -> Result<Record, RecordError> that validates name is non-empty. Consider a name newtype for the domain"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_performance",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "Intermediate Vec<String> allocation via .collect() on split + map, instead of using split_once and borrowing",
+      "failure_mode": "Every line allocates a new Vec of Strings when only two fields are needed. For large files this multiplies allocation pressure and cache misses unnecessarily",
+      "fix": "Replace split+map+collect with split_once(',') and parse directly from the borrowed string slices; use try_reserve before collecting into the output Vec"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_sessions throughput or latency",
+    "no profiler evidence for allocation hot paths",
+    "no allocation budget or try_reserve call in the function",
+    "no command evidence (cargo fmt, clippy, test) was run for this review"
+  ],
+  "residual_risk": "Static review only — no commands run. The code violates multiple absolute laws: unwrap on I/O and parse (lines 9, 19), lossy as conversion (line 19), unchecked indexing (lines 16, 19), hidden I/O in parsing closure (line 16), no parse boundary on Record (lines 3-6), intermediate Vec allocations (lines 12-15), and no typed error taxonomy. All 8 findings are BLOCKER severity. The crate will not pass strict Holzman lint gates. All issues must be repaired before delivery."
+}

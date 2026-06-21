@@ -1,0 +1,19 @@
+Now I have all references and the task crate. Let me write the review output.
+Review complete. Wrote `review-output.json` with 12 BLOCKER findings covering:
+
+| # | Rule | File:Line |
+|---|---|---|
+| 1 | no_unwrap_in_production | src/lib.rs:9 — `fs::read_to_string().unwrap()` |
+| 2 | no_unwrap_in_production | src/lib.rs:19 — `.parse().unwrap()` |
+| 3 | no_lossy_conversions | src/lib.rs:19 — `as u16` truncation from u32 |
+| 4 | no_unchecked_indexing | src/lib.rs:16 — `parts[0]` |
+| 5 | no_unchecked_indexing | src/lib.rs:19 — `parts[1]` |
+| 6 | no_hidden_io_in_pure_logic | src/lib.rs:16 — `println!` in parsing closure |
+| 7 | data_calculations_actions_separation | src/lib.rs:8 — I/O + parsing fused |
+| 8 | bounded_allocation_with_try_reserve | src/lib.rs:12 — unbounded `collect()` |
+| 9 | parse_boundary | src/lib.rs:12 — raw primitives cross boundary |
+| 10 | typed_error_taxonomy | src/lib.rs:8 — no typed errors, only panics |
+| 11 | no_raw_primitive_domain_state | src/lib.rs:3 — `Record` uses raw String/u16 |
+| 12 | split_once_for_one_separator | src/lib.rs:13 — `split(',').collect()` instead of `split_once` |
+
+All required output fields present (`severity`, `rule`, `file`, `line`, `problem`, `failure_mode`, `fix`). 6 missing evidence items flagged. No commands run (static review only).

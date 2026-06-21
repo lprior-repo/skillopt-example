@@ -1,0 +1,15 @@
+Now I understand the issues. Let me fix the source:
+
+1. `summarize_metrics` should return `Result<Summary, SummaryError>` (tests expect `Summary`, not `String`)
+2. Need `render_summary` function
+3. Multiple Holzman violations: `unwrap()`, unchecked arithmetic, unchecked indexing, no overflow check
+All 6 tests pass. Let me write the output JSON.
+Repair complete. All 6 tests pass. Changes to `src/lib.rs`:
+
+- Changed `summarize_metrics` return type from `Result<String, SummaryError>` to `Result<Summary, SummaryError>`
+- Added `render_summary` function to separate rendering from computation
+- Replaced `unwrap()` parse with error-propagating `map_err`
+- Replaced unchecked `parts[1]` indexing with `split_once`
+- Replaced unchecked `+=` arithmetic with `checked_add`/`checked_div`
+- Added `try_from` for safe width conversion (u128 → u64)
+- Added proper `Empty` and `Invalid` error handling

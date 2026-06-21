@@ -1,0 +1,109 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_expect_panic",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure (missing file, permissions, disk full).",
+      "failure_mode": "Untrusted or transient I/O errors abort the process instead of returning a typed domain error.",
+      "fix": "Return Result<Vec<Record>, std::io::Error> and propagate with ? or map_err with a domain error type."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_expect_panic",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric input in the value field.",
+      "failure_mode": "Malformed CSV rows cause a panic instead of returning a typed parse error.",
+      "fix": "Use .parse::<u32>().map_err(|e| ParseError::InvalidValue(e))? or equivalent with a domain error type, propagate up through Result."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] accesses the Vec by index without bounds check. If the line has no commas, this panics.",
+      "failure_mode": "Empty or whitespace-only lines cause a panic at runtime.",
+      "fix": "Use parts.get(0).ok_or(ParseError::MissingField(\"name\")) or restructure with split_once(',')."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] accesses the Vec by index without bounds check. If the line has only one comma-separated field, this panics.",
+      "failure_mode": "Lines missing the value column panic at runtime.",
+      "fix": "Use parts.get(1).ok_or(ParseError::MissingField(\"value\")) or restructure with split_once(',') for the two-field case."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 on a u32 parse result is an unchecked width reduction. Values > 65535 silently overflow.",
+      "failure_mode": "Large numeric values wrap silently, producing incorrect records with no error signal.",
+      "fix": "Use u16::try_from(parsed_u32).map_err(ParseError::ValueOutOfRange) to reject values outside the u16 range."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_side_effects_in_core",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) is a side effect embedded in data-loading logic. I/O side effects belong exclusively in the imperative shell.",
+      "failure_mode": "Hidden console I/O makes the function non-deterministic, non-testable, and couples data parsing to a concrete output target.",
+      "fix": "Remove println! entirely from the parsing function. If logging is needed, return a separate trace structure from the shell layer, not from the core parser."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "split_once_preferred",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(|part| part.trim().to_string()).collect() allocates a full Vec<String> when only the first two fields are needed. SKILL.md mandates split_once for first-delimiter extraction.",
+      "failure_mode": "Unnecessary heap allocation per line; also forces parsing every field even when only the first two matter.",
+      "fix": "Use line.split_once(',').ok_or(ParseError::MissingField(\"delimiter\")) to extract name and value parts, then trim and parse each independently."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "value is a raw u16 with no domain constraint encoded in the type. A Record could hold any u16 including values outside valid domain bounds.",
+      "failure_mode": "Illegal domain values are representable at the type level; the compiler cannot enforce domain invariants.",
+      "fix": "Introduce a named newtype struct RecordValue(u16) with a fallible constructor that enforces domain bounds, and use RecordValue in Record."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_error_taxonomy",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_samples returns Vec<Record> with no Result wrapper. All fallible I/O and parsing must return typed errors per Holzman Rust.",
+      "failure_mode": "Callers cannot distinguish between partial parse success and total failure; the function swallows errors via unwrap.",
+      "fix": "Change signature to pub fn load_samples(path: &str) -> Result<Vec<Record>, LoadError> where LoadError is a domain enum covering IoError, ParseError, and ValueOutOfRange."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_allocation_without_handling",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "collect() into Vec<String> has no bounded capacity and no allocation failure handling. SKILL.md requires try_reserve with checked_add/checked_mul for bounded capacity.",
+      "failure_mode": "A very large file can OOM or trigger OOM-killer; allocation failure is silently converted to continued execution with partial data.",
+      "fix": "Pre-allocate with a line-count estimate via try_reserve, compute capacity with checked_add/checked_mul, and handle AllocationError by returning a typed error."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_samples throughput or allocation behavior",
+    "no profiler data (perf/flamegraph) to validate allocation patterns",
+    "no allocation audit (e.g., dtree or heaptrack) for Vec<String> per-line allocations",
+    "no second-ring validation (e.g., proptest/fuzz) for malformed CSV input",
+    "no command-level evidence that cargo test or cargo clippy passes",
+    "no benchmark/profiler evidence to justify the current parsing approach for the expected input size"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate has pervasive unwrap() usage, unchecked indexing, lossy casts, hidden I/O side effects, and missing error taxonomy. All are runtime panic or silent-misbehavior risks that require implementation repair and post-repair command evidence (cargo test, cargo clippy, cargo bench) to fully close."
+}

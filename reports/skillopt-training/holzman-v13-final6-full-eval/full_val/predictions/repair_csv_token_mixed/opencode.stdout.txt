@@ -1,0 +1,9 @@
+Repaired. All 4 tests pass, zero clippy warnings, all Holzman absolute laws satisfied.
+
+Key changes to `src/lib.rs`:
+- Removed `.unwrap()` — replaced with `.map_err(|_| ParseError::Invalid)?`
+- Removed `Vec::with_capacity` — replaced with `Vec::new()` + `try_reserve(max_items)`
+- Added bounded allocation: `values.len() >= max_items` check before each push
+- Rejected empty input upfront with `ParseError::Empty`
+- Replaced `.collect()` into intermediate Vec with direct `for` iteration over `split(',')`
+- Added `max_items == 0` guard returning `TooMany`

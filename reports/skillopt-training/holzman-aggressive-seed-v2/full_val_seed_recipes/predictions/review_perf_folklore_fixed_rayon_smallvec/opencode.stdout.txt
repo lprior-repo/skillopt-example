@@ -1,0 +1,15 @@
+Now I have all source and references. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings:**
+
+| # | Severity | Rule | Key Issue |
+|---|----------|------|-----------|
+| 1 | BLOCKER | performance-folklore-no-evidence | TODO claims Rayon+SmallVec "will be faster" with zero evidence for a 4-byte input |
+| 2 | BLOCKER | no-parallelism-for-tiny-inputs | Rayon on 4 elements violates Holzman performance defaults; would regress by 1-2 orders of magnitude |
+| 3 | WARNING | missing-checked-allocations | `Vec::new().collect()` on line 6 has no `try_reserve` or allocation error path |
+| 4 | WARNING | missing-allocation-evidence | No profiler data to justify SmallVec adoption |
+| 5 | INFO | missing-benchmark | No benchmark harness exists |
+| 6 | INFO | missing-command-evidence | No baseline command/number/variance documented |
+
+**Missing evidence:** benchmarks, profiler data, baseline commands, allocation traces, second-ring evidence.

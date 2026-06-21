@@ -1,0 +1,10 @@
+Now I understand the issues. The current `parse_events` has multiple Holzman law violations: `unwrap()`, no empty check, no max_items enforcement, no `try_reserve`, no typed error handling.
+Repair complete. Changes to `src/lib.rs`:
+
+- Removed `unwrap()` — replaced with `map_err(|_| ParseError::Invalid)` for parse failures
+- Added empty input check → `Err(ParseError::Empty)`
+- Added `max_items` enforcement with `Err(ParseError::TooMany)` before each push
+- Added `try_reserve(max_items)` with fallible `Err(ParseError::Allocation)`
+- Used `for` loop with `split(',')` + `trim()` instead of `.collect()` + `unwrap()`
+
+All 4 behavior tests pass. No tests edited. No Cargo.toml edited.

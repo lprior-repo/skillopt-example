@@ -1,0 +1,12 @@
+Now I have the full picture. The source has multiple Holzman violations: `unwrap()` (line 24), unchecked indexing `parts[1]`, no overflow detection, division by zero risk, wrong return type (returns `String` but tests expect `Summary`), missing `render_summary`, and missing `Empty`/`Overflow` error handling.
+All 6 tests pass. Now writing the required output.
+Repair complete. All 6 behavior tests pass. Key fixes in `src/lib.rs`:
+
+- **Return type**: `Result<String>` → `Result<Summary>` (matches test contract)
+- **`unwrap()`** removed → `map_err(|_| SummaryError::Invalid)` for parse failures
+- **Unchecked indexing** `parts[1]` → `split_once(',')` with `ok_or(Invalid)`
+- **Unchecked arithmetic** `total += value` → `checked_add` with `ok_or(Overflow)`
+- **Division by zero** → `Empty` error returned before any division
+- **Missing `render_summary`** → implemented as pure formatting function
+- **`Empty` / `Overflow` errors** → properly detected and returned
+- **Functional core** → pure logic in `summarize_metrics`, rendering in `render_summary`

@@ -1,0 +1,13 @@
+Now I have all references and the task crate. Writing the review output.
+Review complete. Found 7 BLOCKER findings covering:
+
+- `status: String` should be an enum (line 3)
+- `is_validated: bool` and `is_sent: bool` are independent lifecycle booleans (lines 4-5)
+- `sent_at_epoch_ms: Option<u64>` is unowned optional lifecycle data (line 6)
+- `id: String` is a raw primitive, no newtype (line 2)
+- `mark_sent` has no pre-condition typestate guards (line 9)
+- The struct makes all 32+ boolean combinations of illegal states representable (line 1)
+
+Also flagged missing benchmark, profiler, allocation, and second-ring evidence.
+
+Output written to `review-output.json`.

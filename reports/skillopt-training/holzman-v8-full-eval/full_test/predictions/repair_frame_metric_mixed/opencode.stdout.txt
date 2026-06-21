@@ -1,0 +1,10 @@
+The `encode_frame` function ignores `max_payload` — the `rejects_limit` test expects it to reject payloads exceeding `max_payload`. Also `payload.len() as u32` is an unchecked lossy cast. Let me fix both.
+All 2 tests pass. Let me run the remaining Holzman verification gates.
+All gates pass. Now let me write the required output JSON.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+1. **Added `max_payload` bounds check** — `payload.len() > max_payload` returns `Err(FrameError::PayloadTooLarge)`, fixing the `rejects_limit` test that was previously failing because `max_payload` was ignored.
+
+2. **Replaced lossy `as` cast with `try_from`** — `payload.len() as u32` → `payload.len().try_into().map_err(|_| FrameError::Overflow)?` prevents truncation on platforms where `usize > u32`.
+
+3. **Added bounded allocation** — `try_reserve(total)` with `checked_add` for header+payload size, mapped to `FrameError::Allocation`.

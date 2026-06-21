@@ -1,0 +1,15 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json` with 9 findings:
+
+**BLOCKERs (4):**
+- `status: String` + lifecycle booleans instead of enum/typestate — makes all illegal states representable
+- `id: String` primitive observable — no `LedgerId` newtype
+- `mark_sent` has no state guard — allows any state transition including re-sends
+- No smart constructor — struct literals can create invalid states
+
+**MAJORs (2):**
+- `sent_at_epoch_ms` never populated by `mark_sent`
+- No allocation awareness — `"sent".to_string()` allocates per call
+
+**MINORs (3):**
+- Missing benchmark, profiler, allocation, and command evidence

@@ -1,0 +1,24 @@
+Now I have full understanding. The source has multiple Holzman violations and a wrong return type. Let me analyze and fix:
+
+**Issues found:**
+1. Returns `Result<String, SummaryError>` but tests expect `Result<Summary, SummaryError>` — wrong return type
+2. No `render_summary` function (tests import it)
+3. `unwrap()` on parse — violation
+4. `parts[1]` unchecked indexing — violation
+5. `total += value` unchecked arithmetic — violation
+6. `total / count as u64` — division by zero + lossy `as` cast
+7. `count as u32` — lossy `as` cast
+All 6 tests pass. Let me fix the unused variable warning for a clean build:
+Clean build, zero warnings, all 6 tests pass. Writing the output:
+Repaired. Summary of changes to `src/lib.rs`:
+
+- **Fixed return type**: `Result<String, SummaryError>` → `Result<Summary, SummaryError>` to match tests
+- **Added `render_summary`**: Pure function rendering `Summary` to string (required by test import)
+- **Removed `unwrap()`**: Parse errors now map to `SummaryError::Invalid`
+- **Replaced unchecked indexing**: `split(',')` + `parts[1]` → `split_once(',')` with `Option` binding
+- **Fixed unchecked arithmetic**: `total += value` → `checked_add` with `Overflow` error
+- **Fixed division-by-zero**: Added `count == 0` guard before division; uses `checked_div`
+- **Fixed lossy `as` casts**: `count as u32` and `count as u64` → `try_from(count)` with error mapping
+- **Moved too_many check inline**: Returns early during iteration (avoids computing summary for rejected inputs)
+
+All 6 behavior tests pass, zero warnings.

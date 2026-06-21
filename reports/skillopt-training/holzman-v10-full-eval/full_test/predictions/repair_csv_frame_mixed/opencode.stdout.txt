@@ -1,0 +1,16 @@
+Now I have full context. Let me repair `src/lib.rs` to satisfy all tests and Holzman laws.
+All 4 tests pass. Now writing the required output.
+Done. Here's a summary of the repair:
+
+**Changes to `src/lib.rs`** — removed all `unwrap()` calls and replaced with Holzman-compliant patterns:
+
+| Issue | Fix |
+|---|---|
+| `.unwrap()` on parse | `.map_err(\|_\| ParseError::Invalid)` |
+| No empty-input check | `input.trim().is_empty()` → `Err(ParseError::Empty)` |
+| No max_items enforcement | `count > max_items` check after `checked_add(1)` → `Err(ParseError::TooMany)` |
+| No bounded allocation | `try_reserve(max_items).map_err(|_| ParseError::Allocation)?` |
+| Unchecked `+= 1` | `checked_add(1)` with overflow → `TooMany` |
+| Whitespace-only input | Trailing `values.is_empty()` → `Err(ParseError::Empty)` |
+
+**Commands run:** `cargo fmt` — passed, `cargo test` — 4/4 passed.

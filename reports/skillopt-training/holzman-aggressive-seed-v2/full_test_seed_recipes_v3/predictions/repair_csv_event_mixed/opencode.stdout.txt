@@ -1,0 +1,10 @@
+Now I have the full picture. The function needs empty validation, max_items enforcement, safe parsing, and `try_reserve`. Let me fix it.
+All 4 tests pass. Now writing the output JSON.
+Repair complete. All 4 tests pass.
+
+**Changes made to `src/lib.rs`:**
+- Removed `.unwrap()` — parse failures now return `ParseError::Invalid` via `map_err`
+- Added empty-input guard returning `ParseError::Empty`
+- Added `try_reserve(max_items)` before iteration for allocation-aware growth
+- Added `max_items` enforcement — returns `ParseError::TooMany` if count exceeds limit
+- Each push uses checked bounds before insertion

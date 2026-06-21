@@ -1,0 +1,17 @@
+Review complete. Written to `review-output.json`.
+
+**7 findings, all structural violations of Holzman Rust / Functional Core principles:**
+
+| # | Severity | Rule | File:Line | Core Issue |
+|---|----------|------|-----------|------------|
+| 1 | BLOCKER | make_illegal_states_unrepresentable | `src/lib.rs:1` | All state combinations are constructable — no invariants |
+| 2 | BLOCKER | type_discipline_enum_over_string | `src/lib.rs:3` | `status: String` accepts arbitrary values |
+| 3 | BLOCKER | type_discipline_newtype_id | `src/lib.rs:2` | `id: String` — no domain newtype |
+| 4 | BLOCKER | type_discipline_typestate | `src/lib.rs:4` | `is_validated` bool bypasses validate-then-send invariant |
+| 5 | BLOCKER | type_discipline_typestate | `src/lib.rs:5` | `is_sent` bool duplicates and diverges from `status` |
+| 6 | MAJOR | functional_core_data_inert | `src/lib.rs:9` | `mark_sent` mutates in-place with no preconditions |
+| 7 | MAJOR | no_public_mutable_fields | `src/lib.rs:2` | All fields pub — external mutation destroys invariants |
+
+**5 missing evidence items** (benchmarks, profiler, allocation analysis, command output, behavior tests).
+
+**Residual risk:** The struct is architecturally broken — illegal states are fully representable. This is not patchable with checks; it requires typestate redesign.

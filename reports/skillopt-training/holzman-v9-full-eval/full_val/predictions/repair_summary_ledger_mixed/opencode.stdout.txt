@@ -1,0 +1,14 @@
+I've read the skill, all references, Cargo.toml, source, and tests. The code has multiple absolute-law violations: `unwrap()`, unchecked indexing `parts[1]`, unchecked `+=`, lossy `as` casts, division by zero risk, wrong return type (`String` vs `Summary`), and missing `render_summary`. Let me fix it.
+All 6 tests pass. Now writing the output JSON.
+Repair complete. All 6 behavior tests pass. Summary of violations fixed in `src/lib.rs`:
+
+| Violation | Before | After |
+|---|---|---|
+| Unchecked indexing | `parts[1]` | `line.split_once(',')` |
+| Panic surface | `.unwrap()` | `.ok_or(SummaryError::Invalid)?` |
+| Unchecked addition | `total += value` | `total.checked_add(value)?` |
+| Unchecked increment | `count += 1` | `count.checked_add(1)?` |
+| Lossy cast | `count as u32`, `count as u64` | `u32::try_from(count)?`, checked div |
+| Division by zero | `total / count as u64` | `total.checked_div(count as u64)?` |
+| Wrong return type | `Result<String, ...>` | `Result<Summary, ...>` |
+| Missing function | N/A | `render_summary(Summary) -> String` |

@@ -1,0 +1,30 @@
+Now I have all references and the source. Let me analyze the crate against Holzman + Functional Rust doctrine.
+
+**Source analysis of `src/lib.rs`:**
+
+1. **Line 2: `pub id: String`** — Raw primitive `String` as domain ID. Violates "parse_boundary" and "newtype/domain IDs" rules.
+2. **Line 3: `pub status: String`** — Status as String. Must be an enum. Explicit six-finding typestate trigger.
+3. **Line 4: `pub is_validated: bool`** — Lifecycle boolean. Must be typestate.
+4. **Line 5: `pub is_sent: bool`** — Lifecycle boolean. Must be typestate.
+5. **Line 6: `pub sent_at_epoch_ms: Option<u64>`** — Optional lifecycle field separate from enum variant.
+6. **Lines 9-12: `mark_sent`** — Overwrites status via string assignment, sets two booleans independently. No invariants, no validation, allows invalid state combinations.
+
+Now let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**Summary: 8 BLOCKER findings across 6 reference files read.**
+
+The `LeaseWorkflow` struct is a textbook example of invalid-state representation:
+
+| Finding | Line | Core Issue |
+|---|---|---|
+| `typestate_state_machine` | 1 | No typestate enum; arbitrary field combinations are legal |
+| `status_string_enum` | 3 | `status: String` instead of enum |
+| `bool_lifecycle_typestate` | 4 | `is_validated: bool` as lifecycle tracker |
+| `option_invalid_state_combinations` | 6 | `is_sent` and `sent_at_epoch_ms` can be inconsistent |
+| `newtype_domain_ids` | 2 | `id: String` with no validation |
+| `parse_boundary` | 1 | No smart constructor; all pub raw primitives |
+| `mark_sent_no_invariants` | 9 | No precondition checks on state transition |
+| `allocation_string_to_owned` | 10 | `to_string()` allocation on every transition |
+
+All findings are independently gradable with severity, rule, file, line, problem, failure_mode, and fix. No commands were run (static review only).

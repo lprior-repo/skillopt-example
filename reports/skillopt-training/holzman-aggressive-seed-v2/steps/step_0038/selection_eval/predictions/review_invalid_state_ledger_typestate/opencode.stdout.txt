@@ -1,0 +1,18 @@
+Now I have full context. Let me write the review.
+Review complete. Written to `review-output.json`.
+
+**Summary of findings (9 total):**
+
+**6 BLOCKERs:**
+- `LedgerWorkflow` uses `String`/`bool`/`Option<u64>` primitive flags instead of enum typestates — impossible states are representable
+- `id: String` is a raw primitive, not a domain newtype
+- `mark_sent` mutates in place instead of returning a new immutable value (violates functional core)
+- `mark_sent` has no precondition checks — any state can transition to sent
+- No domain error type for transition failures
+- `sent_at_epoch_ms` is decoupled from `is_sent` — inconsistent state is representable
+
+**2 MAJORs:**
+- All fields are `pub` — external code bypasses invariants
+- `"sent".to_string()` allocates on every call instead of using a static constant
+
+**Missing evidence:** no benchmarks, no profiler data, no allocation audit, no integration tests, no command evidence.

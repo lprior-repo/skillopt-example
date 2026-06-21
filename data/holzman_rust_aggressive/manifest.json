@@ -1,0 +1,65 @@
+{
+  "seed": 42,
+  "total_tasks": 387,
+  "splits": {
+    "train": 227,
+    "val": 80,
+    "test": 80
+  },
+  "families": [
+    "repair_csv_capacity_counter",
+    "repair_csv_mixed",
+    "repair_csv_precollect",
+    "repair_frame_mixed",
+    "repair_frame_saturating_capacity",
+    "repair_frame_with_capacity",
+    "repair_functional_registration_ddd_types",
+    "repair_holzman_header_checked_boundary",
+    "repair_summary_counter_cast",
+    "repair_summary_mixed",
+    "repair_summary_radix_discard",
+    "review_black_hat_contract_parity",
+    "review_black_hat_evidence_laundering",
+    "review_black_hat_performance_theater",
+    "review_functional_actions_in_calc",
+    "review_hidden_io_mixed",
+    "review_hidden_io_precollect_frame",
+    "review_invalid_state_optional_state",
+    "review_invalid_state_typestate",
+    "review_perf_folklore_rayon_smallvec",
+    "review_unsafe_simd_tail",
+    "review_unsafe_transmute_header",
+    "review_unsafe_unchecked_slice"
+  ],
+  "split_families": {
+    "train": [
+      "repair_csv_capacity_counter",
+      "repair_frame_mixed",
+      "repair_frame_saturating_capacity",
+      "repair_functional_registration_ddd_types",
+      "repair_holzman_header_checked_boundary",
+      "repair_summary_counter_cast",
+      "repair_summary_mixed",
+      "review_black_hat_performance_theater",
+      "review_functional_actions_in_calc",
+      "review_invalid_state_optional_state",
+      "review_invalid_state_typestate",
+      "review_perf_folklore_rayon_smallvec",
+      "review_unsafe_simd_tail",
+      "review_unsafe_transmute_header",
+      "review_unsafe_unchecked_slice"
+    ],
+    "val": [
+      "repair_frame_with_capacity",
+      "repair_summary_radix_discard",
+      "review_black_hat_evidence_laundering",
+      "review_hidden_io_mixed"
+    ],
+    "test": [
+      "repair_csv_mixed",
+      "repair_csv_precollect",
+      "review_black_hat_contract_parity",
+      "review_hidden_io_precollect_frame"
+    ]
+  }
+}

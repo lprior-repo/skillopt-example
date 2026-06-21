@@ -1,0 +1,91 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    ".skill/holzman-rust/SKILL.md",
+    ".skill/holzman-rust/references/claim-traceability.md",
+    ".skill/holzman-rust/references/functional-core-performance.md",
+    ".skill/holzman-rust/references/hardening-checklist.md",
+    ".skill/holzman-rust/references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "no_hidden_io_in_pure_logic",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics fuses file I/O (fs::read_to_string), parsing, println! logging, and domain Record construction in one function, violating Data/Calculations/Actions architecture. Shell I/O leaks into the core.",
+      "failure_mode": "The function cannot be tested without a filesystem, cannot be composed with alternative data sources, and printf-side-effects leak into pure domain logic making the calculation path non-deterministic.",
+      "fix": "Split into a shell function that handles fs::read_to_string and println!, and a pure parse_metrics(input: &[&str]) -> Result<Vec<Record>, ParseError> that consumes trusted text with no I/O."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unwrap_in_production",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() is a panic surface. unwrap() on Result from file I/O aborts the process on any file-not-found, permission-denied, or I/O error.",
+      "failure_mode": "An absent or unreadable metrics file causes a full process panic instead of returning a typed error that a caller can handle gracefully.",
+      "fix": "Return Result<Vec<Record>, LoadError>, propagate the I/O error with map_err(|e| LoadError::Io(e)), and define LoadError::Io(io::Error) or LoadError::NotFound."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unchecked_indexing",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1] performs unchecked index access on a Vec produced from split(','). If a line has fewer than 2 comma-separated fields, this panics with index out of bounds.",
+      "failure_mode": "Malformed input (e.g. a single-field line) crashes the entire pipeline instead of returning a typed parse error for that record.",
+      "fix": "Replace parts[1] with line.split_once(',').ok_or(ParseError::Invalid)?.1 and parse the value directly, avoiding the intermediate parts vector entirely."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_lossy_casts",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 after parse::<u32>() is a lossy cast. Values in the range 65536..=u32::MAX silently truncate to u16::MAX, losing data with no error.",
+      "failure_mode": "A metric value of 70000 silently becomes 4464 (70000 - 65536), corrupting data silently without any validation or error.",
+      "fix": "Replace as u16 with u16::try_from(parsed).map_err(|_| ParseError::ValueOutOfRange), returning a typed error for out-of-range values."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_intermediate_vec_allocation",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "let parts: Vec<String> = line.split(',').map(|part| part.trim().to_string()).collect() materializes an intermediate Vec<String> just to access parts[0] and parts[1]. This is unnecessary allocation for a fixed two-field record.",
+      "failure_mode": "Every input line allocates a temporary Vec plus two String allocations, increasing GC pressure and memory traffic with zero benefit over streaming access.",
+      "fix": "Use line.split_once(',').ok_or(ParseError::Invalid)? to get (_name, value_str) directly, then parse value_str without any intermediate collection."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "bounded_allocation_required",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_metrics has no bounded allocation: no domain cap on max records, no try_reserve, and no max_rows validation. The function will allocate unbounded memory from any file.",
+      "failure_mode": "A maliciously large file (e.g., 10GB) triggers unbounded Vec growth and OOM, causing a denial-of-service without any graceful allocation failure path.",
+      "fix": "Accept a max_records parameter, validate it as a positive cap, then use Vec::new() followed by out.try_reserve(max_records).map_err(|_| LoadError::Allocation)? before any push."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary_required",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Record uses raw primitives (String for name, u16 for value) with pub fields. There is no parse boundary: callers can construct invalid domain states (empty name, negative value, overly long names) directly.",
+      "failure_mode": "Any caller can create Record { name: String::new(), value: 0 } or Record { name: \"a\".repeat(1000), value: 0 }, bypassing all domain invariants without parsing through a smart constructor.",
+      "fix": "Make Record fields private, add a private name newtype (struct Name(String)), and provide Record::new(name: Name, value: u16) -> Result<Self, RecordError> with validation, or use a parse method that consumes raw strings fallibly."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "No benchmark, profiler, or allocation evidence exists for load_metrics. Without measured workload data, performance characteristics (per-iteration allocations, throughput, latency) are unverified.",
+      "failure_mode": "Performance claims or optimizations for this function would be unmeasured folklore. The intermediate Vec<String> per-line and println! side-effect could dominate runtime in real workloads.",
+      "fix": "Add a criterion or custom benchmark measuring allocations/iter, throughput (records/sec), and latency for realistic input sizes. Include a baseline of the current implementation to compare against any fix."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_metrics throughput or allocation profile",
+    "no profiler data showing hot paths in the parsing pipeline",
+    "no allocation budget or try_reserve usage for bounded Vec growth",
+    "no command evidence (cargo test, cargo clippy) was run - review is static only"
+  ],
+  "residual_risk": "Static review only; no commands ran. The source contains 7 BLOCKER violations: hidden I/O fusing shell and core, unwrap panic surfaces, unchecked indexing, lossy as cast, unnecessary intermediate Vec allocation, unbounded allocation without try_reserve/domain cap, and missing parse boundary for domain types. All absolute laws in SKILL.md section 2 are violated. The function cannot be used in any production context without these blockers being fixed."
+}

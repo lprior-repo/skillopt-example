@@ -1,0 +1,90 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "PacketWorkflow uses primitive `status: String`, `is_validated: bool`, and `is_sent: bool` instead of a domain enum and typestate. This allows illegal/inconsistent states such as `status=\"sent\"` with `is_sent=false`, or `sent_at_epoch_ms` set while `is_sent=false`.",
+      "failure_mode": "Any caller can construct or mutate a PacketWorkflow into an impossible state (e.g., validated but not sent, or sent_at_epoch_ms populated without is_sent=true), breaking domain invariants at the type level and requiring runtime checks everywhere the struct is consumed.",
+      "fix": "Replace `status: String`, `is_validated: bool`, `is_sent: bool` with a single `PacketStatus` enum (e.g., `enum PacketStatus { Pending, Validated, Sent { at_epoch_ms: u64 } }`) and remove the redundant boolean and string fields. All illegal states become unrepresentable at compile time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "`id: String` is a primitive type for a domain identifier. No `PacketId` newtype wraps it to enforce domain rules (format, length, uniqueness).",
+      "failure_mode": "Callers can pass arbitrary strings as packet IDs, including empty, malformed, or duplicate values. Domain invariants on ID are enforced at runtime instead of compile time, leading to duplicated validation logic and potential bugs.",
+      "fix": "Introduce `pub struct PacketId(String)` with a fallible constructor `fn new(s: String) -> Result<PacketId, IdError>` that enforces domain rules, and use `PacketId` in `PacketWorkflow`."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "`sent_at_epoch_ms: Option<u64>` uses a primitive `u64` for a domain timestamp. No `EpochMs` newtype wraps it.",
+      "failure_mode": "Callers can pass arbitrary u64 values (e.g., zero, negative-wrapped, or nonsensical epochs) as timestamps. Time arithmetic and comparisons are error-prone without a domain type that enforces valid ranges.",
+      "fix": "Introduce `pub struct EpochMs(u64)` with a constructor that validates the value, and use `EpochMs` inside the `PacketStatus::Sent { at: EpochMs }` variant."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "`mark_sent` mutates the input struct in place (`mut item`) and performs `.to_string()` allocation. It should return a new immutable value (pure function) or be a method on the type that operates on owned data via a constructor.",
+      "failure_mode": "The function is not referentially transparent — it takes and mutates a parameter, making it harder to reason about side effects and harder to test as a pure calculation. The `.to_string()` allocation is unnecessary heap work for a literal string.",
+      "fix": "Change the signature to `fn mark_sent(packet: PacketWorkflow) -> PacketWorkflow` (no `mut`), and assign string literals directly (`item.status = \"sent\";`) without `.to_string()`. After the typestate refactor, this becomes a constructor or pure transformation function."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "redundant_state",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "`status` (String) and `is_sent` (bool) are redundant — both track whether the packet has been sent. `mark_sent` sets `status = \"sent\"` and `is_sent = true`, but `sent_at_epoch_ms` is never set by `mark_sent`, leaving the struct in an inconsistent state.",
+      "failure_mode": "The redundant fields create a contradiction surface: a caller can set `is_sent=true` without setting `status=\"sent\"`, or vice versa. `mark_sent` leaves `sent_at_epoch_ms` as `None` despite marking the packet as sent, violating the invariant that sent packets have a timestamp.",
+      "fix": "Collapse all three fields (`status`, `is_validated`, `is_sent`, `sent_at_epoch_ms`) into a single `PacketStatus` enum that encodes the full state machine. The `Sent` variant holds the timestamp, making redundancy and inconsistency impossible."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_benchmark_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks exist to measure the performance of `mark_sent` or any packet processing path. The crate has no `benches/` directory and no `#[bench]` functions.",
+      "failure_mode": "Without benchmarks, there is no empirical evidence that the implementation meets performance requirements. Any future changes could silently degrade performance.",
+      "fix": "Add a `benches/` directory with a benchmark for the core packet processing function, measuring allocation patterns, throughput, and latency."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "missing_profiler_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler data (perf, flamegraph, or similar) exists to validate allocation or CPU behavior of the packet workflow.",
+      "failure_mode": "Without profiler evidence, allocation hotspots (e.g., `.to_string()` in `mark_sent`) cannot be confirmed as non-issues or addressed proactively.",
+      "fix": "Run `cargo flamegraph` or equivalent profiler to produce allocation/CPU evidence for the packet workflow path."
+    },
+    {
+      "severity": "INFO",
+      "rule": "missing_allocation_evidence",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "The `.to_string()` call on line 10 performs an unnecessary heap allocation for a string literal. No allocation audit or `try_reserve` evidence exists.",
+      "failure_mode": "Unnecessary heap allocation in a hot path degrades performance and increases GC pressure. In high-throughput scenarios, this can become a measurable bottleneck.",
+      "fix": "Replace `.to_string()` with direct string literal assignment: `item.status = \"sent\";` — or after the enum refactor, eliminate the field entirely."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for packet processing throughput or latency",
+    "no profiler data (perf/flamegraph) for allocation behavior of mark_sent",
+    "no allocation audit (try_reserve evidence) for bounded collections",
+    "no second-ring validation (property tests or fuzzer) for domain invariants",
+    "no CLI/command evidence for end-to-end packet workflow"
+  ],
+  "residual_risk": "High. The entire domain model uses primitives and redundant boolean flags, making illegal states representable at compile time. No typestate, no domain enums, and no newtypes exist. The mark_sent function is partially impure and leaves the struct in an inconsistent state (sent without timestamp). Without the typestate refactor, every consumer must re-validate the struct's internal consistency at runtime. No benchmarks, profiler data, or allocation evidence exist to validate performance claims."
+}

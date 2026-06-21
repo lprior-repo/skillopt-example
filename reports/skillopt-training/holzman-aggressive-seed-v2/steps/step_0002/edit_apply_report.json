@@ -1,0 +1,23 @@
+[
+  {
+    "op": "replace",
+    "target": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the f",
+    "content_preview": "- Prefer borrowed data, `Cow`, `Bytes`, caller-owned buffers, `split_once`, `get`, iterators, `try_fold`, checked arithmetic, checked division, checked shifts, `try_from`, and `try_reserve` when the f",
+    "status": "applied_replace",
+    "index": 1
+  },
+  {
+    "op": "replace",
+    "target": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+` in capacity/length/summary math, integer `/` where `checked_di",
+    "content_preview": "Before reporting a repair as done, check the source for these recurring misses: `Vec::with_capacity` without `try_reserve`, unchecked `+`/`*` in capacity/length/summary math (use `checked_add`/`checke",
+    "status": "applied_replace",
+    "index": 2
+  },
+  {
+    "op": "append",
+    "target": "",
+    "content_preview": "## Command Verification\n\nNever claim `cargo fmt`, `cargo test`, or `cargo clippy` passed unless the grader/verification output explicitly confirms it. If a command fails, report the failure, do not cl",
+    "status": "applied_append",
+    "index": 3
+  }
+]

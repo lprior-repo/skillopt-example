@@ -1,0 +1,5 @@
+{"id": "T001", "kind": "review", "code": "fn add(a: i32, b: i32) -> i32 { a + b }", "expected_groups": ["ok"]}
+{"id": "T002", "kind": "review", "code": "fn parse(s: &str) -> Result<i32, std::num::ParseIntError> { s.parse::<i32>() }", "expected_groups": ["ok"]}
+{"id": "T003", "kind": "review", "code": "fn bad() -> i32 { let x: Option<i32> = None; x.unwrap() }", "expected_groups": ["forbidden:unwrap"]}
+{"id": "T004", "kind": "review", "code": "fn also_bad() { let v = vec![1, 2, 3]; let _ = v[10]; }", "expected_groups": ["forbidden:indexing"]}
+{"id": "T005", "kind": "review", "code": "fn debug() { dbg!(42); }", "expected_groups": ["forbidden:dbg_macro"]}

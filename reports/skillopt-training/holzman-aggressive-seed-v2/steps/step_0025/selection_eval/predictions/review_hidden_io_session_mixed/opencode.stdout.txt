@@ -1,0 +1,8 @@
+I've read all skill and reference files. Now I have the full picture of the task crate. Let me write the review output.
+Review complete. Written 11 findings to `review-output.json`:
+
+- **8 BLOCKERs**: `unwrap()` (x3), hidden `println!` I/O, unchecked indexing (x3), lossy `as u16` cast, `split`+`collect` instead of `split_once`
+- **2 MINORs**: missing `try_reserve`, missing benchmark/profiler evidence
+- **4 missing_evidence** entries covering benchmarks, allocation profiling, command evidence, and CLI boundary
+
+All violations map directly to Holzman Rust rules: zero forbidden constructs, functional core / imperative shell separation, no unchecked indexing, no lossy casts, and parse-at-boundaries patterns.

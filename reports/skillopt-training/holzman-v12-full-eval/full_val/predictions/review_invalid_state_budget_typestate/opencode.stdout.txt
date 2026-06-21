@@ -1,0 +1,17 @@
+Now I have all references and the task crate. Let me write the review output.
+Review complete. Written to `/tmp/opencode/holzman-skillopt-train/f79e4522292bd1e3/review_invalid_state_budget_typestate/review-output.json`.
+
+**Summary: 6 BLOCKER findings on `src/lib.rs`**
+
+The `BudgetWorkflow` struct violates Holzman + Functional Rust in every structural dimension:
+
+| # | Rule | Line | Violation |
+|---|------|------|-----------|
+| 1 | `typestate_state_machine` | 1 | No enum-based state machine; flat struct allows illegal combinations |
+| 2 | `no_string_status` | 3 | `status: String` permits arbitrary values |
+| 3 | `no_bool_lifecycle` | 4 | `is_validated: bool` independent from status |
+| 4 | `no_option_invalid_state` | 6 | `sent_at_epoch_ms: Option<u64>` split from `is_sent: bool` |
+| 5 | `newtype_domain_id` | 2 | `id: String` is a raw primitive, no validation |
+| 6 | `parse_boundary` | 9 | No smart constructor; callers construct invalid states directly |
+
+Missing evidence: no benchmarks, no command-truth, no allocation analysis.

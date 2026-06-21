@@ -1,0 +1,18 @@
+Now I have all references and the full source. Let me write the review output.
+Review complete. Written 10 findings to `review-output.json`:
+
+**8 BLOCKERs:**
+1. `unwrap()` on I/O — line 9: file read panics on missing/unreadable file
+2. Unchecked indexing `parts[0]` — line 16: panics on short/malformed lines
+3. Unchecked indexing `parts[1]` — line 19: panics on short/malformed lines
+4. Lossy cast `as u16` — line 19: silently truncates u32 > 65535
+5. Hidden I/O `println!` — line 16: pure logic leaks side effects
+6. `parse_boundary` — line 12: raw `String`/`split(',')`/`.collect()` crosses parse boundary without smart constructors; should use `split_once`
+7. Raw primitive domain types — line 4: `Record` exposes `String` and `u16` publicly, making illegal states representable
+8. Shell leakage / no error taxonomy — line 8: I/O + parsing + domain construction fused into one function with no typed `Result`
+
+**2 WARNINGs:**
+9. Missing `try_reserve` / bounded allocation — line 10: unbounded heap growth
+10. Missing benchmark/profiler/allocation evidence
+
+**Residual risk:** Static review only — no commands executed. All 8 blockers require resolution before delivery.

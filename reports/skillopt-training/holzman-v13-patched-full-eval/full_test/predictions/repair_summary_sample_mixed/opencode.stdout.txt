@@ -1,0 +1,26 @@
+Now I have a clear picture. Let me read the remaining references and then repair the crate.
+Issues identified in `src/lib.rs`:
+- `Vec::collect()` + unchecked `parts[1]` indexing — should use `split_once`
+- `.unwrap()` panic surface
+- `total += value` and `count += 1` — unchecked arithmetic
+- `count as u32` and `count as u64` — lossy casts
+- `total / count` — unchecked division
+- Missing empty-input check
+- Return type mismatch: tests expect `Result<Summary, SummaryError>`, not `Result<String, ...>`
+- Missing `render_summary` function
+
+Fixing production source:
+All 6 tests pass. Let me verify the final source and write the output.
+Repaired. All 6 tests pass. Summary of changes to `src/lib.rs`:
+
+| Violation | Fix |
+|---|---|
+| `split(',').map().collect()` + `parts[1]` indexing | `split_once(',')` with `_name, value_str` destructuring |
+| `.unwrap()` on parse | `.map_err(\|_\| SummaryError::Invalid)` |
+| `total += value` unchecked add | `total.checked_add(value).ok_or(Overflow)` |
+| `count += 1` unchecked add | `count.checked_add(1).ok_or(Overflow)` |
+| `count as u32` lossy cast | `u32::try_from(count).map_err(Overflow)` |
+| `total / count as u64` lossy + unchecked | `u64::try_from(count)` + `checked_div` |
+| Missing empty-input check | `if count == 0 { Err(Empty) }` |
+| Wrong return type `Result<String, ...>` | `Result<Summary, SummaryError>` |
+| Missing `render_summary` | Added as pure formatting function |

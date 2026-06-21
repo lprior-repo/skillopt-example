@@ -1,0 +1,17 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Wrote `review-output.json` with 13 findings:
+
+**9 Blockers:**
+- Hidden I/O in pure logic (fs::read_to_string + println! fused into parsing)
+- Panic surfaces (3x `.unwrap()` on I/O, parse, and implicit indexing)
+- Lossy cast (`u32 as u16` silently truncates)
+- Unbounded allocation (no domain cap, no `try_reserve`)
+- Missing domain modeling (raw `String`/`u16` instead of newtypes)
+- Missing error taxonomy (no typed `Result`, only panics)
+
+**3 Warnings:**
+- No benchmark/profiler/command/test evidence
+
+**Missing evidence:** benchmarks, profiler data, test modules, allocation measurements, command-truth logs
+
+**Residual risk:** Static review only; all semantic violations are independent of compile state and must be fixed before promotion.

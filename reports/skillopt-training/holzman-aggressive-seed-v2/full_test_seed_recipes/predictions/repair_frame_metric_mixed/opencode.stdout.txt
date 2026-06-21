@@ -1,0 +1,18 @@
+Issues identified in `src/lib.rs`:
+1. `payload.len() as u32` — lossy cast, violates Holzman rules
+2. Missing payload length check against `max_payload` (test `rejects_limit` expects this)
+3. Missing `try_reserve` before Vec growth
+4. Missing checked arithmetic for capacity computation
+All 2 tests pass. Now writing the required output.
+Repair complete. Summary of changes to `src/lib.rs`:
+
+| Issue | Fix |
+|---|---|
+| Lossy `as` cast (`payload.len() as u32`) | `u32::try_from(payload.len())` with `FrameError::Overflow` |
+| Missing `max_payload` gate | Early return `Err(FrameError::PayloadTooLarge)` |
+| No bounded allocation | `try_reserve(capacity)` mapped to `FrameError::Allocation` |
+| No checked capacity math | `4usize.checked_add(payload.len()).ok_or(Overflow)` |
+
+`cargo fmt` — passed
+`cargo test` — 2/2 passed (encodes, rejects_limit)
+`repair-output.json` — written

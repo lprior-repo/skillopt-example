@@ -1,0 +1,80 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "status is a raw String, allowing any arbitrary string value including invalid workflow states like \"pending\", \"invalid\", or \"sent\" mixed with is_sent flag",
+      "failure_mode": "Callers can construct PacketWorkflow with status=\"unknown\" and is_sent=true, creating an invalid state the type system cannot reject",
+      "fix": "Replace `status: String` with a domain enum `PacketStatus { Pending, Validated, Sent }` with a fallible constructor rejecting unknown variants"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "is_validated is a bool lifecycle flag that cannot express the full state space; true/false is semantically meaningless without ordering context and can coexist with incompatible status values",
+      "failure_mode": "PacketWorkflow can have status=\"sent\", is_validated=false, is_sent=true — a logically impossible state that the compiler cannot prevent",
+      "fix": "Replace `is_validated: bool` with a typed field on an enum or fold it into a single `PacketStatus` typestate enum that encodes the valid transition lattice (e.g., `Pending -> Validated -> Sent`)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_bool_lifecycle_flags",
+      "file": "src/lib.rs",
+      "line": 5,
+      "problem": "is_sent is a bool lifecycle flag that duplicates the \"sent\" information already in the String status, and can contradict it",
+      "failure_mode": "PacketWorkflow can have status=\"pending\" and is_sent=true, or status=\"sent\" and is_sent=false — either is a broken invariant the type system permits",
+      "fix": "Remove `is_sent: bool` entirely; derive sent-state from the `PacketStatus::Sent` enum variant. If sent-at metadata is needed, place it on the Sent variant: `Sent { sent_at_epoch_ms: u64 }`"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_type_safety",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent takes PacketWorkflow by value and mutates fields directly, bypassing any domain invariants; it does not check preconditions (e.g., must be validated before sent)",
+      "failure_mode": "Any caller can call mark_sent on a PacketWorkflow regardless of its current status, producing a \"sent\" state even from an invalid or unvalidated starting point",
+      "fix": "Replace with a fallible constructor or state-machine method: `fn PacketWorkflow::transition_to_sent(self) -> Result<PacketWorkflow, TransitionError>` that validates the source state is Validated before allowing the transition, or fold into an enum with `with_sent(sent_at: u64) -> Self` that constructs the new state directly"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "id is a raw String with no domain semantics, validation, or formatting guarantees",
+      "failure_mode": "No enforcement of ID format, length limits, uniqueness, or encoding; callers can set empty strings or invalid identifiers",
+      "fix": "Introduce a newtype `PacketId(String)` or `PacketId([u8; N])` with a fallible constructor that validates the ID format at the boundary"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "primitive_obsession",
+      "file": "src/lib.rs",
+      "line": 6,
+      "problem": "sent_at_epoch_ms is a raw Option<u64> with no domain wrapper for temporal values",
+      "failure_mode": "No validation that the epoch value is sensible (e.g., non-zero, within range); callers can store arbitrary u64 values",
+      "fix": "Use a `SentTimestamp(u64)` newtype with a constructor that validates the value (e.g., non-zero) at the boundary, eliminating invalid values from the core"
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "All fields are pub, allowing external code to mutate the struct directly without going through any domain methods",
+      "failure_mode": "External code can set `item.status = \"anything\"` and `item.is_sent = true` directly, completely bypassing the mark_sent function and its (absent) invariants",
+      "fix": "Make all fields private and provide only domain methods for state transitions; use a builder or fallible constructors for initial creation"
+    },
+    {
+      "severity": "MINOR",
+      "rule": "missing_behavior_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No behavior tests exist for the workflow transitions or invariant checks",
+      "failure_mode": "No test evidence that mark_sent produces correct output or that invalid states are rejected",
+      "fix": "Add tests for: valid transition path, rejected invalid transitions, and field access guarantees"
+    }
+  ],
+  "missing_evidence": ["no benchmark exists for any performance claim", "no profiler evidence for allocation patterns", "no allocation analysis (use_count/allocations measured)", "no command-line interface or binary target to test command evidence", "no behavior tests or unit tests in the crate"],
+  "residual_risk": "The data model cannot enforce its own domain invariants — illegal PacketWorkflow states are constructible and mutable from any location. Without replacing primitives (String status, bool flags) with enums/typestates, no amount of runtime checking can fully prevent invalid state. This is an architectural blocker that no amount of tests can fully mitigate."
+}

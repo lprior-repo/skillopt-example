@@ -1,0 +1,25 @@
+{
+  "status": "repaired",
+  "reference_files_read": [
+    "/tmp/opencode/holzman-skillopt-train/cc740de09978fd2f/repair_csv_sensor_mixed/.skill/holzman-rust/SKILL.md",
+    "/home/lewis/.agents/skills/holzman-rust/references/nasa-jpl-standards.md"
+  ],
+  "changed_files": ["src/lib.rs"],
+  "commands": [
+    {"command": "cargo fmt", "status": "passed"},
+    {"command": "cargo test", "status": "passed"},
+    {"command": "cargo clippy -- -D warnings", "status": "passed"}
+  ],
+  "rules_satisfied": [
+    "No production unwrap/expect/panic/todo/unimplemented/unreachable",
+    "Empty input returns Err(ParseError::Empty)",
+    "Invalid parse returns Err(ParseError::Invalid)",
+    "Exceeding max_items returns Err(ParseError::TooMany)",
+    "No unchecked indexing, arithmetic, or lossy casts",
+    "Typed error propagation via ?",
+    "All 4 behavior tests pass",
+    "Clippy clean with -D warnings"
+  ],
+  "skipped_gates": [],
+  "residual_risk": "None. ParseError::Allocation variant is unused but retained for API completeness; it is not reachable in current logic."
+}

@@ -1,0 +1,6 @@
+Repaired `src/lib:9`. The original `parse_audits` used `.unwrap()`, `split().collect()`, and ignored `max_items`. Changes:
+
+- Reject empty input → `ParseError::Empty`
+- Check `max_items == 0` → `ParseError::TooMany`
+- Replace `split().collect().unwrap()` with iterative `try_reserve`, per-item `TooMany` cap, and `map_err(Invalid)` on parse
+- All 4 behavior tests pass, clippy clean, fmt clean

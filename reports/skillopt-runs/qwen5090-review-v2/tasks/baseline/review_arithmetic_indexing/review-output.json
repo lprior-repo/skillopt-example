@@ -1,0 +1,75 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "references/nasa-jpl-standards.md",
+    "references/latency-throughput-playbook.md",
+    "references/runtime-performance-architecture.md",
+    "references/zero-cost-abstractions.md",
+    "references/simd-patterns.md",
+    "references/mechanical-empathy-toolchain.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_bounded_loops / arithmetic_side_effects",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Unchecked arithmetic on line 3: `start + len as usize` uses plain `+` with no overflow check. If `offset + len` exceeds usize::MAX, the addition silently wraps, producing a smaller `end` that may or may not out-of-bounds the buffer depending on the wrap pattern.",
+      "failure_mode": "Silent integer wrap leading to out-of-bounds slice or incorrect window. On 32-bit platforms, `u32::MAX + u32::MAX` wraps to 4294967294usize, potentially underflowing the slice range.",
+      "fix": "Use `usize::checked_add` or `saturating_add` on line 3 and return `Result<&[u8], ArithmeticError>` or `Option<&[u8]>` on overflow."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_unsafe_by_default / indexing_slicing",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "Unchecked slice indexing on line 4: `&buf[start..end]` will panic with IndexOutOfBounds if `end > buf.len()` or `start > buf.len()`. The function accepts arbitrary `offset` and `len` values from callers with no validation, making it trivially panic-inducible.",
+      "failure_mode": "Remote or adversarial callers can supply `offset=0, len=0xFFFFFFFF` on a small buffer to trigger a panic, causing denial of service.",
+      "fix": "Validate `start <= buf.len()` and `end <= buf.len()` before slicing. Return `Result<&[u8], WindowError>` where `WindowError` distinguishes Overflow, OffsetOutOfBounds, and LengthOutOfBounds cases."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_checked_results / zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Function signature returns `&[u8]` directly instead of `Result<&[u8], E>` or `Option<&[u8]>`. This hides all failure modes (arithmetic overflow, bounds violations) behind implicit panics, violating the rule that callers must check return values and callees must validate parameters.",
+      "failure_mode": "All invalid-input paths become panic paths. Callers have no way to distinguish overflow from bounds errors from success. This violates Power of Ten Rule 7 (checked returns) and the Holzman Rust panic-freedom standard.",
+      "fix": "Change signature to `pub fn read_window(buf: &[u8], offset: u32, len: u32) -> Result<&[u8], WindowError>` with a custom enum or use `Option<&[u8]>` if the caller does not need error discrimination."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "power10_simple_control_flow / no_panic_paths",
+      "file": "src/lib.rs",
+      "line": 4,
+      "problem": "The function relies on panic-driven control flow via Rust's slice bounds check. When `end > buf.len()`, the standard library's `Range::start_bound` / `slice::get_unchecked` machinery triggers a `panic!()` via `slice::bounds_check`. This is indirect recursion into the panic machinery and violates the simple control flow rule.",
+      "failure_mode": "Unstructured panic propagation. The panic does not carry domain context (which offset/len/buffer-size caused it), making recovery or diagnostics impossible.",
+      "fix": "Replace with explicit bounds validation and return a typed error. This eliminates the panic path entirely."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "as_conversions / arithmetic_side_effects",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Lossy `as` conversion on line 2: `offset as usize` converts `u32` to `usize`. On 32-bit targets this is exact, but on 16-bit or smaller platforms this silently truncates. While Rust platforms are typically 32/64-bit, the Holzman standard requires explicit handling of all lossy conversions.",
+      "failure_mode": "On exotic platforms or future porting, large u32 values exceeding usize::MAX would truncate, causing incorrect offsets that may or may not out-of-bounds the buffer.",
+      "fix": "Use `u32::try_into()` with explicit `Result<usize, TryFromIntError>` or validate `offset <= usize::MAX` before the cast. Document the target platform constraint."
+    },
+    {
+      "severity": "WARNING",
+      "rule": "power10_short_functions / invariant_density",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No documentation or inline comments explaining the function's preconditions, postconditions, or intended bounds. The function's contract (what offset/len/length relationships are valid) is entirely implicit in the source.",
+      "failure_mode": "Future maintainers or callers cannot determine valid input ranges without reading the source and inferring bounds checks. This increases review cost and bug surface.",
+      "fix": "Add doc comments specifying: (a) valid range: `offset + len <= buf.len()`, (b) error behavior on violation, (c) return value semantics. Even though the function is short, the contract should be explicit."
+    }
+  ],
+  "missing_evidence": [
+    "No benchmarks exist for this function. A latency benchmark with realistic buffer sizes and offset distributions is needed to establish p50/p95/p99 latency for valid and invalid input paths.",
+    "No profiler evidence showing the function's hot-path characteristics or branch predictability of bounds checks.",
+    "No assembly/IR evidence (cargo asm / cargo llvm-ir) to verify whether bounds checks are elided on valid paths or branch predictability of overflow checks.",
+    "No unit tests exist to exercise valid windows, boundary conditions (offset+len == buf.len()), offset-out-of-bounds, length-out-of-bounds, and arithmetic-overflow edge cases.",
+    "No `rust-toolchain.toml` exists to pin the toolchain version."
+  ],
+  "residual_risk": "The function is trivially panic-inducible by any caller with untrusted input. There is no bounds validation, no arithmetic overflow protection, and no fallible return type. An adversary controlling `offset` or `len` can cause immediate denial of service. The only mitigant is that Rust's slice indexing panics before reading invalid memory (no undefined behavior), but the panic itself is a safety violation. Remediation requires converting to Result-returning API with explicit bounds and arithmetic checks. No benchmarks, tests, or toolchain pinning exist, leaving performance and reproducibility unverified."
+}

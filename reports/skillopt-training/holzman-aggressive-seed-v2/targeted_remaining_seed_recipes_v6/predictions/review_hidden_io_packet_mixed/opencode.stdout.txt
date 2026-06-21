@@ -1,0 +1,9 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**14 findings across the crate:**
+
+- **10 BLOCKERs**: `unwrap()` on I/O (line 9), `unwrap()` on parse (line 19), lossy `as u16` cast (line 19), two unchecked `parts[]` indexings (lines 16, 19), hidden `println!` I/O (line 16), mixed I/O/parsing (line 8), unbounded `collect::<Vec>` (line 12), `to_string()` per-field allocation (line 14), no typed error domain (line 8), raw primitives without parse boundary (line 3).
+- **2 WARNINGs**: no benchmark/profiler/allocation evidence, no test files.
+
+**Missing evidence**: benchmarks, profiler data, allocation analysis, Miri/Kani second-ring, command evidence (cargo test/clippy/fmt).

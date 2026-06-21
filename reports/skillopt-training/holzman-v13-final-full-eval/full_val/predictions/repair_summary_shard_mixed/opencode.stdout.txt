@@ -1,0 +1,23 @@
+Now I have the full picture. The crate has multiple Holzman violations and is missing the `render_summary` function. Let me analyze the issues and repair the source.
+
+**Violations found in `src/lib.rs`:**
+1. `split(',').map(...).collect()` — mandatory `split_once` pattern violated
+2. `parts[1]` — unchecked indexing
+3. `.unwrap()` — panic surface on parse
+4. `total += value` — unchecked arithmetic
+5. `count += 1` — unchecked arithmetic  
+6. `count as u32` / `count as u64` — lossy casts (mandatory `try_from`)
+7. `total / count as u64` — unchecked division + lossy cast
+8. Missing `render_summary` function the tests import
+9. Return type mismatch: tests expect `Result<Summary, ...>` not `Result<String, ...>`
+All 6 tests pass. Let me run the remaining verification gates.
+Source is clean — no `unsafe`, `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `assert!`, lossy `as`, unchecked arithmetic/indexing, or ignored fallible results. All mandatory patterns present: `split_once`, `checked_add`, `checked_div`, `u64::try_from(count)`, `u32::try_from(count)`, typed error returns.
+Repair complete. All 6 behavior tests pass, formatting clean, JSON output written.
+
+**Changes to `src/lib.rs`:**
+- Replaced `split(',').collect()` + unchecked `parts[1]` + `.unwrap()` with `split_once(',')` + `map_err`
+- Replaced `total += value` / `count += 1` with `checked_add` + typed `Overflow` errors
+- Replaced lossy `count as u32` / `count as u64` and unchecked `total / count` with `u32::try_from(count)`, `u64::try_from(count)`, and `checked_div`
+- Added `render_summary(Summary) -> String` function
+- Changed `summarize_metrics` return type from `Result<String, ...>` to `Result<Summary, ...>` to match tests
+- Added `Empty` guard at function entry

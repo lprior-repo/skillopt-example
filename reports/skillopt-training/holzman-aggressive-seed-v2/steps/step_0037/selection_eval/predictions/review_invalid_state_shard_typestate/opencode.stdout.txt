@@ -1,0 +1,15 @@
+Now I have a complete picture. Let me write the review output.
+Review complete. Wrote `review-output.json` with 8 findings:
+
+**BLOCKER (5):**
+- Primitive obsession: `id`, `status` as raw `String` instead of newtypes/enums
+- Bool lifecycle flags: `is_validated`, `is_sent` instead of typestate enum
+- Typestate absent: `ShardWorkflow` admits every field combination including contradictions
+- `mark_sent` has no validation or error path for invalid source states
+
+**MAJOR (2):**
+- All fields are `pub` — no encapsulation
+- Magic string `"sent"` instead of enum variant
+
+**MISSING EVIDENCE (5):**
+- No benchmarks, profiler data, allocation analysis, command-layer contracts, or behavior tests

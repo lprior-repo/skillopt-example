@@ -1,0 +1,16 @@
+Now I have all the source and references. Let me write the review output.
+Review complete. Written to `review-output.json`.
+
+**7 BLOCKER findings** across the task crate:
+
+| # | Rule | Line | Core Issue |
+|---|---|---|---|
+| 1 | `typestate_state_machine` | 1 | No explicit state machine; contradictory field combinations are representable |
+| 2 | `status_string` | 3 | `status: String` allows any value including typos and invalid transitions |
+| 3 | `bool_lifecycle` | 4 | Independent `is_validated`/`is_sent` booleans can contradict each other |
+| 4 | `option_invalid_state_combinations` | 6 | `sent_at_epoch_ms` detached from lifecycle state |
+| 5 | `newtype_domain_ids` | 2 | `id: String` raw primitive, interchangeable with other fields |
+| 6 | `parse_boundary` | 1 | No smart constructors; callers construct invalid states directly |
+| 7 | `mark_sent_invalid_transition` | 9 | `mark_sent` skips validation check, sends unvalidated leases |
+
+**5 missing evidence** items: no benchmarks, profiler data, allocation evidence, second-ring verification, or command evidence.

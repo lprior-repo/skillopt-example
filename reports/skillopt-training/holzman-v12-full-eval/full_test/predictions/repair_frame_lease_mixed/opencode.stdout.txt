@@ -1,0 +1,10 @@
+Now let me read the Holzman references and run the initial checks:
+The test expects `PayloadTooLarge` when payload exceeds `max_payload`. Current code ignores `max_payload`. Also has lossy `as` cast. Let me fix both:
+Repaired. Summary of changes to `src/lib.rs`:
+
+1. **Added payload cap check**: `payload.len() > max_payload` → `Err(FrameError::PayloadTooLarge)` (fixed the `rejects_limit` test failure)
+2. **Replaced lossy cast**: `payload.len() as u32` → `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?` (Holzman law compliance)
+3. **Added checked capacity arithmetic**: `4usize.checked_add(payload.len())` (no unchecked arithmetic)
+4. **Added fallible allocation**: `try_reserve` mapped to `FrameError::Allocation`
+
+All 2 tests pass, all Holzman strict lint gates pass. Output written to `repair-output.json`.

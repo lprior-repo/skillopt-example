@@ -1,0 +1,11 @@
+Review complete. Written to `review-output.json`.
+
+**5 BLOCKER findings**, all structural:
+
+1. **`src/lib.rs:1`** — `ShardWorkflow` uses `bool` flags + free-form `String status`, making every illegal state representable. Should be a single enum typestate.
+2. **`src/lib.rs:2`** — `id: String` is a primitive with no domain validation. Should be a `ShardId` newtype.
+3. **`src/lib.rs:4`** — `is_validated: bool` is a primitive lifecycle flag. Should be folded into the typestate enum.
+4. **`src/lib.rs:5`** — `is_sent: bool` + `sent_at_epoch_ms: Option<u64>` can diverge. Should be `Sent { sent_at_epoch_ms: u64 }` variant.
+5. **`src/lib.rs:9`** — `mark_sent` has no precondition checks; any shard can be sent regardless of current state. Should be `try_advance(state) -> Result<ShardState, ShardError>` with enforced transition graph.
+
+**5 missing evidence** items: no benchmarks, profiler, allocation data, second-ring tests, or command evidence.

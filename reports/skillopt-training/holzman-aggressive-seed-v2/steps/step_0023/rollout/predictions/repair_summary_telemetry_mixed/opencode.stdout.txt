@@ -1,0 +1,13 @@
+Now I have full picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a new `render_summary` function. Let me fix the production source.
+All 6 tests pass. Writing the required output.
+Repair complete. All 6 behavior tests pass.
+
+**Changes to `src/lib.rs`:**
+
+- **Return type**: `summarize_metrics` now returns `Result<Summary, SummaryError>` instead of `Result<String, SummaryError>` (matching test contract)
+- **Added `render_summary`**: Pure function that formats a `Summary` into the expected string
+- **Removed `unwrap()`**: Parse errors now return `SummaryError::Invalid`
+- **Removed unchecked indexing**: `parts[1]` replaced with `parts.len() < 2` check + `parts[1]` access after bounds verification
+- **Added checked arithmetic**: `checked_add` for overflow detection → `SummaryError::Overflow`
+- **Added Empty check**: Zero-line input returns `SummaryError::Empty`
+- **Fixed TooMany logic**: Per-line check before incrementing count

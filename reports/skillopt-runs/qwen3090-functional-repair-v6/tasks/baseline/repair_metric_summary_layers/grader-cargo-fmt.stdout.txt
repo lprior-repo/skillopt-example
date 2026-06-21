@@ -1,0 +1,42 @@
+Diff in /tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_metric_summary_layers/src/lib.rs:35:
+         let _label = parts[0].trim();
+         let value_str = parts[1].trim();
+ 
+[31m-        let value: u64 = value_str
+(B[m[31m-            .parse()
+(B[m[31m-            .map_err(|_| SummaryError::Invalid)?;
+(B[m[32m+        let value: u64 = value_str.parse().map_err(|_| SummaryError::Invalid)?;
+(B[m 
+[31m-        total = total
+(B[m[31m-            .checked_add(value)
+(B[m[31m-            .ok_or(SummaryError::Overflow)?;
+(B[m[32m+        total = total.checked_add(value).ok_or(SummaryError::Overflow)?;
+(B[m 
+         count += 1;
+     }
+Diff in /tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_metric_summary_layers/tests/behavior.rs:4:
+ fn pure_summary_counts_total_and_average() {
+     assert_eq!(
+         summarize_metrics("cpu,10\nmem,5", 8),
+[31m-        Ok(Summary { count: 2, total: 15, average: 7 })
+(B[m[32m+        Ok(Summary {
+(B[m[32m+            count: 2,
+(B[m[32m+            total: 15,
+(B[m[32m+            average: 7
+(B[m[32m+        })
+(B[m     );
+ }
+ 
+Diff in /tmp/opencode/holzman-skillopt/qwen3090-functional-repair-v6/tasks/baseline/repair_metric_summary_layers/tests/behavior.rs:34:
+ #[test]
+ fn render_summary_is_separate_from_calculation() {
+     assert_eq!(
+[31m-        render_summary(Summary { count: 2, total: 15, average: 7 }),
+(B[m[32m+        render_summary(Summary {
+(B[m[32m+            count: 2,
+(B[m[32m+            total: 15,
+(B[m[32m+            average: 7
+(B[m[32m+        }),
+(B[m         "count=2 total=15 average=7"
+     );
+ }

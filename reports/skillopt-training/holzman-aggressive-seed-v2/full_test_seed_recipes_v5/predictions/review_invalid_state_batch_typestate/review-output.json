@@ -1,0 +1,92 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "references/functional-core-performance.md",
+    "references/review-output-contract.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "make_illegal_states_unrepresentable",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "BatchWorkflow uses status: String, is_validated: bool, is_sent: bool, and sent_at_epoch_ms: Option<u64> — any caller can construct states like is_sent=true with status='pending' and sent_at_epoch_ms=None",
+      "failure_mode": "Business logic branching on status or sent flags reads inconsistent state; e.g., a 'send batch' path may skip validation because is_validated is checked separately from status, and a 'confirm sent' path may crash on sent_at_epoch_ms.unwrap_or_default()",
+      "fix": "Replace String status and lifecycle booleans with a sealed WorkflowStatus enum and a typestate struct. Use a fallible smart constructor that requires is_validated before allowing transition to Sent, which also requires a timestamp. Remove all pub fields."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parse_boundary",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "Raw primitives (String, bool, Option<u64>) enter the domain struct directly with no parse boundary or smart constructor",
+      "failure_mode": "Callers can bypass all domain invariants by constructing BatchWorkflow{..} directly with arbitrary String values for status and arbitrary bool combinations for lifecycle flags",
+      "fix": "Parse at the boundary into newtypes and enum variants through fallible constructors. Make the struct private and expose only a Builder or constructor that enforces invariants."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "mark_sent mutates the struct in-place with no state transition validation — it overwrites status and sets is_sent without checking prior state or requiring is_validated",
+      "failure_mode": "A batch can be marked sent without ever being validated, or re-sent after already being sent. No idempotency guard, no prior-state check, no timestamp provision",
+      "fix": "Replace mark_sent with a method on a typestate-aware enum. Require the prior state to be Validated before transitioning to Sent, set the timestamp automatically via a clock abstraction or argument, and return a typed error for invalid transitions."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no_pub_fields",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "All four fields of BatchWorkflow are pub, making the struct externally mutable and all invariants bypassable",
+      "failure_mode": "Any downstream crate can set item.status = \"deleted\"; item.is_sent = true; item.is_validated = false; in a single expression, creating an impossible state that breaks all downstream assumptions",
+      "fix": "Make all fields private. Expose only read-only accessors via impl methods. Provide a single constructor/Builder that enforces invariants at construction time."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 10,
+      "problem": "item.status = \"sent\".to_string() allocates a new String on every mark_sent call instead of using an enum variant or &'static str",
+      "failure_mode": "Unnecessary heap allocation in a hot path. If mark_sent is called per-request in a server, this generates continuous allocation pressure with no benefit over an enum or static string",
+      "fix": "Replace status: String with a WorkflowStatus enum. The mark_sent transition assigns the enum variant directly with zero allocation."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmarks, no profiler evidence, no allocation measurements exist for any performance claim about mark_sent or BatchWorkflow",
+      "failure_mode": "Optimization decisions are cargo-culted or reversed without evidence; hidden allocations in hot paths go undetected",
+      "fix": "Add a criterion or tinybench benchmark for mark_sent measuring allocations per call. Run with cargo bench and report baseline numbers before any optimization."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_tests",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No test files exist anywhere in the crate. No behavior tests, no integration tests, no unit tests",
+      "failure_mode": "No evidence that mark_sent works correctly for valid transitions, no regression protection for refactoring the typestate model, no coverage of invalid transition rejection",
+      "fix": "Add tests covering: valid transition from Validated to Sent, rejection of Sent->Sent (idempotency), rejection of Pending->Sent (validation not complete), and constructor rejection of impossible initial states."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "missing_command_evidence",
+      "file": "Cargo.toml",
+      "line": 1,
+      "problem": "No [[bench]] section, no dev-dependencies (criterion, proptest), no test targets configured",
+      "failure_mode": "No CI can run benchmarks or tests; no automated regression or mutation testing is possible",
+      "fix": "Add dev-dependencies for testing and benchmarking. Add [[bench]] section with a criterion harness if performance evidence is required."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for mark_sent or any performance claim",
+    "no profiler evidence (cargo-flamegraph, perf, or similar) exists",
+    "no allocation evidence (criterion with measurement, or valgrind/memcheck) exists",
+    "no second-ring evidence (assembly listing, MIR dump, or compiler IR) exists for allocation claims",
+    "no command evidence (cargo test, cargo clippy, cargo fmt) was run",
+    "no test files exist in the crate",
+    "no examples or benches directories exist"
+  ],
+  "residual_risk": "The crate is architecturally broken at the type level: illegal states are directly representable via pub fields on a struct with String status and boolean lifecycle flags. The mark_sent function performs no validation or state transition guards. All Holzman Rust invariants around typestates, parse boundaries, and functional core separation are violated. Even a trivial repair to the type model would require redesigning the struct into an enum with a typestate pattern. No behavioral evidence (tests, benchmarks, command output) exists to validate any aspect of the crate. The entire crate is BLOCK_GLOBAL until the type model is repaired."
+}

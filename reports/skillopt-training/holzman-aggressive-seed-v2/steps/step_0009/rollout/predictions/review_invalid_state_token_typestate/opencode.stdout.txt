@@ -1,0 +1,8 @@
+Now I have all the information needed. Let me write the review output.
+Review complete. Written to `review-output.json` with 8 findings:
+
+- **4 BLOCKERs**: Primitive-obsessed status field (String instead of enum/typestate), boolean lifecycle flags, unvalidated primitive `id`, and fully public fields with no constructor — all make illegal states representable.
+- **2 MAJORs**: `mark_sent` performs no state checks (always overwrites), and unbounded `.to_string()` allocation with no handling.
+- **2 MINORs**: Missing benchmark/profiler/allocation/command evidence and no clippy/test execution.
+
+Primary residual risk: the type system provides zero protection against workflow invariants — every caller can construct contradictory states.

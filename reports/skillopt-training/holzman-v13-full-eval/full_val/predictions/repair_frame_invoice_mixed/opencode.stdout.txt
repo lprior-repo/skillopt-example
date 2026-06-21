@@ -1,0 +1,19 @@
+Now I understand the issues. The `encode_frame` function violates multiple Holzman Rust laws:
+- Line 10: lossy `as` conversion (`payload.len() as u32`)
+- No `payload.len() > max_payload` check (test `rejects_limit` fails)
+- No checked capacity arithmetic
+- No fallible `try_reserve`
+
+Let me fix the production source.
+Both tests pass. Let me verify the final source and write the output.
+Repair complete. Here's a summary of what was fixed in `src/lib.rs`:
+
+1. **Lossy `as` conversion** (line 10 original): `payload.len() as u32` replaced with `u32::try_from(payload.len()).map_err(|_| FrameError::Overflow)?`
+
+2. **Missing payload size gate**: Added `if payload.len() > max_payload { return Err(FrameError::PayloadTooLarge); }` to satisfy the `rejects_limit` test
+
+3. **Unchecked capacity arithmetic**: Added `4usize.checked_add(payload.len()).ok_or(FrameError::Overflow)?`
+
+4. **Unbounded allocation**: Added `out.try_reserve(capacity).map_err(|_| FrameError::Allocation)?` before extending the buffer
+
+All 2 behavior tests pass, no Holzman absolute laws violated.

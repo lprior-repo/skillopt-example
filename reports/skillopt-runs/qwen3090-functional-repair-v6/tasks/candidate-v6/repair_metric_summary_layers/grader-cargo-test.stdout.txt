@@ -1,0 +1,21 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test detects_total_overflow ... ok
+test pure_summary_counts_total_and_average ... ok
+test rejects_empty_input ... ok
+test rejects_invalid_line_without_panic ... ok
+test rejects_too_many_rows_before_rendering ... ok
+test render_summary_is_separate_from_calculation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,14 @@
+Now I have all context. This is the typestate review task - `JobWorkflow` with `status: String`, lifecycle booleans, and `Option` fields. Per the skill rules, I need exactly six typestate findings plus additional relevant ones.
+Review complete. Written to `review-output.json` with 8 findings:
+
+**Typestate violations (6 findings per skill rules):**
+1. `typestate_enum` - No typestate enum; any invalid state is representable
+2. `status_string` - `status: String` allows arbitrary invalid values
+3. `bool_lifecycle` - `is_validated`/`is_sent` booleans decoupled from lifecycle invariants
+4. `option_invalid_state` - `sent_at_epoch_ms: Option<u64>` decoupled from `is_sent`
+5. `newtype_domain_id` - `id: String` raw primitive, no domain newtype
+6. `parse_boundary` - No smart constructor; raw primitives cross boundary without fallible validation
+
+**Additional violations:**
+7. `public_fields` - All fields are `pub`, enabling unrestricted mutation
+8. `mark_sent_no_guard` - `mark_sent` has no precondition checks on current state

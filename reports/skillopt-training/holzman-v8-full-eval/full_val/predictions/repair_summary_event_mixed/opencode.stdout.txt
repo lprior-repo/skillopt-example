@@ -1,0 +1,11 @@
+Now I have a clear picture. The tests expect `summarize_metrics` to return `Result<Summary, SummaryError>` and a new `render_summary` function. Current code returns `String`, uses `.unwrap()`, has unchecked arithmetic, and missing function. Let me fix it.
+All 6 tests pass. Now writing the required output file.
+Repaired. All 6 tests pass. Changes made to `src/lib.rs`:
+
+- **Signature**: `summarize_metrics` now returns `Result<Summary, SummaryError>` (was `Result<String, ...>`) to match test contract
+- **Removed `.unwrap()`** on `parse::<u64>()` → mapped to `SummaryError::Invalid` via `map_err`
+- **Removed unchecked `total += value`** → replaced with `checked_add`, returns `SummaryError::Overflow` on overflow
+- **Removed unchecked division `total / count`** → replaced with `checked_div`
+- **Removed lossy `count as u32` cast** in format string → uses typed `count_u32` variable
+- **Added `render_summary`** function to separate rendering from core logic
+- **Added empty-input guard** returning `SummaryError::Empty`

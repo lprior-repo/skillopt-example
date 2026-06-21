@@ -1,0 +1,11 @@
+Now let me explore the crate in the current working directory.
+Now I have the full skill and reference context. The task is to review the Rust crates defined in `evals/holzman-rust/tasks.json`. Let me analyze each review task against the Holzman Rust doctrine.
+
+Review tasks from tasks.json:
+1. `review_unbounded_parser` - unwrap/panic on parse, unbounded Vec
+2. `review_async_cpu_mutex` - Arc<Mutex>, lock held across await, CPU on async
+3. `review_unsafe_simd` - unsafe without waiver, no scalar fallback, no target feature detection
+4. `review_dense_ir_hot_path` - serde_json::Value in hot path, HashMap with String keys, format! allocation
+5. `review_arithmetic_indexing` - lossy `as` conversions, unchecked slice indexing
+6. `review_perf_claim_no_bench` - rayon + smallvec + perf claim without benchmark evidence
+Wrote `review-output.json` with 17 findings across 6 review tasks, covering BLOCKER violations for unwrap/panic, unsafe without waiver, serde_json::Value in hot paths, unchecked indexing, and performance claims without benchmark evidence.

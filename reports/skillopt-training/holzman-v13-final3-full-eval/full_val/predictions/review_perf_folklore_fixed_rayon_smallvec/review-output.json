@@ -1,0 +1,93 @@
+{
+  "status": "reviewed",
+  "reference_files_read": [
+    "SKILL.md",
+    "claim-traceability.md",
+    "functional-core-performance.md",
+    "hardening-checklist.md",
+    "review-output-contract.md",
+    "stress-test-plan.md"
+  ],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "folklore-performance-optimization",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "TODO proposes Rayon and SmallVec as optimizations for a [u8; 4] input based on folklore, not measurement. Rayon thread-pool overhead vastly exceeds the work of classifying 4 bytes. SmallVec's inline capacity is unnecessary when the output is exactly 4 elements known at compile time.",
+      "failure_mode": "Introducing Rayon will add thread-scheduling and work-stealing overhead orders of magnitude larger than the 4-element classification, making the function slower. SmallVec adds struct bloat for no benefit over a fixed [4] or Vec with correct capacity.",
+      "fix": "Remove the TODO. Return [\"even\" | \"odd\"; 4] via a fixed-size array to eliminate all allocation, or return a Vec with `Vec::with_capacity(4)` if Vec is required by API. Never introduce Rayon or SmallVec for 4-element inputs without measured scaling evidence across input sizes."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-allocation-for-fixed-tiny-input",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "Function allocates a heap Vec for exactly 4 elements of &str pointers. The input is a fixed [u8; 4] — compile-time known size, zero variance in allocation count.",
+      "failure_mode": "Every call performs a heap allocation, indirection through pointers, and subsequent deallocation. For a function named classify_four, this guarantees allocation overhead per invocation with no path to stack-only execution.",
+      "fix": "Return [\"even\" | \"odd\"; 4] directly. The caller can convert to Vec if needed. This eliminates all heap allocation, all intermediate collections, and all deallocation for this hot path."
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "no-unmeasured-performance-claims",
+      "file": "src/lib.rs",
+      "line": 2,
+      "problem": "The TODO asserts Rayon and SmallVec will be faster without any workload description, target hardware, baseline measurement, input distribution, regression threshold, benchmark command, profiler output, or allocation evidence.",
+      "failure_mode": "Optimization decisions based on folklore rather than measurement introduce regressions. Rayon on 4 elements is provably slower due to thread pool overhead; the claim is falsified by reasoning alone, not even requiring benchmarks.",
+      "fix": "Remove the unmeasured claim. If performance matters, establish a baseline with `cargo bench`, profile with `cargo flamegraph` or `perf`, measure p50/p95/p99 latency, and only then consider alternatives. Document workload, hardware, input distribution, and measured numbers."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-benchmark-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No benchmark exists for classify_four or any performance claim. The function has no benches/, examples/, or benchmark targets in the crate.",
+      "failure_mode": "No empirical basis to verify the function is fast enough, or to detect regressions from future changes. Per Holzman, performance claims require workload, target hardware, baseline number, new number, variance notes, and regression threshold.",
+      "fix": "Add a criterion-based benchmark or a simple timing harness that measures classify_four across varied inputs, and a baseline comparison against the fixed-array return version."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-profiler-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No profiler evidence (flamegraph, perf, cargo-flamegraph) exists to identify the actual bottleneck in this function.",
+      "failure_mode": "Without profiling, optimization targets may be wrong. The allocation is the likely bottleneck, not the classification logic itself.",
+      "fix": "Run profiler against the current implementation to confirm allocation is the dominant cost, then measure the fixed-array version to quantify the improvement."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-allocation-evidence",
+      "file": "src/lib.rs",
+      "line": 3,
+      "problem": "No allocation tracking (alloc_counters, dhat, or valgrind massif) evidence exists to quantify heap pressure from Vec allocation per call.",
+      "failure_mode": "Cannot prove allocation rate or memory footprint impact under load. Misses opportunity to demonstrate elimination of allocation via fixed-size return.",
+      "fix": "Run allocation tracking to quantify bytes allocated per call, then re-run after refactoring to fixed-size array to show zero allocation."
+    },
+    {
+      "severity": "MAJOR",
+      "rule": "missing-second-ring-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "Any claim about performance optimization requires second-ring evidence tied to actual symbols/artifacts (compiler IR, assembly, benchmark results). None exists.",
+      "failure_mode": "Claims about Rayon/SmallVec speedup are unsubstantiated. Per Holzman, claims about zero-cost abstractions or performance require second-ring evidence.",
+      "fix": "Provide assembly listings (cargo asm), LLVM IR, and benchmark results comparing current implementation against fixed-array version."
+    },
+    {
+      "severity": "MINOR",
+      "rule": "command-truth-evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "No command evidence in the final response showing cargo fmt, cargo check, cargo clippy, or cargo test were executed against this crate.",
+      "failure_mode": "Cannot verify the crate compiles cleanly or passes lint gates. Missing evidence is a Holzman verification gate blocker.",
+      "fix": "Run cargo fmt --check, cargo check --workspace --all-targets --all-features, cargo clippy with strict flags, and cargo test --workspace --all-features in the final response."
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for classify_four or any performance claim",
+    "no profiler output (flamegraph/perf) to identify actual bottleneck",
+    "no allocation tracking evidence (dhat/massif/alloc_counters) quantifying heap pressure per call",
+    "no second-ring evidence (assembly, LLVM IR) tied to actual symbols",
+    "no command evidence that cargo fmt/check/clippy/test were executed"
+  ],
+  "residual_risk": "Static review only; no commands run. The crate compiles but no lint or test gates verified. The TODO on line 2 represents an active violation of Holzman performance doctrine — introducing Rayon/SmallVec for 4 elements without measurement will cause a performance regression. The function should return [\"even\" | \"odd\"; 4] to eliminate all allocation. The unmeasured folklore claim must be removed before any code change."
+}

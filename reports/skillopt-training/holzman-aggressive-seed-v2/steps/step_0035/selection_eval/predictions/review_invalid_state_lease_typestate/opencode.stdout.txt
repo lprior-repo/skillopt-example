@@ -1,0 +1,11 @@
+Review complete. Written 9 findings and 5 missing-evidence items to `review-output.json`.
+
+Key findings:
+- **BLOCKER**: `LeaseWorkflow` makes illegal states representable via separate `status: String`, `is_validated: bool`, `is_sent: bool` fields
+- **BLOCKER**: No typestate enum — any boolean/status combination is constructible
+- **BLOCKER**: `mark_sent` has no validation guard — unvalidated leases can be marked sent
+- **BLOCKER**: All struct fields are `pub` — no encapsulation
+- **MAJOR**: `sent_at_epoch_ms` never set in `mark_sent`
+- **MAJOR**: Clock injected directly into core instead of shell layer
+- **MAJOR**: `id: String` not newtyped to domain type
+- **Missing evidence**: no benchmarks, profiler data, allocation analysis, or formal verification

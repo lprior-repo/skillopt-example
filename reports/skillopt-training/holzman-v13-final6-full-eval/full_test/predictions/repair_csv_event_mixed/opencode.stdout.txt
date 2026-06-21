@@ -1,0 +1,10 @@
+Now I'll apply the repair. The current code violates: `unwrap()` panic surface, no `try_reserve`, no empty check, no too-many check, no typed error handling.
+Repaired. All 4 tests pass. Changes to `src/lib.rs`:
+
+- Replaced `unwrap()` with `map_err(|_| ParseError::Invalid)` on parse
+- Added empty-input rejection (`ParseError::Empty`)
+- Added `max_items` bound check before each push (`ParseError::TooMany`)
+- Used `Vec::new()` + `try_reserve()` instead of `.collect()` into Vec
+- Direct iteration over `split(',')` with no intermediate Vec
+
+Output written to `repair-output.json`.

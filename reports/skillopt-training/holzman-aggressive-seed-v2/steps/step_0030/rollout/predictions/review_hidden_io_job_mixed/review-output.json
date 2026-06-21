@@ -1,0 +1,111 @@
+{
+  "status": "reviewed",
+  "reference_files_read": ["SKILL.md", "references/functional-core-performance.md", "references/review-output-contract.md"],
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 9,
+      "problem": "fs::read_to_string(path).unwrap() panics on any I/O failure",
+      "failure_mode": "untrusted or missing file path aborts the entire program instead of returning a typed error",
+      "fix": "return Result<Vec<Record>, std::io::Error> and propagate with ? or explicit Err"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parts[1].parse::<u32>().unwrap() panics on non-numeric or missing field",
+      "failure_mode": "malformed CSV line causes panic instead of returning a typed parse error",
+      "fix": "return Result, use .parse().map_err(|e| ParseError(...)), and handle missing parts with .get(1).ok_or(...)"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "as u16 lossy cast truncates values above 65535 silently",
+      "failure_mode": "values in range 65536..=u32::MAX are silently truncated to u16 range, corrupting data",
+      "fix": "use u32::try_from(u32_value).map_err(...) or parse directly as u16 with parts[1].trim().parse::<u16>()"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "parsing_and_access",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "split(',').map(...).collect() then indexing parts[0] and parts[1] instead of split_once",
+      "failure_mode": "allocates a Vec of all parts unnecessarily, then risks index-out-of-bounds on malformed lines",
+      "fix": "use line.split_once(',').ok_or(MissingDelimiter) to get (name, rest) directly, then parse rest"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "zero_forbidden_constructs",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "parts[0] and parts[1] are unchecked indexed accesses on a Vec<String>",
+      "failure_mode": "a line with fewer than 2 comma-separated fields panics with index-out-of-bounds",
+      "fix": "use .get(0) and .get(1) with ok_or, or restructure with split_once as above"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 16,
+      "problem": "println!(\"loaded {}\", parts[0]) mixes I/O/logging into data parsing logic",
+      "failure_mode": "pure parsing is contaminated with side effects; parsing cannot be tested or composed without stdout interference",
+      "fix": "remove println! from the parsing pipeline; move logging to the shell layer after parsing completes"
+    },
+    {
+      "severity": "BLOCKER",
+      "rule": "functional_core_imperative_shell",
+      "file": "src/lib.rs",
+      "line": 8,
+      "problem": "load_jobs returns Vec<Record> directly instead of Result, hiding all fallible operations",
+      "failure_mode": "all I/O, parse, and indexing failures are panics; callers cannot handle errors gracefully",
+      "fix": "signature should be pub fn load_jobs(path: &str) -> Result<Vec<Record>, LoadError>"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "type_discipline",
+      "file": "src/lib.rs",
+      "line": 19,
+      "problem": "parse::<u32>() then as u16 wastes allocation on wider type before truncation",
+      "failure_mode": "parse succeeds for values outside u16 range but silently truncates; also wastes the intermediate u32",
+      "fix": "parse directly as u16: parts[1].trim().parse::<u16>().map_err(...)"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no benchmark exists for load_jobs throughput or allocation behavior",
+      "failure_mode": "cannot verify if Vec allocation per line, collect(), or String::to_string() are acceptable for the workload",
+      "fix": "add criterion or custom benchmark measuring allocations, throughput, and memory for typical input sizes"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 1,
+      "problem": "no profiler evidence for hot-path allocation profile of load_jobs",
+      "failure_mode": "unknown if per-line Vec allocation + String allocation is the dominant cost; may over-optimize or under-optimize",
+      "fix": "run cargo-flamegraph or similar profiler on load_jobs with representative data"
+    },
+    {
+      "severity": "WARNING",
+      "rule": "performance_evidence",
+      "file": "src/lib.rs",
+      "line": 12,
+      "problem": "no second-ring evidence (allocations, command output) for the parsing path",
+      "failure_mode": "cannot prove whether split+collect+to_string is the right choice vs split_once+&str without measured data",
+      "fix": "add allocation tracking (e.g., alloc counter) or use cargo-bench with --output-json to capture allocation counts"
+    }
+  ],
+  "missing_evidence": [
+    "no benchmark exists for load_jobs throughput or allocation behavior",
+    "no profiler evidence for hot-path allocation profile",
+    "no second-ring allocation or command evidence for parsing choices"
+  ],
+  "residual_risk": "static review only; no commands run. All 8 BLOCKER findings require repair before delivery. The function has zero error handling, uses forbidden constructs (unwrap, as cast, unchecked indexing, println in core), and lacks all performance evidence. Fixing the 8 BLOCKERs is a prerequisite for any further review or delivery."
+}

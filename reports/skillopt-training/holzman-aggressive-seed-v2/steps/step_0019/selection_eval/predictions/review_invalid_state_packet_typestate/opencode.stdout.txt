@@ -1,0 +1,17 @@
+Now I have all the context. Let me write the review output.
+Review complete. Written valid JSON to `review-output.json`.
+
+**8 findings across the crate** — all stemming from the same root architectural violation:
+
+| Severity | Rule | Line | Issue |
+|---|---|---|---|
+| BLOCKER | `make_illegal_states_representable` | 3 | `status: String` — any string accepted, no closed domain |
+| BLOCKER | `bool_lifecycle_flags` | 4 | `is_validated: bool` — redundant, can diverge from status |
+| BLOCKER | `bool_lifecycle_flags` | 5 | `is_sent: bool` — redundant, can diverge from status |
+| BLOCKER | `no_typestate_enforcement` | 1 | No typestates; unvalidated packets can reach sent state |
+| BLOCKER | `no_result_return_type` | 9 | `mark_sent` returns `PacketWorkflow` directly, not `Result` |
+| BLOCKER | `no_domain_newtypes` | 2 | `id: String` and `sent_at_epoch_ms: u64` are raw primitives |
+| WARNING | `allocation_without_try_reserve` | 10 | `.to_string()` allocates on every call |
+| WARNING | `functional_core_purity` | 10 | Heap allocation inside pure core function |
+
+**6 missing evidence items** — no benchmarks, profiler data, command evidence (fmt/test/clippy), or second-ring analysis (Miri/Kani).
