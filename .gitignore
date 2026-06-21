@@ -15,3 +15,9 @@ runs/
 .benchmarks/
 .hypothesis/
 dist/
+docs/providers/
+docs/TUTORIAL.md
+docs/TROUBLESHOOTING.md
+docs/OUTPUT-FORMAT.md
+docs/GLOSSARY.md
+skills/
