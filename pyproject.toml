@@ -122,6 +122,11 @@ files = [
 ]
 exclude = "^(vendor|data|docs|reports|candidates|dist|\\.venv)/"
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_decorators = false
+warn_return_any = false
+
 [tool.ruff]
 line-length = 110
 target-version = "py312"
