@@ -59,7 +59,7 @@ SkillDrivenConfig.from_skill(skill, data_root="data/holzman-rust")
         ▼
 Budget.load(BudgetConfig.default(), budget_path)   # resume-safe
 Leaderboard(leaderboard_path)                      # fcntl-locked
-load_provider(config.provider_spec)                # e.g. "opencode:opencode default"
+load_provider(config.provider_spec)                # such as "opencode:opencode default"
         │
         ▼
 SkillDrivenLoop(config, budget, leaderboard, provider)
@@ -127,12 +127,12 @@ The target contract is
 Result = Ok[T] | Err[E]
 ```
 
-Where `Ok[T]` wraps a success value and `Err[E]` wraps a failure value.
+Where `Ok[T]` wraps a success value and `Err[E]` wraps a failure value
 `E` is constrained to be a `TrainError` subclass so every failure carries
 a `code` (string), a `message` (string), and a `context` (dict)
 
 In the current codebase, the `Result` type is not yet a first-class
-dataclass; functions that can fail raise typed exceptions instead. The
+dataclass; functions that can fail raise typed exceptions instead, the
 `errors.py` hierarchy implements the `E` side of the contract today
 
 ```python
@@ -162,7 +162,7 @@ The rule of thumb for callers:
 The migration to `Result = Ok[T] | Err[E]` is mechanical: replace
 `raise TrainError(...)` with `return Err(TrainError(...))` and convert
 `try: ... except TrainError as e: ...` sites into `match` on the return
-value. The `code` and `context` fields are preserved either way
+value; the `code` and `context` fields are preserved either way
 
 ## Provider Architecture
 
@@ -217,25 +217,25 @@ def __getattr__(name: str) -> object:
 ```
 
 Why this matters: importing `AnthropicProvider` requires the `anthropic`
-package to be installed. If a user only ever runs `--provider mock`,
-the `anthropic` and `openai` SDKs are never imported, and a missing
-optional dependency does not break `skillopt-train list` or any other
-mock-only command. The same trick is applied at the package level in
-`__init__.py`, so `from skillopt_train import AnthropicProvider` works
-but does not pay the import cost until the attribute is touched
+package to be installed; if a user only ever runs `--provider mock`, the
+`anthropic` and `openai` SDKs are never imported, and a missing optional
+dependency does not break `skillopt-train list` or any other mock-only
+command; the same trick is applied at the package level in `__init__.py`,
+so `from skillopt_train import AnthropicProvider` works but does not pay
+the import cost until the attribute is touched
 
 ## `time.monotonic()` vs `time.time()`
 
 The codebase uses two different clock APIs and the choice is deliberate
 
-- `time.time()` returns wall-clock seconds since the epoch. It is
+- `time.time()` returns wall-clock seconds since the epoch; it is
   affected by NTP corrections, daylight-savings changes, and manual
-  clock adjustments. The loop uses it for `started_at`,
+  clock adjustments; the loop uses it for `started_at`,
   `BudgetState.started_at`, `LeaderboardEntry.timestamp`, and
   `MutatorMeta.created_at` — anywhere the value is shown to humans
   or compared against an absolute timestamp
 - `time.monotonic()` returns a clock that is guaranteed never to go
-  backwards. The codebase currently uses `time.time() - started_at`
+  backwards; the codebase currently uses `time.time() - started_at`
   to compute elapsed seconds in `Budget` and `SkillOptLoop`; the
   monotonic variant is the intended upgrade path for production
   because a clock jump during a long step would otherwise silently
@@ -249,12 +249,12 @@ The practical rule:
 
 ## `py.typed` and the Public API
 
-`scripts/skillopt_train/py.typed` is a 9-byte marker file. Its presence
+`scripts/skillopt_train/py.typed` is a 9-byte marker file; its presence
 tells type checkers (mypy, pyright, pylance) that the package ships inline
 type annotations and that downstream code can rely on them
 
 The public surface is enumerated in `__all__` in `__init__.py` and
-currently has 67 symbols. The major groupings:
+currently has 67 symbols; the major groupings:
 
 - **Errors (10)**: `TrainError`, `BudgetExceeded`, `ConfigError`,
   `DiffError`, `EvalError`, `LeaderboardError`, `MutatorError`,
@@ -285,7 +285,7 @@ currently has 67 symbols. The major groupings:
   `skill_train_main`, `train_main`
 
 The three SDK-backed providers are exposed via `__all__` but not
-imported at module load. `from skillopt_train import AnthropicProvider`
+imported at module load; `from skillopt_train import AnthropicProvider`
 triggers the package-level `__getattr__`, which in turn triggers the
 providers-level `__getattr__`, which imports `anthropic` lazily
 
@@ -294,23 +294,23 @@ providers-level `__getattr__`, which imports `anthropic` lazily
 The package ships two loops because they have different configuration
 sources
 
-- `SkillOptLoop` reads a JSON `LoopConfig` file. Use it when the
+- `SkillOptLoop` reads a JSON `LoopConfig` file; use it when the
   loop parameters are version-controlled but the skill is not a
-  self-contained bundle (e.g. multi-skill campaigns, regression
+  self-contained bundle (such as multi-skill campaigns, regression
   suites)
-- `SkillDrivenLoop` reads a `Skill` bundle. Use it when the skill is
+- `SkillDrivenLoop` reads a `Skill` bundle; use it when the skill is
   a first-class artifact that should be discoverable, gradeable, and
   evolvable without an external config
 
 Both share `Budget`, `Leaderboard`, `ModelProvider`, `CritiqueBlock`,
-`FailureDiff`, and the same JSON schemas on disk. Switching between
+`FailureDiff`, and the same JSON schemas on disk; switching between
 them is a one-line change in the calling code
 
 ## Threading and Concurrency
 
-The harness is single-process and single-threaded for the loop body.
+The harness is single-process and single-threaded for the loop body
 Cross-process safety is provided by `fcntl.flock` on the
 `leaderboard.jsonl` file, so multiple `ci_runner` invocations can
-append without corrupting the log. `Budget` uses an in-process
+append without corrupting the log; `Budget` uses an in-process
 `threading.Lock` to guard `record_step` and `check`, allowing a
 future multi-thread step body to share a single budget safely
