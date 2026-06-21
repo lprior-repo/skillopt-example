@@ -1,0 +1,198 @@
+rules:
+  - id: python.no-dynamic-execution
+    message: Dynamic execution is banned; model dispatch as data and match explicitly.
+    severity: ERROR
+    languages: [python]
+    paths: &python_paths
+      include: ["**/*.py"]
+      exclude:
+        - "/.jj/**"
+        - "/.git/**"
+        - "/.venv/**"
+        - "/.benchmarks/**"
+        - "/.hypothesis/**"
+        - "/.mypy_cache/**"
+        - "/.pytest_cache/**"
+        - "/.ruff_cache/**"
+        - "/build/**"
+        - "/dist/**"
+        - "/target/**"
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+      - pattern: compile(...)
+
+  - id: python.no-dunder-import
+    message: __import__ is banned; use explicit imports or importlib.import_module through a typed Result-returning API.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern: __import__(...)
+
+  - id: python.no-shell-escape
+    message: Shell execution is banned.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+      - pattern: subprocess.$CALL(..., shell=True, ...)
+
+  - id: python.no-type-ignore-without-code
+    message: Type ignores must name a checker code.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-regex: '#\s*type:\s*ignore(?!\[[A-Za-z0-9_, -]+\])'
+
+  - id: python.no-any
+    message: Any is banned; model the boundary with a TypedDict, dataclass, Protocol, or Result error.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-regex: '\bAny\b'
+
+  - id: python.no-optional
+    message: Optional[T] is banned; use expression.Option[T].
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-regex: '\bOptional\s*\['
+
+  - id: python.no-mutable-collection-annotations
+    message: Mutable collection annotations are banned; use pyrsistent PVector/PMap/PSet.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-regex: '(:|->)\s*(list|dict|set)\s*\['
+
+  - id: python.no-mutable-dataclass
+    message: Dataclasses must be @dataclass(frozen=True, slots=True).
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-regex: '@dataclass\s*(\((?!(?=[^)]*frozen\s*=\s*True)(?=[^)]*slots\s*=\s*True))[^)]*\)|$)'
+
+  - id: python.no-assert
+    message: assert is banned because it disappears under -O.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern: assert $COND
+
+  - id: python.no-print
+    message: print is banned; return display data as values.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern: print(...)
+
+  - id: python.no-raise
+    message: raise is banned; return Result[T, DomainError].
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern: raise $EXC
+
+  - id: python.no-except
+    message: except is banned; use Result composition.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: |
+          try:
+              ...
+          except $ERR:
+              ...
+      - pattern: |
+          try:
+              ...
+          except:
+              ...
+      - pattern: |
+          try:
+              ...
+          finally:
+              ...
+
+  - id: python.no-subprocess
+    message: subprocess is banned in Python code.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: import subprocess
+      - pattern: from subprocess import $NAME
+      - pattern: subprocess.$CALL(...)
+
+  - id: python.no-network-imports
+    message: Network imports are banned in Python code.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: import socket
+      - pattern: import httpx
+      - pattern: import requests
+      - pattern: from socket import $NAME
+      - pattern: from httpx import $NAME
+      - pattern: from requests import $NAME
+
+  - id: python.no-env-time-random
+    message: Environment, time, and randomness are banned as hidden inputs.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: os.environ
+      - pattern: time.$CALL(...)
+      - pattern: random.$CALL(...)
+
+  - id: python.no-file-writes
+    message: File writes are banned in Python code.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: $PATH.write_text(...)
+      - pattern: $PATH.write_bytes(...)
+      - pattern: $PATH.mkdir(...)
+      - patterns:
+          - pattern: open($PATH, $MODE, ...)
+          - metavariable-regex:
+              metavariable: $MODE
+              regex: '.*[wax+].*'
+
+  - id: python.no-mutable-defaults
+    message: Mutable default arguments are banned.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: |
+          def $F(..., $ARG=[], ...):
+              ...
+      - pattern: |
+          def $F(..., $ARG={}, ...):
+              ...
+      - pattern: |
+          def $F(..., $ARG=set(), ...):
+              ...
+
+  - id: python.no-unsafe-pickle-loads
+    message: pickle.loads on untrusted bytes is banned.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern: pickle.loads(...)
+
+  - id: python.no-execution-introspection
+    message: globals()/locals() are banned for execution or dispatch.
+    severity: ERROR
+    languages: [python]
+    paths: *python_paths
+    pattern-either:
+      - pattern: globals()
+      - pattern: locals()
