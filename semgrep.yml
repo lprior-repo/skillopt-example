@@ -17,6 +17,7 @@ rules:
         - "/build/**"
         - "/dist/**"
         - "/target/**"
+        - "/vendor/**"
     pattern-either:
       - pattern: eval(...)
       - pattern: exec(...)

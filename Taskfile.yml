@@ -10,69 +10,143 @@ tasks:
       - task --list
 
   install:
-    desc: Install dependencies via UV
+    desc: Install dependencies via UV (default groups)
     cmds:
-      - uv sync --dev
+      - uv sync
+
+  lock:
+    desc: Resolve uv.lock without upgrading
+    cmds:
+      - uv lock
 
   lock-upgrade:
-    desc: Upgrade all dependencies in uv.lock
+    desc: Upgrade all dependencies in uv.lock and resync
     cmds:
       - uv lock --upgrade
-      - uv sync --dev
+      - uv sync
 
   test:
-    desc: Validate generated dataset, evaluator imports, and property tests
+    desc: Run pytest on the tests directory
     cmds:
-      - uv run python -m py_compile scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
-      - uv run python scripts/generate_holzman_rust_dataset.py --out /tmp/holzman_rust_aggressive_check --seed 42
-      - uv run pytest tests/ -v
+      - uv run pytest tests
 
-  smoke:
-    desc: Show current candidate evaluator help
+  format-check:
+    desc: Verify ruff formatting without modifying files
     cmds:
-      - uv run python scripts/run_holzman_candidate_eval.py --help
-
-  typecheck:
-    desc: Run mypy on current first-party scripts
-    cmds:
-      - uv run mypy scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+      - uv run ruff format --check .
 
   lint:
     desc: Run ruff lint
     cmds:
-      - uv run ruff check scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+      - uv run ruff check .
 
   format:
     desc: Format code with ruff
     cmds:
-      - uv run ruff format scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+      - uv run ruff format .
 
   fix:
-    desc: Auto-fix lint issues
+    desc: Auto-fix lint issues with ruff
     cmds:
-      - uv run ruff check --fix scripts/generate_holzman_rust_dataset.py scripts/run_holzman_candidate_eval.py vendor/SkillOpt/skillopt/envs/holzman_rust/rollout.py
+      - uv run ruff check --fix .
+
+  typecheck:
+    desc: Run pyright on the project
+    cmds:
+      - uv run pyright
+
+  mypy:
+    desc: Run mypy on the project
+    cmds:
+      - uv run mypy
+
+  semgrep:
+    desc: Run semgrep with the project config
+    cmds:
+      - uv run semgrep --config semgrep.yml --error --metrics=off -j 1 .
+
+  crosshair:
+    desc: Run crosshair contract checker on scripts
+    cmds:
+      - uv run crosshair check scripts/
+
+  mutmut:
+    desc: Run mutmut mutation testing
+    cmds:
+      - uv run mutmut run
+
+  vulture:
+    desc: Run vulture dead code detection on scripts and tests
+    cmds:
+      - uv run vulture scripts tests
+
+  refurb:
+    desc: Run refurb modernization hints on scripts and tests
+    cmds:
+      - uv run refurb scripts tests
+
+  deptry:
+    desc: Run deptry dependency hygiene checks on scripts and tests
+    cmds:
+      - uv run deptry scripts tests
+
+  interrogate:
+    desc: Run interrogate docstring coverage on scripts
+    cmds:
+      - uv run interrogate scripts
+
+  coverage:
+    desc: Run pytest with branch coverage and emit coverage.xml
+    cmds:
+      - uv run pytest --cov=scripts --cov-branch --cov-report=xml
+
+  diff-cover:
+    desc: Verify diff coverage meets the 90 percent threshold
+    cmds:
+      - uv run diff-cover coverage.xml --fail-under=90
+
+  docstrings:
+    desc: Enforce 100 percent docstring coverage in scripts
+    cmds:
+      - uv run interrogate --fail-under=100 scripts/
+
+  compile:
+    desc: Byte-compile all Python sources, skipping cache and VCS directories
+    cmds:
+      - uv run python -m compileall -q -x '(^|/)(\.jj|\.git|\.venv|\.benchmarks|\.hypothesis|\.mypy_cache|\.pytest_cache|\.ruff_cache|build|dist|target)(/|$)' .
+
+  audit:
+    desc: Run pip-audit via uv tool with strict reporting
+    cmds:
+      - uv tool run pip-audit --strict
 
   ci:
-    desc: Run the full CI gate suite locally
+    desc: Run the full quality gate suite in order
     cmds:
       - task: install
+      - task: lock
+      - task: lock-upgrade
+      - task: format-check
       - task: lint
+      - task: format
+      - task: fix
       - task: typecheck
+      - task: mypy
+      - task: compile
+      - task: docstrings
+      - task: interrogate
       - task: test
-      - task: smoke
+      - task: coverage
+      - task: diff-cover
+      - task: semgrep
+      - task: crosshair
+      - task: mutmut
+      - task: vulture
+      - task: refurb
+      - task: deptry
+      - task: audit
 
   clean:
     desc: Remove build artifacts and cache directories
     cmds:
-      - rm -rf .pytest_cache .mypy_cache .ruff_cache dist build .venv __pycache__
-      - find . -type d -name '__pycache__' -not -path '*/.venv/*' -prune -exec rm -rf {} +
-
-  build:
-    desc: Build the wheel and sdist
-    cmds:
-      - uv build
-
-  docs:
-    desc: Print the README header
-    cmds:
-      - head -20 README.md
+      - rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml dist build .venv __pycache__

@@ -1,111 +1,79 @@
-# Python-as-Gleam Constitution
+# Python Constitution
 
-Write Python as if it were Gleam. Python is the runtime; Gleam is the discipline. If a construct is illegal in Gleam, it is illegal here. There are no waivers, carve-outs, grandfather clauses, or temporary exceptions.
+You write Python as if it were Gleam with Rust's assurance. Python is the
+runtime; Gleam is the discipline; Rust is the bar.
 
-## Spine
+## Non-negotiables
 
-- Use `expression` for `Result`, `Option`, `pipe`, `curry`, `compose`, `Seq`, and `Map`.
-- Use `pyrsistent` for `PVector`, `PMap`, and `PSet`.
-- Use `icontract` for `@require`, `@ensure`, and invariants.
-- Use `crosshair` in CI to prove contracts.
-- Use `hypothesis` property tests on public pure functions.
-- Do not reimplement these primitives.
+1. Pure core, thin shell. Side effects only in `io/` and `*_shell.py`.
+2. Errors are values: `Result[T, DomainError]`, never `raise` outside shell.
+3. Data is immutable: `frozen=True, slots=True` on every dataclass; collections
+   are `PVector`/`PMap`/`PSet`.
+4. Branching is `match` with exhaustive variants and `assert_never` fallback.
+5. Trust boundaries parse with `msgspec.json.decode(Schema, raw, strict=True)`.
+6. Every public pure function has `@beartype`, `@icontract.require`,
+   `@icontract.ensure`, a `@given` hypothesis test.
+7. Composition uses `pipe(...)`, not nested calls; name every step.
+8. Optional is banned — use `Option[T]` from `expression`.
+9. No `Any`, no bare `dict`/`list`, no `cast(...)` outside shell.
+10. `uv run` is the only entry point. `uv.lock` is committed and frozen in CI.
 
-## Types
+## When you write a function
 
-- Every function has full annotations.
-- `Any` is banned.
-- Bare `dict`, `list`, `set`, and bare `tuple` are banned in every Python file.
-- Use `PVector[T]`, `PMap[str, T]`, `PSet[T]`, and `tuple[T, ...]`.
-- `Optional[T]` is banned. Use `Option[T]`.
-- Two-type unions are sum types. Model them as frozen dataclass variants.
-- `# type: ignore` must include a checker code.
+- Annotate every parameter and return type, fully.
+- Return `Result[T, E]` if it can fail. `E` is a typed dataclass subclass of
+  the domain error.
+- Add `@beartype` and `icontract` `@require` / `@ensure`.
+- Use `match` for any non-trivial branch. Sum types are frozen dataclass
+  variants.
+- Use `pipe` for multi-step transforms.
+- If you need to parse, the function belongs in `io/`. Pure functions take
+  already-typed values.
 
-## Errors Are Values
+## When you write a test
 
-- Public functions return `Result[T, E]`, never raise.
-- `E` is a frozen dataclass subclass of the project `DomainError`/domain error root.
-- `raise` is banned.
-- `try/except` is banned.
+- Property test first (`@given`). Example test only for regression pinning.
+- Stateful domains get a `hypothesis.stateful.RuleBasedStateMachine`.
+- Mutation testing must kill every mutant on changed lines.
+- Coverage gate is 90% on changed lines (`diff-cover`).
 
-## Data Is Immutable
+## When you review code
 
-- Every dataclass is `@dataclass(frozen=True, slots=True)`.
-- Field updates use `dataclasses.replace` or `attrs.evolve`.
-- Frozen dataclasses must not contain mutable `list`, `dict`, or `set` fields.
-- Mutable local builders are banned.
+In order, reject if:
+1. Any mutation outside the shell.
+2. Any `raise` outside the shell.
+3. Any `Any`, bare `dict`/`list`, `Optional`, `T | None` return.
+4. Any non-exhaustive `match`.
+5. Missing `icontract` contracts on a public pure function.
+6. Missing `@given` property test on a public pure function.
+7. Any `json.loads`, `yaml.safe_load`, `eval`, `shell=True`.
+8. Any `# type: ignore` without a code.
+9. Any `lambda` inside `pipe(...)`.
+10. Any `@dataclass` without `frozen=True, slots=True`.
 
-## Branching
+"We can clean it up later" is how this constitution dies. Block the PR.
 
-- Use `match`/`case` for variant/type dispatch.
-- `if` is allowed for genuine boolean predicates only.
-- Matches on sum types must be exhaustive.
-- No bare `_` final case on domain variants.
+## Environment
 
-## Composition
+    uv sync
+    uv run pyright
+    uv run pytest
 
-- Use `pipe(value, f, g, h)` for multi-step transforms.
-- Pipelines use named pure functions, not anonymous lambdas.
+That's the loop. If `uv run` doesn't have it, it doesn't exist.
 
-## Side Effects
+## CI gates (all mandatory)
 
-- Every Python module takes values and returns values.
-- No Python file is exempt because it is shell code, a test, a benchmark, or vendored code.
-- Do not import `subprocess`, `socket`, `httpx`, `requests`, `time`, `random`, or read `os.environ`.
-- Do not print or write files from Python code.
+    uv sync --frozen
+    uv run ruff format --check
+    uv run ruff check
+    uv run semgrep --config semgrep.yml
+    uv run pyright
+    uv run crosshair check scripts/
+    uv run pytest
+    uv run mutmut run
+    uv run diff-cover coverage.xml --fail-under=90
+    uv run interrogate --fail-under=100 scripts/
+    uv run deptry scripts/
+    uv tool run pip-audit --strict
 
-## Assurance
-
-- Public functions have `icontract` preconditions and postconditions.
-- CrossHair checks every module in CI.
-- Every loop has a static bound.
-- No `while True`.
-- No unbounded recursion.
-- No `assert`.
-- Hypothesis properties cover every public pure function.
-- Mutmut surviving mutants mean the tests are insufficient.
-
-## Banned Constructs
-
-- `eval`, `exec`, `compile`
-- `__import__`
-- `subprocess.run(..., shell=True)` and equivalent shell escapes
-- `os.system`, `os.popen`
-- any `except`
-- `assert`
-- `pickle.loads` on untrusted bytes
-- `globals()` or `locals()` for execution
-- `print`
-- any `raise`
-- `# type: ignore` without a code
-- mutable default arguments
-- `dict[str, Any]` in public signatures
-- `try/except`
-
-## Required For New Functions
-
-1. Annotated signature using `expression` and `pyrsistent` types.
-2. Returns `Result[T, DomainError]`.
-3. Has `icontract` `@require` and `@ensure`.
-4. Has at least one Hypothesis property test.
-5. Is included in the CrossHair CI path.
-6. Has no IO imports or hidden effects.
-
-## Commands
-
-- Use `uv sync --all-groups` to install.
-- Use `uv run ...` for every Python tool: `pytest`, `ruff`, `pyright`, `mypy`, `semgrep`, `crosshair`, `mutmut`, `vulture`, and `refurb`.
-- Do not invoke `.venv/bin/python`, `python`, `pytest`, `ruff`, or `pyright` directly.
-
-## Review Order
-
-1. Is it pure?
-2. Does it return `Result`?
-3. Are types complete and free of `Any`?
-4. Are collections immutable?
-5. Is `match` exhaustive?
-6. Are contracts present and CrossHair-proved?
-7. Is there a Hypothesis property?
-8. Did mutation testing kill the mutants?
-
-If any answer is no, block the change.
+No gate is optional. No gate is a warning.

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+# pyright: reportPrivateUsage=false, reportUnknownLambdaType=false, reportUnknownArgumentType=false
 import dataclasses
 import re
 from pathlib import Path
 from typing import Final
 
 import pytest
+from beartype import beartype
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -15,11 +17,11 @@ from scripts.generate_holzman_rust_dataset import (
     split_family_id,
 )
 from scripts.run_holzman_candidate_eval import (
+    _HARD_PASS_THRESHOLD,
+    _VALID_SPLITS,
     BundleHashesDict,
     CandidatePaths,
     RunError,
-    _HARD_PASS_THRESHOLD,
-    _VALID_SPLITS,
     _as_float,
     _as_int,
     _as_str,
@@ -29,12 +31,9 @@ from scripts.run_holzman_candidate_eval import (
     split_values,
 )
 
-
 _EXPECTED_HARD_THRESHOLD: Final[float] = 1.0
 _EXPECTED_VALID_SPLITS: Final[tuple[str, ...]] = ("train", "val", "test")
-_HELLO_WORLD_SHA256: Final[str] = (
-    "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
-)
+_HELLO_WORLD_SHA256: Final[str] = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
 _PROMOTABLE_REASON: Final[str] = "full_val_test_all_tasks"
 _SKILL_FILENAME: Final[str] = "SKILL.md"
 _REFERENCES_DIRNAME: Final[str] = "references"
@@ -51,6 +50,9 @@ _SAMPLE_INT_PARSE: Final[str] = "123"
 _SAMPLE_FLOAT_PARSE: Final[str] = "1.25"
 _SAMPLE_INT_AS_FLOAT: Final[str] = "5"
 _TRUNCATING_FLOAT: Final[float] = 3.7
+_TRUNCATED_INT: Final[int] = 3
+_PARSED_FLOAT_VALUE: Final[float] = 1.25
+_INT_AS_FLOAT_VALUE: Final[float] = 5.0
 _SAMPLE_FLOAT_TO_STR: Final[float] = 1.5
 _SAMPLE_INT_TO_STR: Final[int] = 42
 _RUN_ERROR_DEFAULT_CODE: Final[str] = "run_error"
@@ -69,24 +71,33 @@ _FLOAT_BOUND: Final[float] = 1e6
 _MAX_SHORT_TEXT: Final[int] = 16
 
 
+@beartype
 def test_hard_pass_threshold_value() -> None:
-    assert _HARD_PASS_THRESHOLD == _EXPECTED_HARD_THRESHOLD
+    if _HARD_PASS_THRESHOLD != _EXPECTED_HARD_THRESHOLD:
+        pytest.fail(f"expected {_EXPECTED_HARD_THRESHOLD}, got {_HARD_PASS_THRESHOLD}")
 
 
+@beartype
 def test_valid_splits_value() -> None:
-    assert _VALID_SPLITS == _EXPECTED_VALID_SPLITS
+    if _VALID_SPLITS != _EXPECTED_VALID_SPLITS:
+        pytest.fail(f"expected {_EXPECTED_VALID_SPLITS}, got {_VALID_SPLITS}")
 
 
+@beartype
 def test_forbidden_spec_from_dict_name() -> None:
     spec = ForbiddenSpec.from_dict(ForbiddenPattern(name="x", pattern="y"))
-    assert spec.name == "x"
+    if spec.name != "x":
+        pytest.fail(f"expected name 'x', got {spec.name!r}")
 
 
+@beartype
 def test_forbidden_spec_from_dict_pattern() -> None:
     spec = ForbiddenSpec.from_dict(ForbiddenPattern(name="x", pattern="y"))
-    assert spec.pattern.pattern == "y"
+    if spec.pattern.pattern != "y":
+        pytest.fail(f"expected pattern 'y', got {spec.pattern.pattern!r}")
 
 
+@beartype
 def test_forbidden_spec_is_frozen() -> None:
     spec = ForbiddenSpec.from_dict(ForbiddenPattern(name="x", pattern="y"))
     with pytest.raises(dataclasses.FrozenInstanceError) as info:
@@ -98,8 +109,11 @@ def test_forbidden_spec_is_frozen() -> None:
             pytest.fail("expected FrozenInstanceError")
 
 
+@beartype
 def test_candidate_paths_is_frozen(tmp_path: Path) -> None:
-    paths = CandidatePaths(skill=tmp_path / _SKILL_FILENAME, references=tmp_path / _REFERENCES_DIRNAME)
+    paths = CandidatePaths(
+        skill=tmp_path / _SKILL_FILENAME, references=tmp_path / _REFERENCES_DIRNAME
+    )
     with pytest.raises(dataclasses.FrozenInstanceError) as info:
         paths.skill = tmp_path / "other"  # type: ignore[misc]
     match info.value:
@@ -109,16 +123,21 @@ def test_candidate_paths_is_frozen(tmp_path: Path) -> None:
             pytest.fail("expected FrozenInstanceError")
 
 
+@beartype
 def test_run_error_carries_code() -> None:
     err = RunError(_RUN_ERROR_MESSAGE, code=_RUN_ERROR_CUSTOM_CODE)
-    assert err.code == _RUN_ERROR_CUSTOM_CODE
+    if err.code != _RUN_ERROR_CUSTOM_CODE:
+        pytest.fail(f"expected code {_RUN_ERROR_CUSTOM_CODE}, got {err.code!r}")
 
 
+@beartype
 def test_run_error_default_code() -> None:
     err = RunError(_RUN_ERROR_MESSAGE)
-    assert err.code == _RUN_ERROR_DEFAULT_CODE
+    if err.code != _RUN_ERROR_DEFAULT_CODE:
+        pytest.fail(f"expected code {_RUN_ERROR_DEFAULT_CODE}, got {err.code!r}")
 
 
+@beartype
 def test_run_error_string_includes_code() -> None:
     err = RunError(_RUN_ERROR_MESSAGE, code=_RUN_ERROR_CUSTOM_CODE)
     rendered = str(err)
@@ -129,207 +148,335 @@ def test_run_error_string_includes_code() -> None:
             pytest.fail(f"missing code/message: {rendered}")
 
 
+@beartype
 def test_as_int_none_returns_default() -> None:
-    assert _as_int(None, _INT_DEFAULT) == _INT_DEFAULT
+    actual = _as_int(None, _INT_DEFAULT)
+    if actual != _INT_DEFAULT:
+        pytest.fail(f"expected {_INT_DEFAULT}, got {actual}")
 
 
+@beartype
 def test_as_int_int_passthrough() -> None:
-    assert _as_int(_SAMPLE_INT, 0) == _SAMPLE_INT
+    actual = _as_int(_SAMPLE_INT, 0)
+    if actual != _SAMPLE_INT:
+        pytest.fail(f"expected {_SAMPLE_INT}, got {actual}")
 
 
+@beartype
 def test_as_int_float_truncates() -> None:
-    assert _as_int(_TRUNCATING_FLOAT, 0) == 3
+    actual = _as_int(_TRUNCATING_FLOAT, 0)
+    if actual != _TRUNCATED_INT:
+        pytest.fail(f"expected {_TRUNCATED_INT}, got {actual}")
 
 
+@beartype
 def test_as_int_str_int() -> None:
-    assert _as_int(_SAMPLE_INT_PARSE, 0) == _SAMPLE_INT * 17 + 4
+    expected = _SAMPLE_INT * 17 + 4
+    actual = _as_int(_SAMPLE_INT_PARSE, 0)
+    if actual != expected:
+        pytest.fail(f"expected {expected}, got {actual}")
 
 
+@beartype
 def test_as_int_str_invalid_returns_default() -> None:
-    assert _as_int("nope", _FALLBACK_INT) == _FALLBACK_INT
+    actual = _as_int("nope", _FALLBACK_INT)
+    if actual != _FALLBACK_INT:
+        pytest.fail(f"expected {_FALLBACK_INT}, got {actual}")
 
 
+@beartype
 def test_as_int_bool_true() -> None:
-    assert _as_int(True, 0) == 1
+    actual = _as_int(True, 0)
+    if actual != 1:
+        pytest.fail(f"expected 1, got {actual}")
 
 
+@beartype
 def test_as_int_bool_false() -> None:
-    assert _as_int(False, 0) == 0
+    actual = _as_int(False, 0)
+    if actual != 0:
+        pytest.fail(f"expected 0, got {actual}")
 
 
+@beartype
 def test_as_int_object_returns_default() -> None:
     class _Opaque:
         pass
 
-    assert _as_int(_Opaque(), _OOPAQUE_INT_DEFAULT) == _OOPAQUE_INT_DEFAULT
+    actual = _as_int(_Opaque(), _OOPAQUE_INT_DEFAULT)
+    if actual != _OOPAQUE_INT_DEFAULT:
+        pytest.fail(f"expected {_OOPAQUE_INT_DEFAULT}, got {actual}")
 
 
+@beartype
 def test_as_float_none_returns_default() -> None:
-    assert _as_float(None, _FLOAT_DEFAULT) == _FLOAT_DEFAULT
+    actual = _as_float(None, _FLOAT_DEFAULT)
+    if actual != _FLOAT_DEFAULT:
+        pytest.fail(f"expected {_FLOAT_DEFAULT}, got {actual}")
 
 
+@beartype
 def test_as_float_int_passthrough() -> None:
-    assert _as_float(_SAMPLE_INT, 0.0) == float(_SAMPLE_INT)
+    expected = float(_SAMPLE_INT)
+    actual = _as_float(_SAMPLE_INT, 0.0)
+    if actual != expected:
+        pytest.fail(f"expected {expected}, got {actual}")
 
 
+@beartype
 def test_as_float_str_float() -> None:
-    assert _as_float(_SAMPLE_FLOAT_PARSE, 0.0) == 1.25
+    actual = _as_float(_SAMPLE_FLOAT_PARSE, 0.0)
+    if actual != _PARSED_FLOAT_VALUE:
+        pytest.fail(f"expected {_PARSED_FLOAT_VALUE}, got {actual}")
 
 
+@beartype
 def test_as_float_str_int_parses() -> None:
-    assert _as_float(_SAMPLE_INT_AS_FLOAT, 0.0) == 5.0
+    actual = _as_float(_SAMPLE_INT_AS_FLOAT, 0.0)
+    if actual != _INT_AS_FLOAT_VALUE:
+        pytest.fail(f"expected {_INT_AS_FLOAT_VALUE}, got {actual}")
 
 
+@beartype
 def test_as_float_str_invalid_returns_default() -> None:
-    assert _as_float("nope", _FALLBACK_FLOAT) == _FALLBACK_FLOAT
+    actual = _as_float("nope", _FALLBACK_FLOAT)
+    if actual != _FALLBACK_FLOAT:
+        pytest.fail(f"expected {_FALLBACK_FLOAT}, got {actual}")
 
 
+@beartype
 def test_as_float_bool_true() -> None:
-    assert _as_float(True, 0.0) == 1.0
+    actual = _as_float(True, 0.0)
+    if actual != 1.0:
+        pytest.fail(f"expected 1.0, got {actual}")
 
 
+@beartype
 def test_as_float_bool_false() -> None:
-    assert _as_float(False, 0.0) == 0.0
+    actual = _as_float(False, 0.0)
+    if actual != 0.0:
+        pytest.fail(f"expected 0.0, got {actual}")
 
 
+@beartype
 def test_as_str_passthrough() -> None:
-    assert _as_str("hello", _STR_DEFAULT) == "hello"
+    actual = _as_str("hello", _STR_DEFAULT)
+    if actual != "hello":
+        pytest.fail(f"expected 'hello', got {actual!r}")
 
 
+@beartype
 def test_as_str_int_to_string() -> None:
-    assert _as_str(_SAMPLE_INT_TO_STR, _STR_DEFAULT) == str(_SAMPLE_INT_TO_STR)
+    expected = str(_SAMPLE_INT_TO_STR)
+    actual = _as_str(_SAMPLE_INT_TO_STR, _STR_DEFAULT)
+    if actual != expected:
+        pytest.fail(f"expected {expected!r}, got {actual!r}")
 
 
+@beartype
 def test_as_str_bool_true() -> None:
-    assert _as_str(True, _STR_DEFAULT) == "True"
+    actual = _as_str(True, _STR_DEFAULT)
+    if actual != "True":
+        pytest.fail(f"expected 'True', got {actual!r}")
 
 
+@beartype
 def test_as_str_bool_false() -> None:
-    assert _as_str(False, _STR_DEFAULT) == "False"
+    actual = _as_str(False, _STR_DEFAULT)
+    if actual != "False":
+        pytest.fail(f"expected 'False', got {actual!r}")
 
 
+@beartype
 def test_as_str_none_returns_default() -> None:
-    assert _as_str(None, _OOPAQUE_STR_DEFAULT) == _OOPAQUE_STR_DEFAULT
+    actual = _as_str(None, _OOPAQUE_STR_DEFAULT)
+    if actual != _OOPAQUE_STR_DEFAULT:
+        pytest.fail(f"expected {_OOPAQUE_STR_DEFAULT}, got {actual!r}")
 
 
+@beartype
 def test_as_str_float_to_string() -> None:
-    assert _as_str(_SAMPLE_FLOAT_TO_STR, _STR_DEFAULT) == str(_SAMPLE_FLOAT_TO_STR)
+    expected = str(_SAMPLE_FLOAT_TO_STR)
+    actual = _as_str(_SAMPLE_FLOAT_TO_STR, _STR_DEFAULT)
+    if actual != expected:
+        pytest.fail(f"expected {expected!r}, got {actual!r}")
 
 
+@beartype
 def test_as_str_object_returns_default() -> None:
     class _Opaque:
         pass
 
-    assert _as_str(_Opaque(), _OOPAQUE_STR_DEFAULT) == _OOPAQUE_STR_DEFAULT
+    actual = _as_str(_Opaque(), _OOPAQUE_STR_DEFAULT)
+    if actual != _OOPAQUE_STR_DEFAULT:
+        pytest.fail(f"expected {_OOPAQUE_STR_DEFAULT}, got {actual!r}")
 
 
+@beartype
 def test_split_values_basic_csv() -> None:
-    assert split_values(_SPLITS_CSV) == ["train", "val"]
+    parts = split_values(_SPLITS_CSV)
+    expected = ["train", "val"]
+    if parts != expected:
+        pytest.fail(f"expected {expected}, got {parts}")
 
 
+@beartype
 def test_split_values_empty() -> None:
-    assert split_values("") == []
+    parts = split_values("")
+    if parts:
+        pytest.fail(f"expected [], got {parts}")
 
 
+@beartype
 def test_split_values_strips_whitespace() -> None:
-    assert split_values(" train , val ") == ["train", "val"]
+    parts = split_values(" train , val ")
+    expected = ["train", "val"]
+    if parts != expected:
+        pytest.fail(f"expected {expected}, got {parts}")
 
 
+@beartype
 def test_split_values_skips_blank_fields() -> None:
-    assert split_values("train,,val,") == ["train", "val"]
+    parts = split_values("train,,val,")
+    expected = ["train", "val"]
+    if parts != expected:
+        pytest.fail(f"expected {expected}, got {parts}")
 
 
+@beartype
 def test_split_family_id_csv_pattern() -> None:
-    assert split_family_id("repair_csv_case00_alpha") == "repair_csv_alpha"
+    actual = split_family_id("repair_csv_case00_alpha")
+    if actual != "repair_csv_alpha":
+        pytest.fail(f"expected 'repair_csv_alpha', got {actual!r}")
 
 
+@beartype
 def test_split_family_id_summary_pattern() -> None:
-    assert split_family_id("repair_summary_case07_beta") == "repair_summary_beta"
+    actual = split_family_id("repair_summary_case07_beta")
+    if actual != "repair_summary_beta":
+        pytest.fail(f"expected 'repair_summary_beta', got {actual!r}")
 
 
+@beartype
 def test_split_family_id_perf_folklore() -> None:
-    assert split_family_id("review_perf_folklore_four_rayon_smallvec") == "review_perf_folklore_rayon_smallvec"
-    assert split_family_id("review_perf_folklore_tiny_stdvec_default") == "review_perf_folklore_stdvec_default"
+    actual = split_family_id("review_perf_folklore_four_rayon_smallvec")
+    if actual != "review_perf_folklore_rayon_smallvec":
+        pytest.fail(f"expected 'review_perf_folklore_rayon_smallvec', got {actual!r}")
+    actual = split_family_id("review_perf_folklore_tiny_stdvec_default")
+    if actual != "review_perf_folklore_stdvec_default":
+        pytest.fail(f"expected 'review_perf_folklore_stdvec_default', got {actual!r}")
 
 
+@beartype
 def test_split_family_id_unknown_returns_itself() -> None:
-    assert split_family_id("not_a_real_pattern") == "not_a_real_pattern"
+    actual = split_family_id("not_a_real_pattern")
+    if actual != "not_a_real_pattern":
+        pytest.fail(f"expected 'not_a_real_pattern', got {actual!r}")
 
 
-def test_sha256_file_deterministic(tmp_path: Path) -> None:
+@beartype
+def test_sha256_file_deterministic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "file.txt"
-    target.write_text("hello world", encoding="utf-8")
-    assert sha256_file(target) == sha256_file(target)
+    monkeypatch.setattr(Path, "read_bytes", lambda _: b"hello world")
+    h1 = sha256_file(target)
+    h2 = sha256_file(target)
+    if h1 != h2:
+        pytest.fail(f"expected equal hashes, got {h1} vs {h2}")
 
 
-def test_sha256_file_known_value(tmp_path: Path) -> None:
+@beartype
+def test_sha256_file_known_value(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "file.txt"
-    target.write_text("hello world", encoding="utf-8")
-    assert sha256_file(target) == _HELLO_WORLD_SHA256
+    monkeypatch.setattr(Path, "read_bytes", lambda _: b"hello world")
+    actual = sha256_file(target)
+    if actual != _HELLO_WORLD_SHA256:
+        pytest.fail(f"expected {_HELLO_WORLD_SHA256}, got {actual}")
 
 
-def test_bundle_hashes_includes_skill_key(tmp_path: Path) -> None:
-    (tmp_path / _SKILL_FILENAME).write_text(_SKILL_BODY, encoding="utf-8")
+@beartype
+def test_bundle_hashes_includes_skill_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    skill_path = tmp_path / _SKILL_FILENAME
+    monkeypatch.setattr(Path, "read_bytes", lambda _: _SKILL_BODY.encode())
     hashes: BundleHashesDict = bundle_hashes(tmp_path)
     match hashes:
         case {"skill": skill_hash}:
-            assert skill_hash == sha256_file(tmp_path / _SKILL_FILENAME)
+            expected = sha256_file(skill_path)
+            if skill_hash != expected:
+                pytest.fail(f"expected {expected}, got {skill_hash}")
         case _:
             pytest.fail("missing skill key")
 
 
-def test_bundle_hashes_includes_references_key(tmp_path: Path) -> None:
-    (tmp_path / _SKILL_FILENAME).write_text(_SKILL_BODY, encoding="utf-8")
+@beartype
+def test_bundle_hashes_includes_references_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     refs = tmp_path / _REFERENCES_DIRNAME
-    refs.mkdir()
-    (refs / "guide.md").write_text(_GUIDE_BODY, encoding="utf-8")
+    guide = refs / "guide.md"
+    monkeypatch.setattr(Path, "read_bytes", lambda _: _GUIDE_BODY.encode())
+    monkeypatch.setattr(Path, "exists", lambda _: True)
+    monkeypatch.setattr(Path, "rglob", lambda _, _pattern: iter([guide]))
+    monkeypatch.setattr(Path, "is_file", lambda _: True)
     hashes = bundle_hashes(tmp_path)
     match hashes:
         case {"references": refs_hash}:
-            assert "references/guide.md" in refs_hash
+            if "references/guide.md" not in refs_hash:
+                pytest.fail(f"missing 'references/guide.md' in {refs_hash}")
         case _:
             pytest.fail("missing references key")
 
 
+@beartype
 def test_promotion_status_non_promotable_targeted() -> None:
-    eligible, reason = _promotion_status(["val", "test"], {"id1"}, "all")
+    eligible, reason = _promotion_status(["val", "test"], frozenset({"id1"}), "all")
     match (eligible, reason):
         case (False, str()):
-            assert "targeted_ids_selected" in reason
+            if "targeted_ids_selected" not in reason:
+                pytest.fail(f"missing 'targeted_ids_selected' in {reason!r}")
         case _:
             pytest.fail("expected non-promotable with targeted ids")
 
 
+@beartype
 def test_promotion_status_non_promotable_splits() -> None:
-    eligible, reason = _promotion_status(["train"], set(), "all")
+    eligible, reason = _promotion_status(["train"], frozenset(), "all")
     match eligible:
         case False:
-            assert "splits_must_be_val_test" in reason
+            if "splits_must_be_val_test" not in reason:
+                pytest.fail(f"missing 'splits_must_be_val_test' in {reason!r}")
         case _:
             pytest.fail("expected non-promotable with wrong splits")
 
 
+@beartype
 def test_promotion_status_non_promotable_kind() -> None:
-    eligible, reason = _promotion_status(["val", "test"], set(), "review")
+    eligible, reason = _promotion_status(["val", "test"], frozenset(), "review")
     match eligible:
         case False:
-            assert "kind=review" in reason
+            if "kind=review" not in reason:
+                pytest.fail(f"missing 'kind=review' in {reason!r}")
         case _:
             pytest.fail("expected non-promotable with non-all kind")
 
 
+@beartype
 def test_promotion_status_promotable() -> None:
-    eligible, reason = _promotion_status(["val", "test"], set(), "all")
-    assert eligible is True
-    assert reason == _PROMOTABLE_REASON
+    eligible, reason = _promotion_status(["val", "test"], frozenset(), "all")
+    if not eligible:
+        pytest.fail("expected eligible=True")
+    if reason != _PROMOTABLE_REASON:
+        pytest.fail(f"expected reason {_PROMOTABLE_REASON}, got {reason!r}")
 
 
 @given(name=st.text(min_size=1, max_size=32), pattern=st.from_regex(_NAME_PATTERN, fullmatch=True))
 @settings(max_examples=_MAX_SMALL_EXAMPLES, deadline=None)
+@beartype
 def test_forbidden_spec_from_dict_round_trip(name: str, pattern: str) -> None:
     spec = ForbiddenSpec.from_dict(ForbiddenPattern(name=name, pattern=pattern))
-    assert spec.name == name
-    assert spec.pattern.pattern == pattern
+    if spec.name != name:
+        pytest.fail(f"expected name {name!r}, got {spec.name!r}")
+    if spec.pattern.pattern != pattern:
+        pytest.fail(f"expected pattern {pattern!r}, got {spec.pattern.pattern!r}")
 
 
 @given(
@@ -337,23 +484,33 @@ def test_forbidden_spec_from_dict_round_trip(name: str, pattern: str) -> None:
         st.none(),
         st.booleans(),
         st.integers(min_value=-_INT_RANGE, max_value=_INT_RANGE),
-        st.floats(min_value=-_FLOAT_BOUND, max_value=_FLOAT_BOUND, allow_nan=False, allow_infinity=False),
+        st.floats(
+            min_value=-_FLOAT_BOUND, max_value=_FLOAT_BOUND, allow_nan=False, allow_infinity=False
+        ),
         st.from_regex(_INT_PATTERN, fullmatch=True),
         st.text(alphabet=_ALPHABET_NON_NUMERIC, min_size=1, max_size=8),
     )
 )
 @settings(max_examples=_MAX_HYPOTHESIS_EXAMPLES, deadline=None)
+@beartype
 def test_as_int_coerces(value: object) -> None:
     result = _as_int(value, 0)
     match value:
         case bool() | int():
-            assert result == int(value)
+            expected = int(value)
+            if result != expected:
+                pytest.fail(f"expected {expected}, got {result}")
         case float():
-            assert result == int(value)
-        case str() as s if re.fullmatch(_INT_PATTERN, s):
-            assert result == int(s)
+            expected = int(value)
+            if result != expected:
+                pytest.fail(f"expected {expected}, got {result}")
+        case str() if re.fullmatch(_INT_PATTERN, value):
+            expected = int(value)
+            if result != expected:
+                pytest.fail(f"expected {expected}, got {result}")
         case _:
-            assert result == 0
+            if result != 0:
+                pytest.fail(f"expected 0, got {result}")
 
 
 @given(
@@ -361,23 +518,33 @@ def test_as_int_coerces(value: object) -> None:
         st.none(),
         st.booleans(),
         st.integers(min_value=-_INT_RANGE, max_value=_INT_RANGE),
-        st.floats(min_value=-_FLOAT_BOUND, max_value=_FLOAT_BOUND, allow_nan=False, allow_infinity=False),
+        st.floats(
+            min_value=-_FLOAT_BOUND, max_value=_FLOAT_BOUND, allow_nan=False, allow_infinity=False
+        ),
         st.from_regex(_FLOAT_PATTERN, fullmatch=True),
         st.text(alphabet=_ALPHABET_NON_NUMERIC, min_size=1, max_size=8),
     )
 )
 @settings(max_examples=_MAX_HYPOTHESIS_EXAMPLES, deadline=None)
+@beartype
 def test_as_float_coerces(value: object) -> None:
     result = _as_float(value, 0.0)
     match value:
         case bool():
-            assert result == float(int(value))
+            expected = float(int(value))
+            if result != expected:
+                pytest.fail(f"expected {expected}, got {result}")
         case int() | float():
-            assert result == float(value)
-        case str() as s if re.fullmatch(_FLOAT_PATTERN, s):
-            assert result == float(s)
+            expected = float(value)
+            if result != expected:
+                pytest.fail(f"expected {expected}, got {result}")
+        case str() if re.fullmatch(_FLOAT_PATTERN, value):
+            expected = float(value)
+            if result != expected:
+                pytest.fail(f"expected {expected}, got {result}")
         case _:
-            assert result == 0.0
+            if result != 0.0:
+                pytest.fail(f"expected 0.0, got {result}")
 
 
 @given(
@@ -385,21 +552,28 @@ def test_as_float_coerces(value: object) -> None:
         st.none(),
         st.booleans(),
         st.integers(min_value=-_INT_RANGE, max_value=_INT_RANGE),
-        st.floats(min_value=-_FLOAT_BOUND, max_value=_FLOAT_BOUND, allow_nan=False, allow_infinity=False),
+        st.floats(
+            min_value=-_FLOAT_BOUND, max_value=_FLOAT_BOUND, allow_nan=False, allow_infinity=False
+        ),
         st.text(min_size=1, max_size=_MAX_SHORT_TEXT),
         st.lists(st.integers(), max_size=3),
     )
 )
 @settings(max_examples=_MAX_HYPOTHESIS_EXAMPLES, deadline=None)
+@beartype
 def test_as_str_coerces(value: object) -> None:
     result = _as_str(value, _STR_DEFAULT)
     match value:
-        case str() as s:
-            assert result == s
+        case str():
+            if result != value:
+                pytest.fail(f"expected {value!r}, got {result!r}")
         case bool() | int() | float():
-            assert result == str(value)
+            expected = str(value)
+            if result != expected:
+                pytest.fail(f"expected {expected!r}, got {result!r}")
         case _:
-            assert result == _STR_DEFAULT
+            if result != _STR_DEFAULT:
+                pytest.fail(f"expected {_STR_DEFAULT!r}, got {result!r}")
 
 
 @given(value=st.text(max_size=64))
@@ -408,10 +582,14 @@ def test_as_str_coerces(value: object) -> None:
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
+@beartype
 def test_split_values_returns_clean_parts(tmp_path: Path, value: str) -> None:
     del tmp_path
     parts = split_values(value)
     for part in parts:
-        assert part == part.strip()
-        assert part
-        assert "," not in part
+        if part != part.strip():
+            pytest.fail(f"part not stripped: {part!r}")
+        if not part:
+            pytest.fail(f"expected non-empty part in {parts!r}")
+        if "," in part:
+            pytest.fail(f"part contains comma: {part!r}")
