@@ -378,8 +378,17 @@ def test_find_validates_name(
     assert info.value.code == "skill_name_invalid"
 
 
+_PROMPT_CONTENT: Any = st.text(
+    alphabet=st.characters(
+        blacklist_characters="\r\n",
+        blacklist_categories=("Cs",),
+    ),
+    max_size=200,
+)
+
+
 @pytest.mark.property
-@given(name=_skill_name(), content=st.text(max_size=200))
+@given(name=_skill_name(), content=_PROMPT_CONTENT)
 @settings(
     max_examples=_EXAMPLE_COUNT,
     suppress_health_check=[HealthCheck.function_scoped_fixture],

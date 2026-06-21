@@ -892,4 +892,260 @@ The JSON object at `data/<root>/loop_state.json` that records the current bundle
 
 ### Run ID
 
-A UUID the harness generates per step Used as the directory name under `runs/` and as the suffix for `summary.json` plus `error.json`.
+A UUID the harness generates per step Used as the directory name under `runs/` and as the suffix for `summary.json` plus `error.json`
+
+### Candidate
+
+A specific proposed bundle produced by one loop step Identified by the candidate name plus the step counter Candidates live under the data root until they are promoted or discarded
+
+### Summary
+
+The JSON object at `runs/<run_id>/summary.json` with `aggregates` plus `gate` keys The harness parses it on every step to decide whether to advance `loop_state.json`
+
+### Diff Report
+
+A markdown summary at `reports/<bundle>.md` listing which addenda were accepted plus which were rejected plus the score trajectory Used by reviewers to audit a bundle evolution
+
+### Budget
+
+The JSON object at `data/<root>/budget.json` recording token usage plus wall-clock consumption plus provider errors Cleared on every successful run
+
+### Mock Provider
+
+The `mock:dryrun` provider that returns a canned JSON response without calling an LLM Useful for local iteration plus CI plus offline development
+
+## Performance Notes
+
+### Eval Throughput
+
+A simple eval can grade hundreds of tasks per second on a laptop More complex evals that spawn cargo or tsc may grade one task per second Tune `max_examples` plus `--limit` to stay within the budget window
+
+### Loop Wall Clock
+
+Most loops finish in under a minute per step when using the mock provider Real providers add latency proportional to the LLM response time plus the eval time Budget for ten minutes per step when using a hosted model
+
+### Caching
+
+The harness caches `Skill.discover` results for the lifetime of the process Reload the harness between edits to a bundle The cache key includes the skill name plus the modification time of `rubric.json`
+
+### Profiling
+
+Profile the harness with `uv run python -m cProfile -o /tmp/profile.pstat -m skillopt_train list --skills-root skills` then visualize with `uv run snakeviz /tmp/profile.pstat`. Hot spots typically live in the provider module or in the eval script
+
+### Memory Footprint
+
+A single loop step holds the canonical bundle plus the overlay plus the eval scratch in memory Memory grows linearly with the number of tasks plus the size of the references directory Cap references at one megabyte per bundle
+
+## Reference
+
+### Internal Modules
+
+- `scripts/skillopt_train/skill.py` — `Skill.discover` plus `Skill.find`
+- `scripts/skillopt_train/rubric.py` — `Rubric.from_path` plus `Rubric.from_mapping`
+- `scripts/skillopt_train/mutator.py` — `Mutator.from_skill` plus the proposer
+- `scripts/skillopt_train/skill_train.py` — `SkillDrivenLoop` plus state types
+- `scripts/skillopt_train/eval_bridge.py` — eval adapter for external harnesses
+- `scripts/skillopt_train/leaderboard.py` — leaderboard comparator plus gate logic
+- `scripts/skillopt_train/budget.py` — token plus wall-clock budget tracker
+- `scripts/skillopt_train/self_critique.py` — self-critique prompt builder
+- `scripts/skillopt_train/diff_report.py` — diff report renderer
+- `scripts/skillopt_train/ci_runner.py` — CI gate driver
+
+### External References
+
+- `vendor/SkillOpt/` — upstream SkillOpt checkout used as the reference implementation
+- `docs/skillopt-site/` — rendered guides for downstream consumers
+- `reports/` — historical diff reports per bundle
+- `.benchmarks/` — performance traces used by the profiling workflow
+
+### Key Files
+
+- `pyproject.toml` — package metadata plus tool configuration
+- `uv.lock` — locked dependency graph
+- `Taskfile.yml` — task runner recipes for local development
+- `README.md` — quickstart plus supported evaluation path
+- `CONTRIBUTING.md` — this file
+
+## Common Tasks
+
+### Inspect A Skill
+
+```bash
+uv run skillopt-train show holzman-rust --skills-root skills
+```
+
+Prints the canonical bundle plus the rubric plus the prompt template plus the task count Useful for sanity-checking a bundle before running it
+
+### Replay A Run
+
+```bash
+uv run skillopt-train replay <run_id> --data-root data/test
+```
+
+Replays the eval phase of a previous step against the same overlay Useful for verifying that a candidate is reproducible
+
+### Compare Two Candidates
+
+```bash
+uv run skillopt-train diff <bundle_a> <bundle_b> --skills-root skills
+```
+
+Prints a side-by-side comparison of the two bundles plus their rubric plus their prompt template plus their task set
+
+### Export A Bundle
+
+```bash
+uv run skillopt-train export holzman-rust --out dist/holzman-rust.tar.gz
+```
+
+Bundles the canonical files plus the references directory into a tarball Suitable for distribution to downstream consumers
+
+### Import A Bundle
+
+```bash
+uv run skillopt-train import dist/holzman-rust.tar.gz --skills-root skills
+```
+
+Imports a previously exported bundle into the skills root Validates every required file before committing
+
+## Style Guide
+
+### Markdown
+
+- Use ATX headings (`##`, `###`)
+- Use fenced code blocks with language tags
+- Use reference-style links for repeated URLs
+- Use tables for structured comparisons
+- Avoid HTML tags except for `<br>` plus `<details>`
+
+### Python
+
+- Type-annotate every public function
+- Use `from __future__ import annotations` in every module
+- Prefer `match` statements over long `if/elif` chains
+- Prefer `tuple` over `list` for fixed-size sequences
+- Use `Final` for module-level constants
+
+### JSON
+
+- Two-space indentation
+- Sorted keys on output
+- Trailing newline after the closing brace
+- No comments in JSON files
+
+### Bash
+
+- Quote every variable expansion
+- Use `set -euo pipefail` at the top of every script
+- Prefer long flags over short flags for readability
+- Use `command -v` to check for required tools
+
+## Security
+
+### Secrets
+
+Never commit API keys or tokens to the repository Use environment variables plus a `.env` file that is gitignored The harness reads `OPENAI_API_KEY` plus `ANTHROPIC_API_KEY` plus `GOOGLE_API_KEY` from the environment
+
+### Sandboxing
+
+The eval harness runs in a subprocess with a controlled working directory Do not give the eval write access outside `sandbox_root` plus `runs/<run_id>/`. The harness refuses to launch evals that request network access unless the rubric explicitly allows it
+
+### Input Validation
+
+Every external input is validated at the boundary `Skill.find` validates the name regex `Rubric.from_path` validates the JSON shape `eval.py` validates every CLI flag Treat any untrusted input as hostile
+
+### Supply Chain
+
+Use `uv lock` to pin every transitive dependency Review dependency diffs in pull requests before merging Run `cargo audit` plus `cargo deny check` for Rust dependencies Run `pip-audit` for Python dependencies
+
+### Provenance
+
+Tag every release with a GPG signature plus a SHA-256 checksum Publish the checksum alongside the wheel plus the sdist Downstream consumers must verify the checksum before installing
+
+## Appendix
+
+### Sample `rubric.json`
+
+```json
+{
+  "name": "python-typing",
+  "description": "Strict typing plus PEP 695 enforcement for Python 3.12+",
+  "forbidden_tokens": {
+    "Any": "forbidden:any",
+    "# type: ignore": "forbidden:type_ignore",
+    "cast": "forbidden:cast",
+    "print": "forbidden:print"
+  },
+  "grade_issue_keys": ["json_errors", "mutation_errors", "protected_changed", "execution_errors", "forbidden_matches", "missing_groups"],
+  "grade_returncode_keys": ["ruff_returncode", "mypy_returncode", "pytest_returncode"],
+  "success_threshold_hard": 1.0,
+  "max_examples": 5
+}
+```
+
+### Sample `tasks.jsonl`
+
+```json
+{"id": "T001", "kind": "review", "code": "def add(a: int, b: int) -> int:\n    return a + b\n", "expected_groups": ["ok"]}
+{"id": "T002", "kind": "review", "code": "def parse(s: str) -> int:\n    return int(s)\n", "expected_groups": ["ok"]}
+{"id": "T003", "kind": "review", "code": "from typing import Any\ndef broken(v: Any) -> Any:\n    return v\n", "expected_groups": ["forbidden:any"]}
+{"id": "T004", "kind": "review", "code": "def ignored() -> None:\n    x = 1  # type: ignore\n    return x\n", "expected_groups": ["forbidden:type_ignore"]}
+{"id": "T005", "kind": "review", "code": "def logged() -> int:\n    print('hello')\n    return 1\n", "expected_groups": ["forbidden:print"]}
+```
+
+### Sample `summary.json`
+
+```json
+{
+  "aggregates": [
+    {
+      "bundle": "python-typing-cand-2",
+      "hard": 0.6,
+      "soft": 0.8,
+      "mixed": 0.7,
+      "passed_tasks": 3,
+      "task_count": 5
+    }
+  ],
+  "gate": {"action": "kept"}
+}
+```
+
+### Sample `leaderboard.jsonl`
+
+```json
+{"step": 0, "bundle": "python-typing-cand-0", "hard": 0.4, "soft": 0.6, "mixed": 0.5, "passed_tasks": 2, "task_count": 5, "accepted": true}
+{"step": 1, "bundle": "python-typing-cand-1", "hard": 0.5, "soft": 0.7, "mixed": 0.6, "passed_tasks": 3, "task_count": 5, "accepted": false}
+{"step": 2, "bundle": "python-typing-cand-2", "hard": 0.6, "soft": 0.8, "mixed": 0.7, "passed_tasks": 3, "task_count": 5, "accepted": true}
+```
+
+### Sample `loop_state.json`
+
+```json
+{
+  "skill": "python-typing",
+  "step": 2,
+  "accepted_addenda": 2,
+  "rejected_addenda": 1,
+  "current_bundle": "skills/python-typing/",
+  "budget": {"tokens": 12345, "wall_clock": 67.8}
+}
+```
+
+### Sample `budget.json`
+
+```json
+{
+  "tokens": 12345,
+  "wall_clock": 67.8,
+  "provider_errors": 0,
+  "eval_errors": 0,
+  "last_step": 2
+}
+```
+
+## Acknowledgements
+
+This project stands on the shoulders of giants The Holzman Rust doctrine is inspired by Gerard Holzman's NASA/JPL Power-of-Ten rules for safety-critical code The TypeScript bundle draws on the React team's official hooks lint rules plus the TypeScript strict-mode playbook The SkillOpt loop design borrows from BEAM-style supervisor trees plus plan-shredder decomposition patterns
+
+Special thanks to the maintainers of `uv` plus `ruff` plus `mypy` plus `pytest` plus `cargo` plus `tsc` plus `vitest` The harness depends on every one of these tools staying fast plus correct plus stable
