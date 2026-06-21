@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Final
 
 import pytest
+
 from skillopt_train.errors import MutatorError
 from skillopt_train.mutator import Mutator, MutatorMeta, propose
 from skillopt_train.providers import (
@@ -12,7 +13,6 @@ from skillopt_train.providers import (
     ScriptedTurn,
     make_json_response,
 )
-
 
 _SAFE_ADDENDUM: Final[str] = "first addendum body\n"
 _SAFE_ADDENDUM_TWO: Final[str] = "second addendum body\n"

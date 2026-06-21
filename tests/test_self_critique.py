@@ -33,7 +33,7 @@ def test_inject_critique_appends_section() -> None:
     assert "Self-Critique" in injected
 
 
-def FailureDiff_stub(  # noqa: N802
+def FailureDiff_stub(
     regressions: tuple[FailureBucket, ...] = (),
     improvements: tuple[FailureBucket, ...] = (),
     introduced: tuple[FailureBucket, ...] = (),

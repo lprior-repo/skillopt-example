@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from skillopt_train.providers import (
     MockProvider,
     ScriptedTurn,
@@ -49,7 +50,9 @@ def test_extract_json_from_bare_braces() -> None:
 
 
 def test_extract_json_rejects_plain_text() -> None:
-    with pytest.raises(Exception):
+    from skillopt_train.errors import ProviderError
+
+    with pytest.raises(ProviderError):
         extract_json("no json here at all")
 
 

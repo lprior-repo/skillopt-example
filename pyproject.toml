@@ -35,6 +35,12 @@ dev = [
 ]
 test = ["hypothesis>=6.100", "pytest>=8", "pytest-benchmark>=4.0"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["scripts/skillopt_train"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"scripts/skillopt_train/py.typed" = "skillopt_train/py.typed"
+
 [dependency-groups]
 dev = [
     "crosshair-tool>=0.0.84",

@@ -5,8 +5,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from skillopt_train.skill import REQUIRED_FILES, Skill
 
+from skillopt_train.skill import REQUIRED_FILES, Skill
 
 _SKILLS_ROOT: Final[Path] = Path("skills")
 _SKILL_BODY: Final[str] = "# {name}\n\nbaseline skill bundle\n"
