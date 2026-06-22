@@ -1971,8 +1971,13 @@ def _scale_counts_post(result: Mapping[str, float], counts: CountsDict, ratio: f
     )
 
 
+def _ratio_non_negative(ratio: float) -> bool:
+    """Require ``ratio`` to be non-negative so scaled counts stay non-negative."""
+    return ratio >= 0.0
+
+
 @beartype
-@icontract.require(_always_true)
+@icontract.require(_ratio_non_negative)
 @icontract.ensure(_scale_counts_post)
 def scale_counts(counts: CountsDict, ratio: float) -> Mapping[str, float]:
     """Multiply every field of ``counts`` by ``ratio`` to get a target size."""
@@ -1992,8 +1997,19 @@ def _add_counts_post(result: CountsDict, left: CountsDict, right: CountsDict) ->
     )
 
 
+def _left_counts_non_negative(left: CountsDict) -> bool:
+    """Require every field of the left :class:`CountsDict` to be non-negative."""
+    return left.total >= 0 and left.review >= 0 and left.repair >= 0
+
+
+def _right_counts_non_negative(right: CountsDict) -> bool:
+    """Require every field of the right :class:`CountsDict` to be non-negative."""
+    return right.total >= 0 and right.review >= 0 and right.repair >= 0
+
+
 @beartype
-@icontract.require(_always_true)
+@icontract.require(_left_counts_non_negative)
+@icontract.require(_right_counts_non_negative)
 @icontract.ensure(_add_counts_post)
 def add_counts(left: CountsDict, right: CountsDict) -> CountsDict:
     """Return the field-wise sum of two :class:`CountsDict` instances."""
@@ -2022,8 +2038,21 @@ def _projected_post(
     return result == expected
 
 
+def _family_count_non_negative(family_count: CountsDict) -> bool:
+    """Require ``family_count`` to be non-negative before projecting the error."""
+    return family_count.total >= 0 and family_count.review >= 0 and family_count.repair >= 0
+
+
+def _counts_map_non_negative(counts: Mapping[str, CountsDict]) -> bool:
+    """Require every :class:`CountsDict` in ``counts`` to be non-negative."""
+    return all(
+        count.total >= 0 and count.review >= 0 and count.repair >= 0 for count in counts.values()
+    )
+
+
 @beartype
-@icontract.require(_always_true)
+@icontract.require(_family_count_non_negative)
+@icontract.require(_counts_map_non_negative)
 @icontract.ensure(_projected_post)
 def projected_assignment_error(
     target_split: str,
@@ -2057,8 +2086,13 @@ def _relative_squared_post(
     return result == expected
 
 
+def _observed_non_negative(observed: CountsDict) -> bool:
+    """Require ``observed`` counts to be non-negative before squaring residuals."""
+    return observed.total >= 0 and observed.review >= 0 and observed.repair >= 0
+
+
 @beartype
-@icontract.require(_always_true)
+@icontract.require(_observed_non_negative)
 @icontract.ensure(_relative_squared_post)
 def relative_squared_error(observed: CountsDict, target: Mapping[str, float]) -> float:
     """Sum the squared relative error between observed counts and targets."""

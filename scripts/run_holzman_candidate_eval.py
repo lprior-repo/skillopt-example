@@ -14,9 +14,9 @@ import argparse
 import importlib
 import json
 import sys
-from collections.abc import Mapping, MutableSequence, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from expression import Error, Ok, Result
 
@@ -104,13 +104,13 @@ _PROMOTION_SPLITS: Final[tuple[str, ...]] = ("val", "test")
 def _shell_get_adapter(cfg: Mapping[str, object]) -> AdapterProtocol:
     """Dynamic-import the SkillOpt adapter factory at the shell layer.
 
-    The cast lives here so :mod:`scripts.eval_core` stays free of
-    ``importlib`` and runtime type-coercion.
+    The boundary narrowing lives here so :mod:`scripts.eval_core` stays
+    free of ``importlib`` and runtime type-coercion.
     """
     from scripts.train import get_adapter  # type: ignore[import-untyped]  # noqa: PLC0415
 
-    raw = cast("dict[str, object]", cfg)
-    return cast(AdapterProtocol, get_adapter(raw))
+    adapter: AdapterProtocol = get_adapter(dict(cfg))
+    return adapter
 
 
 def _shell_load_config(path_str: str) -> object:
@@ -122,7 +122,8 @@ def _shell_load_config(path_str: str) -> object:
 def _shell_flatten_config(raw: object) -> Mapping[str, object]:
     """Flatten the SkillOpt config via its dedicated helper."""
     config_module = importlib.import_module("skillopt.config")
-    return cast("Mapping[str, object]", config_module.flatten_config(raw))
+    flat: Mapping[str, object] = config_module.flatten_config(raw)
+    return flat
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -305,7 +306,7 @@ def main(argv: Sequence[str]) -> Result[int, EvalError]:
     if not validate_splits_result.is_ok():
         return Error(validate_splits_result.error)
     promotion_eligible, promotion_reason = _promotion_status(splits, ids, args.kind)
-    all_summaries: MutableSequence[SummaryDict] = []
+    all_summaries: tuple[SummaryDict, ...] = ()
 
     metadata = _run_metadata(
         candidate=candidate,
@@ -338,7 +339,7 @@ def main(argv: Sequence[str]) -> Result[int, EvalError]:
             promotion_reason,
         )
         _emit_split_summary(summary, split_out)
-        all_summaries.append(summary)
+        all_summaries = (*all_summaries, summary)
         _emit_failure_lines(split, results)
 
     _write_aggregate_summaries(all_summaries, out_root)

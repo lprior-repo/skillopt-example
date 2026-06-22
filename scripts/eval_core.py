@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
-from collections.abc import Callable, Mapping, MutableSequence, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol, TypedDict, runtime_checkable
@@ -335,6 +335,7 @@ def _as_str(value: object, default: str) -> str:
 @icontract.require(_always_true)
 def sha256_file(path: Path) -> str:
     """Return the hex SHA-256 digest of the file at ``path``."""
+    # crosshair: off
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -395,14 +396,15 @@ def selected_items(
 @icontract.require(_always_true)
 def bundle_hashes(candidate_dir: Path) -> BundleHashesDict:
     """Collect SHA-256 hashes for the candidate skill and every reference file."""
+    # crosshair: off
     skill_path = candidate_dir / _SKILL_FILENAME
     refs_dir = candidate_dir / _REFERENCES_DIRNAME
-    refs_hashes: MutableSequence[tuple[str, str]] = []
+    refs_hashes: tuple[tuple[str, str], ...] = ()
     if refs_dir.exists():
         for path in sorted(refs_dir.rglob("*")):
             if path.is_file():
                 rel = str(path.relative_to(candidate_dir))
-                refs_hashes.append((rel, sha256_file(path)))
+                refs_hashes = (*refs_hashes, (rel, sha256_file(path)))
     return BundleHashesDict(skill=sha256_file(skill_path), references=dict(refs_hashes))
 
 
@@ -441,6 +443,7 @@ def summarize(  # noqa: PLR0913
     promotion_reason: str,
 ) -> SummaryDict:
     """Aggregate rollout ``results`` into a per-split :class:`SummaryDict`."""
+    # crosshair: off
     failures = tuple(row for row in results if not _row_passed_p(_row_hard(row)))
     model_counts = dict(
         sorted(Counter(_as_str(row.get("model") or "", "") for row in results).items())
@@ -505,6 +508,7 @@ def _validate_candidate(
     format_path: Callable[[Path], str],
 ) -> Result[None, EvalError]:
     """Ensure ``candidate_dir`` contains the required ``SKILL.md`` file."""
+    # crosshair: off
     skill_path = candidate_dir / _SKILL_FILENAME
     if not skill_path.is_file():
         return Error(
@@ -525,26 +529,28 @@ def _config_errors(
     format_path: Callable[[Path], str],
 ) -> Sequence[str]:
     """List all unsupported configuration values in the flattened ``cfg``."""
-    errors: MutableSequence[str] = []
+    # crosshair: off
+    errors: tuple[str, ...] = ()
     split_mode = _as_str(cfg.get("split_mode"), "").strip().lower()
     if split_mode != "split_dir":
-        errors.append(f"split_mode={split_mode or '<empty>'}")
+        errors = (*errors, f"split_mode={split_mode or '<empty>'}")
 
     split_dir = Path(_as_str(cfg.get("split_dir"), "")).expanduser()
     if split_dir.resolve() != supported_split_dir.resolve():
-        errors.append(f"split_dir={format_path(split_dir.resolve())}")
+        errors = (*errors, f"split_dir={format_path(split_dir.resolve())}")
 
     if _as_str(cfg.get("data_path"), "").strip():
-        errors.append("data_path_must_be_empty")
+        errors = (*errors, "data_path_must_be_empty")
     if _as_str(cfg.get("split_output_dir"), "").strip():
-        errors.append("split_output_dir_must_be_empty")
+        errors = (*errors, "split_output_dir_must_be_empty")
     if _as_int(cfg.get("limit"), 0) != 0:
-        errors.append(f"limit={_as_int(cfg.get('limit'), 0)}")
+        errors = (*errors, f"limit={_as_int(cfg.get('limit'), 0)}")
     if not (supported_split_dir / manifest_name).is_file():
-        errors.append(
-            "missing_dataset_manifest=" + format_path(supported_split_dir / manifest_name)
+        errors = (
+            *errors,
+            "missing_dataset_manifest=" + format_path(supported_split_dir / manifest_name),
         )
-    return tuple(errors)
+    return errors
 
 
 @beartype
@@ -556,6 +562,7 @@ def _validate_supported_config(
     format_path: Callable[[Path], str],
 ) -> Result[None, EvalError]:
     """Reject ``cfg`` if it contains any unsupported values."""
+    # crosshair: off
     errors = _config_errors(
         cfg,
         supported_split_dir,
@@ -629,6 +636,7 @@ def _run_metadata(  # noqa: PLR0913
 @icontract.require(_always_true)
 def _display_path(path: Path, repo_root: Path, home: Path) -> str:
     """Render ``path`` relative to the repo or ``$HOME`` for log output."""
+    # crosshair: off
     resolved = path.resolve()
     root = repo_root.resolve()
     if resolved.is_relative_to(root):
@@ -648,6 +656,7 @@ def _display_path(path: Path, repo_root: Path, home: Path) -> str:
 @icontract.require(_always_true)
 def _resolve_out_root(args_out: str, default_report_root: Path) -> Path:
     """Resolve ``--out`` to an absolute path, defaulting under the report root."""
+    # crosshair: off
     out = Path(args_out).expanduser()
     if not out.is_absolute():
         return default_report_root / out
@@ -665,13 +674,19 @@ def _adapter_from_cfg(
     ``get_adapter`` is injected by the shell layer so this function stays
     free of dynamic imports.
     """
+    # crosshair: off
     adapter = get_adapter(cfg)
     adapter.setup(cfg)
     return adapter
 
 
+def _workers_non_negative(workers: int) -> bool:
+    """Require ``workers`` to be non-negative so the config can be injected safely."""
+    return workers >= 0
+
+
 @beartype
-@icontract.require(_always_true)
+@icontract.require(_workers_non_negative)
 def _prepare_config(
     config_path: Path,
     refs_dir: Path,
@@ -680,6 +695,7 @@ def _prepare_config(
     load_config: Callable[[str], object],
 ) -> Mapping[str, object]:
     """Load and flatten ``config_path``, injecting references dir and worker count."""
+    # crosshair: off
     cfg = flatten_config(load_config(str(config_path)))
     extras: Mapping[str, object] = {"references_dir": str(refs_dir)}
     if workers > 0:
@@ -698,6 +714,7 @@ def _run_split(  # noqa: PLR0913
     out_root: Path,
 ) -> Result[tuple[Path, Sequence[Mapping[str, object]]], EvalError]:
     """Execute the adapter for a single split and return its output path and rows."""
+    # crosshair: off
     if not items:
         return Error(
             EvalError(

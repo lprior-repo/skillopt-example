@@ -46,6 +46,7 @@ from scripts.dataset_core import (
     frame_tests,
     header_expected,
     header_tests,
+    projected_assignment_error,
     registration_expected,
     registration_tests,
     relative_squared_error,
@@ -75,6 +76,8 @@ _FRAME_GROUPS: Final[int] = 6
 _HEADER_GROUPS: Final[int] = 7
 _REGISTRATION_GROUPS: Final[int] = 8
 _BLACK_HAT_GROUPS: Final[int] = 13
+_SPLIT_KEYS: Final[tuple[str, ...]] = ("train", "val", "test")
+_TARGET_MIN: Final[float] = 1.0
 
 
 # --- Strategies ---
@@ -123,6 +126,52 @@ def _counts_dicts(
     review: int = draw(st.integers(min_value=0, max_value=total))
     repair: int = total - review
     return CountsDict(total=total, review=review, repair=repair)
+
+
+@st.composite
+def _target_mapping(draw: st.DrawFn) -> Mapping[str, float]:
+    """Build a single ``{total, review, repair}`` target mapping for property tests."""
+    bound: float = float(_FLOAT_BOUND)
+    return pmap(
+        {
+            "total": draw(
+                st.floats(
+                    min_value=_TARGET_MIN,
+                    max_value=bound,
+                    allow_nan=False,
+                    allow_infinity=False,
+                )
+            ),
+            "review": draw(
+                st.floats(
+                    min_value=_TARGET_MIN,
+                    max_value=bound,
+                    allow_nan=False,
+                    allow_infinity=False,
+                )
+            ),
+            "repair": draw(
+                st.floats(
+                    min_value=_TARGET_MIN,
+                    max_value=bound,
+                    allow_nan=False,
+                    allow_infinity=False,
+                )
+            ),
+        }
+    )
+
+
+@st.composite
+def _split_counts_map(draw: st.DrawFn) -> Mapping[str, CountsDict]:
+    """Build a ``train/val/test`` mapping of :class:`CountsDict` values."""
+    return pmap({split: draw(_counts_dicts()) for split in _SPLIT_KEYS})
+
+
+@st.composite
+def _split_targets_map(draw: st.DrawFn) -> Mapping[str, Mapping[str, float]]:
+    """Build a ``train/val/test`` mapping of target mappings."""
+    return pmap({split: draw(_target_mapping()) for split in _SPLIT_KEYS})
 
 
 # --- add_integers ---
@@ -562,6 +611,43 @@ def test_relative_squared_error_property(counts: CountsDict) -> None:
         + (float(counts.review) - 1.0) ** 2
         + (float(counts.repair) - 1.0) ** 2
     )
+    if result != expected:
+        pytest.fail(f"expected {expected}, got {result}")
+
+
+# --- projected_assignment_error ---
+
+
+@pytest.mark.property
+@given(
+    target_split=st.sampled_from(_SPLIT_KEYS),
+    family_count=_counts_dicts(),
+    counts=_split_counts_map(),
+    targets=_split_targets_map(),
+)
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
+@beartype
+def test_projected_assignment_error_property(
+    target_split: str,
+    family_count: CountsDict,
+    counts: Mapping[str, CountsDict],
+    targets: Mapping[str, Mapping[str, float]],
+) -> None:
+    """Property: ``projected_assignment_error`` is non-negative and equals the per-split sum."""
+    result: float = projected_assignment_error(
+        target_split=target_split,
+        family_count=family_count,
+        counts=counts,
+        targets=targets,
+    )
+    if result < 0.0:
+        pytest.fail(f"expected non-negative, got {result}")
+    expected: float = 0.0
+    for split in _SPLIT_KEYS:
+        observed: CountsDict = (
+            add_counts(counts[split], family_count) if split == target_split else counts[split]
+        )
+        expected += relative_squared_error(observed, targets[split])
     if result != expected:
         pytest.fail(f"expected {expected}, got {result}")
 

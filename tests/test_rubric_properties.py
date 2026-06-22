@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 # pyright: reportPrivateUsage=false, reportUnknownLambdaType=false, reportUnknownArgumentType=false
-import dataclasses
 import hashlib
 import re
 from pathlib import Path
@@ -103,34 +102,6 @@ def test_forbidden_spec_from_dict_pattern() -> None:
     spec = ForbiddenSpec.from_dict(ForbiddenPattern(name="x", pattern="y"))
     if spec.pattern.pattern != "y":
         pytest.fail(f"expected pattern 'y', got {spec.pattern.pattern!r}")
-
-
-@beartype
-def test_forbidden_spec_is_frozen() -> None:
-    """Verify the test_forbidden_spec_is_frozen invariant."""
-    spec = ForbiddenSpec.from_dict(ForbiddenPattern(name="x", pattern="y"))
-    with pytest.raises(dataclasses.FrozenInstanceError) as info:
-        spec.name = "changed"  # type: ignore[misc]
-    match info.value:
-        case dataclasses.FrozenInstanceError():
-            pass
-        case _:
-            pytest.fail("expected FrozenInstanceError")
-
-
-@beartype
-def test_candidate_paths_is_frozen(tmp_path: Path) -> None:
-    """Verify the test_candidate_paths_is_frozen invariant."""
-    paths = CandidatePaths(
-        skill=tmp_path / _SKILL_FILENAME, references=tmp_path / _REFERENCES_DIRNAME
-    )
-    with pytest.raises(dataclasses.FrozenInstanceError) as info:
-        paths.skill = tmp_path / "other"  # type: ignore[misc]
-    match info.value:
-        case dataclasses.FrozenInstanceError():
-            pass
-        case _:
-            pytest.fail("expected FrozenInstanceError")
 
 
 @beartype
@@ -686,6 +657,20 @@ def test_forbidden_spec_from_dict_pattern_property(name: str, pattern: str) -> N
 
 @pytest.mark.property
 @given(
+    name=st.text(min_size=1, max_size=32),
+    pattern=st.from_regex(r"[a-zA-Z_]+", fullmatch=True),
+)
+@settings(max_examples=_MAX_SMALL_EXAMPLES, deadline=None)
+@beartype
+def test_forbidden_spec_is_frozen_property(name: str, pattern: str) -> None:
+    """Property: ``ForbiddenSpec`` is a frozen dataclass for any input."""
+    spec = ForbiddenSpec.from_dict(ForbiddenPattern(name=name, pattern=pattern))
+    if not spec.__dataclass_params__.frozen:  # type: ignore[attr-defined]
+        pytest.fail("expected ForbiddenSpec to be a frozen dataclass")
+
+
+@pytest.mark.property
+@given(
     message=st.text(min_size=0, max_size=32),
     code=st.from_regex(r"[a-z_]+", fullmatch=True),
 )
@@ -928,3 +913,17 @@ def test_promotion_status_promotable_property() -> None:
         pytest.fail("expected eligible=True")
     if reason != _PROMOTABLE_REASON:
         pytest.fail(f"expected reason {_PROMOTABLE_REASON}, got {reason!r}")
+
+
+@pytest.mark.property
+@given(
+    skill_name=st.from_regex(r"[a-z_]+\.md", fullmatch=True),
+    refs_name=st.from_regex(r"[a-z_]+", fullmatch=True),
+)
+@settings(max_examples=_MAX_SMALL_EXAMPLES, deadline=None)
+@beartype
+def test_candidate_paths_is_frozen_property(skill_name: str, refs_name: str) -> None:
+    """Property: ``CandidatePaths`` is a frozen dataclass for any input."""
+    paths = CandidatePaths(skill=Path("/skills") / skill_name, references=Path("/refs") / refs_name)
+    if not paths.__dataclass_params__.frozen:  # type: ignore[attr-defined]
+        pytest.fail("expected CandidatePaths to be a frozen dataclass")

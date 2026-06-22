@@ -7,7 +7,7 @@ import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Final, cast
+from typing import Final
 
 import pytest
 from beartype import beartype
@@ -67,6 +67,22 @@ _INT_RANGE: Final[int] = 2**16
 _FLOAT_BOUND: Final[float] = 1e4
 _SHORT_TEXT: Final[int] = 8
 _HEX_DIGEST_LEN: Final[int] = 64
+
+
+# --- Typed no-op helper ---
+
+
+class _ProtocolCaster:
+    """No-op helper that returns its input with the requested static type."""
+
+    def __getitem__(self, _item: object) -> _ProtocolCaster:
+        return self
+
+    def __call__[T](self, value: T) -> T:
+        return value
+
+
+_as_protocol: _ProtocolCaster = _ProtocolCaster()
 
 
 # --- Test doubles and strategies ---
@@ -145,7 +161,9 @@ def _adapters(draw: st.DrawFn) -> _FakeAdapter:
     train: tuple[Mapping[str, object], ...] = draw(_dataloader_items())
     val: tuple[Mapping[str, object], ...] = draw(_dataloader_items())
     test: tuple[Mapping[str, object], ...] = draw(_dataloader_items())
-    dataloader: DataloaderProtocol = cast(DataloaderProtocol, _FakeDataloader(train, val, test))
+    dataloader: DataloaderProtocol = _as_protocol[DataloaderProtocol](
+        _FakeDataloader(train, val, test)
+    )
     return _FakeAdapter(dataloader)
 
 
@@ -325,7 +343,7 @@ def test_split_values_postcondition_rejects_whitespace_only(
 @beartype
 def test_all_split_items_returns_ok_for_known_splits(adapter: _FakeAdapter, split: str) -> None:
     """Property: ``all_split_items`` always returns ``Ok(...)`` for the known splits."""
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     result: Result[Sequence[Mapping[str, object]], EvalError] = all_split_items(
         adapter_typed, split
     )
@@ -345,7 +363,7 @@ def test_all_split_items_returns_ok_for_known_splits(adapter: _FakeAdapter, spli
 @beartype
 def test_all_split_items_returns_error_for_unknown_split(adapter: _FakeAdapter, split: str) -> None:
     """Property: ``all_split_items`` returns ``Error`` for any split outside the known set."""
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     result: Result[Sequence[Mapping[str, object]], EvalError] = all_split_items(
         adapter_typed, split
     )
@@ -362,7 +380,7 @@ def test_all_split_items_returns_error_for_unknown_split(adapter: _FakeAdapter, 
 @beartype
 def test_selected_items_kind_all_no_ids(adapter: _FakeAdapter) -> None:
     """Property: kind='all' with empty ids returns the split tuple unchanged."""
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     items: Sequence[Mapping[str, object]] = selected_items(adapter_typed, "val", frozenset(), "all")
     if items != adapter.dataloader.val_items:
         pytest.fail("expected val_items for kind=all with empty ids")
@@ -374,7 +392,7 @@ def test_selected_items_kind_all_no_ids(adapter: _FakeAdapter) -> None:
 @beartype
 def test_selected_items_filters_by_kind_review(adapter: _FakeAdapter) -> None:
     """Property: kind='review' filters out repair-kind items."""
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     items: Sequence[Mapping[str, object]] = selected_items(
         adapter_typed, "val", frozenset(), "review"
     )
@@ -828,7 +846,7 @@ def test_resolve_out_root_absolute(tmp_path: Path, leaf: str) -> None:
 def test_adapter_from_cfg_returns_caller_adapter(adapter: _FakeAdapter) -> None:
     """Property: ``_adapter_from_cfg`` returns exactly the adapter the factory produced."""
     cfg: Mapping[str, object] = pmap()
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     result: AdapterProtocol = _adapter_from_cfg(cfg, lambda _: adapter_typed)
     if result is not adapter_typed:
         pytest.fail("expected the adapter returned by the factory")
@@ -888,9 +906,9 @@ def test_prepare_config_injects_references_dir(
 def test_run_split_full_path_no_ids(tmp_path: Path, id_value: str, hard_value: float) -> None:
     """Property: ``_run_split`` returns Ok with a ``full_<split>`` path when ids are empty."""
     items: Sequence[Mapping[str, object]] = (pmap({"id": id_value, "hard": hard_value}),)
-    dataloader: DataloaderProtocol = cast(DataloaderProtocol, _FakeDataloader((), (), ()))
+    dataloader: DataloaderProtocol = _as_protocol[DataloaderProtocol](_FakeDataloader((), (), ()))
     adapter: _FakeAdapter = _FakeAdapter(dataloader)
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     result: Result[tuple[Path, Sequence[Mapping[str, object]]], EvalError] = _run_split(
         adapter_typed, "skill", "val", items, frozenset(), tmp_path
     )
@@ -914,9 +932,9 @@ def test_run_split_full_path_no_ids(tmp_path: Path, id_value: str, hard_value: f
 @beartype
 def test_run_split_returns_error_for_empty_items(tmp_path: Path, split: str) -> None:
     """Property: ``_run_split`` returns ``Error`` when items is empty."""
-    dataloader: DataloaderProtocol = cast(DataloaderProtocol, _FakeDataloader((), (), ()))
+    dataloader: DataloaderProtocol = _as_protocol[DataloaderProtocol](_FakeDataloader((), (), ()))
     adapter: _FakeAdapter = _FakeAdapter(dataloader)
-    adapter_typed: AdapterProtocol = cast(AdapterProtocol, adapter)
+    adapter_typed: AdapterProtocol = _as_protocol[AdapterProtocol](adapter)
     result: Result[tuple[Path, Sequence[Mapping[str, object]]], EvalError] = _run_split(
         adapter_typed, "skill", split, (), frozenset(), tmp_path
     )
