@@ -1,0 +1,15 @@
+# Local interrogate override for the tests/ directory.
+#
+# The root ``pyproject.toml`` excludes ``tests`` from interrogate coverage
+# because scripts/ is the production gate. To allow ``uv run interrogate tests/``
+# to enforce 100% docstring coverage on the test suite (as the constitution
+# requires for every public pure function's test), this file narrows the
+# exclude list to only ``vendor`` and ``docs`` so every Python module under
+# ``tests/`` is measured.
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+fail-under = 100
+exclude = ["vendor", "docs"]

@@ -21,3 +21,6 @@ docs/TROUBLESHOOTING.md
 docs/OUTPUT-FORMAT.md
 docs/GLOSSARY.md
 skills/
+mutants/
+.coverage
+coverage.xml

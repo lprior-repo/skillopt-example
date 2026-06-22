@@ -71,9 +71,14 @@ tasks:
       - uv run crosshair check scripts/
 
   mutmut:
-    desc: Run mutmut mutation testing
+    desc: Run mutation testing via mutmut (slow, full pass)
     cmds:
-      - uv run mutmut run
+      - uv run python mutmut_runner.py run --source-paths scripts --no-progress
+
+  mutation-quick:
+    desc: Run mutmut on small change set
+    cmds:
+      - uv run python mutmut_runner.py run --source-paths scripts --no-progress --max-children 50
 
   vulture:
     desc: Run vulture dead code detection on scripts and tests
@@ -118,9 +123,15 @@ tasks:
       - uv run python -m compileall -q -x '(^|/)(\.jj|\.git|\.venv|\.benchmarks|\.hypothesis|\.mypy_cache|\.pytest_cache|\.ruff_cache|build|dist|target)(/|$)' .
 
   audit:
-    desc: Run pip-audit via uv tool with strict reporting
+    desc: Run pip-audit via uv tool with strict reporting and auto-bootstrap
     cmds:
+      - 'if ! uv tool list 2>/dev/null | grep -q pip-audit; then uv tool install pip-audit; fi'
       - uv tool run --from pip-audit pip-audit --strict
+
+  audit-install:
+    desc: Install pip-audit as a uv tool
+    cmds:
+      - uv tool install pip-audit
 
   ci:
     desc: Run the full quality gate suite in order
