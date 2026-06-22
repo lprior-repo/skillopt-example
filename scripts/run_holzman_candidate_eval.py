@@ -121,7 +121,7 @@ def _shell_load_config(path_str: str) -> object:
 
 def _shell_flatten_config(raw: object) -> Mapping[str, object]:
     """Flatten the SkillOpt config via its dedicated helper."""
-    cfg: dict[str, object] = importlib.import_module("skillopt.config").flatten_config(raw)
+    cfg: Mapping[str, object] = importlib.import_module("skillopt.config").flatten_config(raw)
     return cfg
 
 

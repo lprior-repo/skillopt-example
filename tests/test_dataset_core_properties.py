@@ -17,6 +17,7 @@ from scripts.dataset_core import (
     _INT_BOUND,
     CountsDict,
     ForbiddenPattern,
+    ForbiddenSpec,
     ManifestDict,
     TaskDict,
     _a_in_range,
@@ -1081,6 +1082,25 @@ def test_repair_task_post_rejects_wrong_tests() -> None:
     )
     if _repair_task_post(wrong, task_id=task_id, family=family, src=src, tests=tests):
         pytest.fail("expected False for wrong tests/behavior.rs")
+
+
+# --- ForbiddenSpec.from_dict ---
+
+
+@pytest.mark.property
+@given(
+    name=st.text(min_size=1, max_size=16),
+    pattern=st.text(min_size=1, max_size=16),
+)
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
+@beartype
+def test_forbidden_spec_from_dict_property(name: str, pattern: str) -> None:
+    """Property: ``ForbiddenSpec.from_dict`` round-trips name/pattern into the dataclass."""
+    spec = ForbiddenSpec.from_dict(ForbiddenPattern(name=name, pattern=pattern))
+    if spec.name != name:
+        pytest.fail(f"expected {name}, got {spec.name}")
+    if spec.pattern.pattern != pattern:
+        pytest.fail(f"expected {pattern}, got {spec.pattern.pattern}")
 
 
 # Suppress unused-import lint for type aliases that pyright may flag.
