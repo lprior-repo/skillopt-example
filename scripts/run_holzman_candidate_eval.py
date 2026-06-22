@@ -16,7 +16,7 @@ import json
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
 from expression import Error, Ok, Result
 
@@ -121,10 +121,8 @@ def _shell_load_config(path_str: str) -> object:
 
 def _shell_flatten_config(raw: object) -> Mapping[str, object]:
     """Flatten the SkillOpt config via its dedicated helper."""
-    return cast(
-        "Mapping[str, object]",
-        importlib.import_module("skillopt.config").flatten_config(raw),
-    )
+    cfg: dict[str, object] = importlib.import_module("skillopt.config").flatten_config(raw)
+    return cfg
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
