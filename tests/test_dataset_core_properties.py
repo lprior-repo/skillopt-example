@@ -333,9 +333,13 @@ def test_black_hat_tests_property(task_id: str, domain: str) -> None:
 # --- *expected() / black_hat_expected() ---
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_csv_expected_is_seven_groups() -> None:
+def test_csv_expected_is_seven_groups(unit: None) -> None:
     """Property: ``csv_expected`` always returns exactly 7 token groups."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     groups: Sequence[Sequence[str]] = csv_expected()
     if len(groups) != _CSV_GROUPS:
         pytest.fail(f"expected 7 groups, got {len(groups)}")
@@ -344,9 +348,13 @@ def test_csv_expected_is_seven_groups() -> None:
             pytest.fail("expected non-empty group")
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_summary_expected_is_ten_groups() -> None:
+def test_summary_expected_is_ten_groups(unit: None) -> None:
     """Property: ``summary_expected`` always returns exactly 10 token groups."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     groups: Sequence[Sequence[str]] = summary_expected()
     if len(groups) != _SUMMARY_GROUPS:
         pytest.fail(f"expected 10 groups, got {len(groups)}")
@@ -355,9 +363,13 @@ def test_summary_expected_is_ten_groups() -> None:
             pytest.fail("expected non-empty group")
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_frame_expected_is_six_groups() -> None:
+def test_frame_expected_is_six_groups(unit: None) -> None:
     """Property: ``frame_expected`` always returns exactly 6 token groups."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     groups: Sequence[Sequence[str]] = frame_expected()
     if len(groups) != _FRAME_GROUPS:
         pytest.fail(f"expected 6 groups, got {len(groups)}")
@@ -366,9 +378,13 @@ def test_frame_expected_is_six_groups() -> None:
             pytest.fail("expected non-empty group")
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_header_expected_is_seven_groups() -> None:
+def test_header_expected_is_seven_groups(unit: None) -> None:
     """Property: ``header_expected`` always returns exactly 7 token groups."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     groups: Sequence[Sequence[str]] = header_expected()
     if len(groups) != _HEADER_GROUPS:
         pytest.fail(f"expected 7 groups, got {len(groups)}")
@@ -377,9 +393,13 @@ def test_header_expected_is_seven_groups() -> None:
             pytest.fail("expected non-empty group")
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_registration_expected_is_eight_groups() -> None:
+def test_registration_expected_is_eight_groups(unit: None) -> None:
     """Property: ``registration_expected`` always returns exactly 8 token groups."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     groups: Sequence[Sequence[str]] = registration_expected()
     if len(groups) != _REGISTRATION_GROUPS:
         pytest.fail(f"expected 8 groups, got {len(groups)}")
@@ -388,9 +408,13 @@ def test_registration_expected_is_eight_groups() -> None:
             pytest.fail("expected non-empty group")
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_black_hat_expected_is_thirteen_groups() -> None:
+def test_black_hat_expected_is_thirteen_groups(unit: None) -> None:
     """Property: ``black_hat_expected`` always returns exactly 13 token groups."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     groups: Sequence[Sequence[str]] = black_hat_expected()
     if len(groups) != _BLACK_HAT_GROUPS:
         pytest.fail(f"expected 13 groups, got {len(groups)}")
@@ -498,9 +522,13 @@ def test_repair_task_property(task_id: str, family: str, src: str, tests: str) -
 # --- build_tasks ---
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_build_tasks_property() -> None:
+def test_build_tasks_property(unit: None) -> None:
     """Property: ``build_tasks`` always returns a non-empty sequence of :class:`TaskDict`."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     tasks: Sequence[TaskDict] = build_tasks()
     if not tasks:
         pytest.fail("expected non-empty task list")
@@ -509,9 +537,13 @@ def test_build_tasks_property() -> None:
 # --- empty_counts ---
 
 
+@pytest.mark.property
+@given(st.none())
+@settings(max_examples=_MAX_EXAMPLES, deadline=None)
 @beartype
-def test_empty_counts_property() -> None:
+def test_empty_counts_property(unit: None) -> None:
     """Property: ``empty_counts`` always returns a zero-valued :class:`CountsDict`."""
+    del unit  # silence ARG001 - hypothesis-injected sentinel
     counts: CountsDict = empty_counts()
     if counts.total != 0:
         pytest.fail(f"expected total=0, got {counts.total}")
