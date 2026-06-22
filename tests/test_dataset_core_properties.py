@@ -131,7 +131,7 @@ def _counts_dicts(
 @st.composite
 def _target_mapping(draw: st.DrawFn) -> Mapping[str, float]:
     """Build a single ``{total, review, repair}`` target mapping for property tests."""
-    bound: float = float(_FLOAT_BOUND)
+    bound: float = _FLOAT_BOUND
     return pmap(
         {
             "total": draw(
