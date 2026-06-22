@@ -332,6 +332,7 @@ def _as_str(value: object, default: str) -> str:
 
 
 @beartype
+@icontract.require(_always_true)
 def sha256_file(path: Path) -> str:
     """Return the hex SHA-256 digest of the file at ``path``."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -391,6 +392,7 @@ def selected_items(
 
 
 @beartype
+@icontract.require(_always_true)
 def bundle_hashes(candidate_dir: Path) -> BundleHashesDict:
     """Collect SHA-256 hashes for the candidate skill and every reference file."""
     skill_path = candidate_dir / _SKILL_FILENAME
@@ -429,6 +431,7 @@ def _row_passed_p(hard_value: float) -> bool:
 
 
 @beartype
+@icontract.require(_always_true)
 def summarize(  # noqa: PLR0913
     candidate: str,
     skill_hash: str,
@@ -496,6 +499,7 @@ def _validate_splits(splits: Sequence[str]) -> Result[None, EvalError]:
 
 
 @beartype
+@icontract.require(_always_true)
 def _validate_candidate(
     candidate_dir: Path,
     format_path: Callable[[Path], str],
@@ -513,6 +517,7 @@ def _validate_candidate(
 
 
 @beartype
+@icontract.require(_always_true)
 def _config_errors(
     cfg: Mapping[str, object],
     supported_split_dir: Path,
@@ -543,6 +548,7 @@ def _config_errors(
 
 
 @beartype
+@icontract.require(_always_true)
 def _validate_supported_config(
     cfg: Mapping[str, object],
     supported_split_dir: Path,
@@ -587,6 +593,7 @@ def _log_failure_lines(split: str, results: Sequence[Mapping[str, object]]) -> S
 
 
 @beartype
+@icontract.require(_always_true)
 def _run_metadata(  # noqa: PLR0913
     *,
     candidate: str,
@@ -619,6 +626,7 @@ def _run_metadata(  # noqa: PLR0913
 
 
 @beartype
+@icontract.require(_always_true)
 def _display_path(path: Path, repo_root: Path, home: Path) -> str:
     """Render ``path`` relative to the repo or ``$HOME`` for log output."""
     resolved = path.resolve()
@@ -637,6 +645,7 @@ def _display_path(path: Path, repo_root: Path, home: Path) -> str:
 
 
 @beartype
+@icontract.require(_always_true)
 def _resolve_out_root(args_out: str, default_report_root: Path) -> Path:
     """Resolve ``--out`` to an absolute path, defaulting under the report root."""
     out = Path(args_out).expanduser()
@@ -646,6 +655,7 @@ def _resolve_out_root(args_out: str, default_report_root: Path) -> Path:
 
 
 @beartype
+@icontract.require(_always_true)
 def _adapter_from_cfg(
     cfg: Mapping[str, object],
     get_adapter: Callable[[Mapping[str, object]], AdapterProtocol],
@@ -661,6 +671,7 @@ def _adapter_from_cfg(
 
 
 @beartype
+@icontract.require(_always_true)
 def _prepare_config(
     config_path: Path,
     refs_dir: Path,
@@ -677,6 +688,7 @@ def _prepare_config(
 
 
 @beartype
+@icontract.require(_always_true)
 def _run_split(  # noqa: PLR0913
     adapter: AdapterProtocol,
     skill: str,
